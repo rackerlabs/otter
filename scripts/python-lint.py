@@ -84,19 +84,24 @@ class Lint(cli.Application):
     git = cli.Flag("--git-precommit", help="Lint only modified git files",
                    default=False)
 
-    def main(self, directory=None):
+    def main(self, *directories):
         """
         The actual logic that runs the linters
         """
-        if not self.git and directory is None:
-            raise ValueError("A directory must be provided (or the "
-                             "--git-precommit flag must be passed")
+        if not self.git and len(directories) == 0:
+            print ("ERROR: At least one directory must be provided (or the "
+                   "--git-precommit flag must be passed.\n")
+            self.help()
+            return
 
-        if directory:
-            realdir = os.path.expanduser(directory)
-            if not os.path.exists(realdir):
-                raise ValueError("{0} does not exist".format(directory))
-            files = local['find'](realdir, '-name', '*.py').strip().split('\n')
+        if len(directories) > 0:
+            find = local['find']
+            files = []
+            for directory in directories:
+                real = os.path.expanduser(directory)
+                if not os.path.exists(real):
+                    raise ValueError("{0} does not exist".format(directory))
+                files.extend(find(real, '-name', '*.py').strip().split('\n'))
             if len(files) > 0:
                 print "Linting {0} python files.\n".format(len(files))
                 lint(files)
