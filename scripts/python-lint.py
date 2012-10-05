@@ -14,6 +14,7 @@ This script can be called from the git pre-commit hook with a
 --git-precommit option
 """
 
+import twisted
 import os
 import pep257
 import re
@@ -34,11 +35,11 @@ def lint(to_lint):
         try:
             output = local[linter](*(options + to_lint))
         except commands.ProcessExecutionError as e:
-            output = e.stderr
+            output = e.stdout
 
         if output:
             exit_code = 1
-            print "{0} Errors:".format(linter.upper())
+            print "{0} Errors:".format(linter)
             print output
 
     output = hacked_pep257(to_lint)
@@ -48,7 +49,7 @@ def lint(to_lint):
         print output
 
     if exit_code != 0:
-        print ('Please fix these problems commiting, or to ignore them, '
+        print ('\nPlease fix these problems commiting, or to ignore them, '
                'use git commit --no-verify')
         sys.exit(exit_code)
 
@@ -98,10 +99,10 @@ class Lint(cli.Application):
                 raise ValueError("{0} does not exist".format(directory))
             files = local['find'](realdir, '-name', '*.py').strip().split('\n')
             if len(files) > 0:
-                print "Linting {0} python files".format(len(files))
+                print "Linting {0} python files.\n".format(len(files))
                 lint(files)
             else:
-                print "No python files found to lint."
+                print "No python files found to lint.\n"
 
         else:
             status = local['git']('status', '--porcelain', '-uno')
