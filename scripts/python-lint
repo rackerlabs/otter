@@ -7,9 +7,10 @@
 # pip install pep8       - style guide
 # pip install pep257     - for docstrings
 # pip install pyflakes   - unused imports and variable declarations
+# pip install plumbum    - used for executing shell commands
 #
-# This script should be called from the git pre-commit hook, or just link it
-# as the pre-commit hook.
+# This script can be called from the git pre-commit hook with a
+# --git-precommit option
 
 import os
 import re
