@@ -14,7 +14,6 @@ This script can be called from the git pre-commit hook with a
 --git-precommit option
 """
 
-import twisted
 import os
 import pep257
 import re
