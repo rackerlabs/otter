@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+#
+# Enforces Python coding standards via pep8, pyflakes and pylint
+
+#
+# Installation:
+# pip install pep8       - style guide
+# pip install pep257     - for docstrings
+# pip install pyflakes   - unused imports and variable declarations
+#
+# This script should be called from the git pre-commit hook, or just link it
+# as the pre-commit hook.
+
+import os
+import re
+import sys
+from plumbum import local
+
+status = local['git']('status', '--porcelain', '-uno')
+root = local['git']('rev-parse', '--show-toplevel').strip()
+
+# get all modified or added python files
+modified = re.findall(r"^[AM]\s+\S+\.py$", status, re.MULTILINE)
+
+# now just get the path part, which all should be relative to the root
+to_lint = [os.path.join(root, line.split(' ', 1)[-1].strip())
+           for line in modified]
+
+if to_lint:
+    exit_code = 0
+    for linter, options in (('pyflakes', []), ('pep8', []), ('pep257', [])):
+        output = local[linter](*(options + to_lint))
+        if output:
+            exit_code = 1
+            print "{0} Errors:".format(linter.upper())
+            print output
+
+    if exit_code != 0:
+        print ('Please fix these problems commiting, or to ignore them, '
+               'use git commit --no-verify')
+        sys.exit(exit_code)
