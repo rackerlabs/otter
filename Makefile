@@ -1,6 +1,5 @@
-pep8=pep8
-pep257=pep257
+SCRIPTSDIR=./scripts
+PYTHONLINT=${SCRIPTSDIR}/python-lint
 
 lint:
-	${pep8} otter/
-	${pep257} otter/*
+	${PYTHONLINT} otter

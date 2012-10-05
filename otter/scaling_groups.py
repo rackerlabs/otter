@@ -1,6 +1,5 @@
 """ Scaling groups REST mock API"""
 
-from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.web.error import NoResource
 import json
