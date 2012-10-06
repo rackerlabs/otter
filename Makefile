@@ -5,7 +5,7 @@ PYDIRS=otter scripts
 test:	lint unit integration
 
 run:
-	PYTHONPATH=../ twistd -n web --resource-script=server.rpy 
+	PYTHONPATH=. twistd -n web --resource-script=otter/server.rpy 
 
 lint:
 	${PYTHONLINT} ${PYDIRS}

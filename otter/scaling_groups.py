@@ -1,7 +1,7 @@
 """ Scaling groups REST mock API"""
 
 from twisted.web.resource import Resource
-from twisted.web.error import NoResource
+from twisted.web.resource import NoResource
 import json
 
 groups = {}

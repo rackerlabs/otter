@@ -1,1 +1,3 @@
 twisted>=12.0.0
+tryfer>=0.2.2
+yunomi>=0.5.1
