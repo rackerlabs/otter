@@ -162,6 +162,40 @@ class ScalingGroupList(Resource):
         else:
             return NoResource()
 
-root = Resource()
 
-root.putChild('scaling_groups', ScalingGroupList())
+class NodeTypeResource(Resource):
+
+    """ Resource for a list of scaling groups."""
+
+    def __init__(self):
+        Resource.__init__(self)
+
+    def getChild(self, sub, request):
+        """Get the node type
+
+        Returns a resource
+
+        """
+        if (sub == "scaling_groups"):
+            return ScalingGroupList()
+        else:
+            return NoResource()
+
+
+class TennantIdResource(Resource):
+
+    """ Resource for the tennant ID."""
+
+    def __init__(self):
+        Resource.__init__(self)
+
+    def getChild(self, id, request):
+        """Get the tennant id (and throw it away, since Node RProxy does that)
+
+        Returns a resource
+
+        """
+        return NodeTypeResource()
+
+root = Resource()
+root.putChild('v1.0', TennantIdResource())
