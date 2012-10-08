@@ -1,1 +1,4 @@
 *.pyc
+_trial_temp
+_trial_coverage
+.coverage

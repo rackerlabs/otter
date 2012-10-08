@@ -47,10 +47,7 @@ def lint(to_lint):
         print "Docstring Errors:".format(linter.upper())
         print output
 
-    if exit_code != 0:
-        print ('\nPlease fix these problems commiting, or to ignore them, '
-               'use git commit --no-verify')
-        sys.exit(exit_code)
+    sys.exit(exit_code)
 
 
 def hacked_pep257(to_lint):
