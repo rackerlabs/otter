@@ -1,8 +1,9 @@
-SCRIPTSDIR=./scripts
+CODEDIR=otter
+SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
-PYDIRS=otter scripts
+PYDIRS=${CODEDIR} ${SCRIPTSDIR}
 
-test:	lint unit integration
+test:	unit integration
 
 run:
 	PYTHONPATH=. twistd -n web --resource-script=otter/server.rpy
