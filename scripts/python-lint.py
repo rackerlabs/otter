@@ -62,11 +62,14 @@ def hacked_pep257(to_lint):
     pep257.check_blank_after_summary = ignore
     pep257.check_ends_with_period = ignore
     pep257.check_one_liners = ignore
+    pep257.check_imperative_mood = ignore
 
     errors = []
     for filename in to_lint:
         with open(filename) as f:
-            errors.extend(pep257.check_source(f.read(), filename))
+            source = f.read()
+            if source:
+                errors.extend(pep257.check_source(source, filename))
     return '\n'.join([str(error) for error in sorted(errors)])
 
 
