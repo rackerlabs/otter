@@ -2,4 +2,6 @@
 _trial_temp
 _trial_coverage
 .coverage
-_apidocs
+dropin.cache
+htmldoc
+_builddoc
