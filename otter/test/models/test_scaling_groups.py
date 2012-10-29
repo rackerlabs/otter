@@ -1,10 +1,55 @@
 """
 Tests for :module:`otter.models.interface` and :module:`otter.models.mock`
 """
+from jsonschema import validate
+
 from twisted.trial.unittest import TestCase
 
+from zope.interface.verify import verifyObject
+
+from otter.models.interface import IScalingGroup, scaling_group_config_schema
 from otter.models import mock as mock_model
 from otter.test.utils import DeferredTestMixin
+
+
+class IScalingGroupProviderMixin(DeferredTestMixin,):
+    """
+    Mixin that tests for anything that provides :class:`IScalingGroup`.
+
+    :ivar group_factory: a factory that produces an IScalingGroup provider
+    :type group_factory: callable
+    """
+
+    def test_implements_interface(self):
+        """
+        The provider correctly implements
+        :class:`otter.scaling_groups_interface.IScalingGroup`.
+        """
+        verifyObject(IScalingGroup)
+
+    def test_list_returns_something_iterable(self):
+        """
+        ``list()`` returns a list, or at least something iterable
+        """
+        validate(self.group_factory().list(), {
+            "type": "list",
+            "items": {
+                "type": "string"
+            }
+        })
+
+    def test_view_returns_config(self):
+        """
+        ``view()`` returns a config dictionary containing relevant
+        configuration values, as specified by the
+        :data:`scaling_group_config_schema`
+        """
+        # unlike updating or inputing a group config, the returned config
+        # must actually have all the properties
+        schema = scaling_group_config_schema
+        for property_name in schema['properties']:
+            schema['properties'][property_name]['required'] = True
+        validate(self.group_factory().view(), schema)
 
 
 mock_group = {
