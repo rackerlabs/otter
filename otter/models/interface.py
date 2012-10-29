@@ -1,5 +1,5 @@
 """
-Interface for the front-end scaling groups engine
+Interface to be used by the scaling groups engine
 """
 from zope.interface import Interface, Attribute
 

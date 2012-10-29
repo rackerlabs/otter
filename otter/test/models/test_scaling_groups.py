@@ -1,10 +1,11 @@
 """
-Test the scaling groups interface
+Tests for :module:`otter.models.interface` and :module:`otter.models.mock`
 """
 from twisted.trial.unittest import TestCase
 
-from otter import scaling_groups_mock
+from otter.models import mock as mock_model
 from otter.test.utils import DeferredTestMixin
+
 
 mock_group = {
     'name': 'blah',
@@ -34,7 +35,7 @@ class ScalingGroupsEndpointTestCase(DeferredTestMixin, TestCase):
 
     def setUp(self):
         """ Setup the mocks """
-        self.db = scaling_groups_mock.MockScalingGroupCollection()
+        self.db = mock_model.MockScalingGroupCollection()
         self.db.mock_add_tenant('goo1243')
 
     def test_crud(self):

@@ -1,7 +1,7 @@
 """
 Mock interface for the front-end scaling groups engine
 """
-from otter import scaling_groups_interface
+from otter.models.interface import IScalingGroup, IScalingGroupCollection
 import zope.interface
 
 from twisted.internet import defer
@@ -11,7 +11,7 @@ class MockScalingGroup:
     """
     Mock scaling group record
     """
-    zope.interface.implements(scaling_groups_interface.IScalingGroup)
+    zope.interface.implements(IScalingGroup)
 
     def __init__(self, uuid, data):
         self.uuid = uuid
@@ -78,7 +78,7 @@ class MockScalingGroupCollection:
     """
     Mock scaling group collections
     """
-    zope.interface.implements(scaling_groups_interface.IScalingGroupCollection)
+    zope.interface.implements(IScalingGroupCollection)
 
     def __init__(self):
         """
