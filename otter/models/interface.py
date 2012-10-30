@@ -5,6 +5,25 @@ Interface to be used by the scaling groups engine
 from zope.interface import Interface, Attribute
 
 
+class NoSuchScalingGroup(Exception):
+    """
+    Error to be raised when attempting operations on a scaling group that
+    does not exist.
+    """
+    def __init__(self, tenant_id, scaling_group_id):
+        super(NoSuchScalingGroup, self).__init__(
+            "Scaling group {0!r} does not exist for tenant {0!s}".format(
+                scaling_group_id, tenant_id))
+
+
+class NoSuchEntity(Exception):
+    """
+    Error to be raised when attempting operations on an entity that does not
+    exist.
+    """
+    pass
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -77,32 +96,68 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create(tenant, data):
+    def create_scaling_group(tenant_id, data):
         """
         Update the scaling group paramaters based on the attributes
-        in ``data```
+        in ``data``.
+
+        :param tenant_id: the tenant ID of the scaling groups
+        :type tenant_id: ``str``
+
+        :param data: Configuration data in JSOn format, as specified by
+            :data:`scaling_group_config_schema`
+        :type data: ``dict``
+
+        :return: uuid of the newly created scaling group
+        :rtype: 'str'
         """
         pass
 
-    def delete(tenant, scaling_group_id):
+    def delete_scaling_group(tenant_id, scaling_group_id):
         """
         Delete the scaling group
+
+        :param tenant_id: the tenant ID of the scaling groups
+        :type tenant_id: ``str``
+
+        :param scaling_group_id: the uuid of the scaling group to delete
+        :type scaling_group_id: ``str``
+
+        :return: None
+
+        :raises: :class`NoSuchScalingGroup` if the scaling group id is invalid
+            or doesn't exist for this tenant id
         """
         pass
 
-    def list(tenant):
+    def list_scaling_groups(tenant_id):
         """
         List the scaling groups
+
+        :param tenant_id: the tenant ID of the scaling groups
+        :type tenant_id: ``str``
+
+        :return: mapping of scaling group uuid's to the scaling group's model
+        :rtype: ``dict`` of ``str`` mapped to :class:`IScalingGroup` provider
         """
         pass
 
-    def get(tenant, scaling_group_id):
+    def get_scaling_group(tenant_id, scaling_group_id):
         """
-        Get a scaling group
+        Get a scaling group model
 
         Will return a scaling group even if the ID doesn't exist,
         but the scaling group will throw exceptions when you try to do things
         with it.
+
+        :param tenant_id: the tenant ID of the scaling groups
+        :type tenant_id: ``str``
+
+        :return: scaling group model object
+        :rtype: :class:`IScalingGroup` provider
+
+        :raises: :class`NoSuchScalingGroup` if the scaling group id is invalid
+            or doesn't exist for this tenant id
         """
         pass
 

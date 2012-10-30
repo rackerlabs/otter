@@ -25,10 +25,28 @@ class DeferredTestMixin(object):
         if not isinstance(deferred, defer.Deferred):
             self.fail("Not a deferred")
 
-        results = []
-        deferred.addBoth(lambda result: results.append(result))
-        self.assertTrue(len(results) == 1, "Deferred should have fired")
-        return results[0]
+        output = []
+        deferred.addBoth(lambda result: output.append(result))
+        self.assertTrue(len(output) == 1, "Deferred should have fired")
+        return output[0]
+
+    def assert_deferred_succeeded(self, deferred):
+        """
+        Asserts that the deferred has callbacked, and not errbacked, and
+        returns the result.
+
+        :param deferred: the ``Deferred`` to check
+        :type deferred: :class:`twisted.internet.defer.Deferred`
+
+        :return: whatever the ``Deferred`` fires with
+        """
+        if not isinstance(deferred, defer.Deferred):
+            self.fail("Not a deferred")
+
+        output = []
+        deferred.addCallback(lambda result: output.append(result))
+        self.assertTrue(len(output) == 1, "Deferred did not succeed")
+        return output[0]
 
     def assert_deferred_failed(self, deferred, *expected_failures):
         """
@@ -52,22 +70,22 @@ class DeferredTestMixin(object):
         if not isinstance(deferred, defer.Deferred):
             self.fail("Not a deferred")
 
-        results = []
+        output = []
 
-        def _cb(results):
-            results.append(None)
+        def _cb(result):
+            output.append(None)
             self.fail("Did not errback - instead callbacked with {0!r}".format(
-                results))
+                result))
 
         def _eb(failure):
             if (len(expected_failures) == 0 or
                     failure.check(*expected_failures)):
-                results.append(failure.value)
+                output.append(failure.value)
             else:
-                results.append(None)
+                output.append(None)
                 self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
                     expected_failures, failure))
 
         deferred.addCallbacks(_cb, _eb)
-        self.assertTrue(len(results) == 1, "Deferred should have fired")
-        return results[0]
+        self.assertTrue(len(output) == 1, "Deferred should have fired")
+        return output[0]
