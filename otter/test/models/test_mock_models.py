@@ -12,33 +12,40 @@ from otter.test.models.test_interface import (
     IScalingGroupCollectionProviderMixin)
 
 
-mock_group = {
-    'name': 'blah',
-    'regions': [],
-    'cooldown': 600,
-    'min_servers': 0,
-    'max_servers': 10,
-    'desired_servers': 4,
-    'metadata': {}
-}
-
-edit_group = {
-    'name': 'blah2',
-    'regions': [],
-    'cooldown': 200,
-    'min_servers': 1,
-    'max_servers': 20,
-    'desired_servers': 3,
-    'metadata': {}
-}
-
-
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
-    skip = True
-    # group_factory = MockScalingGroup
+
+    def setUp(self):
+        """
+        Create a mock group
+        """
+        self.group = MockScalingGroup(1, {
+            'name': 'blah',
+            'entity_type': 'servers',
+            'region': 'DFW',
+            'cooldown': 600,
+            'min_servers': 0,
+            'max_servers': 10,
+            'steady_state_servers': 4,
+            'metadata': {}
+        })
+
+
+    # def test_group(self):
+    #     """ Test the scaling group """
+    #     d = self.db.create_scaling_group('goo1243', mock_group)
+    #     id = self.assert_deferred_fired(d)
+    #     group = self.db.get_scaling_group('goo1243', id)
+    #     d = group.view()
+    #     r = self.assert_deferred_fired(d)
+    #     self.assertEqual(r, mock_group)
+    #     d = group.update_scaling_group(edit_group)
+    #     r = self.assert_deferred_fired(d)
+    #     d = group.view()
+    #     r = self.assert_deferred_fired(d)
+    #     self.assertEqual(r, edit_group)
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -58,9 +65,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'entity_type': 'servers',
             'region': 'DFW',
             'cooldown': 600,
-            'min_servers': 0,
-            'max_servers': 10,
-            'desired_servers': 4,
+            'min_entities': 0,
+            'max_entities': 10,
+            'steady_state_entities': 4,
             'metadata': {}
         }
 
@@ -131,31 +138,3 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assert_deferred_failed(
             self.collection.get_scaling_group(self.tenant_id, 1),
             NoSuchScalingGroup)
-
-
-    # def test_crud(self):
-    #     """ Test CRUD operations on the overall structure """
-    #     group = self.db.get_scaling_group('goo1243', id)
-    #     d = group.view()
-    #     r = self.assert_deferred_fired(d)
-    #     self.assertEqual(r, mock_group)
-    #     d = self.db.delete_scaling_group('goo1243', id)
-    #     r = self.assert_deferred_fired(d)
-    #     d = self.db.list_scaling_groups('goo1243')
-    #     r = self.assert_deferred_fired(d)
-    #     self.assertNotIn(id, r)
-    #     self.assertEqual(len(r), 0)
-
-    # def test_group(self):
-    #     """ Test the scaling group """
-    #     d = self.db.create_scaling_group('goo1243', mock_group)
-    #     id = self.assert_deferred_fired(d)
-    #     group = self.db.get_scaling_group('goo1243', id)
-    #     d = group.view()
-    #     r = self.assert_deferred_fired(d)
-    #     self.assertEqual(r, mock_group)
-    #     d = group.update_scaling_group(edit_group)
-    #     r = self.assert_deferred_fired(d)
-    #     d = group.view()
-    #     r = self.assert_deferred_fired(d)
-    #     self.assertEqual(r, edit_group)

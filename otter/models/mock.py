@@ -11,6 +11,37 @@ from twisted.internet import defer
 class MockScalingGroup:
     """
     Mock scaling group record
+
+    :ivar uuid: UUID of the scaling group
+    :type uuid: ``str``
+
+    :ivar name: name of the scaling group
+    :type name: ``str``
+
+    :ivar region: region of the scaling group
+    :type region: ``str``, one of ("DFW", "LON", or "ORD")
+
+    :ivar entity_type: entity type of the scaling group
+    :type entity_type: ``str``, one of ("servers")
+
+    :ivar cooldown: Cooldown period before more entities are added, given in
+        seconds - defaults to 30 if not given
+    :type cooldown: ``float``
+
+    :ivar min_entities: minimum number of entities in this scaling group -
+        defaults to 0 if not given
+    :type min_entities: ``int``
+
+    :ivar max_entities: maximum number of entities in this scaling group -
+        defaults to 1e9 if not given (functionally, no upper limit)
+    :type max_entities: ``int``
+
+    :ivar steady_state_entities: the desired steady state number of entities -
+        defaults to 1 if not given
+    :type steady_state_entities: ``int``
+
+    :ivar metadata: extra metadata associated with this scaling group -
+        defaults to no metadata
     """
     zope.interface.implements(IScalingGroup)
 
@@ -19,62 +50,69 @@ class MockScalingGroup:
         self.name = data['name']
         self.region = data['region']
         self.entity_type = data['entity_type']
-        self.cooldown = data['cooldown']
-        self.min_servers = data['min_servers']
-        self.max_servers = data['max_servers']
-        self.desired_servers = data['desired_servers']
-        self.metadata = data['metadata']
-        self.servers = []
+        self.cooldown = data.get('cooldown', 30)
+        self.min_entities = data.get('min_entities', 0)
+        self.max_entities = data.get('max_entities', 1e9)
+        self.steady_state_entities = data.get('steady_state_entities', 1)
+        self.metadata = data.get('metadata', {})
+        self.entities = []
 
     def view(self):
         """
-        Returns a view of the config
+        :return: :class:`Deferred` that fires with a view of the config
         """
         group = {
             'name': self.name,
             'region': self.region,
             'entity_type': self.entity_type,
             'cooldown': self.cooldown,
-            'min_servers': self.min_servers,
-            'max_servers': self.max_servers,
-            'desired_servers': self.desired_servers,
+            'min_entities': self.min_entities,
+            'max_entities': self.max_entities,
+            'steady_state_entities': self.steady_state_entities,
             'metadata': self.metadata
         }
         return defer.succeed(group)
 
-    def update_scaling_group(self, data):
+    def update(self, data):
         """
         Update the scaling group paramaters based on the attributes
         in ``data```
+
+        :return: :class:`Deferred` that fires with None
         """
         self.name = data['name']
         self.region = data['region']
         self.cooldown = data['cooldown']
-        self.min_servers = data['min_servers']
-        self.max_servers = data['max_servers']
-        self.desired_servers = data['desired_servers']
+        self.min_entities = data['min_entities']
+        self.max_entities = data['max_entities']
+        self.desired_entities = data['desired_entities']
         self.metadata = data['metadata']
         return defer.succeed(0)
 
-    def list_servers(self):
+    def list(self):
         """
-        Returns a list of servers in the scaling group
+        :return: :class:`Deferred` that fires with a list of entities in the
+            scaling group
         """
-        return defer.succeed(self.servers)
+        return defer.succeed(self.entities)
 
-    def delete_server(self, server):
+    def delete(self, server):
         """
         Deletes a server given by the server ID
-        """
-        self.servers.remove(server)
-        return defer.succeed(0)
 
-    def add_server(self, server):
+        :return: :class:`Deferred` that fires with None
+        """
+        self.entities.remove(server)
+        return defer.succeed(None)
+
+    def add(self, server):
         """
         Adds the server to the group manually
+
+        :return: :class:`Deferred` that fires with None
         """
-        self.servers.append(server)
-        return defer.succeed(0)
+        self.entities.append(server)
+        return defer.succeed(None)
 
 
 class MockScalingGroupCollection:
