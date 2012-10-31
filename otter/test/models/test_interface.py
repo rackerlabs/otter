@@ -36,7 +36,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         result = self.assert_deferred_succeeded(
             defer.maybeDeferred(self.group.list, *args, **kwargs))
         validate(result, {
-            "type": "list",
+            "type": "array",
             "items": {
                 "type": "string"
             }
