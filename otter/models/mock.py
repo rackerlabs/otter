@@ -101,7 +101,7 @@ class MockScalingGroup:
     def update(self, data):
         """
         Update the scaling group paramaters based on the attributes
-        in ``data``.  This meth
+        in ``data``.
 
         :return: :class:`Deferred` that fires with None
         """
@@ -110,8 +110,9 @@ class MockScalingGroup:
 
     def list(self):
         """
-        :return: :class:`Deferred` that fires with a list of entities in the
-            scaling group
+        Lists all the entities in the scaling group
+
+        :return: :class:`Deferred` that fires with a list of entity ids
         """
         return defer.succeed(self.entities)
 

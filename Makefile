@@ -1,3 +1,4 @@
+TOP=$(shell pwd)
 CODEDIR=otter
 SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
@@ -7,19 +8,19 @@ DOCDIR=doc
 test:	unit integration
 
 run:
-	PYTHONPATH=. twistd -n web --resource-script=${CODEDIR}/server.rpy
+	PYTHONPATH=".:${PYTHONPATH}" twistd -n web --resource-script=${CODEDIR}/server.rpy
 
 lint:
 	${PYTHONLINT} ${PYDIRS}
 
 unit:
-	PYTHONPATH=. trial --random 0 ${CODEDIR}/test
+	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${CODEDIR}/test
 
 integration:
 	echo "integration test here"
 
 coverage:
-	PYTHONPATH=. coverage run --branch `which trial` ${CODEDIR}/test && coverage html -d _trial_coverage
+	PYTHONPATH=".:${PYTHONPATH}" coverage run --source=${CODEDIR} --branch `which trial` ${CODEDIR}/test && coverage html -d _trial_coverage --omit="${CODEDIR}/test/*"
 
 cleandocs:
 	rm -rf _builddoc
@@ -28,5 +29,5 @@ cleandocs:
 docs: cleandocs
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
-	PYTHONPATH="${CODEDIR}:${PYTHONPATH}" sphinx-build -b html _builddoc htmldoc
+	PYTHONPATH=".:${PYTHONPATH}" sphinx-build -b html _builddoc htmldoc
 	rm -rf _builddoc

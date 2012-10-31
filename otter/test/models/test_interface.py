@@ -1,5 +1,5 @@
 """
-Tests for :module:`otter.models.interface`
+Tests for :mod:`otter.models.interface`
 """
 from jsonschema import Draft3Validator, validate
 
@@ -17,7 +17,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
     """
     Mixin that tests for anything that provides :class:`IScalingGroup`.
 
-    :ivar group: an instance of an :class`IScalingGroup` provider
+    :ivar group: an instance of an :class:`IScalingGroup` provider
     """
 
     def test_implements_interface(self):

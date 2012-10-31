@@ -150,7 +150,7 @@ class IScalingGroupCollection(Interface):
 
         :return: None
 
-        :raises: :class`NoSuchScalingGroupError` if the scaling group id is
+        :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
             invalid or doesn't exist for this tenant id
         """
         pass
@@ -181,7 +181,7 @@ class IScalingGroupCollection(Interface):
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider
 
-        :raises: :class`NoSuchScalingGroupError` if the scaling group id is
+        :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
             invalid or doesn't exist for this tenant id
         """
         pass
