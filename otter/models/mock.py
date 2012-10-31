@@ -25,18 +25,17 @@ class MockScalingGroup:
     :ivar uuid: UUID of the scaling group - once set, cannot be updated
     :type uuid: ``str``
 
-    :ivar region: region of the scaling group - once set, cannot be updated
+    :ivar region: region of the scaling group
     :type region: ``str``, one of ("DFW", "LON", or "ORD")
 
-    :ivar entity_type: entity type of the scaling group - one set, cannot be
-        updated
+    :ivar entity_type: entity type of the scaling group
     :type entity_type: ``str``, one of ("servers")
 
     :ivar name: name of the scaling group
     :type name: ``str``
 
     :ivar cooldown: Cooldown period before more entities are added, given in
-        seconds - defaults to 30 if not given
+        seconds - defaults to 0 if not given
     :type cooldown: ``float``
 
     :ivar min_entities: minimum number of entities in this scaling group -
@@ -57,10 +56,7 @@ class MockScalingGroup:
 
     :ivar metadata: extra metadata associated with this scaling group -
         defaults to no metadata
-
-    :ivar is_entity_id_valid: callback that takes an entity id and returns if
-        it is a valid entity id - defaults to always True
-    :type is_entity_id_valid: callable
+    :type metadata: ``dict``
     """
     zope.interface.implements(IScalingGroup)
 

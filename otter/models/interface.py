@@ -70,8 +70,6 @@ class IScalingGroup(Interface):
         overwrites them.  (Enforce override-only updates should happen
         elsewhere.)
 
-        ``uuid``, ``region``, and ``entity_type`` cannot be updated.
-
         :param data: Configuration data in JSON format, as specified by
             :data:`scaling_group_config_schema`
         :type data: ``dict``
@@ -231,9 +229,3 @@ scaling_group_config_schema = {
 for property_name in scaling_group_config_schema['properties']:
     scaling_group_config_schema['properties'][property_name]['title'] = (
         IScalingGroup[property_name].__doc__)
-
-# the update schema does not have entity_type or region, since those cannot
-# be updated
-scaling_group_update_config_schema = dict(scaling_group_config_schema)
-del scaling_group_update_config_schema['properties']['entity_type']
-del scaling_group_update_config_schema['properties']['region']

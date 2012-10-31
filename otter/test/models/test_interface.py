@@ -1,6 +1,8 @@
 """
 Tests for :mod:`otter.models.interface`
 """
+from copy import deepcopy
+
 from jsonschema import Draft3Validator, validate
 
 from twisted.internet import defer
@@ -53,7 +55,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
-        schema = scaling_group_config_schema
+        schema = deepcopy(scaling_group_config_schema)
         for property_name in schema['properties']:
             schema['properties'][property_name]['required'] = True
 
