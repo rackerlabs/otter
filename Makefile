@@ -1,4 +1,3 @@
-TOP=$(shell pwd)
 CODEDIR=otter
 SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
@@ -31,3 +30,9 @@ docs: cleandocs
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	PYTHONPATH=".:${PYTHONPATH}" sphinx-build -b html _builddoc htmldoc
 	rm -rf _builddoc
+
+clean: cleandocs
+	find . -name '*.pyc' -delete
+	find . -name '.coverage' -delete
+	find . -name '_trial_coverage' -print0 | xargs rm -rf
+	find . -name '_trial_temp' -print0 | xargs rm -rf
