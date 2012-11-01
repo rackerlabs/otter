@@ -23,27 +23,19 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
-        self.group = MockScalingGroup(1, {
-            'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW'
-        })
+        self.group = MockScalingGroup('DFW', 'servers', 1)
 
-    def test_view_has_all_info(self):
+    def test_view_config_has_all_info(self):
         """
         View should return a dictionary that conforms to the JSON schema (has
         all parameters even though only a few were passed in)
         """
-        result = self.validate_view_return_value()
+        result = self.validate_view_config_return_value()
         self.assertEqual(result, {
-            'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW',
-            # the rest are the default values
+            'name': '',
             'cooldown': 0,
             'min_entities': 0,
-            'max_entities': int(1e9),
-            'steady_state_entities': 0,
+            'max_entities': None,
             'metadata': {}
         })
 
@@ -59,7 +51,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Adding a valid entity id adds the entity to the scaling group and it
         appears when listing.
         """
-        self.assertIsNone(self.assert_deferred_succeeded(self.group.add("1")))
+        self.assertIsNone(
+            self.assert_deferred_succeeded(self.group.add_entity("1")))
         self.assertEqual(self.validate_list_return_value(), ["1"])
 
     @mock.patch('otter.models.mock.is_entity_id_valid', return_value=False)
@@ -68,47 +61,45 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Adding an invalid valid entity fails and it doesn't appears when
         listing.
         """
-        self.assert_deferred_failed(self.group.add("1"), InvalidEntityError)
+        self.assert_deferred_failed(
+            self.group.add_entity("1"), InvalidEntityError)
         self.assertEqual(self.validate_list_return_value(), [])
 
     def test_deleting_existing_entity_succeeds(self):
         """
         Deleting a valid entity id removes the entity from the scaling group
         """
-        self.assert_deferred_succeeded(self.group.add("1"))
+        self.assert_deferred_succeeded(self.group.add_entity("1"))
         self.assertEqual(self.validate_list_return_value(), ["1"])
         self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.delete("1")))
+            self.group.delete_entity("1")))
         self.assertEqual(self.validate_list_return_value(), [])
 
     def test_delete_invalid_entity_fails(self):
         """
         Deleting an invalid valid entity fails
         """
-        self.assert_deferred_failed(self.group.delete("1"), NoSuchEntityError)
+        self.assert_deferred_failed(
+            self.group.delete_entity("1"), NoSuchEntityError)
         self.assertEqual(self.validate_list_return_value(), [])
 
-    def test_update_scaling_group_updates_values(self):
+    def test_update_config_updates_ignores_invalid_keys(self):
         """
         Passing in a dict only updates the desired fields that are provided
         """
-        self.assert_deferred_succeeded(self.group.update({
-            'name': 'UPDATED',
+        expected = {
             'cooldown': 1000,
-            'non-param': 'UPDATED'
-        }))
-        result = self.validate_view_return_value()
-        self.assertEqual(result, {
-            'name': 'UPDATED',
-            'cooldown': 1000,
-            # the rest of these values have not been updated
-            'entity_type': 'servers',
-            'region': 'DFW',
-            'min_entities': 0,
-            'max_entities': int(1e9),
-            'steady_state_entities': 0,
-            'metadata': {}
-        })
+            'metadata': {'UPDATED': 'UPDATED'},
+            'min_entities': 100,
+            'max_entities': 1000,
+            'name': 'UPDATED'
+        }
+        extra = dict(expected)
+        extra['non-param'] = 'UPDATED'
+
+        self.assert_deferred_succeeded(self.group.update_config(extra))
+        result = self.validate_view_config_return_value()
+        self.assertEqual(result, expected)
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -125,12 +116,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.config = {
             'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW',
             'cooldown': 600,
             'min_entities': 0,
             'max_entities': 10,
-            'steady_state_entities': 4,
             'metadata': {}
         }
 
@@ -154,7 +142,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_msg.assert_called_once_with(uuid, self.config)
+        mock_msg.assert_called_once_with('DFW', 'servers', uuid, self.config)
 
     def test_delete_removes_a_scaling_group(self):
         """
