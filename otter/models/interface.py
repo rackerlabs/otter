@@ -24,14 +24,6 @@ class NoSuchEntityError(Exception):
     pass
 
 
-class InvalidEntityError(Exception):
-    """
-    Error to be raised when attempting to add an invalid entity (wrong
-    permissions, or wrong entity type) to a scaling group.
-    """
-    pass
-
-
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -99,9 +91,10 @@ class IScalingGroup(Interface):
         """
         pass
 
-    def delete_entity(entity_id):
+    def bounce_entity(entity_id):
         """
-        Deletes an entity given by the entity ID
+        Rebuilds an entity given by the entity ID.  This essentially deletes
+        the given entity and a new one will be rebuilt in its place.
 
         :param entity_id: the uuid of the entity to delete
         :type entity_id: ``str``
@@ -110,21 +103,6 @@ class IScalingGroup(Interface):
 
         :raises: NoSuchEntityError if the entity is not a member of the scaling
             group
-        """
-        pass
-
-    def add_entity(entity_id):
-        """
-        Adds the entity to the group manually, given the entity ID
-
-        :param entity_id: the uuid of the entity to add
-        :type entity_id: ``str``
-
-        :return: None
-
-        :raises: InvalidEntityError if the entity cannot be added due to
-            permission errors, or if the entity is the wrong type
-        :raises: NoSuchEntityError if the entity does not exist
         """
         pass
 

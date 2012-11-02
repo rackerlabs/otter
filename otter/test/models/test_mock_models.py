@@ -6,8 +6,7 @@ import mock
 from twisted.trial.unittest import TestCase
 
 from otter.models.mock import MockScalingGroup, MockScalingGroupCollection
-from otter.models.interface import (NoSuchScalingGroupError,
-                                    InvalidEntityError, NoSuchEntityError)
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -39,49 +38,90 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'metadata': {}
         })
 
-    def test_list_with_no_entities_returns_valid_scheme(self):
+    def test_list_returns_valid_scheme(self):
         """
-        If there are no entities in the scaling group, list returns something
-        conforming to the scheme
+        ``list_entities`` returns something conforming to the scheme whether or
+        not there are entities in the system
         """
         self.assertEqual(self.validate_list_return_value(), [])
+        self.group.entities = ["1", "2", "3"]
+        self.assertEqual(self.validate_list_return_value(), ["1", "2", "3"])
 
-    def test_add_entity_succeeds_and_list_displays_it(self):
+    def test_view_state_returns_valid_scheme(self):
         """
-        Adding a valid entity id adds the entity to the scaling group and it
-        appears when listing.
+        ``view_state`` returns something conforming to the scheme whether or
+        not there are entities in the system
         """
-        self.assertIsNone(
-            self.assert_deferred_succeeded(self.group.add_entity("1")))
-        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 0
+        })
+        self.group.entities = ["1", "2", "3"]
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 3
+        })
 
-    @mock.patch('otter.models.mock.is_entity_id_valid', return_value=False)
-    def test_add_invalid_entity_fails(self, mock_validity):
+    def test_set_steady_state_does_not_exceed_min(self):
         """
-        Adding an invalid valid entity fails and it doesn't appears when
-        listing.
+        Setting a steady state that is below the min will set the steady state
+        to the min.
         """
-        self.assert_deferred_failed(
-            self.group.add_entity("1"), InvalidEntityError)
-        self.assertEqual(self.validate_list_return_value(), [])
+        self.group = MockScalingGroup('DFW', 'servers', 1, {'min_entities': 5})
+        self.assert_deferred_succeeded(self.group.set_steady_state(1))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
 
-    def test_deleting_existing_entity_succeeds(self):
+    def test_set_steady_state_does_not_exceed_max(self):
         """
-        Deleting a valid entity id removes the entity from the scaling group
+        Setting a steady state that is above the max will set the steady state
+        to the max.
         """
-        self.assert_deferred_succeeded(self.group.add_entity("1"))
-        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.group = MockScalingGroup('DFW', 'servers', 1, {'max_entities': 5})
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
+
+    def test_set_steady_state_within_limit_succeeds(self):
+        """
+        Setting a steady state that is between the min and max will set the
+        steady state to to the specified number.
+        """
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 10,
+            'current_entities': 0
+        })
+
+    def test_bounce_existing_entity_succeeds(self):
+        """
+        Bouncing an existing entity succeeds (and does not change the list
+        view)
+        """
+        self.group.entities = ["1"]
         self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.delete_entity("1")))
-        self.assertEqual(self.validate_list_return_value(), [])
+            self.group.bounce_entity("1")))
+        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 1
+        })
 
-    def test_delete_invalid_entity_fails(self):
+    def test_bounce_invalid_entity_fails(self):
         """
-        Deleting an invalid valid entity fails
+        Bouncing an invalid valid entity fails
         """
         self.assert_deferred_failed(
-            self.group.delete_entity("1"), NoSuchEntityError)
+            self.group.bounce_entity("1"), NoSuchEntityError)
         self.assertEqual(self.validate_list_return_value(), [])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 0
+        })
 
     def test_update_config_updates_ignores_invalid_keys(self):
         """
@@ -100,6 +140,50 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(self.group.update_config(extra))
         result = self.validate_view_config_return_value()
         self.assertEqual(result, expected)
+
+    def test_update_config_does_not_overwrite_existing_non_provided_keys(self):
+        """
+        If certain keys are not provided in the update dictionary, the keys
+        that are not provided are not overwritten.
+        """
+        expected = {
+            'cooldown': 1000,
+            'metadata': {'UPDATED': 'UPDATED'},
+            'min_entities': 100,
+            'max_entities': 1000,
+            'name': 'UPDATED'
+        }
+        self.assert_deferred_succeeded(self.group.update_config(expected))
+        self.assert_deferred_succeeded(self.group.update_config({}))
+        result = self.validate_view_config_return_value()
+        self.assertEqual(result, expected)
+
+    def test_update_config_min_updates_steady_state(self):
+        """
+        If the updated min is greater than the current steady state, the
+        current steady state is set to that min
+        """
+        self.assert_deferred_succeeded(self.group.update_config({
+            'min_entities': 5
+        }))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
+
+    def test_update_config_max_updates_steady_state(self):
+        """
+        If the updated max is less than the current steady state, the
+        current steady state is set to that max
+        """
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assert_deferred_succeeded(self.group.update_config({
+            'max_entities': 5
+        }))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

@@ -2,8 +2,7 @@
 Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError,
-                                    InvalidEntityError, NoSuchEntityError)
+                                    NoSuchScalingGroupError, NoSuchEntityError)
 import zope.interface
 
 from twisted.internet import defer
@@ -54,6 +53,9 @@ class MockScalingGroup:
         self.region = region
         self.entity_type = entity_type
 
+        self.entities = []
+
+        self.steady_state = 0
         self.config = {
             'name': "",
             'cooldown': 0,
@@ -63,10 +65,6 @@ class MockScalingGroup:
         }
         if config is not None:
             self.update_config(config)
-
-        # state
-        self.steady_state = self.config['min_entities']
-        self.entities = []
 
     def view_config(self):
         """
@@ -79,7 +77,7 @@ class MockScalingGroup:
         :return: :class:`Deferred` that fires with a view of the state
         """
         return defer.succeed({
-            'steady_state_entities': self.steady_state_entities or 0,
+            'steady_state_entities': self.steady_state,
             'current_entities': len(self.entities)
         })
 
@@ -95,7 +93,9 @@ class MockScalingGroup:
         for key in data:
             if key in valid_keys:
                 self.config[key] = data[key]
-        return defer.succeed(None)
+
+        # make sure the steady state is still within bounds
+        return self.set_steady_state(self.steady_state)
 
     def set_steady_state(self, steady_state):
         """
@@ -121,30 +121,18 @@ class MockScalingGroup:
         """
         return defer.succeed(self.entities)
 
-    def delete_entity(self, entity_id):
+    def bounce_entity(self, entity_id):
         """
-        Deletes a entity given by the server ID
+        Rebuilds a entity given by the server ID
 
         :return: :class:`Deferred` that fires with None
         """
         if entity_id in self.entities:
-            self.entities.remove(entity_id)
+            # don't actually do anything, since this is fake
             return defer.succeed(None)
         return defer.fail(NoSuchEntityError(
             "Scaling group {0} has no such entity {1}".format(self.uuid,
                                                               entity_id)))
-
-    def add_entity(self, entity_id):
-        """
-        Adds the entity to the group manually
-
-        :return: :class:`Deferred` that fires with None
-        """
-        if is_entity_id_valid(entity_id):
-            self.entities.append(entity_id)
-            return defer.succeed(None)
-        return defer.fail(
-            InvalidEntityError("{0} is not a valid entity".format(entity_id)))
 
 
 class MockScalingGroupCollection:
