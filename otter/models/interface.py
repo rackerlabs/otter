@@ -10,10 +10,11 @@ class NoSuchScalingGroupError(Exception):
     Error to be raised when attempting operations on a scaling group that
     does not exist.
     """
-    def __init__(self, tenant_id, scaling_group_id):
+    def __init__(self, tenant_id, region, scaling_group_id):
         super(NoSuchScalingGroupError, self).__init__(
-            "Scaling group {0!r} does not exist for tenant {0!s}".format(
-                scaling_group_id, tenant_id))
+            ("Scaling group {uuid!s} does not exist for tenant {tenant!s} "
+             "in region {region!s}").format(region=region, tenant=tenant_id,
+                                            uuid=scaling_group_id))
 
 
 class NoSuchEntityError(Exception):
@@ -110,7 +111,7 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, region, config):
+    def create_scaling_group(tenant_id, region, config=None):
         """
         Create scaling group based on the tenant id, region, and the
         configuration paramaters.
@@ -131,12 +132,15 @@ class IScalingGroupCollection(Interface):
         """
         pass
 
-    def delete_scaling_group(tenant_id, scaling_group_id):
+    def delete_scaling_group(tenant_id, region, scaling_group_id):
         """
         Delete the scaling group
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
+
+        :param region: the region covered by the scaling group
+        :type region: ``str``
 
         :param scaling_group_id: the uuid of the scaling group to delete
         :type scaling_group_id: ``str``
@@ -144,23 +148,37 @@ class IScalingGroupCollection(Interface):
         :return: None
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
-            invalid or doesn't exist for this tenant id
+            invalid, doesn't exist for this tenant id, or doesn't exist for
+            this region
         """
         pass
 
-    def list_scaling_groups(tenant_id):
+    def list_scaling_groups(tenant_id, region=None):
         """
-        List the scaling groups
+        List the scaling groups for this tenant ID, and for this region if
+        given
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
-        :return: mapping of scaling group uuid's to the scaling group's model
-        :rtype: ``dict`` of ``str`` mapped to :class:`IScalingGroup` provider
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
+        :return: mapping of regions mapped to scaling groups uuids mapped to
+            the scaling group's model::
+
+                {
+                    region: {
+                        uuid: :class:`IScalingGroup` provider
+                    }
+                }
+
+        :rtype: ``dict`` of ``dict`` of ``str`` mapped to
+            :class:`IScalingGroup` provider
         """
         pass
 
-    def get_scaling_group(tenant_id, scaling_group_id):
+    def get_scaling_group(tenant_id, region, scaling_group_id):
         """
         Get a scaling group model
 
@@ -171,11 +189,15 @@ class IScalingGroupCollection(Interface):
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
-            invalid or doesn't exist for this tenant id
+            invalid, doesn't exist for this tenant id, or doesn't exist for
+            this region
         """
         pass
 

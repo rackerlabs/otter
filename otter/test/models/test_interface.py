@@ -123,13 +123,19 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
             self.collection.list_scaling_groups,
             *args, **kwargs))
 
-        # can't JSON validate, so assert that it's a dictionary, all its
-        # strings are keys, and that all its values are IScalingGroups
+        # not valid JSON, since the ultimate objects are IScalingGroup
+        # objects, so assert that it's a dictionary, all its
+        # keys are strings, all its values are dicts whose keys are strings
+        # and whose values are IScalingGroups
         self.assertEqual(type(result), dict)
-        for key in result.keys():
+        for key in result:
             self.assertEqual(type(key), str)
-        for value in result.values():
-            self.assertTrue(IScalingGroup.providedBy(value))
+        for dictionary in result.values():
+            self.assertEqual(type(dictionary), dict)
+            for key in dictionary:
+                self.assertEqual(type(key), str)
+            for ultimate_value in dictionary.values():
+                self.assertTrue(IScalingGroup.providedBy(ultimate_value))
 
         return result
 

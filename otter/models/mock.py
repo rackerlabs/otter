@@ -157,21 +157,28 @@ class MockScalingGroupCollection:
         """
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
-        self.data[tenant][uuid] = MockScalingGroup(region, uuid, config or {})
+        if region not in self.data[tenant]:
+            self.data[tenant][region] = {}
+        self.data[tenant][region][uuid] = MockScalingGroup(region, uuid,
+                                                           config or {})
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, uuid):
+    def delete_scaling_group(self, tenant, region, uuid):
         """
         Delete the scaling group
 
         :return: :class:`Deferred` that fires with None
         """
-        if tenant not in self.data or uuid not in self.data[tenant]:
-            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
-        del self.data[tenant][uuid]
+        if (tenant not in self.data or
+                region not in self.data[tenant] or
+                uuid not in self.data[tenant][region]):
+            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
+        del self.data[tenant][region][uuid]
+        if len(self.data[tenant][region]) == 0:
+            del self.data[tenant][region]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant):
+    def list_scaling_groups(self, tenant, region=None):
         """
         List the scaling groups
 
@@ -179,9 +186,14 @@ class MockScalingGroupCollection:
             group uuids to scaling groups
         :rtype: :class:`Deferred` that fires with a ``dict``
         """
-        return defer.succeed(self.data[tenant])
+        if region is None:
+            return defer.succeed(self.data[tenant])
+        elif region in self.data[tenant]:
+            return defer.succeed({region: self.data[tenant][region]})
+        else:
+            return defer.succeed({region: {}})  # no scaling groups
 
-    def get_scaling_group(self, tenant, uuid):
+    def get_scaling_group(self, tenant, region, uuid):
         """
         Get a scaling group
 
@@ -189,6 +201,8 @@ class MockScalingGroupCollection:
         :rtype: :class:`Deferred` that fires with a :class:`IScalingGroup`
             provider
         """
-        if tenant not in self.data or uuid not in self.data[tenant]:
-            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
-        return self.data[tenant][uuid]
+        if (tenant not in self.data or
+                region not in self.data[tenant] or
+                uuid not in self.data[tenant][region]):
+            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
+        return self.data[tenant][region][uuid]
