@@ -27,9 +27,6 @@ class MockScalingGroup:
     :ivar region: region of the scaling group
     :type region: ``str``, one of ("DFW", "LON", or "ORD")
 
-    :ivar entity_type: entity type of the scaling group
-    :type entity_type: ``str``, one of ("servers")
-
     :ivar config: mapping of config parameters to config values, as specified
         by the :data:`otter.models.interface.scaling_group_config_schema`
     :type config: ``dict``
@@ -48,10 +45,9 @@ class MockScalingGroup:
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, region, entity_type, uuid, config=None):
+    def __init__(self, region, uuid, config=None):
         self.uuid = uuid
         self.region = region
-        self.entity_type = entity_type
 
         self.entities = []
 
@@ -163,7 +159,7 @@ class MockScalingGroupCollection:
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
         self.data[tenant][uuid] = MockScalingGroup(
-            data['region'], data['entity_type'], uuid, data.get('config', {}))
+            data['region'], uuid, data.get('config', {}))
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):

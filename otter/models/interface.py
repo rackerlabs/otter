@@ -30,7 +30,6 @@ class IScalingGroup(Interface):
     """
     # Immutable once the scaling group is created
     uuid = Attribute("UUID of the scaling group.")
-    entity_type = Attribute("What type of entity this scaling group scales.")
     region = Attribute("Region the scaling group covers.")
 
     # State values
@@ -224,12 +223,6 @@ scaling_group_creation_schema = {
             "required": True,
             "enum": ["DFW", "ORD", "LON"],
             "title": "The region covered by the scaling group"
-        },
-        "entity_type": {
-            "type": "string",
-            "required": True,
-            "enum": ["server"],
-            "title": "The entity type to scale"
         },
         "config": scaling_group_config_schema
     },

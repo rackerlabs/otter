@@ -22,7 +22,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
-        self.group = MockScalingGroup('DFW', 'servers', 1)
+        self.group = MockScalingGroup('DFW', 1)
 
     def test_default_view_config_has_all_info(self):
         """
@@ -67,7 +67,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Setting a steady state that is below the min will set the steady state
         to the min.
         """
-        self.group = MockScalingGroup('DFW', 'servers', 1, {'min_entities': 5})
+        self.group = MockScalingGroup('DFW', 1, {'min_entities': 5})
         self.assert_deferred_succeeded(self.group.set_steady_state(1))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -79,7 +79,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Setting a steady state that is above the max will set the steady state
         to the max.
         """
-        self.group = MockScalingGroup('DFW', 'servers', 1, {'max_entities': 5})
+        self.group = MockScalingGroup('DFW', 1, {'max_entities': 5})
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -198,13 +198,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.tenant_id = 'goo1234'
         self.collection.mock_add_tenant(self.tenant_id)
 
-        self.create = {
-            'region': 'DFW',
-            'entity_type': 'server'
-        }
+        self.create = {'region': 'DFW'}
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_group_with_config_and_list_scaling_groups(self, mock_msg):
+    def test_create_group_with_config_and_list_scaling_groups(self, mock_sgrp):
         """
         Listing a scaling group returns a mapping of scaling group uuid to
         scaling group model, and adding another scaling group increases the
@@ -234,10 +231,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_msg.assert_called_once_with('DFW', 'server', uuid, config)
+        mock_sgrp.assert_called_once_with('DFW', uuid, config)
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_without_config_and_list_scaling_groups(self, mock_msg):
+    def test_create_without_config_and_list_scaling_groups(self, mock_sgrp):
         """
         Creation of a scaling group without a 'config' parameter creates a
         scaling group with an empty configuration.
@@ -252,7 +249,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_msg.assert_called_once_with('DFW', 'server', uuid, {})
+        mock_sgrp.assert_called_once_with('DFW', uuid, {})
 
     def test_delete_removes_a_scaling_group(self):
         """
