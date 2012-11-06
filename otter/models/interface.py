@@ -110,17 +110,20 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, data):
+    def create_scaling_group(tenant_id, region, config):
         """
-        Create scaling group based on the region, entity type, and
-        the configuration paramaters, all of which are contained in the
-        parameter ``data``.
+        Create scaling group based on the tenant id, region, and the
+        configuration paramaters.
 
-        :param tenant_id: the tenant ID of the scaling groups
+        :param tenant_id: the tenant ID of the tenant the scaling group
+            belongs to
         :type tenant_id: ``str``
 
-        :param data: Scaling group creation and configuration options in JSON
-            format, as specified by :data:`scaling_group_creation_schema`
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
+        :param config: scaling group configuration options in JSON format, as
+            specified by :data:`scaling_group_config_schema`
         :type data: ``dict``
 
         :return: uuid of the newly created scaling group
@@ -213,18 +216,4 @@ scaling_group_config_schema = {
     "additionalProperties": False,
     "title": ("Optional configuration options for the scaling group, "
               "controlling scaling rate, size, and metadata")
-}
-
-scaling_group_creation_schema = {
-    "type": "object",
-    "properties": {
-        "region": {
-            "type": "string",
-            "required": True,
-            "enum": ["DFW", "ORD", "LON"],
-            "title": "The region covered by the scaling group"
-        },
-        "config": scaling_group_config_schema
-    },
-    "additionalProperties": False
 }

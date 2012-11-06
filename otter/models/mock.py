@@ -148,18 +148,16 @@ class MockScalingGroupCollection:
         """ Mock add a tenant """
         self.data[tenant] = {}
 
-    def create_scaling_group(self, tenant, data):
+    def create_scaling_group(self, tenant, region, config=None):
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data```
+        Create the scaling group
 
         :return: :class:`Deferred` that fires with the uuid of the created
             scaling group
         """
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
-        self.data[tenant][uuid] = MockScalingGroup(
-            data['region'], uuid, data.get('config', {}))
+        self.data[tenant][uuid] = MockScalingGroup(region, uuid, config or {})
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):

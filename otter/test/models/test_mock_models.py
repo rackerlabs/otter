@@ -197,8 +197,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.collection.mock_add_tenant(self.tenant_id)
-
-        self.create = {'region': 'DFW'}
+        self.region = 'DFW'
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_config_and_list_scaling_groups(self, mock_sgrp):
@@ -222,16 +221,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'max_entities': 10,
             'metadata': {}
         }
-        self.create['config'] = config
-
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.create))
+            self.collection.create_scaling_group(
+                self.tenant_id, self.region, config))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_sgrp.assert_called_once_with('DFW', uuid, config)
+        mock_sgrp.assert_called_once_with(self.region, uuid, config)
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_without_config_and_list_scaling_groups(self, mock_sgrp):
@@ -243,13 +241,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          "Should start off with zero groups")
 
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.create))
+            self.collection.create_scaling_group(self.tenant_id, self.region))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_sgrp.assert_called_once_with('DFW', uuid, {})
+        mock_sgrp.assert_called_once_with(self.region, uuid, {})
 
     def test_delete_removes_a_scaling_group(self):
         """
@@ -257,7 +255,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         in the collection
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.create))
+            self.collection.create_scaling_group(self.tenant_id, self.region))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1, "Group not added correctly")
@@ -282,7 +280,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Getting valid scaling group returns a MockScalingGroup
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.create))
+            self.collection.create_scaling_group(self.tenant_id, self.region))
         group = self.validate_get_return_value(self.tenant_id, uuid)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
