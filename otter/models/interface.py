@@ -10,10 +10,11 @@ class NoSuchScalingGroupError(Exception):
     Error to be raised when attempting operations on a scaling group that
     does not exist.
     """
-    def __init__(self, tenant_id, scaling_group_id):
+    def __init__(self, tenant_id, region, scaling_group_id):
         super(NoSuchScalingGroupError, self).__init__(
-            "Scaling group {0!r} does not exist for tenant {0!s}".format(
-                scaling_group_id, tenant_id))
+            ("Scaling group {uuid!s} does not exist for tenant {tenant!s} "
+             "in region {region!s}").format(region=region, tenant=tenant_id,
+                                            uuid=scaling_group_id))
 
 
 class NoSuchEntityError(Exception):
@@ -24,70 +25,76 @@ class NoSuchEntityError(Exception):
     pass
 
 
-class InvalidEntityError(Exception):
-    """
-    Error to be raised when attempting to add an invalid entity (wrong
-    permissions, or wrong entity type) to a scaling group.
-    """
-    pass
-
-
 class IScalingGroup(Interface):
     """
     Scaling group record
     """
+    # Immutable once the scaling group is created
     uuid = Attribute("UUID of the scaling group.")
-    name = Attribute("Name of the scaling group.")
-
-    entity_type = Attribute("What type of entity this scaling group scales.")
     region = Attribute("Region the scaling group covers.")
 
-    cooldown = Attribute(
-        "Cooldown period before more entities are added, given in seconds.")
-    min_entities = Attribute(
-        "Minimum number of entities in the scaling group.")
-    max_entities = Attribute(
-        "Maximum number of entities in the scaling group.")
-    steady_state_entities = Attribute(
-        "The desired steady state number of entities - defaults to the "
-        "minimum. This number represents how many entities _should_ be "
-        "currently in the system to handle the current load. Its value is "
-        "constrained to be between min_entities and max_entities, inclusive.")
-    metadata = Attribute("User-provided metadata")
-
-    def view():
+    # State values
+    def view_config():
         """
-        :return: a view of the config as dict, as specified by
+        :return: a view of the config, as specified by
             :data:`scaling_group_config_schema`
         :rtype: ``dict``
         """
         pass
 
-    def update(data):
+    def view_state():
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data``.  This updates the already-existing values, rather than
-        overwrites them.  (Enforce override-only updates should happen
-        elsewhere.)
+        The state of the scaling group consists of the current number of
+        entities in the scaling group and the desired steady state number of
+        entities.
 
-        :param data: Configuration data in JSON format, as specified by
+        :return: a view of the state of the scaling group as a dict
+        """
+        pass
+
+    def update_config(config):
+        """
+        Update the scaling group configuration paramaters based on the
+        attributes in ``config``.  This updates the already-existing values,
+        rather than overwrites them.  (Enforce override-only updates should
+        happen elsewhere.)
+
+        :param config: Configuration data in JSON format, as specified by
             :data:`scaling_group_config_schema`
-        :type data: ``dict``
+        :type config: ``dict``
 
         :return: None
         """
         pass
 
-    def list():
+    def set_steady_state(steady_state):
+        """
+        The steady state represents the number of entities - defaults to the
+        minimum. This number represents how many entities _should_ be
+        currently in the system to handle the current load. Its value is
+        constrained to be between ``min_entities`` and ``max_entities``,
+        inclusive.
+
+        :param steady_state: The new value for the desired number of entities
+            in steady state.  If this value is greater than ``max_entities``,
+            the value will be set to ``max_entities``.  Similarly, if this
+            value is less than ``min_entities``, the value will be set to
+            ``min_entities``.
+        :type steady_state: ``int``
+        """
+        pass
+
+    def list_entities():
         """
         :return: a list of the uuids of the entities in the scaling group
         :rtype: ``list`` of ``strings``
         """
         pass
 
-    def delete(entity_id):
+    def bounce_entity(entity_id):
         """
-        Deletes an entity given by the entity ID
+        Rebuilds an entity given by the entity ID.  This essentially deletes
+        the given entity and a new one will be rebuilt in its place.
 
         :param entity_id: the uuid of the entity to delete
         :type entity_id: ``str``
@@ -99,36 +106,25 @@ class IScalingGroup(Interface):
         """
         pass
 
-    def add(entity_id):
-        """
-        Adds the entity to the group manually, given the entity ID
-
-        :param entity_id: the uuid of the entity to add
-        :type entity_id: ``str``
-
-        :return: None
-
-        :raises: InvalidEntityError if the entity cannot be added due to
-            permission errors, or if the entity is the wrong type
-        :raises: NoSuchEntityError if the entity does not exist
-        """
-        pass
-
 
 class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, data):
+    def create_scaling_group(tenant_id, region, config=None):
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data``.
+        Create scaling group based on the tenant id, region, and the
+        configuration paramaters.
 
-        :param tenant_id: the tenant ID of the scaling groups
+        :param tenant_id: the tenant ID of the tenant the scaling group
+            belongs to
         :type tenant_id: ``str``
 
-        :param data: Configuration data in JSOn format, as specified by
-            :data:`scaling_group_config_schema`
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
+        :param config: scaling group configuration options in JSON format, as
+            specified by :data:`scaling_group_config_schema`
         :type data: ``dict``
 
         :return: uuid of the newly created scaling group
@@ -136,12 +132,15 @@ class IScalingGroupCollection(Interface):
         """
         pass
 
-    def delete_scaling_group(tenant_id, scaling_group_id):
+    def delete_scaling_group(tenant_id, region, scaling_group_id):
         """
         Delete the scaling group
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
+
+        :param region: the region covered by the scaling group
+        :type region: ``str``
 
         :param scaling_group_id: the uuid of the scaling group to delete
         :type scaling_group_id: ``str``
@@ -149,23 +148,37 @@ class IScalingGroupCollection(Interface):
         :return: None
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
-            invalid or doesn't exist for this tenant id
+            invalid, doesn't exist for this tenant id, or doesn't exist for
+            this region
         """
         pass
 
-    def list_scaling_groups(tenant_id):
+    def list_scaling_groups(tenant_id, region=None):
         """
-        List the scaling groups
+        List the scaling groups for this tenant ID, and for this region if
+        given
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
-        :return: mapping of scaling group uuid's to the scaling group's model
-        :rtype: ``dict`` of ``str`` mapped to :class:`IScalingGroup` provider
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
+        :return: mapping of regions mapped to scaling groups uuids mapped to
+            the scaling group's model::
+
+                {
+                    region: {
+                        uuid: :class:`IScalingGroup` provider
+                    }
+                }
+
+        :rtype: ``dict`` of ``dict`` of ``str`` mapped to
+            :class:`IScalingGroup` provider
         """
         pass
 
-    def get_scaling_group(tenant_id, scaling_group_id):
+    def get_scaling_group(tenant_id, region, scaling_group_id):
         """
         Get a scaling group model
 
@@ -176,11 +189,15 @@ class IScalingGroupCollection(Interface):
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
+        :param region: the region covered by the scaling group
+        :type region: ``str``
+
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id is
-            invalid or doesn't exist for this tenant id
+            invalid, doesn't exist for this tenant id, or doesn't exist for
+            this region
         """
         pass
 
@@ -192,40 +209,33 @@ scaling_group_config_schema = {
     "properties": {
         "name": {
             "type": "string",
-            "required": True,
-        },
-        "entity_type": {
-            "type": "string",
-            "enum": ["servers"],
-            "required": True,
-        },
-        "region": {
-            "type": "string",
-            "enum": ["DFW", "ORD", "LON"],
-            "required": True,
+            "default": "",
+            "title": "Name of the scaling group."
         },
         "cooldown": {
             "type": "number",
-            "mininum": 0
+            "mininum": 0,
+            "title": ("Cooldown period before more entities are added, "
+                      "given in seconds.")
         },
         "min_entities": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "title": "Minimum number of entities in the scaling group."
         },
         "max_entities": {
-            "type": "integer",
-            "minimum": 0
-        },
-        "steady_state_entities": {
-            "type": "integer",
-            "minimum": 0
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "default": None,
+            "title": ("Maximum number of entities in the scaling group. "
+                      "Defaults to null, meaning no maximum.")
         },
         "metadata": {
-            "type": "object"
+            "type": "object",
+            "title": "User-provided metadata"
         }
-    }
+    },
+    "additionalProperties": False,
+    "title": ("Optional configuration options for the scaling group, "
+              "controlling scaling rate, size, and metadata")
 }
-
-for property_name in scaling_group_config_schema['properties']:
-    scaling_group_config_schema['properties'][property_name]['title'] = (
-        IScalingGroup[property_name].__doc__)

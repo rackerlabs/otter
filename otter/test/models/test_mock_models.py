@@ -6,8 +6,7 @@ import mock
 from twisted.trial.unittest import TestCase
 
 from otter.models.mock import MockScalingGroup, MockScalingGroupCollection
-from otter.models.interface import (NoSuchScalingGroupError,
-                                    InvalidEntityError, NoSuchEntityError)
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -23,91 +22,167 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
-        self.group = MockScalingGroup(1, {
-            'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW'
-        })
+        self.group = MockScalingGroup('DFW', 1)
 
-    def test_view_has_all_info(self):
+    def test_default_view_config_has_all_info(self):
         """
         View should return a dictionary that conforms to the JSON schema (has
         all parameters even though only a few were passed in)
         """
-        result = self.validate_view_return_value()
+        result = self.validate_view_config_return_value()
         self.assertEqual(result, {
-            'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW',
-            # the rest are the default values
+            'name': '',
             'cooldown': 0,
             'min_entities': 0,
-            'max_entities': int(1e9),
-            'steady_state_entities': 0,
+            'max_entities': None,
             'metadata': {}
         })
 
-    def test_list_with_no_entities_returns_valid_scheme(self):
+    def test_list_returns_valid_scheme(self):
         """
-        If there are no entities in the scaling group, list returns something
-        conforming to the scheme
+        ``list_entities`` returns something conforming to the scheme whether or
+        not there are entities in the system
         """
         self.assertEqual(self.validate_list_return_value(), [])
+        self.group.entities = ["1", "2", "3"]
+        self.assertEqual(self.validate_list_return_value(), ["1", "2", "3"])
 
-    def test_add_entity_succeeds_and_list_displays_it(self):
+    def test_view_state_returns_valid_scheme(self):
         """
-        Adding a valid entity id adds the entity to the scaling group and it
-        appears when listing.
+        ``view_state`` returns something conforming to the scheme whether or
+        not there are entities in the system
         """
-        self.assertIsNone(self.assert_deferred_succeeded(self.group.add("1")))
-        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 0
+        })
+        self.group.entities = ["1", "2", "3"]
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 3
+        })
 
-    @mock.patch('otter.models.mock.is_entity_id_valid', return_value=False)
-    def test_add_invalid_entity_fails(self, mock_validity):
+    def test_set_steady_state_does_not_exceed_min(self):
         """
-        Adding an invalid valid entity fails and it doesn't appears when
-        listing.
+        Setting a steady state that is below the min will set the steady state
+        to the min.
         """
-        self.assert_deferred_failed(self.group.add("1"), InvalidEntityError)
-        self.assertEqual(self.validate_list_return_value(), [])
+        self.group = MockScalingGroup('DFW', 1, {'min_entities': 5})
+        self.assert_deferred_succeeded(self.group.set_steady_state(1))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
 
-    def test_deleting_existing_entity_succeeds(self):
+    def test_set_steady_state_does_not_exceed_max(self):
         """
-        Deleting a valid entity id removes the entity from the scaling group
+        Setting a steady state that is above the max will set the steady state
+        to the max.
         """
-        self.assert_deferred_succeeded(self.group.add("1"))
-        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.group = MockScalingGroup('DFW', 1, {'max_entities': 5})
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
+
+    def test_set_steady_state_within_limit_succeeds(self):
+        """
+        Setting a steady state that is between the min and max will set the
+        steady state to to the specified number.
+        """
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 10,
+            'current_entities': 0
+        })
+
+    def test_bounce_existing_entity_succeeds(self):
+        """
+        Bouncing an existing entity succeeds (and does not change the list
+        view)
+        """
+        self.group.entities = ["1"]
         self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.delete("1")))
-        self.assertEqual(self.validate_list_return_value(), [])
+            self.group.bounce_entity("1")))
+        self.assertEqual(self.validate_list_return_value(), ["1"])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 1
+        })
 
-    def test_delete_invalid_entity_fails(self):
+    def test_bounce_invalid_entity_fails(self):
         """
-        Deleting an invalid valid entity fails
+        Bouncing an invalid valid entity fails
         """
-        self.assert_deferred_failed(self.group.delete("1"), NoSuchEntityError)
+        self.assert_deferred_failed(
+            self.group.bounce_entity("1"), NoSuchEntityError)
         self.assertEqual(self.validate_list_return_value(), [])
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 0,
+            'current_entities': 0
+        })
 
-    def test_update_scaling_group_updates_values(self):
+    def test_update_config_updates_ignores_invalid_keys(self):
         """
         Passing in a dict only updates the desired fields that are provided
         """
-        self.assert_deferred_succeeded(self.group.update({
-            'name': 'UPDATED',
+        expected = {
             'cooldown': 1000,
-            'non-param': 'UPDATED'
+            'metadata': {'UPDATED': 'UPDATED'},
+            'min_entities': 100,
+            'max_entities': 1000,
+            'name': 'UPDATED'
+        }
+        extra = dict(expected)
+        extra['non-param'] = 'UPDATED'
+
+        self.assert_deferred_succeeded(self.group.update_config(extra))
+        result = self.validate_view_config_return_value()
+        self.assertEqual(result, expected)
+
+    def test_update_config_does_not_overwrite_existing_non_provided_keys(self):
+        """
+        If certain keys are not provided in the update dictionary, the keys
+        that are not provided are not overwritten.
+        """
+        expected = {
+            'cooldown': 1000,
+            'metadata': {'UPDATED': 'UPDATED'},
+            'min_entities': 100,
+            'max_entities': 1000,
+            'name': 'UPDATED'
+        }
+        self.assert_deferred_succeeded(self.group.update_config(expected))
+        self.assert_deferred_succeeded(self.group.update_config({}))
+        result = self.validate_view_config_return_value()
+        self.assertEqual(result, expected)
+
+    def test_update_config_min_updates_steady_state(self):
+        """
+        If the updated min is greater than the current steady state, the
+        current steady state is set to that min
+        """
+        self.assert_deferred_succeeded(self.group.update_config({
+            'min_entities': 5
         }))
-        result = self.validate_view_return_value()
-        self.assertEqual(result, {
-            'name': 'UPDATED',
-            'cooldown': 1000,
-            # the rest of these values have not been updated
-            'entity_type': 'servers',
-            'region': 'DFW',
-            'min_entities': 0,
-            'max_entities': int(1e9),
-            'steady_state_entities': 0,
-            'metadata': {}
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
+        })
+
+    def test_update_config_max_updates_steady_state(self):
+        """
+        If the updated max is less than the current steady state, the
+        current steady state is set to that max
+        """
+        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assert_deferred_succeeded(self.group.update_config({
+            'max_entities': 5
+        }))
+        self.assertEquals(self.validate_view_state_return_value(), {
+            'steady_state_entities': 5,
+            'current_entities': 0
         })
 
 
@@ -122,20 +197,29 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.collection.mock_add_tenant(self.tenant_id)
+        self.region = 'DFW'
 
-        self.config = {
-            'name': 'blah',
-            'entity_type': 'servers',
-            'region': 'DFW',
-            'cooldown': 600,
-            'min_entities': 0,
-            'max_entities': 10,
-            'steady_state_entities': 4,
-            'metadata': {}
-        }
+    def test_list_scaling_groups_is_empty_if_no_groups(self):
+        """
+        Listing all scaling groups for a tenant id, with no scaling groups,
+        returns an empty dictionary
+        """
+        self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
+                         "Should start off with zero groups for tenant")
+
+    def test_list_scaling_groups_has_empty_region_if_called_with_region(self):
+        """
+        Listing all scaling groups for a region for a tenant id will return
+        a dictionary with that region as a key and an empty dictionary as a
+        value
+        """
+        self.assertEqual(
+            self.validate_list_return_value(self.tenant_id, self.region),
+            {self.region: {}},
+            "Should start off with zero groups for region for tenant")
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_and_list_scaling_groups(self, mock_msg):
+    def test_create_group_with_config_and_list_scaling_groups(self, mock_sgrp):
         """
         Listing a scaling group returns a mapping of scaling group uuid to
         scaling group model, and adding another scaling group increases the
@@ -143,18 +227,44 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         since testing list involves putting scaling groups in the collection
         (create), and testing creation involves enumerating the collection
         (list)
+
+        Creation of a scaling group with a 'config' parameter creates a
+        scaling group with the specified configuration.
+        """
+        config = {
+            'name': 'blah',
+            'cooldown': 600,
+            'min_entities': 0,
+            'max_entities': 10,
+            'metadata': {}
+        }
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.tenant_id, self.region, config))
+
+        result = self.validate_list_return_value(self.tenant_id, self.region)
+        self.assertEqual(result[self.region].keys(), [uuid],
+                         "Group not added to collection")
+
+        mock_sgrp.assert_called_once_with(self.region, uuid, config)
+
+    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
+    def test_create_without_config_and_list_scaling_groups(self, mock_sgrp):
+        """
+        Creation of a scaling group without a 'config' parameter creates a
+        scaling group with an empty configuration.
         """
         self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
                          "Should start off with zero groups")
 
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
+            self.collection.create_scaling_group(self.tenant_id, self.region))
 
         result = self.validate_list_return_value(self.tenant_id)
-        self.assertEqual(result.keys(), [uuid],
+        self.assertEqual(result[self.region].keys(), [uuid],
                          "Group not added to collection")
 
-        mock_msg.assert_called_once_with(uuid, self.config)
+        mock_sgrp.assert_called_once_with(self.region, uuid, {})
 
     def test_delete_removes_a_scaling_group(self):
         """
@@ -162,13 +272,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         in the collection
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
+            self.collection.create_scaling_group(self.tenant_id, self.region))
 
-        result = self.validate_list_return_value(self.tenant_id)
-        self.assertEqual(len(result), 1, "Group not added correctly")
+        result = self.validate_list_return_value(self.tenant_id, self.region)
+        self.assertEqual(len(result[self.region]), 1,
+                         "Group not added correctly")
 
         self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.tenant_id, uuid))
+            self.collection.delete_scaling_group(self.tenant_id,
+                                                 self.region, uuid))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result, {}, "Group not deleted from collection")
@@ -178,17 +290,35 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Deleting a scaling group that doesn't exist raises a
         :class:`NoSuchScalingGroupError` exception
         """
-        self.assert_deferred_failed(
-            self.collection.delete_scaling_group(self.tenant_id, 1),
-            NoSuchScalingGroupError)
+        deferred = self.collection.delete_scaling_group(self.tenant_id,
+                                                        self.region, 1)
+        self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
+
+    def test_delete_scaling_group_fails_if_scaling_group_in_wrong_region(self):
+        """
+        Deleting a scaling group that exists in a different region raises a
+        :class:`NoSuchScalingGroupError` exception
+        """
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(self.tenant_id, self.region))
+
+        result = self.validate_list_return_value(self.tenant_id)
+        self.assertEqual(len(result[self.region]), 1,
+                         "Group not added correctly")
+
+        deferred = self.collection.delete_scaling_group(
+            self.tenant_id, 'NOT_' + self.region, uuid)
+
+        self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     def test_get_scaling_group_returns_mock_scaling_group(self):
         """
         Getting valid scaling group returns a MockScalingGroup
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
-        group = self.validate_get_return_value(self.tenant_id, uuid)
+            self.collection.create_scaling_group(self.tenant_id, self.region))
+        group = self.validate_get_return_value(self.tenant_id, self.region,
+                                               uuid)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
@@ -198,5 +328,16 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         :class:`NoSuchScalingGroupError` exception
         """
         self.assert_deferred_failed(
-            self.collection.get_scaling_group(self.tenant_id, 1),
+            self.collection.get_scaling_group(self.tenant_id, self.region, 1),
             NoSuchScalingGroupError)
+
+    def test_get_scaling_group_fails_if_scaling_group_is_in_wrong_region(self):
+        """
+        Getting a scaling group that exists in a different region raises a
+        :class:`NoSuchScalingGroupError` exception
+        """
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(self.tenant_id, self.region))
+        deferred = self.collection.get_scaling_group(
+            self.tenant_id, 'NOT_' + self.region, uuid)
+        self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
