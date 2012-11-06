@@ -163,7 +163,7 @@ class MockScalingGroupCollection:
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
         self.data[tenant][uuid] = MockScalingGroup(
-            'DFW', 'servers', uuid, data)
+            data['region'], data['entity_type'], uuid, data.get('config', {}))
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):

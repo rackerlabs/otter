@@ -24,7 +24,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group = MockScalingGroup('DFW', 'servers', 1)
 
-    def test_view_config_has_all_info(self):
+    def test_default_view_config_has_all_info(self):
         """
         View should return a dictionary that conforms to the JSON schema (has
         all parameters even though only a few were passed in)
@@ -198,16 +198,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.tenant_id = 'goo1234'
         self.collection.mock_add_tenant(self.tenant_id)
 
-        self.config = {
-            'name': 'blah',
-            'cooldown': 600,
-            'min_entities': 0,
-            'max_entities': 10,
-            'metadata': {}
+        self.create = {
+            'region': 'DFW',
+            'entity_type': 'server'
         }
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_and_list_scaling_groups(self, mock_msg):
+    def test_create_group_with_config_and_list_scaling_groups(self, mock_msg):
         """
         Listing a scaling group returns a mapping of scaling group uuid to
         scaling group model, and adding another scaling group increases the
@@ -215,18 +212,47 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         since testing list involves putting scaling groups in the collection
         (create), and testing creation involves enumerating the collection
         (list)
+
+        Creation of a scaling group with a 'config' parameter creates a
+        scaling group with the specified configuration.
         """
         self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
                          "Should start off with zero groups")
+        config = {
+            'name': 'blah',
+            'cooldown': 600,
+            'min_entities': 0,
+            'max_entities': 10,
+            'metadata': {}
+        }
+        self.create['config'] = config
 
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
+            self.collection.create_scaling_group(self.tenant_id, self.create))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result.keys(), [uuid],
                          "Group not added to collection")
 
-        mock_msg.assert_called_once_with('DFW', 'servers', uuid, self.config)
+        mock_msg.assert_called_once_with('DFW', 'server', uuid, config)
+
+    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
+    def test_create_without_config_and_list_scaling_groups(self, mock_msg):
+        """
+        Creation of a scaling group without a 'config' parameter creates a
+        scaling group with an empty configuration.
+        """
+        self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
+                         "Should start off with zero groups")
+
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(self.tenant_id, self.create))
+
+        result = self.validate_list_return_value(self.tenant_id)
+        self.assertEqual(result.keys(), [uuid],
+                         "Group not added to collection")
+
+        mock_msg.assert_called_once_with('DFW', 'server', uuid, {})
 
     def test_delete_removes_a_scaling_group(self):
         """
@@ -234,7 +260,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         in the collection
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
+            self.collection.create_scaling_group(self.tenant_id, self.create))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1, "Group not added correctly")
@@ -259,7 +285,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Getting valid scaling group returns a MockScalingGroup
         """
         uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(self.tenant_id, self.config))
+            self.collection.create_scaling_group(self.tenant_id, self.create))
         group = self.validate_get_return_value(self.tenant_id, uuid)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))

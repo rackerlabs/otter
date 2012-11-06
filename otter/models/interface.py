@@ -113,14 +113,15 @@ class IScalingGroupCollection(Interface):
     """
     def create_scaling_group(tenant_id, data):
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data``.
+        Create scaling group based on the region, entity type, and
+        the configuration paramaters, all of which are contained in the
+        parameter ``data``.
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
-        :param data: Configuration data in JSOn format, as specified by
-            :data:`scaling_group_config_schema`
+        :param data: Scaling group creation and configuration options in JSON
+            format, as specified by :data:`scaling_group_creation_schema`
         :type data: ``dict``
 
         :return: uuid of the newly created scaling group
@@ -209,6 +210,28 @@ scaling_group_config_schema = {
             "type": "object",
             "title": "User-provided metadata"
         }
+    },
+    "additionalProperties": False,
+    "title": ("Optional configuration options for the scaling group, "
+              "controlling scaling rate, size, and metadata")
+}
+
+scaling_group_creation_schema = {
+    "type": "object",
+    "properties": {
+        "region": {
+            "type": "string",
+            "required": True,
+            "enum": ["DFW", "ORD", "LON"],
+            "title": "The region covered by the scaling group"
+        },
+        "entity_type": {
+            "type": "string",
+            "required": True,
+            "enum": ["server"],
+            "title": "The entity type to scale"
+        },
+        "config": scaling_group_config_schema
     },
     "additionalProperties": False
 }
