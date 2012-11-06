@@ -2,8 +2,7 @@
 Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError,
-                                    InvalidEntityError, NoSuchEntityError)
+                                    NoSuchScalingGroupError, NoSuchEntityError)
 import zope.interface
 
 from twisted.internet import defer
@@ -28,83 +27,89 @@ class MockScalingGroup:
     :ivar region: region of the scaling group
     :type region: ``str``, one of ("DFW", "LON", or "ORD")
 
-    :ivar entity_type: entity type of the scaling group
-    :type entity_type: ``str``, one of ("servers")
+    :ivar config: mapping of config parameters to config values, as specified
+        by the :data:`otter.models.interface.scaling_group_config_schema`
+    :type config: ``dict``
 
-    :ivar name: name of the scaling group
-    :type name: ``str``
-
-    :ivar cooldown: Cooldown period before more entities are added, given in
-        seconds - defaults to 0 if not given
-    :type cooldown: ``float``
-
-    :ivar min_entities: minimum number of entities in this scaling group -
-        defaults to 0 if not given
-    :type min_entities: ``int``
-
-    :ivar max_entities: maximum number of entities in this scaling group -
-        defaults to 1e9 if not given (functionally, no upper limit)
-    :type max_entities: ``int``
-
-    :ivar steady_state_entities: the desired steady state number of entities -
+    :ivar steady: the desired steady state number of entities -
         defaults to the minimum if not given.  This how many entities the
         system thinks there should be.  It is like a variable used by
         the scaling system to keep track of how many servers there should be,
         as opposed to constants like the minimum and maximum (which constrain
-        what values the ``steady_state_entities`` can be).
-    :type steady_state_entities: ``int``
+        what values the ``steady_state`` can be).
+    :type steady_state: ``int``
 
-    :ivar metadata: extra metadata associated with this scaling group -
-        defaults to no metadata
-    :type metadata: ``dict``
+    :ivar entities: the entity id's corresponding to the entities in this
+        scaling group
+    :type entities: ``list``
     """
     zope.interface.implements(IScalingGroup)
 
-    def _update_from_dict(self, data):
-        """
-        Updates self from a dictionary.
-        """
-        keys = ('name', 'entity_type', 'region', 'cooldown', 'min_entities',
-                'max_entities', 'steady_state_entities', 'metatdata')
-        for key in data:
-            if key in keys:
-                setattr(self, key, data[key])
-
-    def __init__(self, uuid, data):
+    def __init__(self, region, uuid, config=None):
         self.uuid = uuid
-        self.region = self.entity_type = None
-        self.name = self.cooldown = self.min_entities = None
-        self.max_entities = self.steady_state_entities = self.metadata = None
-        self._update_from_dict(data)
+        self.region = region
+
         self.entities = []
 
-    def view(self):
+        self.steady_state = 0
+        self.config = {
+            'name': "",
+            'cooldown': 0,
+            'min_entities': 0,
+            'max_entities': None,  # no upper limit
+            'metadata': {}
+        }
+        if config is not None:
+            self.update_config(config)
+
+    def view_config(self):
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        group = {
-            'name': self.name or "",
-            'region': self.region,
-            'entity_type': self.entity_type,
-            'cooldown': self.cooldown or 0,
-            'min_entities': self.min_entities or 0,
-            'max_entities': self.max_entities or int(1e9),
-            'steady_state_entities': self.steady_state_entities or 0,
-            'metadata': self.metadata or {}
-        }
-        return defer.succeed(group)
+        return defer.succeed(self.config)
 
-    def update(self, data):
+    def view_state(self):
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data``.
+        :return: :class:`Deferred` that fires with a view of the state
+        """
+        return defer.succeed({
+            'steady_state_entities': self.steady_state,
+            'current_entities': len(self.entities)
+        })
+
+    def update_config(self, data):
+        """
+        Update the scaling group configuration paramaters based on the
+        attributes in ``data``.
 
         :return: :class:`Deferred` that fires with None
         """
-        self._update_from_dict(data)
+        valid_keys = ('name', 'cooldown', 'min_entities', 'max_entities',
+                      'metadata')
+        for key in data:
+            if key in valid_keys:
+                self.config[key] = data[key]
+
+        # make sure the steady state is still within bounds
+        return self.set_steady_state(self.steady_state)
+
+    def set_steady_state(self, steady_state):
+        """
+        Sets the steady state value
+
+        :param steady_state: value to set the steady state to, but will not set
+            to anything below the minimum or above the maximum
+        :type steady_state: ``int``
+
+        :return: :class:`Deferred` that fires with None
+        """
+        self.steady_state = max(steady_state, self.config['min_entities'])
+        if self.config['max_entities'] is not None:
+            self.steady_state = min(self.steady_state,
+                                    self.config['max_entities'])
         return defer.succeed(None)
 
-    def list(self):
+    def list_entities(self):
         """
         Lists all the entities in the scaling group
 
@@ -112,30 +117,18 @@ class MockScalingGroup:
         """
         return defer.succeed(self.entities)
 
-    def delete(self, entity_id):
+    def bounce_entity(self, entity_id):
         """
-        Deletes a entity given by the server ID
+        Rebuilds a entity given by the server ID
 
         :return: :class:`Deferred` that fires with None
         """
         if entity_id in self.entities:
-            self.entities.remove(entity_id)
+            # don't actually do anything, since this is fake
             return defer.succeed(None)
         return defer.fail(NoSuchEntityError(
             "Scaling group {0} has no such entity {1}".format(self.uuid,
                                                               entity_id)))
-
-    def add(self, entity_id):
-        """
-        Adds the entity to the group manually
-
-        :return: :class:`Deferred` that fires with None
-        """
-        if is_entity_id_valid(entity_id):
-            self.entities.append(entity_id)
-            return defer.succeed(None)
-        return defer.fail(
-            InvalidEntityError("{0} is not a valid entity".format(entity_id)))
 
 
 class MockScalingGroupCollection:
@@ -155,31 +148,37 @@ class MockScalingGroupCollection:
         """ Mock add a tenant """
         self.data[tenant] = {}
 
-    def create_scaling_group(self, tenant, data):
+    def create_scaling_group(self, tenant, region, config=None):
         """
-        Update the scaling group paramaters based on the attributes
-        in ``data```
+        Create the scaling group
 
         :return: :class:`Deferred` that fires with the uuid of the created
             scaling group
         """
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
-        self.data[tenant][uuid] = MockScalingGroup(uuid, data)
+        if region not in self.data[tenant]:
+            self.data[tenant][region] = {}
+        self.data[tenant][region][uuid] = MockScalingGroup(region, uuid,
+                                                           config or {})
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, uuid):
+    def delete_scaling_group(self, tenant, region, uuid):
         """
         Delete the scaling group
 
         :return: :class:`Deferred` that fires with None
         """
-        if tenant not in self.data or uuid not in self.data[tenant]:
-            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
-        del self.data[tenant][uuid]
+        if (tenant not in self.data or
+                region not in self.data[tenant] or
+                uuid not in self.data[tenant][region]):
+            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
+        del self.data[tenant][region][uuid]
+        if len(self.data[tenant][region]) == 0:
+            del self.data[tenant][region]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant):
+    def list_scaling_groups(self, tenant, region=None):
         """
         List the scaling groups
 
@@ -187,9 +186,14 @@ class MockScalingGroupCollection:
             group uuids to scaling groups
         :rtype: :class:`Deferred` that fires with a ``dict``
         """
-        return defer.succeed(self.data[tenant])
+        if region is None:
+            return defer.succeed(self.data[tenant])
+        elif region in self.data[tenant]:
+            return defer.succeed({region: self.data[tenant][region]})
+        else:
+            return defer.succeed({region: {}})  # no scaling groups
 
-    def get_scaling_group(self, tenant, uuid):
+    def get_scaling_group(self, tenant, region, uuid):
         """
         Get a scaling group
 
@@ -197,6 +201,8 @@ class MockScalingGroupCollection:
         :rtype: :class:`Deferred` that fires with a :class:`IScalingGroup`
             provider
         """
-        if tenant not in self.data or uuid not in self.data[tenant]:
-            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
-        return self.data[tenant][uuid]
+        if (tenant not in self.data or
+                region not in self.data[tenant] or
+                uuid not in self.data[tenant][region]):
+            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
+        return self.data[tenant][region][uuid]

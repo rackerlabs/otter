@@ -3,7 +3,7 @@ Tests for :mod:`otter.models.interface`
 """
 from copy import deepcopy
 
-from jsonschema import Draft3Validator, validate
+from jsonschema import Draft3Validator, validate, ValidationError
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
@@ -13,6 +13,24 @@ from zope.interface.verify import verifyObject
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     scaling_group_config_schema)
 from otter.test.utils import DeferredTestMixin
+
+
+scaling_group_state_schema = {
+    'type': 'object',
+    'properties': {
+        'steady_state_entities': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        },
+        'current_entities': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        }
+    },
+    'additionalProperties': False
+}
 
 
 class IScalingGroupProviderMixin(DeferredTestMixin):
@@ -36,7 +54,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         :return: the return value of ``list()``
         """
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.list, *args, **kwargs))
+            defer.maybeDeferred(self.group.list_entities, *args, **kwargs))
         validate(result, {
             "type": "array",
             "items": {
@@ -45,13 +63,13 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         })
         return result
 
-    def validate_view_return_value(self, *args, **kwargs):
+    def validate_view_config_return_value(self, *args, **kwargs):
         """
-        Calls ``view()``, and validates that it returns a config dictionary
-        containing relevant configuration values, as specified by the
-        :data:`scaling_group_config_schema`
+        Calls ``view_config()``, and validates that it returns a config
+        dictionary containing relevant configuration values, as specified by
+        the :data:`scaling_group_config_schema`
 
-        :return: the return value of ``view()``
+        :return: the return value of ``view_config()``
         """
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
@@ -60,8 +78,22 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
             schema['properties'][property_name]['required'] = True
 
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view, *args, **kwargs))
+            defer.maybeDeferred(self.group.view_config, *args, **kwargs))
         validate(result, schema)
+        return result
+
+    def validate_view_state_return_value(self, *args, **kwargs):
+        """
+        Calls ``view_state()``, and validates that it returns a state
+        dictionary containing relevant state values
+
+        :return: the return value of ``view_state()``
+        """
+        # unlike updating or inputing a group config, the returned config
+        # must actually have all the properties
+        result = self.assert_deferred_succeeded(
+            defer.maybeDeferred(self.group.view_state, *args, **kwargs))
+        validate(result, scaling_group_state_schema)
         return result
 
 
@@ -91,13 +123,19 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
             self.collection.list_scaling_groups,
             *args, **kwargs))
 
-        # can't JSON validate, so assert that it's a dictionary, all its
-        # strings are keys, and that all its values are IScalingGroups
+        # not valid JSON, since the ultimate objects are IScalingGroup
+        # objects, so assert that it's a dictionary, all its
+        # keys are strings, all its values are dicts whose keys are strings
+        # and whose values are IScalingGroups
         self.assertEqual(type(result), dict)
-        for key in result.keys():
+        for key in result:
             self.assertEqual(type(key), str)
-        for value in result.values():
-            self.assertTrue(IScalingGroup.providedBy(value))
+        for dictionary in result.values():
+            self.assertEqual(type(dictionary), dict)
+            for key in dictionary:
+                self.assertEqual(type(key), str)
+            for ultimate_value in dictionary.values():
+                self.assertTrue(IScalingGroup.providedBy(ultimate_value))
 
         return result
 
@@ -134,9 +172,14 @@ class ScalingGroupConfigTestCase(TestCase):
 
     def test_minimal_config_validates(self):
         """
-        Providing only the name, entity_type, and region will validate.  This
-        is necessary because this may be the minimum schema the user provides.
+        Providing nothing will validate.  This is necessary because this may
+        be the minimum schema the user provides.
         """
-        validate(
-            {'name': 'blah', 'region': 'DFW', 'entity_type': 'servers'},
-            scaling_group_config_schema)
+        validate({}, scaling_group_config_schema)
+
+    def test_extra_values_does_not_validate(self):
+        """
+        Providing non-expected properties will fail validate.
+        """
+        self.assertRaises(ValidationError, validate, {'what': 'not expected'},
+                          scaling_group_config_schema)
