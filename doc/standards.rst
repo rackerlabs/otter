@@ -87,8 +87,22 @@ Limiting the scope of the testing often involves mocking modules, classes, or fu
 #. Mocking should happen in the right place (if you import X from Y, mock Y.X, not X)
 #. Autospec/specify the spec unless you have a good reason not to (see http://www.voidspace.org.uk/python/mock/helpers.html#autospeccing), so your tests do not pass by accident (e.g. when a mock evaluates to true, or when calling assert_X just calls a mock rather than the actually assert method).
 
+----------------------------
+Interface testing guidelines
+----------------------------
+
+By "interface" in this section we mean the interaction point between two parts of this system, or the interaction between the user and this system, or this system and another system.
+
+**Testing code dependant upon an interface**: In general, code should not rely on particular implementations of an interface.  When mocking the depency, only the the parts specified by the interface should be mocked.  If the dependant code uses anything other than what is specified by the interface, the tests should fail.
+
+**Testing implementations of an interface**: Some generalized code that tests implementation of a particular interface would be also useful, so it can be used to test all implementations.
+
+**JSON Schema**:  Output in JSON format can be tested via `jsonschema <https://github.com/Julian/jsonschema>`_, to ensure that it matches what is specified in the interface
+
+**Zope.Interface**: `zope.interface <http://docs.zope.org/zope.interface/README.html>`_, is a library used to explicitly state the interface between two internal parts of the system. You can verify that something has implemented the interface by calling ``zope.interface.verifyObject()`` on the interface and the implementation.
+
 -----------------------------------
-Twisted specific testing guidelines
+Twisted-specific testing guidelines
 -----------------------------------
 
 Testing Twisted involves some quirks, most of which are covered in the `Twisted testing documentation <http://twistedmatrix.com/documents/current/core/howto/testing.html>`_.
@@ -131,7 +145,7 @@ Integration Testing
 
 (work in progress)
 
-#. integration tests on dev machine - would be nice to limit number of services that need to be run at once
+#. integration tests on dev machine - would be nice to limit number of real services that need to be run at once
 
 #. mocking other rackspace REST services (http://sourceforge.net/p/soaprest-mocker/wiki/Home/, http://fog.io/#.6.0/compute/, or we can write our own)
 
