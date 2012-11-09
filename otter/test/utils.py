@@ -1,9 +1,11 @@
 """
 Mixins and utilities to be used for testing.
 """
+import mock
+from cStringIO import StringIO
 
 from twisted.python.failure import Failure
-from twisted.internet.defer import Deferred
+from twisted.internet.defer import Deferred, succeed
 
 
 class DeferredTestMixin(object):
@@ -75,3 +77,60 @@ class DeferredTestMixin(object):
                 self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
                     expected_failures, result))
         return result
+
+
+def mock_agent_request(request_deferred, return_value=None):
+    """
+    A function to get a fake :func:`twisted.web.client.Agent.request` method -
+    this method records the http method, uri, headers, and the content of a
+    bodyProducer.
+
+    This method is used because the reactor needs to actually spin to get
+    certain implementations of :class:`IBodyProducer` to finish writing all
+    bytes to its consumer.  Therefore, the ``request_deferred`` that is
+    provided to this function should be returned at the end of a test method.
+
+    :param return_value: What the deferred returned by the mock method should
+        fire with. Defaults to a mock request with a 204 status code and no
+        body.
+    :type return_value: Some kind of mock request object that provides some of
+        :class:`twisted.web.iweb.IResponse`
+
+    :return: A fake request method, that when called, will return a deferred
+        that will fire with whatever the return value provided was.  Also,
+        a ``dict`` of the method, uri, headers, and body the fake method was
+        called with will be fired from the deferred provided to this function
+        when the body of the request has finished writing all bytes.
+    :rtype: ``func``
+    """
+    def request(method, uri, headers=None, bodyProducer=None):
+        """
+        The fake Agent.request method that records all the information
+        """
+        def _cb(_, body_strio=None):
+            body = ''
+            if body_strio is not None:
+                body = body_strio.getvalue()
+
+            request_deferred.callback({
+                'method': method,
+                'uri': uri,
+                'headers': headers,
+                'body': body
+            })
+
+        if bodyProducer is None:
+            _cb(None)
+        else:
+            body = StringIO()  # not an IConsumer, but only write is called
+            # IBodyProducer's startProducing returns a Deferred that fires
+            # with a None when all bytes have finished writing
+            bodyProducer.startProducing(body).addCallback(_cb, body)
+
+        if return_value is None:
+            return succeed(mock.MagicMock(code=204, content=StringIO()))
+        else:
+            return succeed(return_value)
+
+    return request
+
