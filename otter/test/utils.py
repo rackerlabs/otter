@@ -4,8 +4,9 @@ Mixins and utilities to be used for testing.
 import mock
 from cStringIO import StringIO
 
-from twisted.python.failure import Failure
 from twisted.internet.defer import Deferred, succeed
+from twisted.python.failure import Failure
+from twisted.web.http import Headers
 
 
 class DeferredTestMixin(object):
@@ -128,9 +129,52 @@ def mock_agent_request(request_deferred, return_value=None):
             bodyProducer.startProducing(body).addCallback(_cb, body)
 
         if return_value is None:
-            return succeed(mock.MagicMock(code=204, content=StringIO()))
+            return succeed(mock_response())
         else:
             return succeed(return_value)
 
     return request
 
+
+def mock_response(status_code=200, phrase="ok", headers=None, body=''):
+    """
+    A function to get a fake :class:`twisted.web.interface.IResponse` with the
+    given status code, headers, and body.
+
+    :param status_code: the status code that will be mapped to the ``code``
+        attribute on the response - defaults to 200
+    :type status_code: ``int``
+
+    :param phrase: the http reason phrase that will be mapped to the ``phrase``
+        attribute on the response - defaults to "ok"
+    :type phrase: ``str``
+
+    :param headers: the headers as a dict that will be mapped to the
+        ``headers`` attribute (as a :class:`Header`) on the response - defaults
+        to {}
+    :type headers: ``dict``
+
+    :param body: the body whose length will be mapped to the ``length``
+        attribute on this response - the body will also be written by the
+        method ``deliverBody`` on this response - defaults to ''
+    :type body: ``str``
+
+    :return: a mock response that reflects the provided parameters
+    :rtype: :class:`mock.MagicMock` instance that provides the attributes and
+        methods specified by :class:`twisted.web.interface.IResponse`
+    """
+
+    def deliver_body(iprotocol):
+        iprotocol.dataReceived(body)
+        iprotocol.connectionLost(None)
+
+    response = mock.MagicMock(
+        spec=["version", "code", "phrase", "headers", "deliverBody"],
+        version=("HTTP", 1, 1),
+        code=status_code,
+        phrase=phrase,
+        headers=Headers(headers or {}),
+        length=len(body))
+    response.deliverBody.side_effect = deliver_body
+
+    return response

@@ -55,9 +55,10 @@ def add_entity_to_scaling_group(tenant_id, entity_id, scaling_group_id,
     :param agent: the agent to use to connect to the inventory system
     :type agent: :class:`twisted.web.client.Agent`
 
-    :return: None
-
-    :raises:
+    :raises: :class:`InvalidEntityError` if the inventory system returns a
+        404 for
+    :raises: :class:`InventoryError` if the inventory system does not
+        recognize the entity type or if the tenant id is invalid
     """
     if agent is None:
         agent = _get_agent()
@@ -72,9 +73,9 @@ def add_entity_to_scaling_group(tenant_id, entity_id, scaling_group_id,
         bodyProducer=FileBodyProducer(StringIO(body)))
     deferred.addCallback(_process_response, {
         404: InvalidEntityError("No such {0} {1} for tenant {2}".format(
-                entity_type, entity_id, tenant_id)),
+            entity_type, entity_id, tenant_id)),
         403: InventoryError("Unauthorized to make changes for {0}".format(
-                SCALING_GROUP_SERVICE_NAME))
+            SCALING_GROUP_SERVICE_NAME))
     })
     return deferred
 
@@ -130,11 +131,11 @@ def get_entities_in_scaling_group(tenant_id, scaling_group_id,
         return []  # no entities tagged with the scaling group id
 
     deferred = agent.request(method="GET",
-                             uri=urljoin(config.INVENTORY_URL + path))
+                             uri=urljoin(config.INVENTORY_URL, path))
     deferred.addCallback(_process_response, {
-            404: InventoryError("Invalid entity type {0} or tenant {1}".format(
-                    entity_type, tenant_id))
-        })
+        404: InventoryError("Invalid entity type {0} or tenant {1}".format(
+            entity_type, tenant_id))
+    })
     return deferred.addCallback(_cb)
 
 
@@ -144,19 +145,21 @@ class _BodyReceiver(Protocol):
         self._data = StringIO()
 
     def dataReceived(self, data):
+        """Receive data"""
         self._data.write(data)
 
     def connectionLost(self, reason):
+        """Callback with data"""
         self.finish.callback(self._data.getvalue())
 
 
 def _get_agent():
     """
-    Get a default agent
+    :return: a default agent
     """
     global _agent
     if _agent is None:
-        import reactor
+        from twisted.internet import reactor
         _agent = Agent(reactor)
     return _agent
 
@@ -167,7 +170,7 @@ def _process_response(response, error_mapping=None):
     code is 200, attempts to parse the data as JSON and returns the JSON blob.
     If the status i and if the code is unexp
     """
-    error_mapping = error_mapping or None
+    error_mapping = error_mapping or {}
 
     if response.code == 204:
         return None
