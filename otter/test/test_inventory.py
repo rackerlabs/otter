@@ -21,10 +21,12 @@ class AddToScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         Don't depend on config.INVENTORY_URL to be one particular thing
         """
-        self.url_patcher = mock.patch.object(inventory.config,
-                                             'INVENTORY_URL',
-                                             new="http://url.me")
+        self.url_patcher = mock.patch.object(
+            inventory.config, 'INVENTORY_URL', new="http://url.me")
         self.url_patcher.start()
+        self.version_patcher = mock.patch.object(
+            inventory.config, 'INVENTORY_VERSION', new="v1")
+        self.version_patcher.start()
 
         self.tenant_id = "11111"
         self.entity_id = "10"
@@ -36,6 +38,7 @@ class AddToScalingGroupTestCase(DeferredTestMixin, TestCase):
         Undo patching
         """
         self.url_patcher.stop()
+        self.version_patcher.stop()
 
     def test_default_entity_type_values(self):
         """
@@ -53,7 +56,7 @@ class AddToScalingGroupTestCase(DeferredTestMixin, TestCase):
             self.tenant_id, self.entity_id, "atag", agent=self.mock_agent)
         throwout.addBoth(lambda _: None)
 
-        url = "http://url.me/11111/servers/10/service_tags/{0}/".format(
+        url = "http://url.me/v1/11111/servers/10/service_tags/{0}/".format(
             inventory.SCALING_GROUP_SERVICE_NAME)
 
         return request_call.addCallback(self.assertEqual, {
@@ -80,7 +83,7 @@ class AddToScalingGroupTestCase(DeferredTestMixin, TestCase):
             agent=self.mock_agent)
         throwout.addBoth(lambda _: None)
 
-        url = "http://url.me/11111/db/10/service_tags/{0}/".format(
+        url = "http://url.me/v1/11111/db/10/service_tags/{0}/".format(
             inventory.SCALING_GROUP_SERVICE_NAME)
 
         return request_call.addCallback(self.assertEqual, {
@@ -153,10 +156,12 @@ class GetInScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         Don't depend on config.INVENTORY_URL to be one particular thing
         """
-        self.url_patcher = mock.patch.object(inventory.config,
-                                             'INVENTORY_URL',
-                                             new="http://url.me")
+        self.url_patcher = mock.patch.object(
+            inventory.config, 'INVENTORY_URL', new="http://url.me")
         self.url_patcher.start()
+        self.version_patcher = mock.patch.object(
+            inventory.config, 'INVENTORY_VERSION', new="v1")
+        self.version_patcher.start()
 
         self.tenant_id = "11111"
         self.scaling_group = "10"
@@ -168,6 +173,7 @@ class GetInScalingGroupTestCase(DeferredTestMixin, TestCase):
         Undo patching
         """
         self.url_patcher.stop()
+        self.version_patcher.stop()
 
     def test_default_entity_type_values(self):
         """
@@ -185,7 +191,7 @@ class GetInScalingGroupTestCase(DeferredTestMixin, TestCase):
             self.tenant_id, self.scaling_group, agent=self.mock_agent)
         throwout.addBoth(lambda _: None)
 
-        url = "http://url.me/11111/servers/service_tags/{0}/".format(
+        url = "http://url.me/v1/11111/servers/service_tags/{0}/".format(
             inventory.SCALING_GROUP_SERVICE_NAME)
 
         return request_call.addCallback(self.assertEqual, {
@@ -212,7 +218,7 @@ class GetInScalingGroupTestCase(DeferredTestMixin, TestCase):
             agent=self.mock_agent)
         throwout.addBoth(lambda _: None)
 
-        url = "http://url.me/11111/db/service_tags/{0}/".format(
+        url = "http://url.me/v1/11111/db/service_tags/{0}/".format(
             inventory.SCALING_GROUP_SERVICE_NAME)
 
         return request_call.addCallback(self.assertEqual, {

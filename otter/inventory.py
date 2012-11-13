@@ -63,7 +63,9 @@ def add_entity_to_scaling_group(tenant_id, entity_id, scaling_group_id,
     if agent is None:
         agent = _get_agent()
 
-    path = '/{tenant}/{entity_type}/{entity_id}/service_tags/{name}/'.format(
+    path = '/{version}/{tenant}/{entity_type}/{entity_id}/service_tags/{name}/'
+    path = path.format(
+        version=config.INVENTORY_VERSION,
         tenant=tenant_id, entity_id=entity_id,
         entity_type=entity_type, name=SCALING_GROUP_SERVICE_NAME)
     body = json.dumps([scaling_group_id])
@@ -119,9 +121,12 @@ def get_entities_in_scaling_group(tenant_id, scaling_group_id,
     if agent is None:
         agent = _get_agent()
 
-    # not the most endpoint to get entities for one particular service tag -
-    # search would probably be better when the endpoint is implemented
-    path = '/{tenant}/{entity_type}/service_tags/{service_name}/'.format(
+    # not the most efficint endpoint to get entities for one particular
+    # service tag - search would probably be better when the endpoint is
+    # implemented
+    path = '/{version}/{tenant}/{entity_type}/service_tags/{service_name}/'
+    path = path.format(
+        version=config.INVENTORY_VERSION,
         tenant=tenant_id, entity_type=entity_type,
         service_name=SCALING_GROUP_SERVICE_NAME)
 
