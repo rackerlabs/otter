@@ -175,7 +175,8 @@ class ScalingGroupConfigTestCase(TestCase):
         Providing nothing will validate.  This is necessary because this may
         be the minimum schema the user provides.
         """
-        validate({}, scaling_group_config_schema)
+        validate({'name': 'blah', 'cooldown': 60, 'min_entities': 0},
+                 scaling_group_config_schema)
 
     def test_extra_values_does_not_validate(self):
         """
