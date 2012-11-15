@@ -314,7 +314,7 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
 
         request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
 
-        self.assert_status_code(200, self.endpoint + '/one', 'PUT',
+        self.assert_status_code(204, self.endpoint + '/one', 'PUT',
                                 json.dumps(request_body))
         self.mock_store.get_scaling_group.assert_called_once_with('11111',
                                                                   'dfw',
