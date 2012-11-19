@@ -92,7 +92,7 @@ def view_config_for_scaling_group(request, tenantid, coloid, groupid):
     """
     rec = get_store().get_scaling_group(tenantid, coloid, groupid)
     deferred = defer.maybeDeferred(rec.view_config)
-    deferred.addCallback(json.dumps, request)
+    deferred.addCallback(json.dumps)
     return deferred
 
 
@@ -140,7 +140,7 @@ def get_all_scaling_groups(request, tenantid):
     """
     deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantid)
     deferred.addCallback(_format_groups)
-    deferred.addCallback(json.dumps, request)
+    deferred.addCallback(json.dumps)
     return deferred
 
 
@@ -157,7 +157,7 @@ def get_scaling_groups(request, tenantid, coloid):
     deferred = defer.maybeDeferred(get_store().list_scaling_groups,
                                    tenantid, coloid)
     deferred.addCallback(_format_groups)
-    deferred.addCallback(json.dumps, request)
+    deferred.addCallback(json.dumps)
     return deferred
 
 
