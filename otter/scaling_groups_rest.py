@@ -9,9 +9,6 @@ import json
 from otter.models.interface import \
     scaling_group_config_schema, NoSuchScalingGroupError
 
-groups = {}
-ids = 0
-
 _store = None
 
 
