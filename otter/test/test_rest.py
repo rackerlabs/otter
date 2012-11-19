@@ -231,9 +231,10 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
 
-    def test_group_create_missing_input_400(self):
+    def test_group_create_invalid_schema_400(self):
         """
-        Checks that the scaling groups schema is obeyed
+        Checks that the scaling groups schema is obeyed --
+        an empty schema is bad.
         """
         self.mock_store.create_scaling_group.return_value = defer.succeed(
             'one')
