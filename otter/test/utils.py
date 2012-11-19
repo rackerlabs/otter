@@ -82,9 +82,9 @@ class DeferredTestMixin(object):
 def fixture(fixture_name):
     """
     :param fixture_name: The base filename of the fixture, ex: simple.atom.
-    :type: C{bytes}
+    :type: ``bytes``
 
-    :returns: C{bytes}
+    :returns: ``bytes``
     """
     return open(os.path.join(
         os.path.dirname(__file__),

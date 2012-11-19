@@ -72,7 +72,7 @@ class FileStateStore(object):
     def save_state(self, state):
         """Saves state to the file.
 
-        :type state: ``base_string``
+        :type state: ``bytes``
 
         :returns: `Deferred` that fires when the state has been saved.
         """
