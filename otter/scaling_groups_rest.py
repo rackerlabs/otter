@@ -52,36 +52,37 @@ exception_codes = {
 def _format_groups(groups):
     res = map(lambda format: {'id': format.uuid,
                               'region': format.region,
-                              'name': format.name},
-              groups)
+                              'name': format.name}, groups)
     return res
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:id>/servers/'
-       '<string:serverid>', methods=['DELETE'])
-def delete_scaling_group_servers(request, tenantid, coloid, id, serverid):
-    """Deletes a server from the scaling group
-    Returns a string and 200
 
+@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>'
+       '/servers/<string:serverid>', methods=['DELETE'])
+def delete_scaling_group_servers(request, tenantid, coloid, groupid, serverid):
     """
-    return deferred.fail(NotImplementedError())
+    Deletes a server from the scaling group
+
+    Returns a string and 200
+    """
+    return defer.fail(NotImplementedError())
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:id>/servers',
-       methods=['GET'])
+@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>'
+       '/servers', methods=['GET'])
 def get_scaling_group_servers(request, tenantid, coloid, id):
     """Get a list of the servers in a scaling group.
 
     Returns a string and 200
 
     """
-    return deferred.fail(NotImplementedError())
+    return defer.fail(NotImplementedError())
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:id>',
+@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, tenantid, coloid, id):
+def view_config_for_scaling_group(request, tenantid, coloid, groupid):
     """
     Get config for a scaling group -- gets a dict from the storage
     engine and returns it to the user serialized as JSON
@@ -89,41 +90,41 @@ def view_config_for_scaling_group(request, tenantid, coloid, id):
     Returns a deferred string
 
     """
-    rec = get_store().get_scaling_group(tenantid, coloid, id)
+    rec = get_store().get_scaling_group(tenantid, coloid, groupid)
     deferred = defer.maybeDeferred(rec.view_config)
     deferred.addCallback(json.dumps, request)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:id>',
+@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(scaling_group_config_schema)
-def edit_scaling_group(request, tenantid, coloid, id, data):
+def edit_scaling_group(request, tenantid, coloid, groupid, data):
     """
     Edit config for a scaling group.
 
-    returns a deferred
+    returns a deferred for completion
 
     """
-    rec = get_store().get_scaling_group(tenantid, coloid, id)
+    rec = get_store().get_scaling_group(tenantid, coloid, groupid)
     deferred = defer.maybeDeferred(rec.update_config, data)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:id>',
+@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
        methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_scaling_group(request, tenantid, coloid, id):
+def delete_scaling_group(request, tenantid, coloid, groupid):
     """
     Delete a scaling group.
 
-    Returns a deferred
+    returns a deferred for completion
     """
     deferred = defer.maybeDeferred(get_store().delete_scaling_group,
-                                   tenantid, coloid, id)
+                                   tenantid, coloid, groupid)
     return deferred
 
 

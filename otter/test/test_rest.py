@@ -20,7 +20,11 @@ from jsonschema import ValidationError
 
 
 class DummyException(Exception):
-    """Null"""
+    """
+    A dummy exception to be passed around as if it was a real one.
+
+    This way we are certain to throw a completely unhandled exception
+    """
     pass
 
 
