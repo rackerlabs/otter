@@ -1,10 +1,20 @@
 #!/bin/bash
+#
+# Builds a "bundle" appropriate for deployment.
+#
+# terrarium builds a relocatable virtualenv, this script installs all the
+# requirements from requirements.txt and otter into the virtualenv then
+# creates a tarball for distribution and a sha checksum for verification.
+#
+
 set -e
 
 NAME="otter-deploy"
+
 TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
 SHA256="sha256sum"
+
 
 LSB=""
 
@@ -22,6 +32,9 @@ fi
 
 DIST="${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
 
+# terrarium install's arguments are a list of requirements.txt formatted files
+# This creates a ".self.txt" which contains only '.' indicating to install
+# the current directory as if it were a requirement.
 echo "." > ./.self.txt
 
 echo "Building virtualenv..."

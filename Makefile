@@ -39,3 +39,6 @@ clean: cleandocs
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
 	rm -rf otter-deploy*
+
+bundle:
+	./scripts/bundle.sh
