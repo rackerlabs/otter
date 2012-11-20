@@ -36,3 +36,4 @@ clean: cleandocs
 	find . -name '.coverage' -delete
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
+	rm -rf dist build *.egg-info
