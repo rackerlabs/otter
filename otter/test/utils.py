@@ -2,6 +2,8 @@
 Mixins and utilities to be used for testing.
 """
 
+import os
+
 from twisted.python.failure import Failure
 from twisted.internet.defer import Deferred
 
@@ -75,3 +77,17 @@ class DeferredTestMixin(object):
                 self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
                     expected_failures, result))
         return result
+
+
+def fixture(fixture_name):
+    """
+    :param fixture_name: The base filename of the fixture, ex: simple.atom.
+    :type: ``bytes``
+
+    :returns: ``bytes``
+    """
+    return open(os.path.join(
+        os.path.dirname(__file__),
+        'fixtures',
+        fixture_name
+    )).read()
