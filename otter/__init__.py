@@ -1,1 +1,3 @@
-"""Null"""
+"""
+.. image:: module_diagram.png
+"""
