@@ -69,6 +69,7 @@ def delete_scaling_group_servers(request, tenantid, coloid, groupid, serverid):
 def get_scaling_group_servers(request, tenantid, coloid, id):
     """Get a list of the servers in a scaling group.
 
+    Response format to be defined
     Returns a string and 200
 
     """
@@ -86,6 +87,9 @@ def view_config_for_scaling_group(request, tenantid, coloid, groupid):
 
     Returns a deferred string
 
+    The response looks mostly like this:
+    {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+
     """
     rec = get_store().get_scaling_group(tenantid, coloid, groupid)
     deferred = defer.maybeDeferred(rec.view_config)
@@ -101,6 +105,9 @@ def view_config_for_scaling_group(request, tenantid, coloid, groupid):
 def edit_scaling_group(request, tenantid, coloid, groupid, data):
     """
     Edit config for a scaling group.
+
+    The request looks like: {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+    and the response will be a 204
 
     returns a deferred for completion
 
@@ -133,6 +140,9 @@ def get_all_scaling_groups(request, tenantid):
     Get a list of all scaling groups in all colos
 
     Returns a deferred
+    [{'id': 0, 'region': 'dfw', 'name': 'bob'},
+     {'id': 1, 'region': 'iad', 'name': 'buffy'}]
+    as a deferred
 
     """
     deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantid)
@@ -148,7 +158,10 @@ def get_scaling_groups(request, tenantid, coloid):
     """
     Get a list of scaling groups for a given colo
 
-    Returns a string
+    Returns a list of scaling groups, looking like:
+    [{'id': 0, 'region': 'dfw', 'name': 'bob'},
+     {'id': 1, 'region': 'dfw', 'name': 'buffy'}]
+    as a deferred
 
     """
     deferred = defer.maybeDeferred(get_store().list_scaling_groups,
@@ -165,7 +178,7 @@ def get_scaling_groups(request, tenantid, coloid):
 def create_new_scaling_group(request, tenantid, coloid, data):
     """Create a new scaling group.
 
-    Returns a string
+    Returns a deferred, with the URL in the location header
 
     """
 
