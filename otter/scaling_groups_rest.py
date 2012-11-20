@@ -109,6 +109,9 @@ def edit_scaling_group(request, tenantid, coloid, groupid, data):
     The request looks like: {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
     and the response will be a 204
 
+    The exact update cases are still up in the air -- what happens
+    with defaults?
+
     returns a deferred for completion
 
     """
