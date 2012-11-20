@@ -3,6 +3,7 @@ SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR}
 DOCDIR=doc
+UNITTESTS ?= ${CODEDIR}/test
 
 test:	unit integration
 
@@ -13,8 +14,7 @@ lint:
 	${PYTHONLINT} ${PYDIRS}
 
 unit:
-	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${CODEDIR}/test
-
+	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${UNITTESTS}
 integration:
 	echo "integration test here"
 
@@ -36,3 +36,4 @@ clean: cleandocs
 	find . -name '.coverage' -delete
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
+	rm -rf dist build *.egg-info
