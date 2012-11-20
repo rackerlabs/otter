@@ -3,7 +3,11 @@ from setuptools import setup
 
 NAME='otter'
 
+
 def getPackages(base):
+    """
+    Recursively find python packages.
+    """
     packages = []
 
     def visit(arg, directory, files):
@@ -16,10 +20,15 @@ def getPackages(base):
 
 
 packages = getPackages(NAME)
+
+# If a twisted/plugins directory exists make sure we install the
+# twisted.plugins packages.
 if os.path.exists('twisted/plugins'):
     packages.append('twisted.plugins')
 
 
+# This is an incomplete setup definition useful only for
+# installation into a virtualenv with terrarium for deployment.
 setup(
     name=NAME,
     version='0.0.0',
