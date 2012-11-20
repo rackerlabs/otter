@@ -8,6 +8,8 @@ from twisted.internet import defer
 import json
 from otter.models.interface import \
     scaling_group_config_schema, NoSuchScalingGroupError
+from otter.util.schema import InvalidJsonError
+from jsonschema import ValidationError
 
 _store = None
 
@@ -38,11 +40,9 @@ def set_store(i_store_provider):
     _store = i_store_provider
 
 exception_codes = {
-    'ValidationError': 400,
-    'InvalidJsonError': 400,
-    'NoSuchEntity': 404,
-    'NoSuchEntityType': 404,
-    NoSuchScalingGroupError.__name__: 404
+    ValidationError: 400,
+    InvalidJsonError: 400,
+    NoSuchScalingGroupError: 404
 }
 
 
