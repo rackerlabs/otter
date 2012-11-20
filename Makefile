@@ -3,6 +3,7 @@ SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR}
 DOCDIR=doc
+UNITTESTS ?= ${CODEDIR}/test
 
 test:	unit integration
 
@@ -13,8 +14,7 @@ lint:
 	${PYTHONLINT} ${PYDIRS}
 
 unit:
-	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${CODEDIR}/test
-
+	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${UNITTESTS}
 integration:
 	echo "integration test here"
 
