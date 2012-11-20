@@ -115,9 +115,7 @@ class _RestAPITestMixin(DeferredTestMixin):
         """
         All methods other than GET return a 405: Forbidden Method
         """
-        for method in ("GET", "DELETE", "PUT", "POST"):
-            if method in self.valid_methods:
-                continue
+        for method in self.invalid_methods:
             self.assert_status_code(405, method=method)
 
 
@@ -126,7 +124,7 @@ class ScGroupsEndpointTestCase(_RestAPITestMixin, TestCase):
     Tests for ``/tenantid/scaling_groups``
     """
     endpoint = "/11111/scaling_groups"
-    valid_methods = ("GET", "POST")
+    invalid_methods = ("DELETE", "POST", "PUT")
 
     def setUp(self):
         """
@@ -176,7 +174,7 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
     Tests for ``/tenantid/scaling_groups/dfw``
     """
     endpoint = "/11111/scaling_groups/dfw"
-    valid_methods = ("GET", "POST")
+    invalid_methods = ("DELETE", "PUT")
 
     def setUp(self):
         """
