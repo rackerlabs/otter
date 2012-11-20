@@ -8,6 +8,13 @@ Welcome to otter's documentation!
 
 Otter be an autoscaling system!
 
+Design documentation
+-----------------------------
+.. toctree::
+   :maxdepth: 1
+
+   original_design
+
 Developer documentation
 -----------------------
 
@@ -24,7 +31,6 @@ API documentation
    :maxdepth: 3
 
    otter
-
 
 Indices and tables
 ==================
