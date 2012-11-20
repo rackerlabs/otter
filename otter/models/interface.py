@@ -214,7 +214,7 @@ scaling_group_config_schema = {
         },
         "cooldown": {
             "type": "number",
-            "mininum": 0,
+            "minimum": 0,
             "title": ("Cooldown period before more entities are added, "
                       "given in seconds.")
         },
