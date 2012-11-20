@@ -31,14 +31,16 @@ class DummyStateStore(object):
     Fake state store that doesn't actually store the state.
     """
     def get_state(self):
-        """Always returns no state.
+        """
+        Always returns no state.
 
         :return: ``Deferred`` that callbacks immediately with None
         """
         return defer.succeed(None)
 
     def save_state(self, state):
-        """Does not actually save state.
+        """
+        Does not actually save state.
 
         :return: ``Deferred`` that callbacks immediately with None
         """
@@ -59,7 +61,8 @@ class FileStateStore(object):
         self.filename = filename
 
     def get_state(self):
-        """Reads state from the file.
+        """
+        Reads state from the file.
 
         :returns: `Deferred` that fires with the current state.
         """
@@ -70,7 +73,8 @@ class FileStateStore(object):
         return defer.execute(_read)
 
     def save_state(self, state):
-        """Saves state to the file.
+        """
+        Saves state to the file.
 
         :type state: ``bytes``
 

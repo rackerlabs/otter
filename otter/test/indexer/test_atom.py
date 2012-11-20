@@ -24,13 +24,15 @@ class SimpleAtomTestCase(TestCase):
         self.simple_entry = entries(self.simple_atom)[0]
 
     def test_parse(self):
-        """:func:`otter.indexer.atom.parse` returns something with an xpath
+        """
+        :func:`otter.indexer.atom.parse` returns something with an xpath
         attribute.
         """
         self.assertEqual(hasattr(self.simple_atom, "xpath"), True)
 
     def test_summary(self):
-        """:func:`otter.indexer.atom.summary` finds "compute.instance.update"
+        """
+        :func:`otter.indexer.atom.summary` finds "compute.instance.update"
         as the summary of the first entry in the sample simple atom feed
         """
         self.assertEqual(
@@ -38,7 +40,8 @@ class SimpleAtomTestCase(TestCase):
             "compute.instance.update")
 
     def test_categories_with_pattern(self):
-        """:func:`otter.indexer.categories` finds categories that match a
+        """
+        :func:`otter.indexer.categories` finds categories that match a
         particular pattern only, if pattern is given
         """
         self.assertEqual(
@@ -47,7 +50,8 @@ class SimpleAtomTestCase(TestCase):
         )
 
     def test_categories(self):
-        """:func:`otter.indexer.categories` finds all categories if no pattern
+        """
+        :func:`otter.indexer.categories` finds all categories if no pattern
         is given
         """
         self.assertEqual(
@@ -56,7 +60,8 @@ class SimpleAtomTestCase(TestCase):
         )
 
     def test_previous_link(self):
-        """:func:`otter.indexer.previous_link` finds the previous link in the
+        """
+        :func:`otter.indexer.previous_link` finds the previous link in the
         simple sample atom feed.
         """
         self.assertEqual(
@@ -66,7 +71,8 @@ class SimpleAtomTestCase(TestCase):
         )
 
     def test_updated(self):
-        """:func:`otter.indexer.updated` finds the updated timestamp in the
+        """
+        :func:`otter.indexer.updated` finds the updated timestamp in the
         first entry in the sample simple atom feed
         """
         self.assertEqual(
@@ -75,7 +81,8 @@ class SimpleAtomTestCase(TestCase):
         )
 
     def test_content(self):
-        """:func:`otter.indexer.content` finds "Hello." as the content in the
+        """
+        :func:`otter.indexer.content` finds "Hello." as the content in the
         first entry in the sample simple atom feed
         """
         self.assertEqual(

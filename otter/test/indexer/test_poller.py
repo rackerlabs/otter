@@ -43,7 +43,8 @@ class FakeResponse(object):
 
 
 def feed_response(fixture_name):
-    """Load a fixture into the body of a fake response.
+    """
+    Load a fixture into the body of a fake response.
 
     :return: ``Deferred`` that callbacks with the contents of said fixture
     """
@@ -54,10 +55,13 @@ def feed_response(fixture_name):
 
 
 class FeedPollerServiceTests(TestCase):
-    """Tests for :class:`otter.indexer.poller.FeedPollerService`"""
+    """
+    Tests for :class:`otter.indexer.poller.FeedPollerService`
+    """
 
     def setUp(self):
-        """Create a FeedPollerService with a mock agent, TimerService,
+        """
+        Create a FeedPollerService with a mock agent, TimerService,
         and cooperator that do not use the real reactor
         """
         self.handler = mock.Mock()
@@ -79,19 +83,22 @@ class FeedPollerServiceTests(TestCase):
         self.poll = self.timer.mock_calls[0][1][1]
 
     def test_startService(self):
-        """``startService`` calls the TimerService's ``startService``
+        """
+        ``startService`` calls the TimerService's ``startService``
         """
         self.poller.startService()
         self.timer.return_value.startService.assert_called_once_with()
 
     def test_stopService(self):
-        """``stopService`` calls the TimerService's ``stopService``
+        """
+        ``stopService`` calls the TimerService's ``stopService``
         """
         self.poller.stopService()
         self.timer.return_value.stopService.assert_called_once_with()
 
     def test_poll(self):
-        """During a polling interval, a request is made to the URL specified
+        """
+        During a polling interval, a request is made to the URL specified
         to the constructor of the FeedPollerService, and the response from the
         server is parsed into atom entries, which are then passed to the
         handler.

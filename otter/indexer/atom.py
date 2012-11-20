@@ -8,7 +8,8 @@ _namespaces = {'atom': 'http://www.w3.org/2005/Atom'}
 
 
 def parse(feed_data):
-    """Get a tree from feed data
+    """
+    Get a tree from feed data
 
     :type feed_data: ``str``
 
@@ -18,7 +19,8 @@ def parse(feed_data):
 
 
 def xpath(path, elem):
-    """Get a particular path from an etree
+    """
+    Get a particular path from an etree
 
     :type path: ``str``
     :type elem: :class:`ElementTree` or :class:`Element`
@@ -30,7 +32,8 @@ def xpath(path, elem):
 
 
 def entries(feed):
-    """Get entries from a particular atom feed
+    """
+    Get entries from a particular atom feed
 
     :type feed: :class:`ElementTree`
 
@@ -40,7 +43,8 @@ def entries(feed):
 
 
 def previous_link(feed):
-    """Get the previous link from a particular AtomHopper feed
+    """
+    Get the previous link from a particular AtomHopper feed
 
     :type feed: :class:`ElementTree`
 
@@ -56,7 +60,8 @@ def previous_link(feed):
 
 
 def summary(entry):
-    """Get the summary from a particular AtomHopper entry
+    """
+    Get the summary from a particular AtomHopper entry
 
     :type entry: :class:`Element`
 
@@ -72,7 +77,8 @@ def summary(entry):
 
 
 def content(entry):
-    """Get the text content from a particular AtomHopper entry
+    """
+    Get the text content from a particular AtomHopper entry
 
     :type entry: :class:`Element`
 
@@ -88,7 +94,8 @@ def content(entry):
 
 
 def categories(entry, term_contains=None):
-    """Get a list of categories for a particular AtomHopper entry
+    """
+    Get a list of categories for a particular AtomHopper entry
 
     :type entry: :class:`Element`
 
@@ -107,7 +114,8 @@ def categories(entry, term_contains=None):
 
 
 def updated(entry):
-    """Get the updated date/time as a string from a particular AtomHopper entry
+    """
+    Get the updated date/time as a string from a particular AtomHopper entry
 
     :type entry: :class:`Element`
 

@@ -19,7 +19,8 @@ from otter.indexer.state import FileStateStore
 
 
 class Options(usage.Options):
-    """Command line options for running the AtomHopper polling service
+    """
+    Command line options for running the AtomHopper polling service
     """
     name = 'atomhopper-indexer'
 
@@ -29,7 +30,8 @@ class Options(usage.Options):
 
 
 def makeService(config):
-    """Make the FeedPollerService that will polling AtomHopper.
+    """
+    Make the FeedPollerService that will polling AtomHopper.
     """
     s = MultiService()
 

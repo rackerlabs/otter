@@ -23,7 +23,6 @@ from plumbum import local, cli, commands
 
 def lint(to_lint):
     """
-
     Run all linters against a list of files.
 
     :param to_lint: a list of files to lint.
@@ -67,7 +66,9 @@ def hacked_pep257(to_lint):
     original_check_return_type = pep257.check_return_type
 
     def better_check_return_type(def_docstring, context, is_script):
-        """Ignore private methods"""
+        """
+        Ignore private methods
+        """
         def_name = context.split()[1]
         if def_name.startswith('_') and not def_name.endswith('__'):
             original_check_return_type(def_docstring, context, is_script)
@@ -84,7 +85,6 @@ def hacked_pep257(to_lint):
 
 
 class Lint(cli.Application):
-
     """
     Command line app for VmrunWrapper
     """

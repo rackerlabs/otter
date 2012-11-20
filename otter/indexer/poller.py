@@ -32,11 +32,14 @@ class _BodyReceiver(Protocol):
         self._buffer = []
 
     def dataReceived(self, data):
-        """Store data in buffer"""
+        """
+        Store data in buffer
+        """
         self._buffer.append(data)
 
     def connectionLost(self, reason):
-        """Callback the ``finish`` ``Deferred`` with all the data that has
+        """
+        Callback the ``finish`` ``Deferred`` with all the data that has
         been written to the buffer.
         """
         self.finish.callback(''.join(self._buffer))
@@ -93,12 +96,15 @@ class FeedPollerService(Service):
         self._coiterate = coiterate
 
     def startService(self):
-        """Start the feed polling service - called by the twisted
-        application when starting up"""
+        """
+        Start the feed polling service - called by the twisted
+        application when starting up
+        """
         self._timer_service.startService()
 
     def stopService(self):
-        """Stop the feed polling service - called by the twisted
+        """
+        Stop the feed polling service - called by the twisted
         application when shutting down
 
         :return: ``Deferred``
