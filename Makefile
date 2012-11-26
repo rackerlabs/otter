@@ -15,6 +15,7 @@ lint:
 
 unit:
 	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${UNITTESTS}
+
 integration:
 	echo "integration test here"
 
@@ -37,3 +38,7 @@ clean: cleandocs
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
+	rm -rf otter-deploy*
+
+bundle:
+	./scripts/bundle.sh
