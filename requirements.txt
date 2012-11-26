@@ -1,4 +1,4 @@
--e git+http://github.com/twisted/klein.git#egg=klein
+git+http://github.com/twisted/klein.git
 twisted>=12.0.0
 tryfer>=0.2.2
 jsonschema>=0.7
