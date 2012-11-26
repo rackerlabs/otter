@@ -25,6 +25,15 @@ API documentation
 
    otter
 
+Data/Schema documentation
+-------------------------
+
+.. toctree:
+    :maxdepth: 1
+
+    launch_config
+    scaling_group
+
 
 Indices and tables
 ==================
@@ -32,4 +41,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
