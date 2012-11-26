@@ -15,7 +15,6 @@ TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
 SHA256="sha256sum"
 
-
 LSB=""
 
 if [[ $(which lsb_release) != "" ]]; then
@@ -26,7 +25,7 @@ if [[ "${BUILD_NUMBER}" != "" ]]; then
     BUILD_NUMBER="-${BUILD_NUMBER}"
 fi
 
-if [[ $(which sha256sum) == "" ]]; then
+if [[ $(which ${SHA256}) == "" ]]; then
     SHA256="shasum -a 256"
 fi
 
@@ -35,7 +34,14 @@ DIST="${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
 # terrarium install's arguments are a list of requirements.txt formatted files
 # This creates a ".self.txt" which contains only '.' indicating to install
 # the current directory as if it were a requirement.
-echo "." > ./.self.txt
+
+SELF_DEP="."
+
+if [[ "$1" == "--dev" ]]; then
+    SELF_DEP="-e .";
+fi
+
+echo "${SELF_DEP}" > ./.self.txt
 
 echo "Building virtualenv..."
 terrarium --target ${NAME} install ./requirements.txt ./.self.txt
