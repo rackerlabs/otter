@@ -3,3 +3,5 @@ twisted>=12.0.0
 tryfer>=0.2.2
 jsonschema>=0.7
 yunomi>=0.2.1
+iso8601>=0.1.4
+lxml>=3.0.1 
