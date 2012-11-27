@@ -28,11 +28,12 @@ API documentation
 Data/Schema documentation
 -------------------------
 
-.. toctree:
-    :maxdepth: 1
+.. toctree::
+   :maxdepth: 3
 
-    launch_config
-    scaling_group
+   launch_config
+   scaling_group
+   scale_policy
 
 
 Indices and tables
