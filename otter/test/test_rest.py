@@ -64,7 +64,7 @@ class _RestAPITestMixin(DeferredTestMixin):
 
         scaling_groups_rest.set_store(self.mock_store)
 
-        self.mock_store.list_scaling_groups.return_value = self.mock_groups
+        self.mock_store.list_scaling_groups.return_value = {'dfw': self.mock_groups}
 
     def assert_status_code(self, expected_status, endpoint=None,
                            method="GET", body="", ):
@@ -131,8 +131,8 @@ class ScGroupsEndpointTestCase(_RestAPITestMixin, TestCase):
         Set up expected value (for testing generating json blobs)
         """
         super(ScGroupsEndpointTestCase, self).setUp()
-        self.expected = [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-                         {u'id': 1, u'region': u'dfw', 'name': 'bob'}]
+        self.expected = {'dfw' : [{'id': 0, 'region': 'dfw', 'name': 'bob'},
+                                  {u'id': 1, u'region': u'dfw', 'name': 'bob'}]}
 
     def test_unknown_error_is_500(self):
         """
@@ -148,7 +148,7 @@ class ScGroupsEndpointTestCase(_RestAPITestMixin, TestCase):
         If there are no groups for that account, a JSON blob containing an
         empty list is returned with a 200 (OK) status
         """
-        expected = []
+        expected = {}
         self.mock_store.list_scaling_groups.return_value = defer.succeed(
             expected)
         body = self.assert_status_code(200)
@@ -160,8 +160,6 @@ class ScGroupsEndpointTestCase(_RestAPITestMixin, TestCase):
         """
         Test that the entity list gets sent properly
         """
-        self.mock_store.list_scaling_groups.return_value = defer.succeed(
-            self.mock_groups)
 
         response_body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with(
@@ -181,8 +179,8 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         Set up expected value (for testing generating json blobs)
         """
         super(ScColoEndpointTestCase, self).setUp()
-        self.expected = [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-                         {u'id': 1, u'region': u'dfw', 'name': 'bob'}]
+        self.expected = {'dfw' : [{'id': 0, 'region': 'dfw', 'name': 'bob'},
+                                  {u'id': 1, u'region': u'dfw', 'name': 'bob'}]}
 
     def test_unknown_error_is_500(self):
         """
@@ -198,7 +196,7 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         If there are no groups for that account and colo, a JSON blob
         containing an empty list is returned with a 200 (OK) status
         """
-        expected = []
+        expected = {}
         self.mock_store.list_scaling_groups.return_value = defer.succeed(
             expected)
         body = self.assert_status_code(200)
@@ -210,9 +208,6 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         """
         Test that the entity list gets sent properly
         """
-        self.mock_store.list_scaling_groups.return_value = defer.succeed(
-            self.mock_groups)
-
         response_body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with(
             '11111', 'dfw')

@@ -47,9 +47,11 @@ exception_codes = {
 
 
 def _format_groups(groups):
-    res = map(lambda format: {'id': format.uuid,
-                              'region': format.region,
-                              'name': format.name}, groups)
+    res = {}
+    for colo in groups:
+        res[colo] = map(lambda format: {'id': format.uuid,
+                                  'region': format.region,
+                                  'name': format.name}, groups[colo])
     return res
 
 
