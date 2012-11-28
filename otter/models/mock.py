@@ -1,5 +1,5 @@
 """
-Mock interface for the front-end scaling groups engine
+ Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError)

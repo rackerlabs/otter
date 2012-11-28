@@ -43,8 +43,8 @@ def fails_with(mapping):
             def _fail(failure, request):
                 failure = _get_real_failure(failure)
                 code = 500
-                if failure.type.__name__ in mapping:
-                    code = mapping[failure.type.__name__]
+                if failure.type in mapping:
+                    code = mapping[failure.type]
                     errorObj = {
                         'type': failure.type.__name__,
                         'code': code,
