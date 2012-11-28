@@ -68,7 +68,7 @@ class _RestAPITestMixin(DeferredTestMixin):
                                                             self.mock_groups}
 
     def assert_status_code(self, expected_status, endpoint=None,
-                           method="GET", body="", ):
+                           method="GET", body="", location=None):
         """
         Asserts that the status code of a particular request with the given
         endpoint, request method, request body results in the provided status
@@ -87,9 +87,16 @@ class _RestAPITestMixin(DeferredTestMixin):
         :param body: what the request body should contain
         :type body: ``string``
 
+        :param location: what the location header should contain
+        :type location: ``string``
+
         :return: the response body as a string
         """
         request = requestMock(endpoint or self.endpoint, method)
+
+        if location is not None:
+            request.setHeader = mock.Mock(wraps=request.setHeader)
+
         request.content = StringIO(body)
         request.code = None
         # there should not be an error and the result should return immediately
@@ -98,6 +105,8 @@ class _RestAPITestMixin(DeferredTestMixin):
             None)
         # check the response code
         request.setResponseCode.assert_called_once_with(expected_status)
+        if location is not None:
+            request.setHeader.assert_any_call('Location', location)
 
         if expected_status in http.NO_BODY_CODES:
             # Annoying implementation detail: if the status code is one of the
@@ -247,8 +256,10 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed(
             'one')
         request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        expected_url = 'http://127.0.0.1/v1.0/11111/scaling_groups/dfw/one/'
         self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body))
+                                'POST', json.dumps(request_body),
+                                expected_url)
         self.mock_store.create_scaling_group.assert_called_once_with(
             '11111', 'dfw', request_body)
 
