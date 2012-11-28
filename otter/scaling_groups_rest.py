@@ -12,6 +12,7 @@ from otter.util.schema import InvalidJsonError
 from jsonschema import ValidationError
 
 _store = None
+_urlRoot = 'http://127.0.0.1/v1.0'
 
 
 def get_store():
@@ -24,6 +25,15 @@ def get_store():
         from otter.models.mock import MockScalingGroupCollection
         _store = MockScalingGroupCollection()
     return _store
+
+
+def get_url_root():
+    """
+    Get the URL root
+    :return: string containing the URL root
+    """
+    global _urlRoot
+    return _urlRoot
 
 
 def set_store(i_store_provider):
@@ -50,8 +60,7 @@ def _format_groups(groups):
     res = {}
     for colo in groups:
         res[colo] = map(lambda format: {'id': format.uuid,
-                                  'region': format.region,
-                                  'name': format.name}, groups[colo])
+                                        'region': format.region}, groups[colo])
     return res
 
 
@@ -145,8 +154,8 @@ def get_all_scaling_groups(request, tenantid):
     Get a list of all scaling groups in all colos
 
     Returns a deferred
-    [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-     {'id': 1, 'region': 'iad', 'name': 'buffy'}]
+    [{'id': 0, 'region': 'dfw'},
+     {'id': 1, 'region': 'iad'}]
     as a deferred
 
     """
@@ -164,8 +173,8 @@ def get_scaling_groups(request, tenantid, coloid):
     Get a list of scaling groups for a given colo
 
     Returns a list of scaling groups, looking like:
-    [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-     {'id': 1, 'region': 'dfw', 'name': 'buffy'}]
+    [{'id': 0, 'region': 'dfw'},
+     {'id': 1, 'region': 'dfw'}]
     as a deferred
 
     """
@@ -189,8 +198,8 @@ def create_new_scaling_group(request, tenantid, coloid, data):
 
     def send_redirect(uuid):
         request.setHeader("Location",
-                          "http://127.0.0.1/scaling_groups/{0}/{1}/".
-                          format(coloid, uuid))
+                          "{0}/{1}/scaling_groups/{2}/{3}/".
+                          format(get_url_root(), tenantid, coloid, uuid))
 
     deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantid,
                                    coloid, data)

@@ -64,7 +64,8 @@ class _RestAPITestMixin(DeferredTestMixin):
 
         scaling_groups_rest.set_store(self.mock_store)
 
-        self.mock_store.list_scaling_groups.return_value = {'dfw': self.mock_groups}
+        self.mock_store.list_scaling_groups.return_value = {'dfw':
+                                                            self.mock_groups}
 
     def assert_status_code(self, expected_status, endpoint=None,
                            method="GET", body="", ):
@@ -131,8 +132,9 @@ class ScGroupsEndpointTestCase(_RestAPITestMixin, TestCase):
         Set up expected value (for testing generating json blobs)
         """
         super(ScGroupsEndpointTestCase, self).setUp()
-        self.expected = {'dfw' : [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-                                  {u'id': 1, u'region': u'dfw', 'name': 'bob'}]}
+        self.expected = {'dfw': [{'id': 0, 'region': 'dfw'},
+                                 {u'id': 1, u'region': u'dfw'}
+                                 ]}
 
     def test_unknown_error_is_500(self):
         """
@@ -179,8 +181,8 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
         Set up expected value (for testing generating json blobs)
         """
         super(ScColoEndpointTestCase, self).setUp()
-        self.expected = {'dfw' : [{'id': 0, 'region': 'dfw', 'name': 'bob'},
-                                  {u'id': 1, u'region': u'dfw', 'name': 'bob'}]}
+        self.expected = {'dfw': [{'id': 0, 'region': 'dfw'},
+                                 {u'id': 1, u'region': u'dfw'}]}
 
     def test_unknown_error_is_500(self):
         """
