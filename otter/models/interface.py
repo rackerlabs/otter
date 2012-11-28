@@ -210,18 +210,21 @@ scaling_group_config_schema = {
         "name": {
             "type": "string",
             "default": "",
-            "title": "Name of the scaling group."
+            "title": "Name of the scaling group.",
+            "required": True
         },
         "cooldown": {
             "type": "number",
             "minimum": 0,
             "title": ("Cooldown period before more entities are added, "
-                      "given in seconds.")
+                      "given in seconds."),
+            "required": True
         },
         "min_entities": {
             "type": "integer",
             "minimum": 0,
-            "title": "Minimum number of entities in the scaling group."
+            "title": "Minimum number of entities in the scaling group.",
+            "required": True,
         },
         "max_entities": {
             "type": ["integer", "null"],
