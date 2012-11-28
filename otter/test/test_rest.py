@@ -251,7 +251,7 @@ class ScColoEndpointTestCase(_RestAPITestMixin, TestCase):
 
     def test_group_create(self):
         """
-        Tries to create an entity
+        Tries to create a scaling group
         """
         self.mock_store.create_scaling_group.return_value = defer.succeed(
             'one')
