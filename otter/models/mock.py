@@ -45,33 +45,41 @@ class MockScalingGroup:
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, region, uuid, config=None):
+    def __init__(self, region, uuid, config=None, tenant_id=None):
         self.uuid = uuid
         self.region = region
 
         self.entities = []
 
         self.steady_state = 0
-        self.config = {
-            'name': "",
-            'cooldown': 0,
-            'min_entities': 0,
-            'max_entities': None,  # no upper limit
-            'metadata': {}
-        }
+
         if config is not None:
+            self.config = {
+                'name': "",
+                'cooldown': 0,
+                'min_entities': 0,
+                'max_entities': None,  # no upper limit
+                'metadata': {}
+            }
             self.update_config(config)
+        else:
+            self.error = NoSuchScalingGroupError(tenant_id, region, uuid)
+            self.config = None
 
     def view_config(self):
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
+        if self.config is None:
+            return defer.fail(self.error)
         return defer.succeed(self.config)
 
     def view_state(self):
         """
         :return: :class:`Deferred` that fires with a view of the state
         """
+        if self.config is None:
+            return defer.fail(self.error)
         return defer.succeed({
             'steady_state_entities': self.steady_state,
             'current_entities': len(self.entities)
@@ -84,6 +92,9 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
+        if self.config is None:
+            return defer.fail(self.error)
+
         valid_keys = ('name', 'cooldown', 'min_entities', 'max_entities',
                       'metadata')
         for key in data:
@@ -103,6 +114,9 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
+        if self.config is None:
+            return defer.fail(self.error)
+
         self.steady_state = max(steady_state, self.config['min_entities'])
         if self.config['max_entities'] is not None:
             self.steady_state = min(self.steady_state,
@@ -115,6 +129,8 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with a list of entity ids
         """
+        if self.config is None:
+            return defer.fail(self.error)
         return defer.succeed(self.entities)
 
     def bounce_entity(self, entity_id):
@@ -123,6 +139,9 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
+        if self.config is None:
+            return defer.fail(self.error)
+
         if entity_id in self.entities:
             # don't actually do anything, since this is fake
             return defer.succeed(None)
@@ -187,22 +206,26 @@ class MockScalingGroupCollection:
         :rtype: :class:`Deferred` that fires with a ``dict``
         """
         if region is None:
-            return defer.succeed(self.data[tenant])
+            reformat = {}
+            for colo in self.data[tenant]:
+                reformat[colo] = self.data[tenant][colo].values()
+            return defer.succeed(reformat)
         elif region in self.data[tenant]:
-            return defer.succeed({region: self.data[tenant][region]})
+            return defer.succeed({region: self.data[tenant][region].values()})
         else:
-            return defer.succeed({region: {}})  # no scaling groups
+            return defer.succeed({region: []})  # no scaling groups
 
     def get_scaling_group(self, tenant, region, uuid):
         """
         Get a scaling group
 
-        :return: :class:`Deferred` that a scaling group model
-        :rtype: :class:`Deferred` that fires with a :class:`IScalingGroup`
+        :return: a scaling group model
+        :rtype: a :class:`IScalingGroup`
             provider
         """
-        if (tenant not in self.data or
-                region not in self.data[tenant] or
-                uuid not in self.data[tenant][region]):
-            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
-        return self.data[tenant][region][uuid]
+        result = self.data.get(tenant, {}).get(region, {}).get(uuid, None)
+
+        # if the scaling group doesn't exist, return one anyway that raises
+        # a NoSuchScalingGroupError whenever its methods are called
+        return result or MockScalingGroup(region, uuid, config=None,
+                                          tenant_id=tenant)
