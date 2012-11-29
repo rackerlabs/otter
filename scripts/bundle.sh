@@ -11,6 +11,7 @@ set -e
 
 NAME="otter-deploy"
 TARGET=${TARGET:="$NAME"}
+DIST_DIR=${DIST_DIR:="."}
 
 TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
@@ -30,7 +31,13 @@ if [[ "$(which ${SHA256})" == "" ]]; then
     SHA256="shasum -a 256"
 fi
 
-DIST="${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
+if [[ "$1" == "--dev" ]]; then
+    LSB="dev"
+    GIT_REV=""
+    BUILD_NUMBER=""
+fi
+
+DIST="${DIST_DIR}/${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
 
 # terrarium install's arguments are a list of requirements.txt formatted files
 # This creates a ".self.txt" which contains only '.' indicating to install
@@ -47,10 +54,44 @@ echo "${SELF_DEP}" > ./.self.txt
 echo "Building virtualenv..."
 terrarium --target ${TARGET} install ./requirements.txt ./.self.txt
 
-if [[ "$1" != "--dev" ]]; then
-    echo "Generating distribution tarball..."
-    (cd ${TARGET}; tar -zcvf ${DIST} *)
+if [[ "$1" == "--dev" ]]; then
+    #
+    # When using the -e argument in requirements.txt the files get installed
+    # in 'editable' mode.
+    #
+    # This means the files are not copied into the virtualenv but their path
+    # is written to an easy-install.pth file to be added to sys.path.
+    #
+    # The issue is that pip install -e (and therefore -e in requirements.txt)
+    # writes a _relative_ path to the easy-install.pth file.
+    #
+    # This terrible piece of shell scripting rewrites all the relative paths
+    # so you can still move the dev virtualenv outside of the otter repo
+    # directory.
+    #
+    echo "Rewriting relative paths in easy-install.pth..."
+    easy_install_pth=$(find ${TARGET} -name "easy-install.pth")
+    site_packages=$(dirname ${easy_install_pth})
+    egg_links=$(find ${TARGET} -name "*.egg-link")
 
-    echo "Calculating checksum..."
-    ${SHA256} ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
+    IFS=$(echo)
+    for link in ${egg_links}; do
+        link_val=$(cat ${link})
+        real_path=$(cd ${site_packages}; cd ${link_val}; pwd);
+        echo "Changing ${link_val} to ${real_path}"
+        sed -ie "s|^${link_val}\$|${real_path}\n|g" ${easy_install_pth}
+    done
+
+    unset IFS
 fi
+
+echo "Generating distribution tarball..."
+tar -zcvf ${DIST} -C ${TARGET} \
+    --dereference \
+    --hard-dereference \
+    --exclude 'local' \
+    --exclude-vcs .;
+
+echo "Calculating checksum..."
+${SHA256} ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
+
