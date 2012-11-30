@@ -11,7 +11,6 @@ tests and mock model unit tests do not lie.
 """
 
 import json
-import mock
 from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
@@ -51,19 +50,9 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         """
         Replace the store every time with a clean one.
         """
-        self.urlpatcher = mock.patch('otter.scaling_groups_rest.get_url_root',
-                                     return_value="http://ignore")
-        self.urlpatcher.start()
-
         store = MockScalingGroupCollection()
         store.mock_add_tenant('11111')
         set_store(store)
-
-    def tearDown(self):
-        """
-        Unpatch URL
-        """
-        self.urlpatcher.stop()
 
     def _create_and_view_scaling_group(self):
         """
@@ -81,7 +70,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         }
 
         wrapper = self.assert_deferred_succeeded(
-            request('POST', '/11111/scaling_groups/dfw',
+            request('POST', '/v1.0/11111/scaling_groups/dfw',
                     body=json.dumps(config)))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -150,7 +139,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         Asserts that there are ``number`` number of scaling groups
         """
         wrapper = self.assert_deferred_succeeded(
-            request('GET', '/11111/scaling_groups'))
+            request('GET', '/v1.0/11111/scaling_groups'))
         self.assertEqual(200, wrapper.response.code)
 
         all_groups = json.loads(wrapper.content)

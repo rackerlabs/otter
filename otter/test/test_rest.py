@@ -3,7 +3,6 @@
 from collections import defaultdict, namedtuple
 import json
 
-from klein import resource
 from klein.test_resource import requestMock
 
 import mock
@@ -11,6 +10,7 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 from twisted.web import server, http
+from twisted.web.resource import getChildForRequest
 
 from otter import scaling_groups_rest
 from otter.models.interface import NoSuchScalingGroupError
@@ -64,6 +64,8 @@ def request(method, endpoint, headers=None, body=None):
     """
     # build mock request
     mock_request = requestMock(endpoint, method, headers=headers, body=body)
+    # because the first one is empty, it breaks getChildForRequest
+    mock_request.postpath.pop(0)
 
     # these are used when writing the response
     mock_request.code = None
@@ -99,8 +101,8 @@ def request(method, endpoint, headers=None, body=None):
 
         return ResponseWrapper(response=response, content=content)
 
-    deferred = _render(resource(), mock_request)
-    return deferred.addCallback(build_response)
+    resource = getChildForRequest(scaling_groups_rest.root, mock_request)
+    return _render(resource, mock_request).addCallback(build_response)
 
 
 class RestAPITestMixin(DeferredTestMixin):
@@ -174,7 +176,7 @@ class ScGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/tenantid/scaling_groups``
     """
-    endpoint = "/11111/scaling_groups"
+    endpoint = "/v1.0/11111/scaling_groups"
     invalid_methods = ("DELETE", "POST", "PUT")
 
     def setUp(self):
@@ -223,7 +225,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/tenantid/scaling_groups/dfw``
     """
-    endpoint = "/11111/scaling_groups/dfw"
+    endpoint = "/v1.0/11111/scaling_groups/dfw"
     invalid_methods = ("DELETE", "PUT")
 
     def setUp(self):
