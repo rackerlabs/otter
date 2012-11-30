@@ -6,7 +6,7 @@ import mock
 from twisted.trial.unittest import TestCase
 
 from otter.models.mock import MockScalingGroup, MockScalingGroupCollection
-from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError)
+from otter.models.interface import NoSuchScalingGroupError, NoSuchEntityError
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -292,7 +292,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                uuid)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
-        self.assert_deferred_succeeded(group.view_config())
+
+        for method in ('view_config', 'view_state', 'list_entities'):
+            self.assert_deferred_succeeded(getattr(group, method)())
+
+        self.assert_deferred_succeeded(group.update_config({}))
+        self.assert_deferred_succeeded(group.set_steady_state(1))
+
+        group.entities = [1]
+        self.assert_deferred_succeeded(group.bounce_entity(1))
 
     def test_get_scaling_group_works_but_methods_do_not(self):
         """
@@ -302,5 +310,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         group = self.validate_get_return_value(self.tenant_id, self.region, 1)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
-        self.assert_deferred_failed(group.view_config(),
+
+        for method in ('view_config', 'view_state', 'list_entities'):
+            self.assert_deferred_failed(getattr(group, method)(),
+                                        NoSuchScalingGroupError)
+
+        self.assert_deferred_failed(group.update_config({}),
+                                    NoSuchScalingGroupError)
+        self.assert_deferred_failed(group.set_steady_state(1),
+                                    NoSuchScalingGroupError)
+        group.entities = [1]
+        self.assert_deferred_failed(group.bounce_entity(1),
                                     NoSuchScalingGroupError)

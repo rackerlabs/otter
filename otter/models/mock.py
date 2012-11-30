@@ -8,15 +8,6 @@ import zope.interface
 from twisted.internet import defer
 
 
-def is_entity_id_valid(entity_id):
-    """
-    Whether the entity id is a valid entity id.
-
-    :return: True if the entity is valid, False else
-    """
-    return isinstance(entity_id, str)
-
-
 class MockScalingGroup:
     """
     Mock scaling group record
