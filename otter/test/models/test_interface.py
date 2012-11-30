@@ -182,3 +182,21 @@ class ScalingGroupConfigTestCase(TestCase):
         """
         self.assertRaises(ValidationError, validate, {'what': 'not expected'},
                           scaling_group_config_schema)
+
+    def test_anything_in_metadata_validates(self):
+        """
+        Putting all sorts of data into the metadata will still validate
+        """
+        config = {
+            'name': 'blah',
+            'cooldown': 60,
+            'min_entities': 0,
+            'metadata': {
+                'somekey': 'somevalue',
+                'alist': [],
+                'adict': {
+                    'dictkey': 5
+                }
+            }
+        }
+        validate(config, scaling_group_config_schema)
