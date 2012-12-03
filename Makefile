@@ -7,7 +7,9 @@ DOCDIR=doc
 UNITTESTS ?= ${CODEDIR}/test
 CQLSHARGS ?= localhost 9170
 CONTROL_KEYSPACE ?= OTTER
-CONTROL_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g
+REPLICATION_FACTOR ?= 3
+CONTROL_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/$(REPLICATION_FACTOR)/g
+DEV_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/1/g
 CONTROL_SETUP    = $(shell ls schema/setup/control_*.cql | sort)
 CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 
@@ -43,13 +45,15 @@ schema: FORCE schema-setup schema-teardown
 schema-setup:
 	echo "-- *** Generated Schema ***" > schema/setup.cql
 	for f in $(CONTROL_SETUP); do \
-	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/setup.cql; \
+	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/setup-prod.cql; \
+	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/setup-dev.cql; \
 	done \
 
 schema-teardown:
 	echo "-- *** Generated Schema ***" > schema/teardown.cql
 	for f in $(CONTROL_TEARDOWN); do \
-	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/teardown.cql; \
+	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/teardown-prod.cql; \
+	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/teardown-dev.cql; \
 	done \
 
 FORCE:
@@ -61,8 +65,8 @@ clean: cleandocs
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
 	rm -rf otter-deploy*
-	rm schema/setup.cql
-	rm schema/teardown.cql
+	rm schema/setup-*.cql
+	rm schema/teardown-*.cql
 
 bundle:
 	./scripts/bundle.sh
