@@ -114,8 +114,8 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
     def validate_list_return_value(self, *args, **kwargs):
         """
-        Calls ``list_scaling_groups()`` and validates that it returns a list
-        of strings
+        Calls ``list_scaling_groups()`` and validates that it returns a
+        dictionary of a dictionary of lists of :class:`IScalingGroup` providers
 
         :return: the return value of ``list_scaling_groups()``
         """
@@ -130,12 +130,10 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         self.assertEqual(type(result), dict)
         for key in result:
             self.assertEqual(type(key), str)
-        for dictionary in result.values():
-            self.assertEqual(type(dictionary), dict)
-            for key in dictionary:
-                self.assertEqual(type(key), str)
-            for ultimate_value in dictionary.values():
-                self.assertTrue(IScalingGroup.providedBy(ultimate_value))
+        for group_list in result.values():
+            self.assertEqual(type(group_list), list)
+            for group in group_list:
+                self.assertTrue(IScalingGroup.providedBy(group))
 
         return result
 
@@ -184,3 +182,21 @@ class ScalingGroupConfigTestCase(TestCase):
         """
         self.assertRaises(ValidationError, validate, {'what': 'not expected'},
                           scaling_group_config_schema)
+
+    def test_anything_in_metadata_validates(self):
+        """
+        Putting all sorts of data into the metadata will still validate
+        """
+        config = {
+            'name': 'blah',
+            'cooldown': 60,
+            'min_entities': 0,
+            'metadata': {
+                'somekey': 'somevalue',
+                'alist': [],
+                'adict': {
+                    'dictkey': 5
+                }
+            }
+        }
+        validate(config, scaling_group_config_schema)
