@@ -111,7 +111,7 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, region, config=None):
+    def create_scaling_group(tenant_id, region, config):
         """
         Create scaling group based on the tenant id, region, and the
         configuration paramaters.
@@ -164,17 +164,13 @@ class IScalingGroupCollection(Interface):
         :param region: the region covered by the scaling group
         :type region: ``str``
 
-        :return: mapping of regions mapped to scaling groups uuids mapped to
-            the scaling group's model::
+        :return: mapping of regions mapped to lists of scaling groups models::
 
                 {
-                    region: {
-                        uuid: :class:`IScalingGroup` provider
-                    }
+                    region: [:class:`IScalingGroup` provider...]
                 }
 
-        :rtype: ``dict`` of ``dict`` of ``str`` mapped to
-            :class:`IScalingGroup` provider
+        :rtype: ``dict`` of ``list`` of :class:`IScalingGroup` provider
         """
         pass
 

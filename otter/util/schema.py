@@ -24,6 +24,7 @@ def validate_body(schema):
         @wraps(f)
         def _(request, *args, **kwargs):
             try:
+                request.content.seek(0)
                 data = json.loads(request.content.read())
                 jsonschema.validate(data, schema)
             except ValueError as e:
