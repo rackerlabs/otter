@@ -43,11 +43,12 @@ config = {
                             "values should be strings not exceeding 256 "
                             "characters in length."),
             "patternProperties": {
-                ".{0,256}": {
+                "^.{0,256}$": {
                     "type": "string",
                     "maxLength": 256
                 }
-            }
+            },
+            "additionalProperties": False
         }
     },
     "additionalProperties": False
