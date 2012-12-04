@@ -7,3 +7,5 @@ htmldoc
 _builddoc
 .self.txt
 otter-deploy*
+schema/setup-*.cql
+schema/teardown-*.cql
