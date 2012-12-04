@@ -79,3 +79,10 @@ class ScalingGroupConfigTestCase(TestCase):
             base['metadata'] = invalid
             self.assertRaisesRegexp(ValidationError, error_regexp,
                                     validate, base, scaling_group.config)
+
+
+class LaunchConfigTestCase(TestCase):
+    """
+    Simple verification that the JSON schema for launch configs is correct.
+    """
+    pass
