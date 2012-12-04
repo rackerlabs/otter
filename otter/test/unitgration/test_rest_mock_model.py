@@ -62,8 +62,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         config = {
             'name': 'created',
             'cooldown': 10,
-            'min_entities': 1,
-            'max_entities': 8,
+            'minEntities': 1,
+            'maxEntities': 8,
             'metadata': {
                 'somekey': 'somevalue'
             }
@@ -98,8 +98,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         config = {
             'name': 'edited',
             'cooldown': 5,
-            'min_entities': 3,
-            'max_entities': 10,
+            'minEntities': 3,
+            'maxEntities': 10,
             'metadata': {
                 'anotherkey': 'anothervalue'
             }
