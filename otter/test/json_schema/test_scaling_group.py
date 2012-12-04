@@ -26,16 +26,55 @@ class ScalingGroupConfigTestCase(TestCase):
             prop = scaling_group.config['properties'][property_name]
             self.assertTrue('description' in prop)
 
-    def test_extra_values_does_not_validate(self):
-        """
-        Providing non-expected properties will fail validate.
-        """
-        self.assertRaises(ValidationError, validate, {'what': 'not expected'},
-                          scaling_group.config)
-
     def test_valid_examples_validate(self):
         """
         The examples in the config examples all validate.
         """
         for example in scaling_group.config_examples:
             validate(example, scaling_group.config)
+
+    def test_extra_values_does_not_validate(self):
+        """
+        Providing non-expected properties will fail validate.
+        """
+        invalid = {
+            'name': 'who',
+            'cooldown': 60,
+            'minEntities': 1,
+            'what': 'not expected'
+        }
+        self.assertRaises(ValidationError, validate, invalid,
+                          scaling_group.config)
+
+    def test_long_name_value_does_not_validate(self):
+        """
+        The name must be less than or equal to 256 characters.
+        """
+        invalid = {
+            'name': ' ' * 257,
+            'cooldown': 60,
+            'minEntities': 1,
+        }
+        self.assertRaises(ValidationError, validate, invalid,
+                          scaling_group.config)
+
+    def test_invalid_metadata_does_not_validate(self):
+        """
+        Metadata keys and values must be strings of less than or equal to 256
+        characters.  Anything else will fail to validate.
+        """
+        base = {
+            'name': "stuff",
+            'cooldown': 60,
+            'minEntities': 1
+        }
+        invalids = [
+            {'key' * 256: ""},
+            {'key': "value" * 256},
+            {'key': 1},
+            {'key': None}
+        ]
+        for invalid in invalids:
+            base['metadata'] = invalid
+            self.assertRaises(ValidationError, validate, base,
+                              scaling_group.config)

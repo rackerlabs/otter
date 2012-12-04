@@ -11,32 +11,43 @@ config = {
         "name": {
             "type": "string",
             "description": "Name of the scaling group.",
-            "default": "",
+            "maxLength": 256,
             "required": True
         },
         "cooldown": {
-            "type": "number",
+            "type": "integer",
             "description": ("Cooldown period before more entities are added, "
-                            "given in seconds."),
+                            "given in seconds.  This number must be an "
+                            "integer."),
             "minimum": 0,
             "required": True
         },
         "minEntities": {
             "type": "integer",
-            "description": "Minimum number of entities in the scaling group.",
+            "description": ("Minimum number of entities in the scaling group. "
+                            "This number must be an integer."),
             "minimum": 0,
             "required": True,
         },
         "maxEntities": {
             "type": ["integer", "null"],
             "description": ("Maximum number of entities in the scaling group. "
-                            "Defaults to null, meaning no maximum."),
+                            "Defaults to null, meaning no maximum.  When "
+                            "given, this number must be an integer."),
             "minimum": 0,
             "default": None
         },
         "metadata": {
             "type": "object",
-            "description": "User-provided key-value metadata."
+            "description": ("User-provided key-value metadata.  Both keys and "
+                            "values should be strings not exceeding 256 "
+                            "characters in length."),
+            "patternProperties": {
+                ".{0,256}": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
         }
     },
     "additionalProperties": False
@@ -56,10 +67,7 @@ config_examples = [
         "maxEntities": 100,
         "metadata": {
             "firstkey": "this is a string",
-            "secondkey": [1, 2, 3],
-            "thirdkey": {
-                "subkey": True
-            }
+            "secondkey": "1",
         }
     }
 ]
