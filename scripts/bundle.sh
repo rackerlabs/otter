@@ -6,6 +6,9 @@
 # requirements from requirements.txt and otter into the virtualenv then
 # creates a tarball for distribution and a sha checksum for verification.
 #
+# This only runs on Ubuntu.  It is intended to be used by chef (recipe[otter::dev])
+# and Jenkins.
+#
 
 set -e
 
@@ -15,21 +18,9 @@ DIST_DIR=${DIST_DIR:="."}
 
 TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
-SHA256="sha256sum"
 
-LSB=""
-
-if [[ "$(which lsb_release)" != "" ]]; then
-    LSB="$(lsb_release -cs)-$(lsb_release -rs)-"
-fi
-
-if [[ "${BUILD_NUMBER}" != "" ]]; then
-    BUILD_NUMBER="-${BUILD_NUMBER}"
-fi
-
-if [[ "$(which ${SHA256})" == "" ]]; then
-    SHA256="shasum -a 256"
-fi
+LSB="$(lsb_release -cs)-$(lsb_release -rs)-"
+BUILD_NUMBER="-${BUILD_NUMBER}"
 
 if [[ "$1" == "--dev" ]]; then
     LSB="dev"
@@ -93,5 +84,5 @@ tar -zcvf ${DIST} -C ${TARGET} \
     --exclude-vcs .;
 
 echo "Calculating checksum..."
-${SHA256} ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
+sha256sum ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
 
