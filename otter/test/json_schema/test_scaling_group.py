@@ -153,9 +153,11 @@ class ServerLaunchConfigTestCase(TestCase):
             }
         }
         invalids = [
-            ({'lbid': '', 'port': 80, 'network': 'public'}, 'not of type'),
-            ({'lbid': 3, 'port': '80', 'network': 'public'}, 'not of type'),
-            ({'lbid': 3, 'port': 80,
+            ({'loadBalancerId': '', 'port': 80, 'network': 'public'},
+             'not of type'),
+            ({'loadBalancerId': 3, 'port': '80', 'network': 'public'},
+             'not of type'),
+            ({'loadBalancerId': 3, 'port': 80,
              'network': '11111111-1111-1111-111111111111'}, 'is not one of')
         ]
         for invalid, regexp in invalids:
@@ -178,8 +180,8 @@ class ServerLaunchConfigTestCase(TestCase):
             "args": {
                 "server": {},
                 "loadBalancers": [
-                    {'lbid': 1, 'port': 80, 'network': 'public'},
-                    {'lbid': 1, 'port': 80, 'network': 'public'}
+                    {'loadBalancerId': 1, 'port': 80, 'network': 'public'},
+                    {'loadBalancerId': 1, 'port': 80, 'network': 'public'}
                 ]
             }
         }

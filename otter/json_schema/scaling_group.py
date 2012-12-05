@@ -51,7 +51,7 @@ launch_server = {
                             "added to."),
                         "properties": {
                             # load balancer id's are NOT uuid's.  just an int.
-                            "lbid": {
+                            "loadBalancerId": {
                                 "type": "integer",
                                 "description": (
                                     "The ID of the load balancer to which new "
@@ -139,7 +139,7 @@ launch_server_config_examples = [
             },
             "loadBalancers": [
                 {
-                    "lbid": 2200,
+                    "loadBalancerId": 2200,
                     "port": 8081,
                     "network": "private"
                 }
@@ -156,12 +156,12 @@ launch_server_config_examples = [
             },
             "loadBalancers": [
                 {
-                    "lbid": 441,
+                    "loadBalancerId": 441,
                     "port": 80,
                     "network": "public"
                 },
                 {
-                    "lbid": 2200,
+                    "loadBalancerId": 2200,
                     "port": 8081,
                     "network": "private"
                 }
