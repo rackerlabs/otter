@@ -3,7 +3,13 @@ JSON Schemas for the scaling group - the launch config and the general scaling
 group configuration.  There are also example configs and launch configs.
 """
 
-launch_server_config = {
+# This is built using union types which may not be available in Draft 4
+# see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
+# required-based-on-value-of-another-field
+# and https://groups.google.com/forum/?fromgroups=#!msg/json-
+# schema/uvUFu6KE_xQ/O5aTuw5pRYEJ
+
+launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
                     "of launch configuration will spin up a next-gen server "
@@ -12,14 +18,9 @@ launch_server_config = {
                     "arguments are specified."),
     "properties": {
         "type": {
-            "type": "string",
-            "description": "The type of launch config this is.",
             "enum": ["launch_server"],
-            "required": True
         },
         "args": {
-            "type": "object",
-            "required": True,
             "properties": {
                 "server": {
                     "type": "object",
@@ -77,6 +78,22 @@ launch_server_config = {
             },
             "additionalProperties": False
         }
+    }
+}
+
+# base launch config
+launch_config = {
+    "type": [launch_server],
+    "properties": {
+        "type": {
+            "type": "string",
+            "description": "The type of launch config this is.",
+            "required": True
+        },
+        "args": {
+            "type": "object",
+            "required": True
+        }
     },
     "additionalProperties": False
 }
@@ -111,7 +128,7 @@ launch_server_config_examples = [
             },
             "loadBalancers": [
                 {
-                    "id": 2200,
+                    "lbid": 2200,
                     "port": 8081,
                     "network": "private"
                 }
@@ -128,16 +145,26 @@ launch_server_config_examples = [
             },
             "loadBalancers": [
                 {
-                    "id": 441,
+                    "lbid": 441,
                     "port": 80,
                     "network": "public"
                 },
                 {
-                    "id": 2200,
+                    "lbid": 2200,
                     "port": 8081,
                     "network": "private"
                 }
             ]
+        }
+    },
+    {
+        "type": "launch_server",
+        "args": {
+            "server": {
+                "flavorRef": 2,
+                "name": "worker",
+                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0",
+            },
         }
     }
 ]
