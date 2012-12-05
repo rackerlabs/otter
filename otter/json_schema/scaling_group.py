@@ -24,6 +24,10 @@ launch_server = {
             "properties": {
                 "server": {
                     "type": "object",
+                    # The schema for the create server attributes should come
+                    # from Nova, or Nova should provide some no-op method to
+                    # validate creating a server.  Autoscale should not
+                    # attempt to re-create Nova's validation.
                     "description": (
                         "Attributes to provide to nova create server: "
                         "http://docs.rackspace.com/servers/api/v2/"
@@ -46,6 +50,7 @@ launch_server = {
                             "One load balancer all new servers should be "
                             "added to."),
                         "properties": {
+                            # load balancer id's are NOT uuid's.  just an int.
                             "lbid": {
                                 "type": "integer",
                                 "description": (
@@ -63,6 +68,12 @@ launch_server = {
                             },
                             "network": {
                                 "type": "string",
+                                # the "Add Node" endpoint in the load
+                                # balancers API accepts the network ID of
+                                # 'public' rather than the all zero's UUID4
+                                # (for the public network) and 'private' rather
+                                # than the all 1's UUID4 (for the ServiceNet)
+                                # network
                                 "description": (
                                     "Which network's IPv4 address to add to "
                                     "the load balancer ('public' or "
