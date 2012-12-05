@@ -43,8 +43,8 @@ class ScalingGroupConfigTestCase(TestCase):
             'minEntities': 1,
             'what': 'not expected'
         }
-        self.assertRaises(ValidationError, validate, invalid,
-                          scaling_group.config)
+        self.assertRaisesRegexp(ValidationError, "Additional properties",
+                                validate, invalid, scaling_group.config)
 
     def test_long_name_value_does_not_validate(self):
         """
@@ -55,8 +55,8 @@ class ScalingGroupConfigTestCase(TestCase):
             'cooldown': 60,
             'minEntities': 1,
         }
-        self.assertRaises(ValidationError, validate, invalid,
-                          scaling_group.config)
+        self.assertRaisesRegexp(ValidationError, "is too long",
+                                validate, invalid, scaling_group.config)
 
     def test_invalid_metadata_does_not_validate(self):
         """
@@ -69,12 +69,13 @@ class ScalingGroupConfigTestCase(TestCase):
             'minEntities': 1
         }
         invalids = [
-            {'key' * 256: ""},
-            {'key': "value" * 256},
-            {'key': 1},
-            {'key': None}
+            # because Draft 3 doesn't support key length, so it's a regexp
+            ({'key' * 256: ""}, "Additional properties"),
+            ({'key': "value" * 256}, "is too long"),
+            ({'key': 1}, "not of type"),
+            ({'key': None}, "not of type")
         ]
-        for invalid in invalids:
+        for invalid, error_regexp in invalids:
             base['metadata'] = invalid
-            self.assertRaises(ValidationError, validate, base,
-                              scaling_group.config)
+            self.assertRaisesRegexp(ValidationError, error_regexp,
+                                    validate, base, scaling_group.config)
