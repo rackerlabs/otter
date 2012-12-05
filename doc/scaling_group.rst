@@ -9,8 +9,8 @@ Scaling Group Schema
         "scaling_group": {
             "name": "ScalingGroup1",
             "cooldown": 999,
-            "min_entities": 0,
-            "max_entities": null,
+            "minEntities": 0,
+            "maxEntities": null,
             "metadata": {}
         }
     }
