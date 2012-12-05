@@ -9,6 +9,17 @@ group configuration.  There are also example configs and launch configs.
 # and https://groups.google.com/forum/?fromgroups=#!msg/json-
 # schema/uvUFu6KE_xQ/O5aTuw5pRYEJ
 
+# It is possible to create an invalid launch config (one that fails to create
+# a server) - (1) we don't validate against nova yet, (2) even if it validates
+# against nova at creation time, they may delete an image or network, and (3)
+# it is possible for the user to create a server that is not connected to
+# either the public net or the ServiceNet.
+
+# TODO: we need some strategy for perhaps warning the user that their launch
+# config has problems.  Perhaps a no-op validation endpoint that lists all the
+# problems with their launch configuration, or perhaps accept the launch
+# configuration and return a warning list of all possible problems.
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -39,8 +50,15 @@ launch_server = {
                     "type": "array",
                     "description": (
                         "One or more load balancers to add new servers to. "
-                        "All servers added to these load balancers will be "
-                        "enabled, of primary type, and equally weighted."),
+                        "All servers will be added to these load balancers "
+                        "with their ServiceNet addresses, and will be "
+                        "enabled, of primary type, and equally weighted. If "
+                        "new servers are not connected to the ServiceNet, "
+                        "they will not be added to any load balancers."),
+                    # The network is ServiceNet because CLB doesn't work with
+                    # isolated networks, and using public networks will just
+                    # get the customer charged for the bandwidth anyway, so it
+                    # doesn't seem like a good idea.
                     "required": False,
                     "minItems": 0,
                     "uniqueItems": True,
@@ -65,21 +83,6 @@ launch_server = {
                                     "new servers) to load balance on for this "
                                     "particular load balancer."),
                                 "required": True
-                            },
-                            "network": {
-                                "type": "string",
-                                # the "Add Node" endpoint in the load
-                                # balancers API accepts the network ID of
-                                # 'public' rather than the all zero's UUID4
-                                # (for the public network) and 'private' rather
-                                # than the all 1's UUID4 (for the ServiceNet)
-                                # network
-                                "description": (
-                                    "Which network's IPv4 address to add to "
-                                    "the load balancer ('public' or "
-                                    "'private')."),
-                                "required": True,
-                                "enum": ["public", "private"]
                             }
                         },
                         "additionalProperties": False
@@ -140,8 +143,7 @@ launch_server_config_examples = [
             "loadBalancers": [
                 {
                     "loadBalancerId": 2200,
-                    "port": 8081,
-                    "network": "private"
+                    "port": 8081
                 }
             ]
         }
@@ -157,13 +159,11 @@ launch_server_config_examples = [
             "loadBalancers": [
                 {
                     "loadBalancerId": 441,
-                    "port": 80,
-                    "network": "public"
+                    "port": 80
                 },
                 {
                     "loadBalancerId": 2200,
-                    "port": 8081,
-                    "network": "private"
+                    "port": 8081
                 }
             ]
         }

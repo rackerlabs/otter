@@ -144,7 +144,7 @@ class ServerLaunchConfigTestCase(TestCase):
 
     def test_invalid_load_balancer_does_not_validate(self):
         """
-        Load balancers need to have 3 values: lbid, port, and network.
+        Load balancers need to have 2 values: loadBalancerId and port.
         """
         base = {
             "type": "launch_server",
@@ -153,17 +153,13 @@ class ServerLaunchConfigTestCase(TestCase):
             }
         }
         invalids = [
-            ({'loadBalancerId': '', 'port': 80, 'network': 'public'},
-             'not of type'),
-            ({'loadBalancerId': 3, 'port': '80', 'network': 'public'},
-             'not of type'),
-            ({'loadBalancerId': 3, 'port': 80,
-             'network': '11111111-1111-1111-111111111111'}, 'is not one of')
+            {'loadBalancerId': '', 'port': 80},
+            {'loadBalancerId': 3, 'port': '80'}
         ]
-        for invalid, regexp in invalids:
+        for invalid in invalids:
             base["args"]["loadBalancers"] = [invalid]
-            # the type fails ot valdiate because of "regexp" region
-            self.assertRaisesRegexp(ValidationError, regexp, validate,
+            # the type fails ot valdiate because of 'not of type'
+            self.assertRaisesRegexp(ValidationError, 'not of type', validate,
                                     base, scaling_group.launch_server)
             # because the type schema fails to validate, the config schema
             # fails to validate because it is not the given type
@@ -180,8 +176,8 @@ class ServerLaunchConfigTestCase(TestCase):
             "args": {
                 "server": {},
                 "loadBalancers": [
-                    {'loadBalancerId': 1, 'port': 80, 'network': 'public'},
-                    {'loadBalancerId': 1, 'port': 80, 'network': 'public'}
+                    {'loadBalancerId': 1, 'port': 80},
+                    {'loadBalancerId': 1, 'port': 80}
                 ]
             }
         }
