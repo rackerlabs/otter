@@ -5,26 +5,17 @@ Launch Config Schema
 **Document type: launch_server**::
 
     {
-        "imageId": "image_uuid_string",
-        "flavorId": "...",
-        "networks": [
-            "..."
-        ],
-        "loadBalancers": [
-            {
-                id: "",
-                port: ""
-            }
-        ],
-        "volumes": [
-            {
-                "volumeId": "...",
-                "device": "..."
+        "type": "launch_servers",
+        "args": {
+            "server": {
+                "...nova create server args..."
             },
-            {
-                "volumeId": "...",
-                "device": "..."
-            }
-        ],
-        "metadata": {},
+            "loadBalancers":
+                {
+                    "id": "",
+                    "port": "",
+                    "network": ""
+                }
+            ]
+        }
     }
