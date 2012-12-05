@@ -1,0 +1,187 @@
+<!--
+Google IO 2012 HTML5 Slide Template
+
+Authors: Eric Bidelman <ebidel@gmail.com>
+         Luke Mahé <lukem@google.com>
+
+URL: https://code.google.com/p/io-2012-slides
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Google IO 2012</title>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">-->
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+  <!--This one seems to work all the time, but really small on ipad-->
+  <!--<meta name="viewport" content="initial-scale=0.4">-->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="stylesheet" media="all" href="theme/css/default.css">
+  <link rel="stylesheet" media="only screen and (max-device-width: 480px)" href="theme/css/phone.css">
+  <base target="_blank"> <!-- This amazingness opens all links in a new tab. -->
+  <script data-main="js/slides" src="js/require-1.0.8.min.js"></script>
+</head>
+<body style="opacity: 0">
+
+<slides class="layout-widescreen">
+
+  <slide>
+    <article class="flexbox vcenter">
+      <img src="https://i.chzbgr.com/completestore/12/8/19/AjXtHogT4UqgJwDJsq7igA2.gif" height="225" width="336">
+    </article>
+  </slide>
+
+  <slide class="title-slide segue nobackground">
+    <aside class="gdbar"><img src="https://i.chzbgr.com/completestore/12/8/19/AjXtHogT4UqgJwDJsq7igA2.gif" height="225" width="336"></aside>
+    <!-- The content of this hgroup is replaced programmatically through the slide_config.json. -->
+    <hgroup class="auto-fadein">
+      <h1 data-config-title><!-- populated from slide_config.json --></h1>
+      <h2 data-config-subtitle><!-- populated from slide_config.json --></h2>
+      <p data-config-presenter><!-- populated from slide_config.json --></p>
+    </hgroup>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>What?</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li>When a user-configurable threshold is reached, spin up more servers</li>
+        <li>When a user-configurable threshold is reached, shut down more servers</li>
+        <li>Don't accidentally cause users to exceed their budget</li>
+      </ul>
+    </article>
+  </slide>
+
+
+  <slide>
+    <hgroup>
+      <h2>Why?</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li>We get rejected at the beginning of the conversation with companies because we don't have it</li>
+        <li>Sell more compute hours</li>
+      </ul>
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Who?</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li>Management: Greg, Duncan</li>
+        <li>TPM: Felix</li>
+        <li>Software Engineering: Ying, David, Ken</li>
+        <li>Dev Ops: Phil, Shawn</li>
+        <li>Quality: Alex, Lekha</li> 
+      </ul>
+    </article>
+  </slide>
+  
+  <slide>
+    <hgroup>
+      <h2>Technological Stack</h2>
+    </hgroup>
+    <article>
+      <ul>
+        <li>Twisted Python</li>
+        <li>Cassandra</li>
+        <li>Littlechef</li>
+        <li>VMWare instead of Vagrant</li>
+        <li>JIRA instead of v1</li>
+        <li>Klein and MagicMock</li>
+      </ul>
+    </article>
+  </slide>
+  
+  <slide>
+    <hgroup>
+      <h2>Product Observation</h2>
+    </hgroup>
+    <article>
+      <ul class="build">
+        <li>Amazon AutoScale represents the MVP</li>
+        <li>..but...</li>
+        <li>We can do <i>much</i> better</li>
+        <li>(Especially in terms of a clean API and Reach UI)</li>
+      </ul>
+    </article>
+  </slide>
+  
+  <slide>
+    <hgroup>
+      <h2>Architecture</h2>
+    </hgroup>
+    <article class="flexbox vcenter">
+      <img src="images/arch.png" alt="Description" title="Description">
+    </article>
+  </slide>
+  
+  <slide>
+    <hgroup>
+      <h2>Sequence of operation</h2>
+    </hgroup>
+    <article class="flexbox vcenter">
+      <img src="images/minseq.png" alt="Description" title="Description">
+    </article>
+  </slide>
+
+  <slide>
+    <hgroup>
+      <h2>Salient Points</h2>
+    </hgroup>
+    <article>
+      <ul class="build">
+       <li>v1 requires images to be self-provisioning (Service Registry is your friend)</li>
+       <li>We need to be able to be counted on, much in the same way as MaaS, so we need to spend time working on cross-colo resiliency</li>
+       <li>Allowing MaaS to generate scale-up/scale-down events means that we don't need to write a micro-MaaS inside of our product</li>
+       <li>We are crossing the rubicon: JSON only, no XML</li>
+      </ul>
+    </article>
+  </slide>
+  
+  <slide>
+    <hgroup>
+      <h2>Social features</h2>
+    </hgroup>
+    <article>
+      <ul class="build">
+       <li>Kanban instead of Scrum</li>
+       <li>Teatime instead of standups</li>
+      </ul>
+    </article>
+  </slide>
+      
+  <slide class="logoslide dark nobackground">
+    <article class="flexbox vcenter">
+
+    </article>
+  </slide>
+
+  <slide class="backdrop"></slide>
+
+</slides>
+
+<script>
+var _gaq = _gaq || [];
+_gaq.push(['_setAccount', 'UA-XXXXXXXX-1']);
+_gaq.push(['_trackPageview']);
+
+(function() {
+  var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+  ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+  var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+})();
+</script>
+
+<!--[if IE]>
+  <script src="http://ajax.googleapis.com/ajax/libs/chrome-frame/1/CFInstall.min.js"></script>
+  <script>CFInstall.check({mode: 'overlay'});</script>
+<![endif]-->
+</body>
+</html>
