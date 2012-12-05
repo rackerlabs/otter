@@ -33,8 +33,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result, {
             'name': '',
             'cooldown': 0,
-            'min_entities': 0,
-            'max_entities': None,
+            'minEntities': 0,
+            'maxEntities': None,
             'metadata': {}
         })
 
@@ -67,7 +67,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Setting a steady state that is below the min will set the steady state
         to the min.
         """
-        self.group = MockScalingGroup('DFW', 1, {'min_entities': 5})
+        self.group = MockScalingGroup('DFW', 1, {'minEntities': 5})
         self.assert_deferred_succeeded(self.group.set_steady_state(1))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -79,7 +79,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Setting a steady state that is above the max will set the steady state
         to the max.
         """
-        self.group = MockScalingGroup('DFW', 1, {'max_entities': 5})
+        self.group = MockScalingGroup('DFW', 1, {'maxEntities': 5})
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -130,8 +130,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected = {
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
-            'min_entities': 100,
-            'max_entities': 1000,
+            'minEntities': 100,
+            'maxEntities': 1000,
             'name': 'UPDATED'
         }
         extra = dict(expected)
@@ -149,8 +149,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected = {
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
-            'min_entities': 100,
-            'max_entities': 1000,
+            'minEntities': 100,
+            'maxEntities': 1000,
             'name': 'UPDATED'
         }
         self.assert_deferred_succeeded(self.group.update_config(expected))
@@ -164,7 +164,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         current steady state is set to that min
         """
         self.assert_deferred_succeeded(self.group.update_config({
-            'min_entities': 5
+            'minEntities': 5
         }))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -178,7 +178,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
         self.assert_deferred_succeeded(self.group.update_config({
-            'max_entities': 5
+            'maxEntities': 5
         }))
         self.assertEquals(self.validate_view_state_return_value(), {
             'steady_state_entities': 5,
@@ -201,8 +201,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.config = {
             'name': 'blah',
             'cooldown': 600,
-            'min_entities': 0,
-            'max_entities': 10,
+            'minEntities': 0,
+            'maxEntities': 10,
             'metadata': {}
         }
 
