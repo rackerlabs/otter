@@ -3,15 +3,14 @@ Tests for :mod:`otter.models.interface`
 """
 from copy import deepcopy
 
-from jsonschema import Draft3Validator, validate, ValidationError
+from jsonschema import validate
 
 from twisted.internet import defer
-from twisted.trial.unittest import TestCase
 
 from zope.interface.verify import verifyObject
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    scaling_group_config_schema)
+from otter.models.interface import IScalingGroup, IScalingGroupCollection
+from otter.json_schema.scaling_group import config as group_config_schema
 from otter.test.utils import DeferredTestMixin
 
 
@@ -67,13 +66,13 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         Calls ``view_config()``, and validates that it returns a config
         dictionary containing relevant configuration values, as specified by
-        the :data:`scaling_group_config_schema`
+        the :data:`group_config_schema`
 
         :return: the return value of ``view_config()``
         """
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
-        schema = deepcopy(scaling_group_config_schema)
+        schema = deepcopy(group_config_schema)
         for property_name in schema['properties']:
             schema['properties'][property_name]['required'] = True
 
@@ -148,55 +147,3 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
             self.collection.get_scaling_group, *args, **kwargs))
         self.assertTrue(IScalingGroup.providedBy(result))
         return result
-
-
-class ScalingGroupConfigTestCase(TestCase):
-    """
-    Simple verification that the JSON schema for scaling groups is correct.
-    """
-    def test_schema_valid(self):
-        """
-        The schema itself is valid Draft 3 schema
-        """
-        Draft3Validator.check_schema(scaling_group_config_schema)
-
-    def test_all_properties_have_titles(self):
-        """
-        All the properties in the schema should have titles
-        """
-        for property_name in scaling_group_config_schema['properties']:
-            prop = scaling_group_config_schema['properties'][property_name]
-            self.assertTrue('title' in prop)
-
-    def test_minimal_config_validates(self):
-        """
-        Providing nothing will validate.  This is necessary because this may
-        be the minimum schema the user provides.
-        """
-        validate({'name': 'blah', 'cooldown': 60, 'min_entities': 0},
-                 scaling_group_config_schema)
-
-    def test_extra_values_does_not_validate(self):
-        """
-        Providing non-expected properties will fail validate.
-        """
-        self.assertRaises(ValidationError, validate, {'what': 'not expected'},
-                          scaling_group_config_schema)
-
-    def test_anything_in_metadata_validates(self):
-        """
-        Putting all sorts of data into the metadata will still validate
-        """
-        config = {
-            'name': 'blah',
-            'cooldown': 60,
-            'min_entities': 0,
-            'metadata': {
-                'somekey': 'somevalue',
-                'alist': [],
-                'adict': {
-                    'dictkey': 5
-                }
-            }
-        }
-        validate(config, scaling_group_config_schema)

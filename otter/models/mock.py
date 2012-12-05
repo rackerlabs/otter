@@ -48,8 +48,8 @@ class MockScalingGroup:
             self.config = {
                 'name': "",
                 'cooldown': 0,
-                'min_entities': 0,
-                'max_entities': None,  # no upper limit
+                'minEntities': 0,
+                'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
             self.update_config(config)
@@ -86,7 +86,7 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
 
-        valid_keys = ('name', 'cooldown', 'min_entities', 'max_entities',
+        valid_keys = ('name', 'cooldown', 'minEntities', 'maxEntities',
                       'metadata')
         for key in data:
             if key in valid_keys:
@@ -108,10 +108,10 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
 
-        self.steady_state = max(steady_state, self.config['min_entities'])
-        if self.config['max_entities'] is not None:
+        self.steady_state = max(steady_state, self.config['minEntities'])
+        if self.config['maxEntities'] is not None:
             self.steady_state = min(self.steady_state,
-                                    self.config['max_entities'])
+                                    self.config['maxEntities'])
         return defer.succeed(None)
 
     def list_entities(self):

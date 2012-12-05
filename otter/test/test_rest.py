@@ -2,6 +2,7 @@
 
 from collections import defaultdict, namedtuple
 import json
+from jsonschema import ValidationError
 
 from klein.test_resource import requestMock
 
@@ -16,7 +17,6 @@ from otter import scaling_groups_rest
 from otter.models.interface import NoSuchScalingGroupError
 from otter.test.utils import DeferredTestMixin
 from otter.util.schema import InvalidJsonError
-from jsonschema import ValidationError
 
 
 class DummyException(Exception):
@@ -298,7 +298,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.create_scaling_group.return_value = defer.succeed(
             'one')
-        request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
         expected_url = 'http://127.0.0.1/v1.0/11111/scaling_groups/dfw/one/'
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body),
@@ -321,7 +321,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
         """
         Tries to get a group
         """
-        request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
 
         mock_group = mock.MagicMock()
         mock_group.uuid = 'one'
@@ -366,7 +366,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.return_value = mock_group
 
-        request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
 
         self.assert_status_code(204, self.endpoint + '/one', 'PUT',
                                 json.dumps(request_body))
@@ -408,7 +408,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.return_value = mock_group
 
-        request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
 
         self.assert_status_code(404, self.endpoint + '/one', 'PUT',
                                 json.dumps(request_body))
@@ -427,7 +427,7 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.return_value = mock_group
 
-        request_body = {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
 
         self.assert_status_code(500, self.endpoint + '/one', 'PUT',
                                 json.dumps(request_body))

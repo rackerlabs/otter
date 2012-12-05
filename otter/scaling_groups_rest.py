@@ -1,15 +1,17 @@
 """ Scaling groups REST mock API"""
 
-from twisted.web.resource import Resource
-from util.schema import validate_body
-from util.fault import fails_with, succeeds_with
 from klein import resource, route
-from twisted.internet import defer
 import json
-from otter.models.interface import \
-    scaling_group_config_schema, NoSuchScalingGroupError
-from otter.util.schema import InvalidJsonError
 from jsonschema import ValidationError
+
+from twisted.internet import defer
+from twisted.web.resource import Resource
+
+from otter.models.interface import NoSuchScalingGroupError
+from otter.json_schema.scaling_group import config as config_schema
+from otter.util.schema import InvalidJsonError, validate_body
+from otter.util.fault import fails_with, succeeds_with
+
 
 _store = None
 _urlRoot = 'http://127.0.0.1/v1.0'
@@ -112,7 +114,7 @@ def view_config_for_scaling_group(request, tenantid, coloid, groupid):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(scaling_group_config_schema)
+@validate_body(config_schema)
 def edit_scaling_group(request, tenantid, coloid, groupid, data):
     """
     Edit config for a scaling group.
@@ -188,7 +190,7 @@ def get_scaling_groups(request, tenantid, coloid):
 @route('/<string:tenantid>/scaling_groups/<string:coloid>', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(scaling_group_config_schema)
+@validate_body(config_schema)
 def create_new_scaling_group(request, tenantid, coloid, data):
     """Create a new scaling group.
 
