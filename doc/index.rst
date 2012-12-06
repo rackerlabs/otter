@@ -17,7 +17,14 @@ Developer documentation
    architecture
    standards
 
-API documentation
+Endpoint API documentation
+--------------------------
+.. toctree::
+   :maxdepth: 3
+
+   rest
+
+Code API documentation
 -----------------
 
 .. toctree::
