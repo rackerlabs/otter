@@ -188,7 +188,8 @@ config = {
     "properties": {
         "name": {
             "type": "string",
-            "description": "Name of the scaling group.",
+            "description": ("Name of the scaling group (this name does not "
+                            "have to be unique)."),
             "maxLength": 256,
             "required": True
         },
@@ -232,6 +233,7 @@ config = {
     "additionalProperties": False
 }
 
+
 # Valid config examples
 config_examples = [
     {
@@ -250,3 +252,102 @@ config_examples = [
         }
     }
 ]
+
+
+scaling_policy = {
+    "type": [
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "capabilityUrls": {},
+                "changePercent": {"required": True}
+            },
+            "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "capabilityUrls": {},
+                "change": {"required": True}
+            },
+            "additionalProperties": False
+        }
+    ],
+    "description": (
+        "A Scaling Policy defines how the current number of servers in the "
+        "scaling group should change, and how often this exact change can "
+        "happen (cooldown)."),
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": (
+                "A name for this scaling policy. This name does have to be "
+                "unique for all scaling policies."),
+            "required": True,
+            "maxLength": 256,
+        },
+        "change": {
+            "type": "integer",
+            "description": (
+                "A non-zero integer change to make in the number of servers "
+                "in the scaling group.  If positive, the number of servers "
+                "will increase.  If negative, the number of servers will "
+                "decrease."),
+            "disallow": 0
+        },
+        "changePercent": {
+            "type": "number",
+            "description": (
+                "A non-zero percent change to make in the number of servers "
+                "in the scaling group.  If positive, the number of servers "
+                "will increase by the given percentage, rounded up to the "
+                "nearest integer.  If negative, the number of servers will "
+                "decrease by the given percentage, rounded up to the nearest "
+                "integer."),
+            "disallow": 0
+        },
+        "cooldown": {
+            "type": "number",
+            "description": (
+                "Cooldown period before this particular scaling policy can "
+                "be executed again.  This cooldown period does not affect the "
+                "global scaling group cooldown."),
+            "minimum": 0,
+            "required": True
+        },
+        "capabilityUrls": {
+            "type": "array",
+            "description": (
+                "A list of capability URLs, their short names, and an id."),
+            "items": {
+                "type": "object",
+                "description": (
+                    "A list of capability URLs.  The URLs themselves are "
+                    "unique and thus serve as their own unique ID, but they "
+                    "can also be named with a non-unique, human readable "
+                    "string."),
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "A unique capability URL for the scaling policy."),
+                        "required": True
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "A short, human-readable name that describes this "
+                            "capability URL."),
+                        "required": False,
+                        "maxLength": 256,
+                    }
+                },
+                "additionalProperties": False
+            }
+        }
+    }
+}
