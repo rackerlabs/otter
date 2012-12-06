@@ -2,9 +2,10 @@
 Launch Config Schema
 ====================
 
+The server arg contains arguments that will be passed to nova's create server API.  It is treated as opaque to autoscale.  (Nova should handle validation).
+
 **Document type: launch_server**::
 
-The server arg contains arguments that will be passed to nova's create server API.  It is treated as opaque to autoscale.  (Nova should handle validation).
 
     {
         "type": "launch_servers",

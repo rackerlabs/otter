@@ -22,10 +22,10 @@ Endpoint API documentation
 .. toctree::
    :maxdepth: 3
 
-   rest
+   endpoints
 
 Code API documentation
------------------
+----------------------
 
 .. toctree::
    :maxdepth: 3

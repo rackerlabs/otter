@@ -6,7 +6,7 @@
         <text>ScalingGroup1</text>
       </controlProperties>
     </control>
-    <control controlID="4" controlTypeID="com.balsamiq.mockups::Label" x="201" y="236" w="-1" h="-1" measuredW="41" measuredH="21" zOrder="1" locked="false" isInGroup="-1">
+    <control controlID="4" controlTypeID="com.balsamiq.mockups::Label" x="201" y="236" w="-1" h="-1" measuredW="40" measuredH="21" zOrder="1" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Name</text>
       </controlProperties>
@@ -73,7 +73,7 @@
         <text>Block%20Storage</text>
       </controlProperties>
     </control>
-    <control controlID="26" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="1039" w="502" h="148" measuredW="334" measuredH="53" zOrder="16" locked="false" isInGroup="-1">
+    <control controlID="26" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="1039" w="502" h="148" measuredW="333" measuredH="53" zOrder="16" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Name%20%5E%2C%20Region%20%5Ev%2C%20Type%2C%20Size%20v%0AVolume-1%2C%20Dallas%20%28DFW%29%2C%20Standard%20%28SATA%29%2C%20100GB</text>
       </controlProperties>
@@ -104,7 +104,7 @@
         <text>Save%20Here%0AYou%20can%20add%20Scaling%20Policies%20later</text>
       </controlProperties>
     </control>
-    <control controlID="37" controlTypeID="com.balsamiq.mockups::DataGrid" x="213" y="1501" w="726" h="262" measuredW="357" measuredH="143" zOrder="23" locked="false" isInGroup="-1">
+    <control controlID="37" controlTypeID="com.balsamiq.mockups::DataGrid" x="213" y="1501" w="726" h="262" measuredW="354" measuredH="143" zOrder="23" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Name%2C%20Direction%2C%20Adjustment%2C%20Cooldown%0A%5BScale%20Up%2010%25%5D%2C%20Up%2C%2010%25%2C%205%20Minutes%0A%5BScale%20Down%2010%25%5D%2C%20Down%2C%2010%25%2C%205%20Minutes%0A%5BScale%20Up%201%20Server%5D%2C%20Up%2C%201%20Server%2C%205%20Minutes%0A%5BScale%20Down%201%20Server%5D%2C%20Down%2C%201%20Server%2C%205%20Minutes</text>
       </controlProperties>
@@ -168,7 +168,7 @@
             <text>Cancel</text>
           </controlProperties>
         </control>
-        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="196" y="113" w="206" h="-1" measuredW="80" measuredH="23" zOrder="10" locked="false" isInGroup="41">
+        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="196" y="113" w="206" h="-1" measuredW="79" measuredH="23" zOrder="10" locked="false" isInGroup="41">
           <controlProperties>
             <text>Percent</text>
           </controlProperties>
@@ -195,12 +195,12 @@
         <text>Choose%20Image</text>
       </controlProperties>
     </control>
-    <control controlID="43" controlTypeID="com.balsamiq.mockups::Label" x="201" y="548" w="109" h="21" measuredW="42" measuredH="21" zOrder="27" locked="false" isInGroup="-1">
+    <control controlID="43" controlTypeID="com.balsamiq.mockups::Label" x="201" y="548" w="109" h="21" measuredW="43" measuredH="21" zOrder="27" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Image</text>
       </controlProperties>
     </control>
-    <control controlID="44" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="584" w="502" h="148" measuredW="412" measuredH="53" zOrder="28" locked="false" isInGroup="-1">
+    <control controlID="44" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="584" w="502" h="148" measuredW="411" measuredH="53" zOrder="28" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Selected%2C%20Name%20%5E%2C%20Parent%20Server%20%2C%20Date%20Created%20v%0A%5Bx%5D%2C%20Core-1%2C%20Core%2C%20Aug%207%202012%20-%204%3A57%20pm%20UTC</text>
       </controlProperties>
@@ -264,7 +264,7 @@
             <text>Cancel</text>
           </controlProperties>
         </control>
-        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="204" y="116" w="206" h="-1" measuredW="80" measuredH="23" zOrder="10" locked="false" isInGroup="47">
+        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="204" y="116" w="206" h="-1" measuredW="79" measuredH="23" zOrder="10" locked="false" isInGroup="47">
           <controlProperties>
             <text>Percent</text>
           </controlProperties>
@@ -284,9 +284,9 @@
             <text>Minutes</text>
           </controlProperties>
         </control>
-        <control controlID="18" controlTypeID="com.balsamiq.mockups::DataGrid" x="139" y="235" w="633" h="136" measuredW="523" measuredH="69" zOrder="14" locked="false" isInGroup="47">
+        <control controlID="18" controlTypeID="com.balsamiq.mockups::DataGrid" x="139" y="235" w="633" h="136" measuredW="518" measuredH="55" zOrder="14" locked="false" isInGroup="47">
           <controlProperties>
-            <text>Name%5Cr%28job%20title%29%20%5E%2C%20Cooldown%20%5Ev%2C%20Public%20URL%0APagerduty%2C%203%20min%2C%20http%3A//api.rackspace.com/2.0/account/12345678/AutoScale/%5Cr941aed660b278246f29ddaced1</text>
+            <text>Name%20%5E%2C%20Cooldown%20%5Ev%2C%20Public%20URL%0APagerduty%2C%203%20min%2C%20http%3A//api.rackspace.com/2.0/account/12345678/AutoScale/%5Cr941aed660b278246f29ddaced1</text>
           </controlProperties>
         </control>
         <control controlID="20" controlTypeID="com.balsamiq.mockups::Label" x="41" y="199" w="-1" h="-1" measuredW="77" measuredH="21" zOrder="15" locked="false" isInGroup="47">
@@ -334,7 +334,7 @@
         <text>Have%20Rackspace%20Cloud%20Monitoring%20trigger%20Scale%20Events</text>
       </controlProperties>
     </control>
-    <control controlID="56" controlTypeID="__group__" x="1045" y="2454" w="498" h="167" measuredW="914" measuredH="167" zOrder="37" locked="false" isInGroup="-1">
+    <control controlID="56" controlTypeID="__group__" x="1045" y="2454" w="498" h="167" measuredW="498" measuredH="167" zOrder="37" locked="false" isInGroup="-1">
       <groupChildrenDescriptors>
         <control controlID="20" controlTypeID="__group__" x="0" y="0" w="498" h="167" measuredW="498" measuredH="167" zOrder="0" locked="false" isInGroup="56">
           <groupChildrenDescriptors>
@@ -406,7 +406,7 @@
         <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.48.08%2520PM.png</src>
       </controlProperties>
     </control>
-    <control controlID="72" controlTypeID="com.balsamiq.mockups::CallOut" x="1326" y="3690" w="-1" h="-1" measuredW="169" measuredH="40" zOrder="44" locked="false" isInGroup="-1">
+    <control controlID="72" controlTypeID="com.balsamiq.mockups::CallOut" x="1326" y="3690" w="-1" h="-1" measuredW="169" measuredH="43" zOrder="44" locked="false" isInGroup="-1">
       <controlProperties>
         <text>Create%20Autoscale%20Group</text>
       </controlProperties>
@@ -427,7 +427,7 @@
             <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.44.34%2520PM.png</src>
           </controlProperties>
         </control>
-        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="540" y="95" w="-1" h="-1" measuredW="92" measuredH="43" zOrder="1" locked="false" isInGroup="74">
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="540" y="95" w="-1" h="-1" measuredW="92" measuredH="39" zOrder="1" locked="false" isInGroup="74">
           <controlProperties>
             <text>Autoscaling</text>
           </controlProperties>
@@ -442,7 +442,7 @@
             <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.52.34%2520PM.png</src>
           </controlProperties>
         </control>
-        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="72" y="281" w="-1" h="-1" measuredW="238" measuredH="37" zOrder="1" locked="false" isInGroup="78">
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="72" y="281" w="-1" h="-1" measuredW="238" measuredH="40" zOrder="1" locked="false" isInGroup="78">
           <controlProperties>
             <text>Create%20Autoscale%20Group%20from%20Image</text>
           </controlProperties>
