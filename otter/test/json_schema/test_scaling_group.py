@@ -137,7 +137,7 @@ class ServerLaunchConfigTestCase(TestCase):
     """
     def test_valid_examples_validate(self):
         """
-        The examples in the launch server config examples all validate.
+        The launch server config examples all validate.
         """
         for example in scaling_group.launch_server_config_examples:
             validate(example, scaling_group.launch_config)
@@ -209,3 +209,84 @@ class ServerLaunchConfigTestCase(TestCase):
         # fails to validate because it is not the given type
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, scaling_group.launch_config)
+
+
+class ScalingPolicyTestCase(TestCase):
+    """
+    Simple verification that the JSON schema for scaling policies is correct.
+    """
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(scaling_group.scaling_policy)
+        Draft3Validator.check_schema(scaling_group.scaling_policy_creation)
+
+    def test_valid_examples_validate(self):
+        """
+        The scaling policy and scaling policy creation examples all validate.
+        """
+        for example in scaling_group.scaling_policy_examples:
+            validate(example, scaling_group.scaling_policy)
+        for example in scaling_group.scaling_policy_creation_examples:
+            validate(example, scaling_group.scaling_policy_creation)
+
+    def test_either_change_or_changePercent(self):
+        """
+        A scaling policy can have either the attribute "change" or
+        "changePercent", but not both
+        """
+        invalid = {
+            "name": "",
+            "change": 5,
+            "changePercent": 5,
+            "cooldown": 5
+        }
+        schemas = (
+            scaling_group.scaling_policy,
+            scaling_group.scaling_policy_creation)
+        for schema in schemas:
+            self.assertRaisesRegexp(ValidationError, 'not of type',
+                                    validate, invalid, schema)
+
+    def test_no_other_properties_valid(self):
+        """
+        Scaling policy can only have the following properties: name,
+        change/changePercent, cooldown, and capabilityUrls.  Any other property
+        results in an error.
+        """
+        invalid = {
+            "name": "",
+            "change": 5,
+            "cooldown": 5,
+            "poofy": False
+        }
+        schemas = (
+            scaling_group.scaling_policy,
+            scaling_group.scaling_policy_creation)
+        for schema in schemas:
+            self.assertRaisesRegexp(ValidationError, 'not of type',
+                                    validate, invalid, schema)
+
+    def test_non_creation_capability_urls_only_have_url_and_name(self):
+        """
+        Scaling policy capability url items can only have the following
+        properties: name, url.  Any other property results in an error.
+        """
+        invalid = {
+            "name": "",
+            "url": "",
+            "poofy": True
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'not of type',
+            validate, invalid, scaling_group.scaling_policy)
+
+    def test_creation_capability_urls_are_names(self):
+        """
+        Scaling policy creation capability url items are names.
+        """
+        invalid = {"name": "", "url": ""}
+        self.assertRaisesRegexp(
+            ValidationError, 'not of type',
+            validate, invalid, scaling_group.scaling_policy_creation)
