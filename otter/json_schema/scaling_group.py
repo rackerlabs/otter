@@ -3,9 +3,6 @@ JSON Schemas for the scaling group - the launch config and the general scaling
 group configuration.  There are also example configs and launch configs.
 """
 
-from copy import deepcopy
-
-
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
 # required-based-on-value-of-another-field
@@ -330,13 +327,17 @@ scaling_policy = {
                     "A list of capability URLs.  The URLs themselves are "
                     "unique and thus serve as their own unique ID, but they "
                     "can also be named with a non-unique, human readable "
-                    "string."),
+                    "string.  If an object has only a name and not a URL, "
+                    "a capability URL will be generated.  All changes to the "
+                    "url properties will be ignored."),
                 "properties": {
                     "url": {
                         "type": "string",
                         "description": (
-                            "A unique capability URL for the scaling policy."),
-                        "required": True
+                            "A unique capability URL for the scaling policy. "
+                            "This is read-only; that means that all changes "
+                            "will be ignored."),
+                        "required": False
                     },
                     "name": {
                         "type": "string",
@@ -358,7 +359,7 @@ scaling_policy_examples = [
     {
         "name": "scale up by 10",
         "change": 10,
-        "cooldown": 5
+        "cooldown": 5,
     },
     {
         "name": 'scale down a 5.5 percent because of a tweet',
@@ -368,36 +369,10 @@ scaling_policy_examples = [
             {
                 "url": "https://autoscale.rax.io/3908sdkldg0950wds05kdgazpfc",
                 "name": "twitter"
+            },
+            {
+                "name": "tweetbot"
             }
         ]
-    }
-]
-
-
-scaling_policy_creation = deepcopy(scaling_policy)
-scaling_policy_creation["properties"]["capabilityUrls"] = {
-    "type": "array",
-    "description": (
-        "A list of short, human readable names.  For each name, a capability "
-        "url will be generated."),
-    "items": {
-        "type": "string",
-        "description": "The name for the capability url",
-        "maxLength": 256
-    }
-}
-
-
-scaling_policy_creation_examples = [
-    {
-        "name": "scale up by 10",
-        "change": 10,
-        "cooldown": 5
-    },
-    {
-        "name": 'scale down a 5.5 percent because of a tweet',
-        "changePercent": -5.5,
-        "cooldown": 6,
-        "capabilityUrls": ["twitter"]
     }
 ]
