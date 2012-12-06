@@ -7,3 +7,4 @@ htmldoc
 _builddoc
 .self.txt
 otter-deploy*
+*.egg-info
