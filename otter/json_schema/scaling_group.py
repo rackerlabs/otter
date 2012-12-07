@@ -275,6 +275,16 @@ scaling_policy = {
                 "change": {"required": True}
             },
             "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "capabilityUrls": {},
+                "steadyState": {"required": True}
+            },
+            "additionalProperties": False
         }
     ],
     "description": (
@@ -307,6 +317,14 @@ scaling_policy = {
                 "nearest integer.  If negative, the number of servers will "
                 "decrease by the given percentage, rounded up to the nearest "
                 "integer.")
+        },
+        "steadyState": {
+            "type": "integer",
+            "description": (
+                "How many servers there should be in the steady state (an "
+                "absolute number, rather than a delta from the current "
+                "number of servers)."),
+            "minimum": 0
         },
         "cooldown": {
             "type": "number",
@@ -374,5 +392,10 @@ scaling_policy_examples = [
                 "name": "tweetbot"
             }
         ]
+    },
+    {
+        "name": 'set number of servers to 10',
+        "steadyState": 10,
+        "cooldown": 3
     }
 ]
