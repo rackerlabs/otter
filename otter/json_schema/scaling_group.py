@@ -261,6 +261,7 @@ scaling_policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "capabilityUrls": {},
                 "changePercent": {"required": True}
             },
             "additionalProperties": False
@@ -270,6 +271,7 @@ scaling_policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "capabilityUrls": {},
                 "change": {"required": True}
             },
             "additionalProperties": False
@@ -279,6 +281,7 @@ scaling_policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "capabilityUrls": {},
                 "steadyState": {"required": True}
             },
             "additionalProperties": False
@@ -334,6 +337,40 @@ scaling_policy = {
                 "does not affect the global scaling group cooldown."),
             "minimum": 0,
             "required": True
+        },
+        "capabilityUrls": {
+            "type": "array",
+            "description": (
+                "A list of capability URLs, their short names, and an id."),
+            "items": {
+                "type": "object",
+                "description": (
+                    "A list of capability URLs.  The URLs themselves are "
+                    "unique and thus serve as their own unique ID, but they "
+                    "can also be named with a non-unique, human readable "
+                    "string.  If an object has only a name and not a URL, "
+                    "a capability URL will be generated.  All changes to the "
+                    "url properties will be ignored."),
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "A unique capability URL for the scaling policy. "
+                            "This is read-only; that means that all changes "
+                            "will be ignored."),
+                        "required": False
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "A short, human-readable name that describes this "
+                            "capability URL."),
+                        "required": True,
+                        "maxLength": 256
+                    }
+                },
+                "additionalProperties": False
+            }
         }
     }
 }
@@ -348,7 +385,16 @@ scaling_policy_examples = [
     {
         "name": 'scale down a 5.5 percent because of a tweet',
         "changePercent": -5.5,
-        "cooldown": 6
+        "cooldown": 6,
+        "capabilityUrls": [
+            {
+                "url": "https://autoscale.rax.io/3908sdkldg0950wds05kdgazpfc",
+                "name": "twitter"
+            },
+            {
+                "name": "tweetbot"
+            }
+        ]
     },
     {
         "name": 'set number of servers to 10',
