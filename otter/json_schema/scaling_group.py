@@ -310,10 +310,13 @@ scaling_policy = {
             "description": (
                 "A non-zero percent change to make in the number of servers "
                 "in the scaling group.  If positive, the number of servers "
-                "will increase by the given percentage, rounded up to the "
-                "nearest integer.  If negative, the number of servers will "
-                "decrease by the given percentage, rounded up to the nearest "
-                "integer.")
+                "will increase by the given percentage.  If negative, the "
+                "number of servers will decrease by the given percentage. The "
+                "absolute change in the number of servers will be rounded "
+                "down to the nearest integer greater than zero.  This means "
+                "that if -X% of the current number of servers turns out to be "
+                "-0.5 servers, the actual number of servers that will be "
+                "shut down is 1.")
         },
         "steadyState": {
             "type": "integer",
