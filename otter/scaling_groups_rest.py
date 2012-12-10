@@ -66,9 +66,9 @@ def _format_groups(groups):
     return res
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>'
-       '/servers/<string:serverid>', methods=['DELETE'])
-def delete_scaling_group_servers(request, tenantid, coloid, groupid, serverid):
+@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>'
+       '/servers/<string:serverId>', methods=['DELETE'])
+def delete_scaling_group_servers(request, tenantId, coloId, groupId, serverId):
     """
     Deletes a server from the scaling group
 
@@ -77,9 +77,9 @@ def delete_scaling_group_servers(request, tenantid, coloid, groupid, serverid):
     return defer.fail(NotImplementedError())
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>'
+@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>'
        '/servers', methods=['GET'])
-def get_scaling_group_servers(request, tenantid, coloid, id):
+def get_scaling_group_servers(request, tenantId, coloId, groupId):
     """Get a list of the servers in a scaling group.
 
     Response format to be defined
@@ -89,11 +89,11 @@ def get_scaling_group_servers(request, tenantid, coloid, id):
     return defer.fail(NotImplementedError())
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
+@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, tenantid, coloid, groupid):
+def view_config_for_scaling_group(request, tenantId, coloId, groupId):
     """
     Get config for a scaling group -- gets a dict from the storage
     engine and returns it to the user serialized as JSON
@@ -104,18 +104,18 @@ def view_config_for_scaling_group(request, tenantid, coloid, groupid):
     {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
 
     """
-    rec = get_store().get_scaling_group(tenantid, coloid, groupid)
+    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
     deferred = defer.maybeDeferred(rec.view_config)
     deferred.addCallback(json.dumps)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
+@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(config_schema)
-def edit_scaling_group(request, tenantid, coloid, groupid, data):
+def edit_scaling_group(request, tenantId, coloId, groupId, data):
     """
     Edit config for a scaling group.
 
@@ -128,30 +128,30 @@ def edit_scaling_group(request, tenantid, coloid, groupid, data):
     returns a deferred for completion
 
     """
-    rec = get_store().get_scaling_group(tenantid, coloid, groupid)
+    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
     deferred = defer.maybeDeferred(rec.update_config, data)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>/<string:groupid>',
+@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
        methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_scaling_group(request, tenantid, coloid, groupid):
+def delete_scaling_group(request, tenantId, coloId, groupId):
     """
     Delete a scaling group.
 
     returns a deferred for completion
     """
     deferred = defer.maybeDeferred(get_store().delete_scaling_group,
-                                   tenantid, coloid, groupid)
+                                   tenantId, coloId, groupId)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups',  methods=['GET'])
+@route('/<string:tenantId>/scaling_groups',  methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_all_scaling_groups(request, tenantid):
+def get_all_scaling_groups(request, tenantId):
     """
     Get a list of all scaling groups in all colos
 
@@ -161,16 +161,16 @@ def get_all_scaling_groups(request, tenantid):
     as a deferred
 
     """
-    deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantid)
+    deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantId)
     deferred.addCallback(_format_groups)
     deferred.addCallback(json.dumps)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>',  methods=['GET'])
+@route('/<string:tenantId>/scaling_groups/<string:coloId>',  methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_scaling_groups(request, tenantid, coloid):
+def get_scaling_groups(request, tenantId, coloId):
     """
     Get a list of scaling groups for a given colo
 
@@ -181,17 +181,17 @@ def get_scaling_groups(request, tenantid, coloid):
 
     """
     deferred = defer.maybeDeferred(get_store().list_scaling_groups,
-                                   tenantid, coloid)
+                                   tenantId, coloId)
     deferred.addCallback(_format_groups)
     deferred.addCallback(json.dumps)
     return deferred
 
 
-@route('/<string:tenantid>/scaling_groups/<string:coloid>', methods=['POST'])
+@route('/<string:tenantId>/scaling_groups/<string:coloId>', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(config_schema)
-def create_new_scaling_group(request, tenantid, coloid, data):
+def create_new_scaling_group(request, tenantId, coloId, data):
     """Create a new scaling group.
 
     Returns a deferred, with the URL in the location header
@@ -201,10 +201,10 @@ def create_new_scaling_group(request, tenantid, coloid, data):
     def send_redirect(uuid):
         request.setHeader("Location",
                           "{0}/{1}/scaling_groups/{2}/{3}/".
-                          format(get_url_root(), tenantid, coloid, uuid))
+                          format(get_url_root(), tenantId, coloId, uuid))
 
-    deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantid,
-                                   coloid, data)
+    deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantId,
+                                   coloId, data)
     deferred.addCallback(send_redirect)
     return deferred
 
