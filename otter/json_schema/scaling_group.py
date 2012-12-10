@@ -345,13 +345,21 @@ scaling_policy = {
             "items": {
                 "type": "object",
                 "description": (
-                    "A list of capability URL names.  The URLs themselves are "
+                    "A list of capability URLs.  The URLs themselves are "
                     "unique and thus serve as their own unique ID, but they "
                     "can also be named with a non-unique, human readable "
                     "string.  If an object has only a name and not a URL, "
                     "a capability URL will be generated.  All changes to the "
                     "url properties will be ignored."),
                 "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "A unique capability URL for the scaling policy. "
+                            "This is read-only; that means that all changes "
+                            "will be ignored."),
+                        "required": False
+                    },
                     "name": {
                         "type": "string",
                         "description": (
@@ -380,6 +388,7 @@ scaling_policy_examples = [
         "cooldown": 6,
         "capabilityUrls": [
             {
+                "url": "https://autoscale.rax.io/3908sdkldg0950wds05kdgazpfc",
                 "name": "twitter"
             },
             {

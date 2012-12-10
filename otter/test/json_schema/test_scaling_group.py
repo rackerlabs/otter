@@ -274,7 +274,7 @@ class ScalingPolicyTestCase(TestCase):
             ValidationError, 'not of type',
             validate, invalid, scaling_group.scaling_policy)
 
-    def test_capability_urls_only_have_name(self):
+    def test_capability_urls_only_have_url_and_name(self):
         """
         Scaling policy capability url items can only have the following
         properties: name, url.  Any other property results in an error.
@@ -282,6 +282,7 @@ class ScalingPolicyTestCase(TestCase):
         invalid = {
             "name": "",
             "url": "",
+            "poofy": True
         }
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
