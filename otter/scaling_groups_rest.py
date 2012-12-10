@@ -93,10 +93,10 @@ def get_scaling_group_servers(request, tenantId, coloId, groupId):
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, tenantId, coloId, groupId):
+def view_details_for_scaling_group(request, tenantId, coloId, groupId):
     """
-    Get config for a scaling group -- gets a dict from the storage
-    engine and returns it to the user serialized as JSON
+    View all config details for a scaling group.  This implementation is
+    currently wrong.
 
     Returns a deferred string
 
@@ -206,6 +206,74 @@ def create_new_scaling_group(request, tenantId, coloId, data):
     deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantId,
                                    coloId, data)
     deferred.addCallback(send_redirect)
+    return deferred
+
+
+# -------------------- read/update scaling group configs ---------------------
+
+
+@route(('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>/'
+        'group_config'),
+       methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_config_for_scaling_group(request, tenantId, coloId, groupId):
+    """
+    Get the configuration for a scaling group, which includes the minimum
+    number of entities, the maximum number of entities, global cooldown, and
+    other metadata.  This data is returned in the body of the response in JSON
+    format.
+
+    Example response::
+
+        {
+            "name": "workers",
+            "cooldown": 60,
+            "minEntities": 5,
+            "maxEntities": 100,
+            "metadata": {
+                "firstkey": "this is a string",
+                "secondkey": "1",
+            }
+        }
+    """
+    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
+    deferred = defer.maybeDeferred(rec.view_config)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>/'
+        'group_config'),
+       methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(config_schema)
+def edit_config_for_scaling_group(request, tenantId, coloId, groupId, data):
+    """
+    Edit the configuration for a scaling group, which includes the minimum
+    number of entities, the maximum number of entities, global cooldown, and
+    other metadata.  This data provided in the request body in JSON format.
+    If successful, no response body will be returned.
+
+    Example request::
+
+        {
+            "name": "workers",
+            "cooldown": 60,
+            "minEntities": 5,
+            "maxEntities": 100,
+            "metadata": {
+                "firstkey": "this is a string",
+                "secondkey": "1",
+            }
+        }
+
+    The exact update cases are still up in the air -- can the user provide
+    a mimimal schema, and if so, what happens with defaults?
+    """
+    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
+    deferred = defer.maybeDeferred(rec.update_config, data)
     return deferred
 
 
