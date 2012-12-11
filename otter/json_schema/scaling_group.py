@@ -188,7 +188,8 @@ config = {
     "properties": {
         "name": {
             "type": "string",
-            "description": "Name of the scaling group.",
+            "description": ("Name of the scaling group (this name does not "
+                            "have to be unique)."),
             "maxLength": 256,
             "required": True
         },
@@ -232,6 +233,7 @@ config = {
     "additionalProperties": False
 }
 
+
 # Valid config examples
 config_examples = [
     {
@@ -248,5 +250,109 @@ config_examples = [
             "firstkey": "this is a string",
             "secondkey": "1",
         }
+    }
+]
+
+
+scaling_policy = {
+    "type": [
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "changePercent": {"required": True}
+            },
+            "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "change": {"required": True}
+            },
+            "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "steadyState": {"required": True}
+            },
+            "additionalProperties": False
+        }
+    ],
+    "description": (
+        "A Scaling Policy defines how the current number of servers in the "
+        "scaling group should change, and how often this exact change can "
+        "happen (cooldown)."),
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": (
+                "A name for this scaling policy. This name does have to be "
+                "unique for all scaling policies."),
+            "required": True,
+            "maxLength": 256,
+        },
+        "change": {
+            "type": "integer",
+            "description": (
+                "A non-zero integer change to make in the number of servers "
+                "in the scaling group.  If positive, the number of servers "
+                "will increase.  If negative, the number of servers will "
+                "decrease.")
+        },
+        "changePercent": {
+            "type": "number",
+            "description": (
+                "A non-zero percent change to make in the number of servers "
+                "in the scaling group.  If positive, the number of servers "
+                "will increase by the given percentage.  If negative, the "
+                "number of servers will decrease by the given percentage. The "
+                "absolute change in the number of servers will be rounded "
+                "down to the nearest integer greater than zero.  This means "
+                "that if -X% of the current number of servers turns out to be "
+                "-0.5 servers, the actual number of servers that will be "
+                "shut down is 1.")
+        },
+        "steadyState": {
+            "type": "integer",
+            "description": (
+                "How many servers there should be in the steady state (an "
+                "absolute number, rather than a delta from the current "
+                "number of servers)."),
+            "minimum": 0
+        },
+        "cooldown": {
+            "type": "number",
+            "description": (
+                "Cooldown period (given in seconds) before this particular "
+                "scaling policy can be executed again.  This cooldown period "
+                "does not affect the global scaling group cooldown."),
+            "minimum": 0,
+            "required": True
+        }
+    }
+}
+
+
+scaling_policy_examples = [
+    {
+        "name": "scale up by 10",
+        "change": 10,
+        "cooldown": 5,
+    },
+    {
+        "name": 'scale down a 5.5 percent because of a tweet',
+        "changePercent": -5.5,
+        "cooldown": 6
+    },
+    {
+        "name": 'set number of servers to 10',
+        "steadyState": 10,
+        "cooldown": 3
     }
 ]
