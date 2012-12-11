@@ -214,7 +214,7 @@ def create_new_scaling_group(request, tenantid, coloid, data):
 # -------------------- read/update launch configs ---------------------
 
 
-@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch'),
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -266,7 +266,7 @@ def view_launch_config(request, tenantId, groupId):
     return deferred
 
 
-@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch'),
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -322,6 +322,93 @@ def edit_launch_config(request, tenantId, groupId, data):
     """
     rec = get_store().get_launch_config(tenantId, groupId)
     deferred = defer.maybeDeferred(rec.update_launch_config, data)
+    return deferred
+
+
+# -------------------- read/create scaling policies ---------------------
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/policy'),
+       methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def get_policies(request, tenantId, groupId):
+    """
+    Get an array of all scaling policies in the group. Each policy describes an
+    id, name, type, adjustment, and cooldown.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "scaling_policies": [
+                {
+                    "id": 1
+                    "name": "scale up by one server",
+                    "type" : "scale_up",
+                    "adjustment": 1,
+                    "cooldown": 150
+                },
+                {
+                    "name": "scale up one percent",
+                    "type" : "scale_up_percent",
+                    "adjustment": 10,
+                    "cooldown": 150
+                },
+                {
+                    "name": "scale down one server",
+                    "type" : "scale_down",
+                    "adjustment": 1,
+                    "cooldown": 150
+                },
+                {
+                    "name": "scale down one percent",
+                    "type" : "scale_down_percent",
+                    "adjustment": 10,
+                    "cooldown": 150
+                }
+            ]
+        }
+    """
+    rec = get_store().get_policies(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.view_policies)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/policy'),
+       methods=['POST'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(launch_schema)
+def create_policy(request, tenantId, groupId, data):
+    """
+    Create a new scaling policy. Scaling policies must include a name, type,
+    adjustment, and cooldown.
+    The response will contain the generated ID.
+    This data provided in the request body in JSON format.
+
+    Example request::
+
+        {
+            "name": "scale up by one server",
+            "type" : "scale_up",
+            "adjustment": 1,
+            "cooldown": 150
+        }
+
+    Example response::
+
+        {
+            "id": 1
+            "name": "scale up by one server",
+            "type" : "scale_up",
+            "adjustment": 1,
+            "cooldown": 150
+        }
+    """
+    rec = get_store().get_policy(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.create_policy, data)
     return deferred
 
 
