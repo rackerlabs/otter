@@ -250,3 +250,74 @@ config_examples = [
         }
     }
 ]
+
+
+policy_schema = {
+    "type": "object",
+    "description": "A policy for scaling the group.",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Name of the scaling policy.",
+            "maxLength": 256,
+            "required": True
+        },
+        "cooldown": {
+            "type": "integer",
+            "description": ("Cooldown period before more entities are added,"
+                            "given in seconds."
+                            "This number must be an integer."),
+            "minimum": 0,
+            "required": True
+        },
+        "change": {
+            "type": ["integer", "null"],
+            "description": ("Scale the group by this number of entities."
+                            "This number must be an integer."),
+            "minimum": 0,
+            "default": None
+        },
+        "changePercent": {
+            "type": ["integer", "null"],
+            "description": ("Scale the group by this percent."
+                            "This number must be an integer."),
+            "minimum": 0,
+            "default": None
+        },
+        "steadyState": {
+            "type": ["integer", "null"],
+            "description": ("Set the group to this number of entities."
+                            "This number must be an integer."),
+            "minimum": 0,
+            "default": None
+        }
+    },
+    "additionalProperties": False
+}
+
+policy_examples = [
+        {
+            "id": 1,
+            "name": "scale up by one server",
+            "change": 1,
+            "cooldown": 150
+        },
+        {
+            "id": 2,
+            "name": "scale up ten percent",
+            "changePercent": 10,
+            "cooldown": 150
+        },
+        {
+            "id": 3,
+            "name": "scale down one server",
+            "change": -1,
+            "cooldown": 150
+        },
+        {
+            "id": 4,
+            "name": "scale down ten percent",
+            "changePercent": -10,
+            "cooldown": 150
+        }
+    ]
