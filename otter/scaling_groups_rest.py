@@ -16,6 +16,12 @@ from otter.util.fault import fails_with, succeeds_with
 _store = None
 _urlRoot = 'http://127.0.0.1/v1.0'
 
+exception_codes = {
+    ValidationError: 400,
+    InvalidJsonError: 400,
+    NoSuchScalingGroupError: 404
+}
+
 
 def get_store():
     """
@@ -51,12 +57,6 @@ def set_store(i_store_provider):
     global _store
     _store = i_store_provider
 
-exception_codes = {
-    ValidationError: 400,
-    InvalidJsonError: 400,
-    NoSuchScalingGroupError: 404
-}
-
 
 def _format_groups(groups):
     res = {}
@@ -66,158 +66,274 @@ def _format_groups(groups):
     return res
 
 
-@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>'
-       '/servers/<string:serverId>', methods=['DELETE'])
-def delete_scaling_group_servers(request, tenantId, coloId, groupId, serverId):
-    """
-    Deletes a server from the scaling group
+# -------------------- list scaling groups for tenant id ----------------------
 
-    Returns a string and 200
-    """
-    return defer.fail(NotImplementedError())
-
-
-@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>'
-       '/servers', methods=['GET'])
-def get_scaling_group_servers(request, tenantId, coloId, groupId):
-    """Get a list of the servers in a scaling group.
-
-    Response format to be defined
-    Returns a string and 200
-
-    """
-    return defer.fail(NotImplementedError())
-
-
-@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
-       methods=['GET'])
+@route('/<string:tenantId>/autoscale',  methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_details_for_scaling_group(request, tenantId, coloId, groupId):
+def list_all_scaling_groups(request, tenantId):
     """
-    View all config details for a scaling group.  This implementation is
-    currently wrong.
+    Lists all the autoscaling groups per for a given tenant ID.
 
-    Returns a deferred string
+    Example response::
 
-    The response looks mostly like this:
-    {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
-
+        [
+            {
+                "id": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/a09e7493-7429-41e1-8d3f-384d7ece09c0"
+            },
+            {
+                "id": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/0d589460-f177-4b0f-81c1-8ab8903ac7d8"
+            }
+        ]
     """
-    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
-    deferred = defer.maybeDeferred(rec.view_config)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
-       methods=['PUT'])
-@fails_with(exception_codes)
-@succeeds_with(204)
-@validate_body(config_schema)
-def edit_scaling_group(request, tenantId, coloId, groupId, data):
-    """
-    Edit config for a scaling group.
-
-    The request looks like: {'name': 'blah', 'cooldown': 60, 'min_entities': 0}
-    and the response will be a 204
-
-    The exact update cases are still up in the air -- what happens
-    with defaults?
-
-    returns a deferred for completion
-
-    """
-    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
-    deferred = defer.maybeDeferred(rec.update_config, data)
-    return deferred
-
-
-@route('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>',
-       methods=['DELETE'])
-@fails_with(exception_codes)
-@succeeds_with(204)
-def delete_scaling_group(request, tenantId, coloId, groupId):
-    """
-    Delete a scaling group.
-
-    returns a deferred for completion
-    """
-    deferred = defer.maybeDeferred(get_store().delete_scaling_group,
-                                   tenantId, coloId, groupId)
-    return deferred
-
-
-@route('/<string:tenantId>/scaling_groups',  methods=['GET'])
-@fails_with(exception_codes)
-@succeeds_with(200)
-def get_all_scaling_groups(request, tenantId):
-    """
-    Get a list of all scaling groups in all colos
-
-    Returns a deferred
-    [{'id': 0, 'region': 'dfw'},
-     {'id': 1, 'region': 'iad'}]
-    as a deferred
-
-    """
-    deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantId)
+    deferred = defer.maybeDeferred(get_store().list_autoscale, tenantId)
     deferred.addCallback(_format_groups)
     deferred.addCallback(json.dumps)
     return deferred
 
 
-@route('/<string:tenantId>/scaling_groups/<string:coloId>',  methods=['GET'])
-@fails_with(exception_codes)
-@succeeds_with(200)
-def get_scaling_groups(request, tenantId, coloId):
-    """
-    Get a list of scaling groups for a given colo
+# --------------------------- CRD a scaling group -----------------------------
+# (CRD = CRUD - U, because updating happens at suburls - so you can update
+# different parts)
 
-    Returns a list of scaling groups, looking like:
-    [{'id': 0, 'region': 'dfw'},
-     {'id': 1, 'region': 'dfw'}]
-    as a deferred
-
-    """
-    deferred = defer.maybeDeferred(get_store().list_scaling_groups,
-                                   tenantId, coloId)
-    deferred.addCallback(_format_groups)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@route('/<string:tenantId>/scaling_groups/<string:coloId>', methods=['POST'])
+# TODO: in the implementation ticket, the interface create definition should be
+#       changed, and the mock store and corresponding tests also changed.
+# C
+@route('/<string:tenantId>/autoscale', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(config_schema)
-def create_new_scaling_group(request, tenantId, coloId, data):
-    """Create a new scaling group.
-
-    Returns a deferred, with the URL in the location header
-
+def create_new_scaling_group(request, tenantId, data):
     """
+    Create a new scaling group, given the general scaling group configuration,
+    launch configuration, and optional scaling policies.  This data provided
+    in the request body in JSON format. If successful, no response body will
+    be returned.
 
+    Example request body containing some scaling policies::
+        {
+            "groupConfiguration": {
+                "name": "workers",
+                "cooldown": 60,
+                "minEntities": 5,
+                "maxEntities": 100,
+                "metadata": {
+                    "firstkey": "this is a string",
+                    "secondkey": "1",
+                }
+            },
+            "launchConfiguration": {
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 3,
+                        "name": "webhead",
+                        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                        "OS-DCF:diskConfig": "AUTO",
+                        "metadata": {
+                            "mykey": "myvalue"
+                        },
+                        "personality": [
+                            {
+                                "path": '/root/.ssh/authorized_keys',
+                                "contents": (
+                                    "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                            }
+                        ],
+                        "networks": [
+                            {
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }
+                        ],
+                    },
+                    "loadBalancers": [
+                        {
+                            "loadBalancerId": 2200,
+                            "port": 8081
+                        }
+                    ]
+                }
+            },
+            "scalingPolicies": [
+                {
+                    "name": "scale up by 10",
+                    "change": 10,
+                    "cooldown": 5
+                }
+                {
+                    "name": 'scale down 5.5 percent',
+                    "changePercent": -5.5,
+                    "cooldown": 6
+                },
+                {
+                    "name": 'set number of servers to 10',
+                    "steadyState": 10,
+                    "cooldown": 3
+                }
+            ]
+        }
+
+    The ``scalingPolicies`` attribute can also be an empty list, or just left
+    out entirely.
+    """
     def send_redirect(uuid):
         request.setHeader("Location",
-                          "{0}/{1}/scaling_groups/{2}/{3}/".
-                          format(get_url_root(), tenantId, coloId, uuid))
+                          "{0}/{1}/autoscale/{3}/".
+                          format(get_url_root(), tenantId, uuid))
 
-    deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantId,
-                                   coloId, data)
+    deferred = defer.maybeDeferred(
+        get_store().create_scaling_group, tenantId, data)
     deferred.addCallback(send_redirect)
     return deferred
 
 
+# TODO: in the implementation story, the interface create definition should be
+#       changed to remove colo, and the mock store and corresponding tests
+#       also changed
+# R
+@route('/<string:tenantId>/autoscale/<string:groupId>', methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_manifest_config_for_scaling_group(request, tenantId, groupId):
+    """
+    View manifested view of the scaling group configuration, including the
+    launch configuration, and the scaling policies.  This data is returned in
+    the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "groupConfiguration": {
+                "name": "workers",
+                "cooldown": 60,
+                "minEntities": 5,
+                "maxEntities": 100,
+                "metadata": {
+                    "firstkey": "this is a string",
+                    "secondkey": "1",
+                }
+            },
+            "launchConfiguration": {
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 3,
+                        "name": "webhead",
+                        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                        "OS-DCF:diskConfig": "AUTO",
+                        "metadata": {
+                            "mykey": "myvalue"
+                        },
+                        "personality": [
+                            {
+                                "path": '/root/.ssh/authorized_keys',
+                                "contents": (
+                                    "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                            }
+                        ],
+                        "networks": [
+                            {
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }
+                        ],
+                    },
+                    "loadBalancers": [
+                        {
+                            "loadBalancerId": 2200,
+                            "port": 8081
+                        }
+                    ]
+                }
+            },
+            "scalingPolicies": [
+                {
+                    "name": "scale up by 10",
+                    "change": 10,
+                    "cooldown": 5
+                }
+                {
+                    "name": 'scale down 5.5 percent',
+                    "changePercent": -5.5,
+                    "cooldown": 6
+                },
+                {
+                    "name": 'set number of servers to 10',
+                    "steadyState": 10,
+                    "cooldown": 3
+                }
+            ]
+        }
+    """
+    raise NotImplementedError()
+
+
+# TODO: in the implementation story, the interface delete definition should be
+#       changed, and the mock store and corresponding tests also changed to
+#       not delete if there are existing servers.
+# Feature: Force delete, which stops scaling, deletes all servers for you, then
+#       deletes the scaling group.
+# D
+@route('/<string:tenantId>/autoscale/<string:groupId>', methods=['DELETE'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+def delete_scaling_group(request, tenantId, groupId):
+    """
+    Delete a scaling group if there are no entities belonging to the scaling
+    group.  If successful, no response body will be returned.
+    """
+    deferred = defer.maybeDeferred(get_store().delete_scaling_group,
+                                   tenantId, groupId)
+    return deferred
+
+
+@route('/<string:tenantId>/autoscale/<string:groupId>/state', methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def get_scaling_group_state(request, tenantId, coloId, groupId):
+    """
+    Get the current state of the scaling group, including the current set of
+    active entities, the current set of pending entities, the desired number
+    of entities, the current desired number of steady state servers.  This
+    data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "active": [
+                {
+                    "id": "bec45fbd-e437-4928-aa20-14cdd251f87e",
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/fd7d75ab-21fe-4c64-9770-a2f58a08eea9"
+                },
+                {
+                    "id": "bec45fbd-e437-4928-aa20-14cdd251f87e",
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/bec45fbd-e437-4928-aa20-14cdd251f87e"
+                }
+            ],
+            "pending": [
+                {
+                    "id": "a8af00f5-bb09-44bd-9ee5-f7a16b2cb1e9",
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/a8af00f5-bb09-44bd-9ee5-f7a16b2cb1e9"
+                }
+            ],
+            "steadyState": 3,
+            "scalingStatus": "running"
+        }
+    """
+    raise NotImplementedError()
+
+
 # -------------------- read/update scaling group configs ---------------------
 
-
-@route(('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>/'
-        'group_config'),
+# TODO: in the implementation story, the interface get scaling group
+#       definition should be changed to remove colo, and the mock store and
+#       corresponding tests also changed
+@route('/<string:tenantId>/autoscale/<string:groupId>/config',
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, tenantId, coloId, groupId):
+def view_config_for_scaling_group(request, tenantId, groupId):
     """
     Get the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -237,19 +353,21 @@ def view_config_for_scaling_group(request, tenantId, coloId, groupId):
             }
         }
     """
-    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
+    rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = defer.maybeDeferred(rec.view_config)
     deferred.addCallback(json.dumps)
     return deferred
 
 
-@route(('/<string:tenantId>/scaling_groups/<string:coloId>/<string:groupId>/'
-        'group_config'),
+# TODO: in the implementation story, the interface get scaling group
+#       definition should be changed to remove colo, and the mock store and
+#       corresponding tests also changed
+@route(('/<string:tenantId>/autoscale/<string:groupId>/config'),
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(config_schema)
-def edit_config_for_scaling_group(request, tenantId, coloId, groupId, data):
+def edit_config_for_scaling_group(request, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -272,7 +390,7 @@ def edit_config_for_scaling_group(request, tenantId, coloId, groupId, data):
     The exact update cases are still up in the air -- can the user provide
     a mimimal schema, and if so, what happens with defaults?
     """
-    rec = get_store().get_scaling_group(tenantId, coloId, groupId)
+    rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = defer.maybeDeferred(rec.update_config, data)
     return deferred
 
