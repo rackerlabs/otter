@@ -9,6 +9,8 @@ from twisted.web.resource import Resource
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.json_schema.scaling_group import config as config_schema
+from otter.json_schema.scaling_group import launch_server_config_examples \
+as launch_schema
 from otter.util.schema import InvalidJsonError, validate_body
 from otter.util.fault import fails_with, succeeds_with
 
@@ -206,6 +208,120 @@ def create_new_scaling_group(request, tenantid, coloid, data):
     deferred = defer.maybeDeferred(get_store().create_scaling_group, tenantid,
                                    coloid, data)
     deferred.addCallback(send_redirect)
+    return deferred
+
+
+# -------------------- read/update launch configs ---------------------
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+       methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_launch_config(request, tenantId, groupId):
+    """
+    Get the launch configuration for a scaling group, which includes the
+    details of how to create a server, from what image, which load balancers to
+    join it to, and what networks to add it to, and other metadata.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": 3,
+                    "name": "webhead",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "OS-DCF:diskConfig": "AUTO",
+                    "metadata": {
+                        "mykey": "myvalue"
+                    },
+                    "personality": [
+                        {
+                            "path": '/root/.ssh/authorized_keys',
+                            "contents": (
+                                "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                        }
+                    ],
+                    "networks": [
+                        {
+                            "uuid": "11111111-1111-1111-1111-111111111111"
+                        }
+                    ],
+                },
+                "loadBalancers": [
+                    {
+                        "loadBalancerId": 2200,
+                        "port": 8081
+                    }
+                ]
+            }
+        }
+    """
+    rec = get_store().get_launch_config(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.view_config)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+       methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(launch_schema)
+def edit_launch_config(request, tenantId, groupId, data):
+    """
+    Edit the launch configuration for a scaling group, which includes the
+    details of how to create a server, from what image, which load balancers to
+    join it to, and what networks to add it to, and other metadata.
+    This data provided in the request body in JSON format.
+    If successful, no response body will be returned.
+
+    Example request::
+
+        {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": 3,
+                    "name": "webhead",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "OS-DCF:diskConfig": "AUTO",
+                    "metadata": {
+                        "mykey": "myvalue"
+                    },
+                    "personality": [
+                        {
+                            "path": '/root/.ssh/authorized_keys',
+                            "contents": (
+                                "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                        }
+                    ],
+                    "networks": [
+                        {
+                            "uuid": "11111111-1111-1111-1111-111111111111"
+                        }
+                    ],
+                },
+                "loadBalancers": [
+                    {
+                        "loadBalancerId": 2200,
+                        "port": 8081
+                    }
+                ]
+            }
+        }
+
+    The exact update cases are still up in the air -- can the user provide
+    a mimimal schema, and if so, what happens with defaults?
+
+    Nova should validate the image before saving the new config.
+    Users may have an invalid configuration based on dependencies.
+    """
+    rec = get_store().get_launch_config(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.update_launch_config, data)
     return deferred
 
 
