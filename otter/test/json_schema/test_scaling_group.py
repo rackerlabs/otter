@@ -137,7 +137,7 @@ class ServerLaunchConfigTestCase(TestCase):
     """
     def test_valid_examples_validate(self):
         """
-        The examples in the launch server config examples all validate.
+        The launch server config examples all validate.
         """
         for example in scaling_group.launch_server_config_examples:
             validate(example, scaling_group.launch_config)
@@ -209,3 +209,67 @@ class ServerLaunchConfigTestCase(TestCase):
         # fails to validate because it is not the given type
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, scaling_group.launch_config)
+
+
+class ScalingPolicyTestCase(TestCase):
+    """
+    Simple verification that the JSON schema for scaling policies is correct.
+    """
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(scaling_group.scaling_policy)
+
+    def test_valid_examples_validate(self):
+        """
+        The scaling policy examples all validate.
+        """
+        for example in scaling_group.scaling_policy_examples:
+            validate(example, scaling_group.scaling_policy)
+
+    def test_either_change_or_changePercent_or_steadyState(self):
+        """
+        A scaling policy can have the attribute "change" or "changePercent" or
+        "steadyState", but not any combination thereof
+        """
+        one_only = ("change", "changePercent", "steadyState")
+        for combination in ((0, 1), (0, 2), (1, 2), (0, 1, 2)):
+            invalid = {
+                "name": "meh",
+                "cooldown": 5,
+            }
+            for index in combination:
+                invalid[one_only[index]] = 5
+            self.assertRaisesRegexp(
+                ValidationError, 'not of type',
+                validate, invalid, scaling_group.scaling_policy)
+
+    def test_set_steady_state_must_not_be_negative(self):
+        """
+        Cannot set the steady state to a negative number
+        """
+        invalid = {
+            "name": "",
+            "steadyState": -1,
+            "cooldown": 5
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'minimum',
+            validate, invalid, scaling_group.scaling_policy)
+
+    def test_no_other_properties_valid(self):
+        """
+        Scaling policy can only have the following properties: name,
+        change/changePercent, cooldown, and capabilityUrls.  Any other property
+        results in an error.
+        """
+        invalid = {
+            "name": "",
+            "change": 5,
+            "cooldown": 5,
+            "poofy": False
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'not of type',
+            validate, invalid, scaling_group.scaling_policy)
