@@ -10,6 +10,9 @@ test:	unit integration
 run:
 	PYTHONPATH=".:${PYTHONPATH}" twistd -n web --resource-script=${CODEDIR}/server.rpy
 
+env:
+	./scripts/bootstrap-virtualenv.sh
+
 lint:
 	${PYTHONLINT} ${PYDIRS}
 
@@ -38,7 +41,7 @@ clean: cleandocs
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
-	rm -rf otter-deploy*
+	rm -rf otter-deploy* .ve
 
 bundle:
 	./scripts/bundle.sh
