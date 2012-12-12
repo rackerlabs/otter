@@ -257,40 +257,34 @@ config_examples = [
 policy_schema = {
     "type": [
         {
-            "uuid": {
-                "type": "object",
-                "properties":
-                    {
-                        "name": {},
-                        "cooldown": {},
-                        "changePercent": {"required": True}
-                    }
+            "type": "object",
+            "properties":
+                {
+                    "name": {},
+                    "cooldown": {},
+                    "changePercent": {"required": True}
+                },
+            "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties":
+                {
+                    "name": {},
+                    "cooldown": {},
+                    "change": {"required": True}
             },
             "additionalProperties": False
         },
         {
-            "uuid": {
-                "type": "object",
-                "properties":
-                    {
-                        "name": {},
-                        "cooldown": {},
-                        "change": {"required": True}
-                    }
-        },
-        "additionalProperties": False
-        },
-        {
-            "uuid": {
-                "type": "object",
-                "properties":
-                    {
-                        "name": {},
-                        "cooldown": {},
-                        "steadyState": {"required": True}
-                    }
-        },
-        "additionalProperties": False
+            "type": "object",
+            "properties":
+                {
+                    "name": {},
+                    "cooldown": {},
+                    "steadyState": {"required": True}
+                },
+            "additionalProperties": False
         }
     ],
     "description": (

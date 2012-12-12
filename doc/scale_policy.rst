@@ -6,8 +6,7 @@ Scale Policy Schema
 
     {
         "name": "scale up by one server",
-        "type" : "scale_up",
-        "adjustment": 1,
+        "change": 1,
         "cooldown": 150
     }
 
@@ -15,8 +14,7 @@ Scale Policy Schema
 
     {
         "name": "scale up one percent",
-        "type" : "scale_up_percent",
-        "adjustment": 10,
+        "changePercent": 10,
         "cooldown": 150
     }
 
@@ -24,8 +22,7 @@ Scale Policy Schema
 
     {
         "name": "scale down one server",
-        "type" : "scale_down",
-        "adjustment": 1,
+        "change": -1,
         "cooldown": 150
     }
 
@@ -33,7 +30,6 @@ Scale Policy Schema
 
     {
         "name": "scale down one percent",
-        "type" : "scale_down_percent",
-        "adjustment": 10,
+        "changePercent": 10,
         "cooldown": 150
     }
