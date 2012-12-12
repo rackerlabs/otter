@@ -82,11 +82,11 @@ def list_all_scaling_groups(request, tenantId):
         [
             {
                 "id": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
             },
             {
                 "id": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/0d589460-f177-4b0f-81c1-8ab8903ac7d8"
+                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
             }
         ]
     """
@@ -306,17 +306,17 @@ def get_scaling_group_state(request, tenantId, coloId, groupId):
             "active": [
                 {
                     "id": "bec45fbd-e437-4928-aa20-14cdd251f87e",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/fd7d75ab-21fe-4c64-9770-a2f58a08eea9"
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
                 },
                 {
                     "id": "bec45fbd-e437-4928-aa20-14cdd251f87e",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/bec45fbd-e437-4928-aa20-14cdd251f87e"
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
                 }
             ],
             "pending": [
                 {
                     "id": "a8af00f5-bb09-44bd-9ee5-f7a16b2cb1e9",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/a8af00f5-bb09-44bd-9ee5-f7a16b2cb1e9"
+                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
                 }
             ],
             "steadyState": 3,
