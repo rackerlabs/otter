@@ -9,10 +9,7 @@ from twisted.web.resource import Resource
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.json_schema.scaling_group import config as config_schema
-from otter.json_schema.scaling_group import launch_server_config_examples \
-as launch_schema
-from otter.json_schema.scaling_group import launch_server_config_examples \
-as policy_schema
+from otter.json_schema.scaling_group import launch_config, policy_schema
 from otter.util.schema import InvalidJsonError, validate_body
 from otter.util.fault import fails_with, succeeds_with
 
@@ -458,7 +455,7 @@ def view_launch_config(request, tenantId, groupId):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(launch_schema)
+@validate_body(launch_config)
 def edit_launch_config(request, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the
@@ -567,7 +564,7 @@ def get_policies(request, tenantId, groupId):
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(launch_schema)
+@validate_body(policy_schema)
 def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
