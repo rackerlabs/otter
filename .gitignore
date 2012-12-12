@@ -8,3 +8,5 @@ _builddoc
 .self.txt
 otter-deploy*
 *.egg-info
+.ve
+build
