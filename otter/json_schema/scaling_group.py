@@ -254,34 +254,43 @@ config_examples = [
 ]
 
 
-scaling_policy = {
+policy_schema = {
     "type": [
         {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "changePercent": {"required": True}
+            "uuid": {
+                "type": "object",
+                "properties":
+                    {
+                        "name": {},
+                        "cooldown": {},
+                        "changePercent": {"required": True}
+                    }
             },
             "additionalProperties": False
         },
         {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "change": {"required": True}
-            },
-            "additionalProperties": False
+            "uuid": {
+                "type": "object",
+                "properties":
+                    {
+                        "name": {},
+                        "cooldown": {},
+                        "change": {"required": True}
+                    }
+        },
+        "additionalProperties": False
         },
         {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "steadyState": {"required": True}
-            },
-            "additionalProperties": False
+            "uuid": {
+                "type": "object",
+                "properties":
+                    {
+                        "name": {},
+                        "cooldown": {},
+                        "steadyState": {"required": True}
+                    }
+        },
+        "additionalProperties": False
         }
     ],
     "description": (
@@ -339,7 +348,7 @@ scaling_policy = {
 }
 
 
-scaling_policy_examples = [
+policy_examples = [
     {
         "name": "scale up by 10",
         "change": 10,

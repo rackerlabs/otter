@@ -179,10 +179,15 @@ def create_new_scaling_group(request, tenantId, data):
     The ``scalingPolicies`` attribute can also be an empty list, or just left
     out entirely.
     """
-    def send_redirect(uuid):
-        request.setHeader("Location",
-                          "{0}/{1}/autoscale/{3}/".
-                          format(get_url_root(), tenantId, uuid))
+    def send_redirect(groupId):
+        request.setHeader(
+            "Location",
+            "{0}/{1}/autoscale/{2}/".format(
+                get_url_root(),
+                tenantId,
+                groupId
+            )
+        )
 
     deferred = defer.maybeDeferred(
         get_store().create_scaling_group, tenantId, data)
@@ -249,20 +254,25 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                 }
             },
             "scalingPolicies": [
-                {
-                    "name": "scale up by 10",
-                    "change": 10,
-                    "cooldown": 5
-                }
-                {
-                    "name": 'scale down 5.5 percent',
-                    "changePercent": -5.5,
-                    "cooldown": 6
+                "ab2b2865-2e9d-4422-a6aa-5af184f81d7b": {
+                    "name": "scale up by one server",
+                    "change": 1,
+                    "cooldown": 150
                 },
-                {
-                    "name": 'set number of servers to 10',
-                    "steadyState": 10,
-                    "cooldown": 3
+                "a64b4aa8-03f5-4c46-9bc0-add7c3795809":{
+                    "name": "scale up ten percent",
+                    "changePercent": 10,
+                    "cooldown": 150
+                },
+                "30faf2d1-39db-4c85-9505-07cbe7ab5569": {
+                    "name": "scale down one server",
+                    "change": -1,
+                    "cooldown": 150
+                },
+                "dde7c707-750d-4df5-9828-687bb77cb8fd":{
+                    "name": "scale down ten percent",
+                    "changePercent": -10,
+                    "cooldown": 150
                 }
             ]
         }
@@ -526,27 +536,23 @@ def get_policies(request, tenantId, groupId):
     Example response::
 
         {
-            "scalingPolicies": [
-                {
-                    "id": 1,
+            "scalingPolicies": {
+                "ab2b2865-2e9d-4422-a6aa-5af184f81d7b": {
                     "name": "scale up by one server",
                     "change": 1,
                     "cooldown": 150
                 },
-                {
-                    "id": 2,
+                "a64b4aa8-03f5-4c46-9bc0-add7c3795809":{
                     "name": "scale up ten percent",
                     "changePercent": 10,
                     "cooldown": 150
                 },
-                {
-                    "id": 3,
+                "30faf2d1-39db-4c85-9505-07cbe7ab5569": {
                     "name": "scale down one server",
                     "change": -1,
                     "cooldown": 150
                 },
-                {
-                    "id": 4,
+                "dde7c707-750d-4df5-9828-687bb77cb8fd":{
                     "name": "scale down ten percent",
                     "changePercent": -10,
                     "cooldown": 150
@@ -563,13 +569,13 @@ def get_policies(request, tenantId, groupId):
 @route(('/<string:tenantId>/autoscale/<string:groupId>/policy'),
        methods=['POST'])
 @fails_with(exception_codes)
-@succeeds_with(204)
+@succeeds_with(201)
 @validate_body(policy_schema)
 def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
-    The response will contain the generated ID.
+    The response header will redirect to the generated ID.
     This data provided in the request body in JSON format.
 
     Example request::
@@ -580,17 +586,22 @@ def create_policy(request, tenantId, groupId, data):
             "cooldown": 150
         }
 
-    Example response::
-
-        {
-            "id": 1,
-            "name": "scale up by one server",
-            "change": 1,
-            "cooldown": 150
-        }
     """
+
+    def send_redirect(groupId, policyId):
+        request.setHeader(
+            "Location",
+            "{0}/{1}/autoscale/{2}/policy/{3}".format(
+                get_url_root(),
+                tenantId,
+                groupId,
+                policyId
+            )
+        )
+
     rec = get_store().get_policy(tenantId, groupId)
     deferred = defer.maybeDeferred(rec.create_policy, data)
+    deferred.addCallback(send_redirect)
     return deferred
 
 # -------------------- view/edit/delete scaling policies ---------------------
@@ -602,14 +613,13 @@ def create_policy(request, tenantId, groupId, data):
 @succeeds_with(200)
 def view_policy(request, tenantId, groupId, policyId):
     """
-    Get an array of a scaling policy. Each policy describes an
-    id, name, type, adjustment, and cooldown.
+    Get an array of a scaling policy. Each policy describes a
+    name, type, adjustment, and cooldown.
     This data is returned in the body of the response in JSON format.
 
     Example response::
 
         {
-            "id": 1
             "name": "scale up by one server",
             "change": 1,
             "cooldown": 150
@@ -630,13 +640,11 @@ def edit_policy(request, tenantId, groupId, policyId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
-    The response will contain the generated ID.
     If successful, no response body will be returned.
 
     Example request::
 
         {
-            "id": 1,
             "name": "scale up by two servers",
             "change": 2,
             "cooldown": 150
