@@ -9,8 +9,7 @@ from twisted.web.resource import Resource
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.json_schema.scaling_group import config as config_schema
-from otter.json_schema.scaling_group import launch_server_config_examples as launch_schema
-
+from otter.json_schema.scaling_group import launch_config, policy_schema
 from otter.util.schema import InvalidJsonError, validate_body
 from otter.util.fault import fails_with, succeeds_with
 
@@ -180,10 +179,15 @@ def create_new_scaling_group(request, tenantId, data):
     The ``scalingPolicies`` attribute can also be an empty list, or just left
     out entirely.
     """
-    def send_redirect(uuid):
-        request.setHeader("Location",
-                          "{0}/{1}/autoscale/{3}/".
-                          format(get_url_root(), tenantId, uuid))
+    def send_redirect(groupId):
+        request.setHeader(
+            "Location",
+            "{0}/{1}/autoscale/{2}/".format(
+                get_url_root(),
+                tenantId,
+                groupId
+            )
+        )
 
     deferred = defer.maybeDeferred(
         get_store().create_scaling_group, tenantId, data)
@@ -250,20 +254,25 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                 }
             },
             "scalingPolicies": [
-                {
-                    "name": "scale up by 10",
-                    "change": 10,
-                    "cooldown": 5
-                }
-                {
-                    "name": 'scale down 5.5 percent',
-                    "changePercent": -5.5,
-                    "cooldown": 6
+                "ab2b2865-2e9d-4422-a6aa-5af184f81d7b": {
+                    "name": "scale up by one server",
+                    "change": 1,
+                    "cooldown": 150
                 },
-                {
-                    "name": 'set number of servers to 10',
-                    "steadyState": 10,
-                    "cooldown": 3
+                "a64b4aa8-03f5-4c46-9bc0-add7c3795809": {
+                    "name": "scale up ten percent",
+                    "changePercent": 10,
+                    "cooldown": 150
+                },
+                "30faf2d1-39db-4c85-9505-07cbe7ab5569": {
+                    "name": "scale down one server",
+                    "change": -1,
+                    "cooldown": 150
+                },
+                "dde7c707-750d-4df5-9828-687bb77cb8fd": {
+                    "name": "scale down ten percent",
+                    "changePercent": -10,
+                    "cooldown": 150
                 }
             ]
         }
@@ -400,7 +409,7 @@ def edit_config_for_scaling_group(request, tenantId, groupId, data):
 # -------------------- read/update launch configs ---------------------
 
 
-@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch'),
        methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -452,11 +461,11 @@ def view_launch_config(request, tenantId, groupId):
     return deferred
 
 
-@route(('/<string:tenantId>/autoscale/<string:groupId>/launch_config'),
+@route(('/<string:tenantId>/autoscale/<string:groupId>/launch'),
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(launch_schema)
+@validate_body(launch_config)
 def edit_launch_config(request, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the
@@ -508,6 +517,323 @@ def edit_launch_config(request, tenantId, groupId, data):
     """
     rec = get_store().get_launch_config(tenantId, groupId)
     deferred = defer.maybeDeferred(rec.update_launch_config, data)
+    return deferred
+
+
+# -------------------- list/create scaling policies ---------------------
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/policy'),
+       methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def get_policies(request, tenantId, groupId):
+    """
+    Get a mapping of scaling policy IDs to scaling policies in the group.
+    Each policy describes an id, name, type, adjustment, and cooldown.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "ab2b2865-2e9d-4422-a6aa-5af184f81d7b": {
+                "name": "scale up by one server",
+                "change": 1,
+                "cooldown": 150
+            },
+            "a64b4aa8-03f5-4c46-9bc0-add7c3795809": {
+                "name": "scale up ten percent",
+                "changePercent": 10,
+                "cooldown": 150
+            },
+            "30faf2d1-39db-4c85-9505-07cbe7ab5569": {
+                "name": "scale down one server",
+                "change": -1,
+                "cooldown": 150
+            },
+            "dde7c707-750d-4df5-9828-687bb77cb8fd": {
+                "name": "scale down ten percent",
+                "changePercent": -10,
+                "cooldown": 150
+            }
+        }
+    """
+    rec = get_store().get_policies(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.view_policies)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/policy'),
+       methods=['POST'])
+@fails_with(exception_codes)
+@succeeds_with(201)
+@validate_body(policy_schema)
+def create_policy(request, tenantId, groupId, data):
+    """
+    Create a new scaling policy. Scaling policies must include a name, type,
+    adjustment, and cooldown.
+    The response header will point to the newly created policy.
+    This data provided in the request body in JSON format.
+
+    Example request::
+
+        {
+            "name": "scale up by one server",
+            "change": 1,
+            "cooldown": 150
+        }
+
+    """
+
+    def send_redirect(groupId, policyId):
+        request.setHeader(
+            "Location",
+            "{0}/{1}/autoscale/{2}/policy/{3}".format(
+                get_url_root(),
+                tenantId,
+                groupId,
+                policyId
+            )
+        )
+
+    rec = get_store().get_policy(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.create_policy, data)
+    deferred.addCallback(send_redirect)
+    return deferred
+
+# -------------------- view/edit/delete scaling policies ---------------------
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>'), methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_policy(request, tenantId, groupId, policyId):
+    """
+    Get a scaling policy which describes a name, type, adjustment, and cooldown.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "name": "scale up by one server",
+            "change": 1,
+            "cooldown": 150
+        }
+    """
+    rec = get_store().get_policy(tenantId, groupId, policyId)
+    deferred = defer.maybeDeferred(rec.view_policy)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>'), methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(policy_schema)
+def edit_policy(request, tenantId, groupId, policyId, data):
+    """
+    Updates a scaling policy. Scaling policies must include a name, type,
+    adjustment, and cooldown.
+    If successful, no response body will be returned.
+
+    Example request::
+
+        {
+            "name": "scale up by two servers",
+            "change": 2,
+            "cooldown": 150
+        }
+
+
+    """
+    rec = get_store().get_policy(tenantId, groupId)
+    deferred = defer.maybeDeferred(rec.edit_policy, data)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+    '/policy/<string:policyId>'), methods=['DELETE'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+def delete_policy(request, tenantId, groupId, policyId):
+    """
+    Delete a scaling policy. If successful, no response body will be returned.
+    """
+    deferred = defer.maybeDeferred(get_store().delete_policy,
+                                   tenantId, groupId, policyId)
+    return deferred
+
+
+# -------------------- view/create/update scaling webhooks ---------------------
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>/webhook'),
+        methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_all_webhooks(request, tenantId, groupId, policyId):
+    """
+    Get a mapping of IDs to their respective scaling policy webhooks.
+    Each webhook has a name, url, and cooldown.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
+                "name": "pagerduty",
+                "URL":
+                    "autoscale.api.rackspacecloud.com/v1.0/action/
+                    d0f4c14c48ad4837905ea7520cc4af700f6433ce0985e6bb87b6b461
+                    7cb944abf814bd53964ddbf55b41e5812b3afe90890c0a4db75cb043
+                    67e139fd62eab2e1",
+                "cooldown": 150
+            },
+            "b556078a-8c29-4129-9411-72580ffd0ba0": {
+                "name": "maas",
+                "URL":
+                    "autoscale.api.rackspacecloud.com/v1.0/action/
+                    db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+                    d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+                    f1e4df963414dbfe",
+                "cooldown": 150
+            }
+        }
+    """
+    rec = get_store().get_all_webhooks(tenantId, groupId, policyId)
+    deferred = defer.maybeDeferred(rec.view_all_webhooks)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>/webhook'),
+       methods=['POST'])
+@fails_with(exception_codes)
+@succeeds_with(201)
+@validate_body(policy_schema)
+def create_webhook(request, tenantId, groupId, policyId, data):
+    """
+    Create a new scaling policy webhook. Scaling policies must include a name
+    and cooldown.
+    The response header will point to the generated policy webhook resource.
+    This data provided in the request body in JSON format.
+
+    Example request::
+
+        {
+            "name": "the best webhook ever",
+            "cooldown": 150
+        }
+
+    """
+
+    def send_redirect(groupId, policyId, webhookId):
+        request.setHeader(
+            "Location",
+            "{0}/{1}/autoscale/{2}/policy/{3}/webhook/{4}".format(
+                get_url_root(),
+                tenantId,
+                groupId,
+                policyId,
+                webhookId
+            )
+        )
+
+    rec = get_store().get_webhook(tenantId, groupId, policyId)
+    deferred = defer.maybeDeferred(rec.create_webhook, data)
+    deferred.addCallback(send_redirect)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>/webhook/<string:webhookId>'),
+        methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def view_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Get information about a specific scaling policy webhook.
+    Each webhook has a name, url, and cooldown.
+    This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "name": "pagerduty",
+            "URL":
+                "autoscale.api.rackspacecloud.com/v1.0/action/
+                db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+                d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+                f1e4df963414dbfe",
+            "cooldown": 150
+        }
+    """
+    rec = get_store().get_webhook(tenantId, groupId, policyId, webhookId)
+    deferred = defer.maybeDeferred(rec.view_webhook)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>'
+        '/policy/<string:policyId>/webhook/<string:webhookId'),
+         methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(policy_schema)
+def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
+    """
+    Update an existing webhook.
+    WebhookIds not recognized will be ignored with accompanying data.
+    URLs will be ignored if submitted, but that will not invalidate the request.
+    If successful, no response body will be returned.
+
+    Example initial state::
+
+        {
+            "name": "maas",
+            "URL":
+               "autoscale.api.rackspacecloud.com/v1.0/action/
+               db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+               d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+               f1e4df963414dbfe",
+            "cooldown": 150
+        }
+
+    Example request::
+
+       {
+            "name": "something completely different",
+            "URL":
+                "autoscale.api.rackspacecloud.com/v1.0/action/
+                db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+                d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+                f1e4df963414dbfe",
+            "cooldown": 777
+        }
+
+
+    """
+    rec = get_store().get_webhook(tenantId, groupId, policyId, webhookId)
+    deferred = defer.maybeDeferred(rec.edit_all_webhooks, data)
+    return deferred
+
+
+@route(('/<string:tenantId>/autoscale/<string:groupId>/policy/'
+        '<string:policyId>/webhook/<string:webhookId>'), methods=['DELETE'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+def delete_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Delete a scaling policy webhook.
+    If successful, no response body will be returned.
+    """
+    deferred = defer.maybeDeferred(get_store().delete_policy,
+                                   tenantId, groupId, policyId, webhookId)
     return deferred
 
 
