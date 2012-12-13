@@ -21,7 +21,7 @@ import sys
 from plumbum import local, cli, commands
 
 pep8_options = [
-    '--max-line-length=125'
+    '--max-line-length=105'
 ]
 
 
