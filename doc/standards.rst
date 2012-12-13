@@ -41,8 +41,9 @@ Python code should conform to `pep8 coding standards <http://www.python.org/dev/
 #. variables, method names, and class names should not be camel-cased, but should have underscores
 #. indentation should consist of 4 spaces
 #. there should be 1 line between method definitions and 2 lines between class/function definitions
-#. code, comments, and docstrings should be wrapped at 80 columns
 #. no trailing whitespace
+#. code, comments, and docstrings should be wrapped at 80 columns if possible, but the linter will allow lines of up to 119 columns for those lines that really cannot be wrapped (long URLs, for example) - 119 columns is the maximum that will fit into the Github diff viewer.
+
 
 --------
 Pyflakes
