@@ -10,9 +10,10 @@ passes review should it be merged into master.
    lot of files,  possible it should be split up into multiple pull requests that are based upon each
    other.
 
-#. Commit messages should be informative as to the changes being made.  A message like "Fix linting
-   errors" would be good, whereas a commit messages like "lint" or "error" would be vague and
-   unspecific.
+#. Commit messages should be informative as to the changes being made. A message like "Added validation
+   for the server build config to fix issue AUTO-XXXX" or "Changed timeout to prevent spammy logging
+   observed in production" would be good, whereas a commit messages like "lint" or "error" would be
+   vague and unspecific.
 
 #. NEVER squash merges.  Always use the github merge button to merge a branch into master.
 
