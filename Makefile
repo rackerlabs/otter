@@ -41,7 +41,7 @@ clean: cleandocs
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
-	rm -rf otter-deploy* .ve
+	rm -rf otter-deploy*
 
 bundle:
 	./scripts/bundle.sh
