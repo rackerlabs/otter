@@ -8,9 +8,12 @@
 
 VE_DIR=${VE_DIR:=.ve}
 
-rm -rf ${VE_DIR}
-
-virtualenv ${VE_DIR}
+if [[ -d ${VE_DIR} ]]; then
+    echo "Skipping build virtualenv"
+else
+    echo "Building complete virtualenv"
+    virtualenv ${VE_DIR}
+fi
 
 source .ve/bin/activate
 
