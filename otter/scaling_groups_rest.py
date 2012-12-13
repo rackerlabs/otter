@@ -529,8 +529,8 @@ def edit_launch_config(request, tenantId, groupId, data):
 @succeeds_with(200)
 def get_policies(request, tenantId, groupId):
     """
-    Get an array of all scaling policies in the group. Each policy describes an
-    id, name, type, adjustment, and cooldown.
+    Get a mapping of scaling policy IDs to scaling policies in the group.
+    Each policy describes an id, name, type, adjustment, and cooldown.
     This data is returned in the body of the response in JSON format.
 
     Example response::
@@ -573,7 +573,7 @@ def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
-    The response header will redirect to the generated ID.
+    The response header will point to the newly created policy.
     This data provided in the request body in JSON format.
 
     Example request::
@@ -611,8 +611,7 @@ def create_policy(request, tenantId, groupId, data):
 @succeeds_with(200)
 def view_policy(request, tenantId, groupId, policyId):
     """
-    Get an array of a scaling policy. Each policy describes a
-    name, type, adjustment, and cooldown.
+    Get a scaling policy which describes a name, type, adjustment, and cooldown.
     This data is returned in the body of the response in JSON format.
 
     Example response::
@@ -636,7 +635,7 @@ def view_policy(request, tenantId, groupId, policyId):
 @validate_body(policy_schema)
 def edit_policy(request, tenantId, groupId, policyId, data):
     """
-    Create a new scaling policy. Scaling policies must include a name, type,
+    Updates a scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
     If successful, no response body will be returned.
 
@@ -678,13 +677,13 @@ def delete_policy(request, tenantId, groupId, policyId):
 @succeeds_with(200)
 def view_all_webhooks(request, tenantId, groupId, policyId):
     """
-    Get an array of scaling policy webhooks. Each webhook has a name, url,
-    and cooldown.
+    Get a mapping of IDs to their respective scaling policy webhooks.
+    Each webhook has a name, url, and cooldown.
     This data is returned in the body of the response in JSON format.
 
     Example response::
 
-        [
+        {
             "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
                 "name": "pagerduty",
                 "URL":
@@ -703,7 +702,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
                     f1e4df963414dbfe",
                 "cooldown": 150
             }
-        ]
+        }
     """
     rec = get_store().get_all_webhooks(tenantId, groupId, policyId)
     deferred = defer.maybeDeferred(rec.view_all_webhooks)
@@ -788,7 +787,7 @@ def create_webhook(request, tenantId, groupId, policyId, data):
     """
     Create a new scaling policy webhook. Scaling policies must include a name
     and cooldown.
-    The response header will redirect to the generated ID.
+    The response header will point to the generated policy webhook resource.
     This data provided in the request body in JSON format.
 
     Example request::
