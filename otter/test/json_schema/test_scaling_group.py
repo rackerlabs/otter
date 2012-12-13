@@ -273,3 +273,62 @@ class ScalingPolicyTestCase(TestCase):
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
             validate, invalid, scaling_group.scaling_policy)
+
+
+class CreateScalingGroupTestCase(TestCase):
+    """
+    Simple verification that the JSON schema for creating a scaling group is
+    correct.
+    """
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(scaling_group.create_group)
+
+    def test_valid_examples_validate(self):
+        """
+        The scaling policy examples all validate.
+        """
+        for example in scaling_group.create_group_examples:
+            validate(example, scaling_group.create_group)
+
+    def test_wrong_launch_config_fails(self):
+        """
+        Not including a launchConfiguration or including an invalid ones will
+        fail to validate.
+        """
+        invalid = {'groupConfiguration': scaling_group.config_examples[0]}
+        self.assertRaisesRegexp(
+            ValidationError, 'launchConfiguration',
+            validate, invalid, scaling_group.create_group)
+        invalid['launchConfiguration'] = {}
+        self.assertRaises(ValidationError,
+                          validate, invalid, scaling_group.create_group)
+
+    def test_wrong_group_config_fails(self):
+        """
+        Not including a groupConfiguration or including an invalid ones will
+        fail to validate.
+        """
+        invalid = {'launchConfiguration':
+                   scaling_group.launch_server_config_examples[0]}
+        self.assertRaisesRegexp(
+            ValidationError, 'groupConfiguration',
+            validate, invalid, scaling_group.create_group)
+        invalid['groupConfiguration'] = {}
+        self.assertRaises(ValidationError,
+                          validate, invalid, scaling_group.create_group)
+
+    def test_wrong_scaling_policy_fails(self):
+        """
+        An otherwise ok creation blob fails if the provided scaling policies
+        are wrong.
+        """
+        self.assertRaises(
+            ValidationError, validate, {
+                'groupConfiguration': scaling_group.config_examples[0],
+                'launchConfiguration':
+                scaling_group.launch_server_config_examples[0],
+                'scalingPolicies': [{}]
+            }, scaling_group.create_group)
