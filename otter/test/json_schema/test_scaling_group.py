@@ -219,14 +219,14 @@ class ScalingPolicyTestCase(TestCase):
         """
         The schema itself is a valid Draft 3 schema
         """
-        Draft3Validator.check_schema(scaling_group.scaling_policy)
+        Draft3Validator.check_schema(scaling_group.policy)
 
     def test_valid_examples_validate(self):
         """
         The scaling policy examples all validate.
         """
-        for example in scaling_group.scaling_policy_examples:
-            validate(example, scaling_group.scaling_policy)
+        for example in scaling_group.policy_examples:
+            validate(example, scaling_group.policy)
 
     def test_either_change_or_changePercent_or_steadyState(self):
         """
@@ -243,7 +243,7 @@ class ScalingPolicyTestCase(TestCase):
                 invalid[one_only[index]] = 5
             self.assertRaisesRegexp(
                 ValidationError, 'not of type',
-                validate, invalid, scaling_group.scaling_policy)
+                validate, invalid, scaling_group.policy)
 
     def test_set_steady_state_must_not_be_negative(self):
         """
@@ -256,7 +256,7 @@ class ScalingPolicyTestCase(TestCase):
         }
         self.assertRaisesRegexp(
             ValidationError, 'minimum',
-            validate, invalid, scaling_group.scaling_policy)
+            validate, invalid, scaling_group.policy)
 
     def test_no_other_properties_valid(self):
         """
@@ -272,7 +272,7 @@ class ScalingPolicyTestCase(TestCase):
         }
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
-            validate, invalid, scaling_group.scaling_policy)
+            validate, invalid, scaling_group.policy)
 
 
 class CreateScalingGroupTestCase(TestCase):
