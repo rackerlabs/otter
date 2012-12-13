@@ -114,6 +114,7 @@ def create_new_scaling_group(request, tenantId, data):
     be returned.
 
     Example request body containing some scaling policies::
+
         {
             "groupConfiguration": {
                 "name": "workers",
@@ -122,7 +123,7 @@ def create_new_scaling_group(request, tenantId, data):
                 "maxEntities": 100,
                 "metadata": {
                     "firstkey": "this is a string",
-                    "secondkey": "1",
+                    "secondkey": "1"
                 }
             },
             "launchConfiguration": {
@@ -654,8 +655,8 @@ def edit_policy(request, tenantId, groupId, policyId, data):
     return deferred
 
 
-@route(('/<string:tenantId>/autoscale/<string:groupId>'
-    '/policy/<string:policyId>'), methods=['DELETE'])
+@route('/<string:tenantId>/autoscale/<string:groupId>/policy/<string:policyId>',
+       methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 def delete_policy(request, tenantId, groupId, policyId):
@@ -672,7 +673,7 @@ def delete_policy(request, tenantId, groupId, policyId):
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>'
         '/policy/<string:policyId>/webhook'),
-        methods=['GET'])
+       methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
 def view_all_webhooks(request, tenantId, groupId, policyId):
@@ -752,7 +753,7 @@ def create_webhook(request, tenantId, groupId, policyId, data):
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>'
         '/policy/<string:policyId>/webhook/<string:webhookId>'),
-        methods=['GET'])
+       methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
 def view_webhook(request, tenantId, groupId, policyId, webhookId):
@@ -780,8 +781,8 @@ def view_webhook(request, tenantId, groupId, policyId, webhookId):
 
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>'
-        '/policy/<string:policyId>/webhook/<string:webhookId'),
-         methods=['PUT'])
+        '/policy/<string:policyId>/webhook/<string:webhookId>'),
+       methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(policy_schema)
