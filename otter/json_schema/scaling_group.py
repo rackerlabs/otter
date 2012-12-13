@@ -154,7 +154,7 @@ launch_server_config_examples = [
             "server": {
                 "flavorRef": 2,
                 "name": "worker",
-                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0",
+                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
             },
             "loadBalancers": [
                 {
@@ -174,8 +174,8 @@ launch_server_config_examples = [
             "server": {
                 "flavorRef": 2,
                 "name": "worker",
-                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0",
-            },
+                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+            }
         }
     }
 ]
@@ -248,7 +248,7 @@ config_examples = [
         "maxEntities": 100,
         "metadata": {
             "firstkey": "this is a string",
-            "secondkey": "1",
+            "secondkey": "1"
         }
     }
 ]
@@ -258,32 +258,29 @@ policy_schema = {
     "type": [
         {
             "type": "object",
-            "properties":
-                {
-                    "name": {},
-                    "cooldown": {},
-                    "changePercent": {"required": True}
-                },
-            "additionalProperties": False
-        },
-        {
-            "type": "object",
-            "properties":
-                {
-                    "name": {},
-                    "cooldown": {},
-                    "change": {"required": True}
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "changePercent": {"required": True}
             },
             "additionalProperties": False
         },
         {
             "type": "object",
-            "properties":
-                {
-                    "name": {},
-                    "cooldown": {},
-                    "steadyState": {"required": True}
-                },
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "change": {"required": True}
+            },
+            "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "steadyState": {"required": True}
+            },
             "additionalProperties": False
         }
     ],
@@ -346,7 +343,7 @@ policy_examples = [
     {
         "name": "scale up by 10",
         "change": 10,
-        "cooldown": 5,
+        "cooldown": 5
     },
     {
         "name": 'scale down a 5.5 percent because of a tweet',
