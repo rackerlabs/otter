@@ -24,6 +24,7 @@ pep8_options = [
     '--max-line-length=125'
 ]
 
+
 def lint(to_lint):
     """
     Run all linters against a list of files.
