@@ -15,6 +15,7 @@ Developer documentation
    :maxdepth: 2
 
    architecture
+   dev_processes
    standards
 
 Endpoint API documentation
