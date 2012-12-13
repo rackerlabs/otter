@@ -256,7 +256,7 @@ config_examples = [
 ]
 
 
-policy_schema = {
+policy = {
     "type": [
         {
             "type": "object",
@@ -368,7 +368,7 @@ create_group = {
         'launchConfiguration': launch_config,
         'scalingPolicies': {
             'type': 'array',
-            'items': scaling_policy,
+            'items': policy,
             'uniqueItems': True
         }
     },
@@ -389,6 +389,6 @@ create_group_examples = [
     {
         "groupConfiguration": config_examples[1],
         "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": scaling_policy_examples
+        "scalingPolicies": policy_examples
     }
 ]

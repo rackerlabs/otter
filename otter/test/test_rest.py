@@ -175,9 +175,9 @@ class RestAPITestMixin(DeferredTestMixin):
             self.assert_status_code(405, method=method)
 
 
-class ScAllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
+class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/tenantid/autoscale``
+    Tests for ``/tenantid/autoscale`` endpoints
     """
     endpoint = "/v1.0/11111/autoscale"
     invalid_methods = ("DELETE", "PUT")
@@ -258,23 +258,38 @@ class ScAllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             '11111', request_body)
 
 
-class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
+class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/tenantid/autoscale``
+    Tests for ``/tenantid/autoscale/groupid`` endpoints
     """
-    endpoint = "/v1.0/11111/autoscale"
-    invalid_methods = ("DELETE", "PUT")
+    endpoint = "/v1.0/11111/autoscale/one"
+    invalid_methods = ("POST", "PUT")  # cannot update in bulk
 
     def test_group_delete(self):
         """
-        Tries to delete a group
+        Deleting an existing group succeeds with a 204.
         """
         self.mock_store.delete_scaling_group.return_value = defer.succeed(None)
 
-        self.assert_status_code(204, self.endpoint + '/one', 'DELETE')
-        self.mock_store.delete_scaling_group.assert_called_once_with('11111',
-                                                                     'dfw',
-                                                                     'one')
+        response_body = self.assert_status_code(204, method="DELETE")
+        self.assertEqual(response_body, "")
+        self.mock_store.delete_scaling_group.assert_called_once_with(
+            '11111', 'one')
+
+    def test_group_delete_404(self):
+        """
+        Deleting a non-existant group fails with a 404.
+        """
+        self.mock_store.delete_scaling_group.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
+
+        response_body = self.assert_status_code(404, method="DELETE")
+        self.mock_store.delete_scaling_group.assert_called_once_with(
+            '11111', 'one')
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_group_get(self):
         """

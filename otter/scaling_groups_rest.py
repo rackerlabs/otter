@@ -574,7 +574,7 @@ def get_policies(request, tenantId, groupId):
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(policy_schema)
+@validate_body(sg_schema.policy)
 def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
@@ -638,7 +638,7 @@ def view_policy(request, tenantId, groupId, policyId):
         '/policy/<string:policyId>'), methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.policy_schema)
+@validate_body(sg_schema.policy)
 def edit_policy(request, tenantId, groupId, policyId, data):
     """
     Updates a scaling policy. Scaling policies must include a name, type,
@@ -721,7 +721,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(sg_schema.policy_schema)
+@validate_body(sg_schema.policy)
 def create_webhook(request, tenantId, groupId, policyId, data):
     """
     Create a new scaling policy webhook. Scaling policies must include a name
@@ -790,7 +790,7 @@ def view_webhook(request, tenantId, groupId, policyId, webhookId):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.policy_schema)
+@validate_body(sg_schema.policy)
 def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
     """
     Update an existing webhook.
