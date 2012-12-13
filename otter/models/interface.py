@@ -168,7 +168,7 @@ class IScalingGroupCollection(Interface):
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
-        :return: ``list`` of :class:`IScalingGroup` providers::
+        :return: ``list`` of :class:`IScalingGroup` providers
         """
         pass
 

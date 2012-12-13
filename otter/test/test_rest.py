@@ -177,7 +177,7 @@ class RestAPITestMixin(DeferredTestMixin):
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/tenantid/autoscale`` endpoints
+    Tests for ``/{tenantId}/autoscale`` endpoints
     """
     endpoint = "/v1.0/11111/autoscale"
     invalid_methods = ("DELETE", "PUT")
@@ -260,7 +260,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/tenantid/autoscale/groupid`` endpoints
+    Tests for ``/{tenantId}/autoscale/{groupId}`` endpoints
     """
     endpoint = "/v1.0/11111/autoscale/one"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
@@ -290,6 +290,13 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+
+class GroupConfigTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/autoscale/{groupId}/config`` endpoints
+    """
+    skip = "Not implemented yet."
 
     def test_group_get(self):
         """

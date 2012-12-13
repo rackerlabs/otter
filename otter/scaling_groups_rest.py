@@ -1,4 +1,6 @@
-""" Scaling groups REST mock API"""
+"""
+Autoscale top level REST endpoints  (/tenantId/autoscale)
+"""
 
 from klein import resource, route
 import json
