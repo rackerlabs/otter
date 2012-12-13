@@ -9,8 +9,10 @@ from twisted.web.resource import Resource
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.json_schema.scaling_group import config as config_schema
-from otter.json_schema.scaling_group import launch_server_config_examples \
-as launch_schema
+from otter.json_schema.scaling_group import (
+    launch_server_config_examples as launch_schema
+)
+
 from otter.util.schema import InvalidJsonError, validate_body
 from otter.util.fault import fails_with, succeeds_with
 
