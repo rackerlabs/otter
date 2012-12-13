@@ -10,6 +10,9 @@ test:	unit integration
 run:
 	PYTHONPATH=".:${PYTHONPATH}" twistd -n web --resource-script=${CODEDIR}/server.rpy
 
+env:
+	./scripts/bootstrap-virtualenv.sh
+
 lint:
 	${PYTHONLINT} ${PYDIRS}
 
