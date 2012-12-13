@@ -671,7 +671,7 @@ def delete_policy(request, tenantId, groupId, policyId):
 
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>'
-        '/policy/<string:policyId>/webhook/'),
+        '/policy/<string:policyId>/webhook'),
         methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -711,74 +711,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
 
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>'
-        '/policy/<string:policyId>/webhook/'),
-         methods=['PUT'])
-@fails_with(exception_codes)
-@succeeds_with(204)
-@validate_body(policy_schema)
-def edit_all_webhooks(request, tenantId, groupId, policyId, data):
-    """
-    Update all existing webhooks. This will allow users to change names
-    and cooldowns in one go.
-    WebhookIds not recognized will be ignored in totality.
-    URLs will be ignored completely.
-    If successful, no response body will be returned.
-
-    Example initial state::
-
-        [
-                "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
-                "name": "pagerduty",
-                "URL":
-                    "autoscale.api.rackspacecloud.com/v1.0/action/
-                    d0f4c14c48ad4837905ea7520cc4af700f6433ce0985e6bb87b6b461
-                    7cb944abf814bd53964ddbf55b41e5812b3afe90890c0a4db75cb043
-                    67e139fd62eab2e1",
-                "cooldown": 150
-            },
-            "b556078a-8c29-4129-9411-72580ffd0ba0": {
-                "name": "maas",
-                "URL":
-                    "autoscale.api.rackspacecloud.com/v1.0/action/
-                    db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
-                    d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
-                    f1e4df963414dbfe",
-                "cooldown": 150
-            }
-        ]
-
-    Example request::
-
-        [
-            "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
-                "name": "pagerduty",
-                "URL":
-                    "autoscale.api.rackspacecloud.com/v1.0/action/
-                    d0f4c14c48ad4837905ea7520cc4af700f6433ce0985e6bb87b6b461
-                    7cb944abf814bd53964ddbf55b41e5812b3afe90890c0a4db75cb043
-                    67e139fd62eab2e1",
-                "cooldown": 5
-            },
-            "b556078a-8c29-4129-9411-72580ffd0ba0": {
-                "name": "something completely different",
-                "URL":
-                    "autoscale.api.rackspacecloud.com/v1.0/action/
-                    db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
-                    d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
-                    f1e4df963414dbfe",
-                "cooldown": 777
-            }
-        ]
-
-
-    """
-    rec = get_store().get_all_webhooks(tenantId, groupId, policyId)
-    deferred = defer.maybeDeferred(rec.edit_all_webhooks, data)
-    return deferred
-
-
-@route(('/<string:tenantId>/autoscale/<string:groupId>'
-        '/policy/<string:policyId>/webhook/'),
+        '/policy/<string:policyId>/webhook'),
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
@@ -891,7 +824,7 @@ def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
 
 
 @route(('/<string:tenantId>/autoscale/<string:groupId>/policy/'
-        '<string:policyId>webhook/<string:webhookId>'), methods=['DELETE'])
+        '<string:policyId>/webhook/<string:webhookId>'), methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 def delete_webhook(request, tenantId, groupId, policyId, webhookId):

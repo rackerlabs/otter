@@ -30,6 +30,6 @@ Scale Policy Schema
 
     {
         "name": "scale down one percent",
-        "changePercent": 10,
+        "changePercent": -10,
         "cooldown": 150
     }
