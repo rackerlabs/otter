@@ -18,6 +18,9 @@ from otter.models.interface import NoSuchScalingGroupError
 from otter.test.utils import DeferredTestMixin
 from otter.util.schema import InvalidJsonError
 
+from otter.json_schema.scaling_group import (
+    config_examples, launch_server_config_examples as launch_examples)
+
 
 class DummyException(Exception):
     """
@@ -172,70 +175,13 @@ class RestAPITestMixin(DeferredTestMixin):
             self.assert_status_code(405, method=method)
 
 
-class ScGroupsEndpointTestCase(RestAPITestMixin, TestCase):
+class ScAllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/tenantid/scaling_groups``
+    Tests for ``/tenantid/autoscale``
     """
-    endpoint = "/v1.0/11111/scaling_groups"
-    invalid_methods = ("DELETE", "POST", "PUT")
-
-    def setUp(self):
-        """
-        Set up expected value (for testing generating json blobs)
-        """
-        super(ScGroupsEndpointTestCase, self).setUp()
-        self.expected = {'dfw': [{'id': 0, 'region': 'dfw'},
-                                 {u'id': 1, u'region': u'dfw'}
-                                 ]}
-
-    def test_unknown_error_is_500(self):
-        """
-        If an unexpected exception is raised, endpoint returns a 500.
-        """
-        error = DummyException('what')
-        self.mock_store.list_scaling_groups.return_value = defer.fail(error)
-        self.assert_status_code(500)
-        self.flushLoggedErrors()
-
-    def test_no_groups_returns_json_blob_with_empty_list(self):
-        """
-        If there are no groups for that account, a JSON blob containing an
-        empty list is returned with a 200 (OK) status
-        """
-        expected = {}
-        self.mock_store.list_scaling_groups.return_value = defer.succeed(
-            expected)
-        body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(
-            '11111')
-        self.assertEqual(json.loads(body), expected)
-
-    def test_returned_entity_list_gets_translated(self):
-        """
-        Test that the entity list gets sent properly
-        """
-
-        response_body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(
-            '11111')
-        self.assertEqual(json.loads(response_body), self.expected)
-
-
-class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
-    """
-    Tests for ``/tenantid/scaling_groups/dfw``
-    """
-    endpoint = "/v1.0/11111/scaling_groups/dfw"
+    endpoint = "/v1.0/11111/autoscale"
     invalid_methods = ("DELETE", "PUT")
 
-    def setUp(self):
-        """
-        Set up expected value (for testing generating json blobs)
-        """
-        super(ScColoEndpointTestCase, self).setUp()
-        self.expected = {'dfw': [{'id': 0, 'region': 'dfw'},
-                                 {u'id': 1, u'region': u'dfw'}]}
-
     def test_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -245,36 +191,40 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
-    def test_no_groups_returns_json_blob_with_empty_list(self):
+    def test_no_groups_returns_empty_list(self):
         """
-        If there are no groups for that account and colo, a JSON blob
-        containing an empty list is returned with a 200 (OK) status
+        If there are no groups for that account, a JSON blob consisting of an
+        empty list is returned with a 200 (OK) status
         """
-        expected = {}
-        self.mock_store.list_scaling_groups.return_value = defer.succeed(
-            expected)
+        self.mock_store.list_scaling_groups.return_value = defer.succeed([])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(
-            '11111', 'dfw')
-        self.assertEqual(json.loads(body), expected)
+        self.mock_store.list_scaling_groups.assert_called_once_with('11111')
+        self.assertEqual(json.loads(body), [])
 
-    def test_returned_group_list_gets_translated(self):
+    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="/v1.0")
+    def test_returned_group_list_gets_translated(self, mock_url):
         """
-        Test that the entity list gets sent properly
+        Test that the scaling groups list gets translated into a list of
+        scaling group ids and links.
         """
+        # return two mock scaling group objects
+        self.mock_store.list_scaling_groups.return_value = defer.succeed([
+            mock.MagicMock(spec=['uuid'], uuid="1"),
+            mock.MagicMock(spec=['uuid'], uuid="2")
+        ])
         response_body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(
-            '11111', 'dfw')
-        self.assertEqual(json.loads(response_body), self.expected)
+        self.mock_store.list_scaling_groups.assert_called_once_with('11111')
+        self.assertEqual(json.loads(response_body), [
+            {'id': '1', 'link': '/v1.0/11111/autoscale/1'},
+            {'id': '2', 'link': '/v1.0/11111/autoscale/2'}
+        ])
 
     def test_group_create_bad_input_400(self):
         """
         Checks that the serialization checks and rejects unserializable
         data
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed(
-            'one')
-
+        self.mock_store.create_scaling_group.return_value = defer.succeed("one")
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
 
@@ -283,28 +233,37 @@ class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
         Checks that the scaling groups schema is obeyed --
         an empty schema is bad.
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed(
-            'one')
 
-        response_body = self.assert_status_code(400, None,
-                                                'POST', '{}')
+        self.mock_store.create_scaling_group.return_value = defer.succeed("one")
+        response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
+
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    def test_group_create(self):
+    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="/v1.0")
+    def test_group_create(self, mock_url):
         """
         Tries to create a scaling group
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed(
-            'one')
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
-        expected_url = 'http://127.0.0.1/v1.0/11111/scaling_groups/dfw/one/'
+        self.mock_store.create_scaling_group.return_value = defer.succeed("one")
+        request_body = {
+            'groupConfiguration': config_examples[0],
+            'launchConfiguration': launch_examples[0]
+        }
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body),
-                                expected_url)
+                                '/v1.0/11111/autoscale/one')
         self.mock_store.create_scaling_group.assert_called_once_with(
-            '11111', 'dfw', request_body)
+            '11111', request_body)
+
+
+class ScColoEndpointTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/tenantid/autoscale``
+    """
+    endpoint = "/v1.0/11111/autoscale"
+    invalid_methods = ("DELETE", "PUT")
 
     def test_group_delete(self):
         """
