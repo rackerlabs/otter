@@ -24,6 +24,19 @@ passes review should it be merged into master.
    branch, for instance), and never to master. Merging from master is an acceptable alternative to
    rebasing.
 
-#. Please use ``git config push.default current`` (or alternatively ``git config --global push.default
-   current``), so that if a branch argument is left off of ``git push``, by default it pushes the
-   current branch to the remote branch of the same name.
+#. If you are using a version of git >= 1.8, please use ``git config push.default current`` (or
+   alternatively ``git config --global push.default current``), so that if a branch argument is left
+   off of ``git push``, by default it pushes the current branch to the remote branch of the same name.
+
+   Alternately, this function by Phil Kates/Jordan Evans helps to avoid accidentally pushing to
+   master::
+
+       function gpthis() {
+          git_branch=$(git_current_branch)
+          if [ $git_branch = 'master' ]
+          then
+              echo "\nWon't merge branch master.\n If you really want to merge to master, please run 'git push origin master'"
+          else
+              git push $1 origin HEAD:$git_branch
+          fi
+       }
