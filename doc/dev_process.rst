@@ -36,7 +36,9 @@ passes review should it be merged into master.
           git_branch=$(git_current_branch)
           if [ $git_branch = 'master' ]
           then
-              echo "\nWon't merge branch master.\n If you really want to merge to master, please run 'git push origin master'"
+              echo "\nWon't merge branch master."
+              echo "If you really want to merge to master, please run:"
+              echo "   git push origin master"
           else
               git push $1 origin HEAD:$git_branch
           fi
