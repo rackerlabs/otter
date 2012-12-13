@@ -14,24 +14,6 @@ from otter.json_schema.scaling_group import config as group_config_schema
 from otter.test.utils import DeferredTestMixin
 
 
-scaling_group_state_schema = {
-    'type': 'object',
-    'properties': {
-        'steady_state_entities': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        },
-        'current_entities': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        }
-    },
-    'additionalProperties': False
-}
-
-
 class IScalingGroupProviderMixin(DeferredTestMixin):
     """
     Mixin that tests for anything that provides :class:`IScalingGroup`.
@@ -45,22 +27,6 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         :class:`otter.scaling_groups_interface.IScalingGroup`.
         """
         verifyObject(IScalingGroup, self.group)
-
-    def validate_list_return_value(self, *args, **kwargs):
-        """
-        Calls ``list()``, and validates it returns a list of strings
-
-        :return: the return value of ``list()``
-        """
-        result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.list_entities, *args, **kwargs))
-        validate(result, {
-            "type": "array",
-            "items": {
-                "type": "string"
-            }
-        })
-        return result
 
     def validate_view_config_return_value(self, *args, **kwargs):
         """
@@ -92,7 +58,28 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         # must actually have all the properties
         result = self.assert_deferred_succeeded(
             defer.maybeDeferred(self.group.view_state, *args, **kwargs))
-        validate(result, scaling_group_state_schema)
+        array_of_strings = {
+            'type': 'array',
+            'items': {'type': "string"},
+            'uniqueItems': True
+        }
+        validate(result, {
+            'type': 'object',
+            'properties': {
+                'steadyState': {
+                    'type': 'integer',
+                    'minimum': 0,
+                    'required': True
+                },
+                'paused': {
+                    'type': 'boolean',
+                    'required': True
+                },
+                'active': array_of_strings,
+                'pending': array_of_strings
+            },
+            'additionalProperties': False
+        })
         return result
 
 

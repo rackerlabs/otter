@@ -42,11 +42,25 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        The state of the scaling group consists of the current number of
-        entities in the scaling group and the desired steady state number of
-        entities.
+        The state of the scaling group consists of a list unique IDs of the
+        current entities in the scaling group, the a list of the unique IDs
+        of the pending entities in the scaling group, the desired steady state
+        number of entities, and a boolean specifying whether scaling is
+        currently paused.
 
-        :return: a view of the state of the scaling group as a dict
+        :return: a view of the state of the scaling group in the form::
+
+            {
+                'active': [
+                    '7e8b8ef3-ea06-44d2-8418-4bff11acc9fe',
+                    '18aefdc0-abfd-4b40-a800-201f326fabe3'
+                ],
+                'pending': ['ccc26371-79dc-4839-b0ec-e6c3f31f415d'],
+                'steadyState': 3,
+                'paused': false
+            }
+
+        :rtype: ``dict``
         """
         pass
 
@@ -79,13 +93,6 @@ class IScalingGroup(Interface):
             value is less than ``min_entities``, the value will be set to
             ``min_entities``.
         :type steady_state: ``int``
-        """
-        pass
-
-    def list_entities():
-        """
-        :return: a list of the uuids of the entities in the scaling group
-        :rtype: ``list`` of ``strings``
         """
         pass
 

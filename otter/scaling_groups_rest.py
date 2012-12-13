@@ -330,7 +330,7 @@ def get_scaling_group_state(request, tenantId, coloId, groupId):
                 }
             ],
             "steadyState": 3,
-            "scalingStatus": "running"
+            "paused": false
         }
     """
     raise NotImplementedError()
