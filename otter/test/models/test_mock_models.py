@@ -193,14 +193,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     Tests for :class:`MockScalingGroupCollection`
     """
 
-    skip = "All broken"
-
     def setUp(self):
         """ Setup the mocks """
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
-        self.collection.mock_add_tenant(self.tenant_id)
-        self.region = 'DFW'
         self.config = {
             'name': 'blah',
             'cooldown': 600,
@@ -209,24 +205,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'metadata': {}
         }
 
-    def test_list_scaling_groups_is_empty_if_no_groups(self):
+    def test_list_scaling_groups_is_empty_if_new_tenant_id(self):
         """
-        Listing all scaling groups for a tenant id, with no scaling groups,
-        returns an empty dictionary
+        Listing all scaling groups for a tenant id, with no scaling groups
+        because they are a new tenant id, returns an empty list
         """
-        self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
+        self.assertEqual(self.validate_list_return_value(self.tenant_id), [],
                          "Should start off with zero groups for tenant")
-
-    def test_list_scaling_groups_has_empty_region_if_called_with_region(self):
-        """
-        Listing all scaling groups for a region for a tenant id will return
-        a dictionary with that region as a key and an empty dictionary as a
-        value
-        """
-        self.assertEqual(
-            self.validate_list_return_value(self.tenant_id, self.region),
-            {self.region: []},
-            "Should start off with zero groups for region for tenant")
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_config_and_list_scaling_groups(self, mock_sgrp):
@@ -241,18 +226,32 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Creation of a scaling group with a 'config' parameter creates a
         scaling group with the specified configuration.
         """
-        self.assertEqual(self.validate_list_return_value(self.tenant_id), {},
+        fake_launch = {"launch": "config"}
+        fake_policies = [1, 2, 3]
+        self.assertEqual(self.validate_list_return_value(self.tenant_id), [],
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.region, self.config))
+                self.tenant_id, self.config, fake_launch, fake_policies))
 
-        result = self.validate_list_return_value(self.tenant_id, self.region)
-        self.assertEqual(len(result[self.region]), 1)
-        self.assertEqual(result[self.region][0].uuid, uuid,
-                         "Group not added to collection")
+        result = self.validate_list_return_value(self.tenant_id)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].uuid, uuid, "Group not added to collection")
 
-        mock_sgrp.assert_called_once_with(self.region, uuid, self.config)
+        mock_sgrp.assert_called_once_with(uuid, self.config, fake_launch,
+                                          fake_policies)
+
+    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
+    def test_create_group_with_no_policies(self, mock_sgrp):
+        """
+        Creating a scaling group with all arguments except policies passes None
+        as policies to the MockScalingGroup.
+        """
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.tenant_id, self.config, {}))
+
+        mock_sgrp.assert_called_once_with(uuid, self.config, {}, None)
 
     def test_delete_removes_a_scaling_group(self):
         """
@@ -261,26 +260,23 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.region, self.config))
-
-        result = self.validate_list_return_value(self.tenant_id, self.region)
-        self.assertEqual(len(result[self.region]), 1,
-                         "Group not added correctly")
-
-        self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.tenant_id,
-                                                 self.region, uuid))
+                self.tenant_id, self.config, {}))  # ignore launch for now
 
         result = self.validate_list_return_value(self.tenant_id)
-        self.assertEqual(result, {}, "Group not deleted from collection")
+        self.assertEqual(len(result), 1, "Group not added correctly")
+
+        self.assert_deferred_succeeded(
+            self.collection.delete_scaling_group(self.tenant_id, uuid))
+
+        result = self.validate_list_return_value(self.tenant_id)
+        self.assertEqual(result, [], "Group not deleted from collection")
 
     def test_delete_scaling_group_fails_if_scaling_group_does_not_exist(self):
         """
         Deleting a scaling group that doesn't exist raises a
         :class:`NoSuchScalingGroupError` exception
         """
-        deferred = self.collection.delete_scaling_group(self.tenant_id,
-                                                        self.region, 1)
+        deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     def test_get_scaling_group_returns_mock_scaling_group(self):
@@ -290,9 +286,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.region, self.config))
-        group = self.validate_get_return_value(self.tenant_id, self.region,
-                                               uuid)
+                self.tenant_id, self.config, {}))  # ignore launch for now
+        group = self.validate_get_return_value(self.tenant_id, uuid)
+
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
@@ -310,7 +306,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Getting a scaling group that doesn't exist returns a MockScalingGropu
         whose methods will raise :class:`NoSuchScalingGroupError` exceptions.
         """
-        group = self.validate_get_return_value(self.tenant_id, self.region, 1)
+        group = self.validate_get_return_value(self.tenant_id, 1)
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
@@ -322,6 +318,5 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                     NoSuchScalingGroupError)
         self.assert_deferred_failed(group.set_steady_state(1),
                                     NoSuchScalingGroupError)
-        group.entities = [1]
         self.assert_deferred_failed(group.bounce_entity(1),
                                     NoSuchScalingGroupError)

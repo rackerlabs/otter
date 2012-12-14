@@ -1,6 +1,8 @@
 """
  Mock interface for the front-end scaling groups engine
 """
+from collections import defaultdict
+
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError)
 import zope.interface
@@ -36,9 +38,8 @@ class MockScalingGroup:
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, region, uuid, config=None, tenant_id=None):
+    def __init__(self, uuid, config, launch, policies=None, tenant_id=None):
         self.uuid = uuid
-        self.region = region
 
         self.entities = []
 
@@ -53,8 +54,10 @@ class MockScalingGroup:
                 'metadata': {}
             }
             self.update_config(config)
+            self.launch = launch
+            self.policies = policies or []
         else:
-            self.error = NoSuchScalingGroupError(tenant_id, region, uuid)
+            self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
 
     def view_config(self):
@@ -151,14 +154,12 @@ class MockScalingGroupCollection:
         """
         Init
         """
-        self.data = {}
+        # If all authorization passes, and the user doesn't exist in the store,
+        # then they must be a valid new user.  Just create an account for them.
+        self.data = defaultdict(dict)
         self.uuid = 0
 
-    def mock_add_tenant(self, tenant):
-        """ Mock add a tenant """
-        self.data[tenant] = {}
-
-    def create_scaling_group(self, tenant, region, config=None):
+    def create_scaling_group(self, tenant, config, launch, policies=None):
         """
         Create the scaling group
 
@@ -167,28 +168,22 @@ class MockScalingGroupCollection:
         """
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
-        if region not in self.data[tenant]:
-            self.data[tenant][region] = {}
-        self.data[tenant][region][uuid] = MockScalingGroup(region, uuid,
-                                                           config or {})
+        self.data[tenant][uuid] = MockScalingGroup(
+            uuid, config, launch, policies)
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, region, uuid):
+    def delete_scaling_group(self, tenant, uuid):
         """
         Delete the scaling group
 
         :return: :class:`Deferred` that fires with None
         """
-        if (tenant not in self.data or
-                region not in self.data[tenant] or
-                uuid not in self.data[tenant][region]):
-            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
-        del self.data[tenant][region][uuid]
-        if len(self.data[tenant][region]) == 0:
-            del self.data[tenant][region]
+        if (tenant not in self.data or uuid not in self.data[tenant]):
+            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
+        del self.data[tenant][uuid]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant, region=None):
+    def list_scaling_groups(self, tenant):
         """
         List the scaling groups
 
@@ -196,17 +191,9 @@ class MockScalingGroupCollection:
             group uuids to scaling groups
         :rtype: :class:`Deferred` that fires with a ``dict``
         """
-        if region is None:
-            reformat = {}
-            for colo in self.data[tenant]:
-                reformat[colo] = self.data[tenant][colo].values()
-            return defer.succeed(reformat)
-        elif region in self.data[tenant]:
-            return defer.succeed({region: self.data[tenant][region].values()})
-        else:
-            return defer.succeed({region: []})  # no scaling groups
+        return defer.succeed(self.data.get(tenant, {}).values())
 
-    def get_scaling_group(self, tenant, region, uuid):
+    def get_scaling_group(self, tenant, uuid):
         """
         Get a scaling group
 
@@ -214,9 +201,8 @@ class MockScalingGroupCollection:
         :rtype: a :class:`IScalingGroup`
             provider
         """
-        result = self.data.get(tenant, {}).get(region, {}).get(uuid, None)
+        result = self.data.get(tenant, {}).get(uuid, None)
 
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
-        return result or MockScalingGroup(region, uuid, config=None,
-                                          tenant_id=tenant)
+        return result or MockScalingGroup(uuid, None, None, tenant_id=tenant)
