@@ -60,14 +60,41 @@ def set_store(i_store_provider):
     _store = i_store_provider
 
 
-def _get_autoscale_link(tenant_id, group_id=None):
+def get_autoscale_links(tenant_id, group_id=None, format="json",
+                        api_version="1.0"):
     """
-    Generates a link into the autoscale system, based on the ids given.
+    Generates links into the autoscale system, based on the ids given.  If
+    the format is "json", then a JSON blob will be given in the form of::
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          },
+          {
+            "href": <url without api version>,
+            "rel": "bookmark"
+          }
+        ]
+
+    Otherwise, the return value will just be the link.
+
+    :param link_blob":
     """
-    link = "{0}/{1!s}/autoscale".format(get_url_root(), tenant_id)
+    api = "v{0}".format(api_version)
+    path_parts = [get_url_root(), api, tenant_id, "autoscale"]
     if group_id is not None:
-        link = "{0}/{1!s}".format(link, group_id)
-    return link
+        path_parts.append(group_id)
+
+    url = "/".join(path_parts)
+
+    if format == "json":
+        return [
+            {"href": url, "rel": "self"},
+            {"href": url.replace('/{0}/'.format(api), '/'), "rel": "bookmark"}
+        ]
+    else:
+        return url
 
 
 # -------------------- list scaling groups for tenant id ----------------------
@@ -82,14 +109,32 @@ def list_all_scaling_groups(request, tenantId):
     Example response::
 
         [
-            {
-                "id": "{instance_id}"
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
-            },
-            {
-                "id": "{instance_id}"
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
-            }
+          {
+            "id": "{groupId1}"
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId1}"
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId1}"
+                "rel": "bookmark"
+              }
+            ]
+          },
+          {
+            "id": "{groupId2}"
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId2}",
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId1}"
+                "rel": "bookmark"
+              }
+            ]
+          }
         ]
     """
     def format_list(groups):
@@ -99,7 +144,7 @@ def list_all_scaling_groups(request, tenantId):
         return [
             {
                 'id': group.uuid,
-                'link': _get_autoscale_link(tenantId, group.uuid)
+                'links': get_autoscale_links(tenantId, group.uuid)
             } for group in groups]
 
     deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantId)
@@ -195,7 +240,8 @@ def create_new_scaling_group(request, tenantId, data):
     out entirely.
     """
     def send_redirect(uuid):
-        request.setHeader("Location", _get_autoscale_link(tenantId, uuid))
+        request.setHeader(
+            "Location", get_autoscale_links(tenantId, uuid, format=None))
 
     deferred = defer.maybeDeferred(
         get_store().create_scaling_group, tenantId, data)

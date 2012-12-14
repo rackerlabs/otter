@@ -201,7 +201,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
         self.assertEqual(json.loads(body), [])
 
-    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="/v1.0")
+    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="")
     def test_returned_group_list_gets_translated(self, mock_url):
         """
         Test that the scaling groups list gets translated into a list of
@@ -212,11 +212,23 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             mock.MagicMock(spec=['uuid'], uuid="1"),
             mock.MagicMock(spec=['uuid'], uuid="2")
         ])
-        response_body = self.assert_status_code(200)
+        body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
-        self.assertEqual(json.loads(response_body), [
-            {'id': '1', 'link': '/v1.0/11111/autoscale/1'},
-            {'id': '2', 'link': '/v1.0/11111/autoscale/2'}
+        self.assertEqual(json.loads(body), [
+            {
+                'id': '1',
+                'links': [
+                    {"href": '/v1.0/11111/autoscale/1', "rel": "self"},
+                    {"href": '/11111/autoscale/1', "rel": "bookmark"}
+                ]
+            },
+            {
+                'id': '2',
+                'links': [
+                    {"href": '/v1.0/11111/autoscale/2', "rel": "self"},
+                    {"href": '/11111/autoscale/2', "rel": "bookmark"}
+                ]
+            }
         ])
 
     def test_group_create_bad_input_400(self):
@@ -241,7 +253,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="/v1.0")
+    @mock.patch('otter.scaling_groups_rest.get_url_root', return_value="")
     def test_group_create(self, mock_url):
         """
         Tries to create a scaling group
