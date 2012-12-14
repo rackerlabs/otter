@@ -14,15 +14,24 @@ class MockScalingGroup:
     """
     Mock scaling group record
 
+    :ivar tenant_id: the tenant ID of the scaling group - once set, should not
+        be updated
+    :type tenant_id: ``str``
+
     :ivar uuid: UUID of the scaling group - once set, cannot be updated
     :type uuid: ``str``
 
-    :ivar region: region of the scaling group
-    :type region: ``str``, one of ("DFW", "LON", or "ORD")
-
-    :ivar config: mapping of config parameters to config values, as specified
-        by the :data:`otter.models.interface.scaling_group_config_schema`
+    :ivar config: group configuration values, as specified by
+        :data:`otter.json_schema.scaling_group.config`
     :type config: ``dict``
+
+    :ivar launch: launch configuration, as specified by
+        :data:`otter.json_schema.scaling_group.config`
+    :type config: ``dict``
+
+    :ivar policies: scaling policies of the group, each of which is specified
+        by :data:`otter.json_schema.scaling_group.scaling_policy`
+    :type config: ``list``
 
     :ivar steady: the desired steady state number of entities -
         defaults to the minimum if not given.  This how many entities the
@@ -32,20 +41,35 @@ class MockScalingGroup:
         what values the ``steady_state`` can be).
     :type steady_state: ``int``
 
-    :ivar entities: the entity id's corresponding to the entities in this
-        scaling group
-    :type entities: ``list``
+    :ivar active_entities: the entity id's corresponding to the active
+        entities in this scaling group
+    :type active_entities: ``list``
+
+    :ivar pending_entities: the entity id's corresponding to the pending
+        entities in this scaling group
+    :type pending_entities: ``list``
+
+    :ivar running: whether the scaling is currently running, or paused
+    :type entities: ``bool``
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, uuid, config, launch, policies=None, tenant_id=None):
+    def __init__(self, tenant_id, uuid, creation=None):
+        """
+        Creates a MockScalingGroup object.  If the actual scaling group should
+        be created, a creation argument is provided containing the config, the
+        launch config, and optional scaling policies.
+        """
+        self.tenant_id = tenant_id
         self.uuid = uuid
 
-        self.entities = []
-
+        # state that may be changed
         self.steady_state = 0
+        self.active_entities = []
+        self.pending_entities = []
+        self.paused = False
 
-        if config is not None:
+        if creation is not None:
             self.config = {
                 'name': "",
                 'cooldown': 0,
@@ -53,12 +77,14 @@ class MockScalingGroup:
                 'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
-            self.update_config(config)
-            self.launch = launch
-            self.policies = policies or []
+            self.update_config(creation['config'])
+            self.launch = creation['launch']
+            self.policies = creation.get('policies', None) or []
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
+            self.launch = None
+            self.policies = None
 
     def view_config(self):
         """
@@ -75,8 +101,10 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
         return defer.succeed({
-            'steady_state_entities': self.steady_state,
-            'current_entities': len(self.entities)
+            'steadyState': self.steady_state,
+            'active': self.active_entities,
+            'pending': self.pending_entities,
+            'paused': self.paused
         })
 
     def update_config(self, data):
@@ -117,16 +145,6 @@ class MockScalingGroup:
                                     self.config['maxEntities'])
         return defer.succeed(None)
 
-    def list_entities(self):
-        """
-        Lists all the entities in the scaling group
-
-        :return: :class:`Deferred` that fires with a list of entity ids
-        """
-        if self.config is None:
-            return defer.fail(self.error)
-        return defer.succeed(self.entities)
-
     def bounce_entity(self, entity_id):
         """
         Rebuilds a entity given by the server ID
@@ -136,12 +154,12 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
 
-        if entity_id in self.entities:
+        if entity_id in self.active_entities:
             # don't actually do anything, since this is fake
             return defer.succeed(None)
         return defer.fail(NoSuchEntityError(
-            "Scaling group {0} has no such entity {1}".format(self.uuid,
-                                                              entity_id)))
+            "Scaling group {0} has no such active entity {1}".format(
+                self.uuid, entity_id)))
 
 
 class MockScalingGroupCollection:
@@ -169,7 +187,8 @@ class MockScalingGroupCollection:
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
         self.data[tenant][uuid] = MockScalingGroup(
-            uuid, config, launch, policies)
+            tenant, uuid,
+            {'config': config, 'launch': launch, 'policies': policies})
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):
@@ -205,4 +224,4 @@ class MockScalingGroupCollection:
 
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
-        return result or MockScalingGroup(uuid, None, None, tenant_id=tenant)
+        return result or MockScalingGroup(tenant, uuid, None)
