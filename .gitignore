@@ -11,3 +11,4 @@ otter-deploy*
 .ve
 build
 test-report.xml
+subunit-output.txt

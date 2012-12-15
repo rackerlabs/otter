@@ -20,7 +20,8 @@ lint:
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | subunit2junitxml > test-report.xml
+	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
+	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
 else
 	trial --random 0 ${UNITTESTS}
 endif
