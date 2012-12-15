@@ -1,4 +1,6 @@
-""" Scaling groups REST mock API"""
+"""
+Autoscale top level REST endpoints  (/tenantId/autoscale)
+"""
 
 from klein import resource, route
 import json
@@ -8,14 +10,13 @@ from twisted.internet import defer
 from twisted.web.resource import Resource
 
 from otter.models.interface import NoSuchScalingGroupError
-from otter.json_schema.scaling_group import config as config_schema
-from otter.json_schema.scaling_group import launch_config, policy_schema
+from otter.json_schema import scaling_group as sg_schema
 from otter.util.schema import InvalidJsonError, validate_body
 from otter.util.fault import fails_with, succeeds_with
 
 
 _store = None
-_urlRoot = 'http://127.0.0.1/v1.0'
+_urlRoot = 'http://127.0.0.1'
 
 exception_codes = {
     ValidationError: 400,
@@ -59,12 +60,41 @@ def set_store(i_store_provider):
     _store = i_store_provider
 
 
-def _format_groups(groups):
-    res = {}
-    for colo in groups:
-        res[colo] = map(lambda format: {'id': format.uuid,
-                                        'region': format.region}, groups[colo])
-    return res
+def get_autoscale_links(tenant_id, group_id=None, format="json",
+                        api_version="1.0"):
+    """
+    Generates links into the autoscale system, based on the ids given.  If
+    the format is "json", then a JSON blob will be given in the form of::
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          },
+          {
+            "href": <url without api version>,
+            "rel": "bookmark"
+          }
+        ]
+
+    Otherwise, the return value will just be the link.
+
+    :param link_blob":
+    """
+    api = "v{0}".format(api_version)
+    path_parts = [get_url_root(), api, tenant_id, "autoscale"]
+    if group_id is not None:
+        path_parts.append(group_id)
+
+    url = "/".join(path_parts)
+
+    if format == "json":
+        return [
+            {"href": url, "rel": "self"},
+            {"href": url.replace('/{0}/'.format(api), '/'), "rel": "bookmark"}
+        ]
+    else:
+        return url
 
 
 # -------------------- list scaling groups for tenant id ----------------------
@@ -79,18 +109,46 @@ def list_all_scaling_groups(request, tenantId):
     Example response::
 
         [
-            {
-                "id": "{instance_id}"
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
-            },
-            {
-                "id": "{instance_id}"
-                "link": "https://dfw.autoscale.api.rackspace.com/v1.0/036213/autoscale/{instance_id}"
-            }
+          {
+            "id": "{groupId1}"
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId1}"
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId1}"
+                "rel": "bookmark"
+              }
+            ]
+          },
+          {
+            "id": "{groupId2}"
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId2}",
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId2}"
+                "rel": "bookmark"
+              }
+            ]
+          }
         ]
     """
-    deferred = defer.maybeDeferred(get_store().list_autoscale, tenantId)
-    deferred.addCallback(_format_groups)
+    def format_list(groups):
+        # if this list of groups is ever too large, or getting the link
+        # becomes a more time consuming task, perhaps this map should be done
+        # cooperatively
+        return [
+            {
+                'id': group.uuid,
+                'links': get_autoscale_links(tenantId, group.uuid)
+            } for group in groups]
+
+    deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantId)
+    deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -102,10 +160,11 @@ def list_all_scaling_groups(request, tenantId):
 # TODO: in the implementation ticket, the interface create definition should be
 #       changed, and the mock store and corresponding tests also changed.
 # C
+
 @route('/<string:tenantId>/autoscale', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(config_schema)
+@validate_body(sg_schema.create_group)
 def create_new_scaling_group(request, tenantId, data):
     """
     Create a new scaling group, given the general scaling group configuration,
@@ -180,15 +239,9 @@ def create_new_scaling_group(request, tenantId, data):
     The ``scalingPolicies`` attribute can also be an empty list, or just left
     out entirely.
     """
-    def send_redirect(groupId):
+    def send_redirect(uuid):
         request.setHeader(
-            "Location",
-            "{0}/{1}/autoscale/{2}/".format(
-                get_url_root(),
-                tenantId,
-                groupId
-            )
-        )
+            "Location", get_autoscale_links(tenantId, uuid, format=None))
 
     deferred = defer.maybeDeferred(
         get_store().create_scaling_group, tenantId, data)
@@ -330,7 +383,7 @@ def get_scaling_group_state(request, tenantId, coloId, groupId):
                 }
             ],
             "steadyState": 3,
-            "scalingStatus": "running"
+            "paused": false
         }
     """
     raise NotImplementedError()
@@ -378,7 +431,7 @@ def view_config_for_scaling_group(request, tenantId, groupId):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(config_schema)
+@validate_body(sg_schema.config)
 def edit_config_for_scaling_group(request, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
@@ -466,7 +519,7 @@ def view_launch_config(request, tenantId, groupId):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(launch_config)
+@validate_body(sg_schema.launch_config)
 def edit_launch_config(request, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the
@@ -569,7 +622,7 @@ def get_policies(request, tenantId, groupId):
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(policy_schema)
+@validate_body(sg_schema.policy)
 def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
@@ -633,7 +686,7 @@ def view_policy(request, tenantId, groupId, policyId):
         '/policy/<string:policyId>'), methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(policy_schema)
+@validate_body(sg_schema.policy)
 def edit_policy(request, tenantId, groupId, policyId, data):
     """
     Updates a scaling policy. Scaling policies must include a name, type,
@@ -716,7 +769,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
        methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(policy_schema)
+@validate_body(sg_schema.policy)
 def create_webhook(request, tenantId, groupId, policyId, data):
     """
     Create a new scaling policy webhook. Scaling policies must include a name
@@ -785,7 +838,7 @@ def view_webhook(request, tenantId, groupId, policyId, webhookId):
        methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(policy_schema)
+@validate_body(sg_schema.policy)
 def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
     """
     Update an existing webhook.
