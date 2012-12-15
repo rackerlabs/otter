@@ -1,6 +1,8 @@
 """
  Mock interface for the front-end scaling groups engine
 """
+from collections import defaultdict
+
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError)
 import zope.interface
@@ -12,15 +14,24 @@ class MockScalingGroup:
     """
     Mock scaling group record
 
+    :ivar tenant_id: the tenant ID of the scaling group - once set, should not
+        be updated
+    :type tenant_id: ``str``
+
     :ivar uuid: UUID of the scaling group - once set, cannot be updated
     :type uuid: ``str``
 
-    :ivar region: region of the scaling group
-    :type region: ``str``, one of ("DFW", "LON", or "ORD")
-
-    :ivar config: mapping of config parameters to config values, as specified
-        by the :data:`otter.models.interface.scaling_group_config_schema`
+    :ivar config: group configuration values, as specified by
+        :data:`otter.json_schema.scaling_group.config`
     :type config: ``dict``
+
+    :ivar launch: launch configuration, as specified by
+        :data:`otter.json_schema.scaling_group.config`
+    :type config: ``dict``
+
+    :ivar policies: scaling policies of the group, each of which is specified
+        by :data:`otter.json_schema.scaling_group.scaling_policy`
+    :type config: ``list``
 
     :ivar steady: the desired steady state number of entities -
         defaults to the minimum if not given.  This how many entities the
@@ -30,21 +41,35 @@ class MockScalingGroup:
         what values the ``steady_state`` can be).
     :type steady_state: ``int``
 
-    :ivar entities: the entity id's corresponding to the entities in this
-        scaling group
-    :type entities: ``list``
+    :ivar active_entities: the entity id's corresponding to the active
+        entities in this scaling group
+    :type active_entities: ``list``
+
+    :ivar pending_entities: the entity id's corresponding to the pending
+        entities in this scaling group
+    :type pending_entities: ``list``
+
+    :ivar running: whether the scaling is currently running, or paused
+    :type entities: ``bool``
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, region, uuid, config=None, tenant_id=None):
+    def __init__(self, tenant_id, uuid, creation=None):
+        """
+        Creates a MockScalingGroup object.  If the actual scaling group should
+        be created, a creation argument is provided containing the config, the
+        launch config, and optional scaling policies.
+        """
+        self.tenant_id = tenant_id
         self.uuid = uuid
-        self.region = region
 
-        self.entities = []
-
+        # state that may be changed
         self.steady_state = 0
+        self.active_entities = []
+        self.pending_entities = []
+        self.paused = False
 
-        if config is not None:
+        if creation is not None:
             self.config = {
                 'name': "",
                 'cooldown': 0,
@@ -52,10 +77,14 @@ class MockScalingGroup:
                 'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
-            self.update_config(config)
+            self.update_config(creation['config'])
+            self.launch = creation['launch']
+            self.policies = creation.get('policies', None) or []
         else:
-            self.error = NoSuchScalingGroupError(tenant_id, region, uuid)
+            self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
+            self.launch = None
+            self.policies = None
 
     def view_config(self):
         """
@@ -72,8 +101,10 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
         return defer.succeed({
-            'steady_state_entities': self.steady_state,
-            'current_entities': len(self.entities)
+            'steadyState': self.steady_state,
+            'active': self.active_entities,
+            'pending': self.pending_entities,
+            'paused': self.paused
         })
 
     def update_config(self, data):
@@ -114,16 +145,6 @@ class MockScalingGroup:
                                     self.config['maxEntities'])
         return defer.succeed(None)
 
-    def list_entities(self):
-        """
-        Lists all the entities in the scaling group
-
-        :return: :class:`Deferred` that fires with a list of entity ids
-        """
-        if self.config is None:
-            return defer.fail(self.error)
-        return defer.succeed(self.entities)
-
     def bounce_entity(self, entity_id):
         """
         Rebuilds a entity given by the server ID
@@ -133,12 +154,12 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
 
-        if entity_id in self.entities:
+        if entity_id in self.active_entities:
             # don't actually do anything, since this is fake
             return defer.succeed(None)
         return defer.fail(NoSuchEntityError(
-            "Scaling group {0} has no such entity {1}".format(self.uuid,
-                                                              entity_id)))
+            "Scaling group {0} has no such active entity {1}".format(
+                self.uuid, entity_id)))
 
 
 class MockScalingGroupCollection:
@@ -151,14 +172,12 @@ class MockScalingGroupCollection:
         """
         Init
         """
-        self.data = {}
+        # If all authorization passes, and the user doesn't exist in the store,
+        # then they must be a valid new user.  Just create an account for them.
+        self.data = defaultdict(dict)
         self.uuid = 0
 
-    def mock_add_tenant(self, tenant):
-        """ Mock add a tenant """
-        self.data[tenant] = {}
-
-    def create_scaling_group(self, tenant, region, config=None):
+    def create_scaling_group(self, tenant, config, launch, policies=None):
         """
         Create the scaling group
 
@@ -167,28 +186,23 @@ class MockScalingGroupCollection:
         """
         self.uuid += 1
         uuid = '{0}'.format(self.uuid)
-        if region not in self.data[tenant]:
-            self.data[tenant][region] = {}
-        self.data[tenant][region][uuid] = MockScalingGroup(region, uuid,
-                                                           config or {})
+        self.data[tenant][uuid] = MockScalingGroup(
+            tenant, uuid,
+            {'config': config, 'launch': launch, 'policies': policies})
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, region, uuid):
+    def delete_scaling_group(self, tenant, uuid):
         """
         Delete the scaling group
 
         :return: :class:`Deferred` that fires with None
         """
-        if (tenant not in self.data or
-                region not in self.data[tenant] or
-                uuid not in self.data[tenant][region]):
-            return defer.fail(NoSuchScalingGroupError(tenant, region, uuid))
-        del self.data[tenant][region][uuid]
-        if len(self.data[tenant][region]) == 0:
-            del self.data[tenant][region]
+        if (tenant not in self.data or uuid not in self.data[tenant]):
+            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
+        del self.data[tenant][uuid]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant, region=None):
+    def list_scaling_groups(self, tenant):
         """
         List the scaling groups
 
@@ -196,17 +210,9 @@ class MockScalingGroupCollection:
             group uuids to scaling groups
         :rtype: :class:`Deferred` that fires with a ``dict``
         """
-        if region is None:
-            reformat = {}
-            for colo in self.data[tenant]:
-                reformat[colo] = self.data[tenant][colo].values()
-            return defer.succeed(reformat)
-        elif region in self.data[tenant]:
-            return defer.succeed({region: self.data[tenant][region].values()})
-        else:
-            return defer.succeed({region: []})  # no scaling groups
+        return defer.succeed(self.data.get(tenant, {}).values())
 
-    def get_scaling_group(self, tenant, region, uuid):
+    def get_scaling_group(self, tenant, uuid):
         """
         Get a scaling group
 
@@ -214,9 +220,8 @@ class MockScalingGroupCollection:
         :rtype: a :class:`IScalingGroup`
             provider
         """
-        result = self.data.get(tenant, {}).get(region, {}).get(uuid, None)
+        result = self.data.get(tenant, {}).get(uuid, None)
 
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
-        return result or MockScalingGroup(region, uuid, config=None,
-                                          tenant_id=tenant)
+        return result or MockScalingGroup(tenant, uuid, None)
