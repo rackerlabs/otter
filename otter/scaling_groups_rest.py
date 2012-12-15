@@ -130,7 +130,7 @@ def list_all_scaling_groups(request, tenantId):
                 "rel": "self"
               },
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId1}"
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId2}"
                 "rel": "bookmark"
               }
             ]
