@@ -10,3 +10,4 @@ otter-deploy*
 *.egg-info
 .ve
 build
+test-report.xml
