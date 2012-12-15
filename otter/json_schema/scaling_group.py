@@ -109,7 +109,8 @@ launch_config = {
             "required": True
         }
     },
-    "additionalProperties": False
+    "additionalProperties": False,
+    "required": True
 }
 
 
@@ -230,7 +231,8 @@ config = {
             "additionalProperties": False
         }
     },
-    "additionalProperties": False
+    "additionalProperties": False,
+    "required": True
 }
 
 
@@ -254,7 +256,7 @@ config_examples = [
 ]
 
 
-policy_schema = {
+policy = {
     "type": [
         {
             "type": "object",
@@ -354,5 +356,39 @@ policy_examples = [
         "name": 'set number of servers to 10',
         "steadyState": 10,
         "cooldown": 3
+    }
+]
+
+
+create_group = {
+    "type": "object",
+    "description": "Schema of the JSON used to create a scaling group.",
+    "properties": {
+        'groupConfiguration': config,
+        'launchConfiguration': launch_config,
+        'scalingPolicies': {
+            'type': 'array',
+            'items': policy,
+            'uniqueItems': True
+        }
+    },
+    "additionalProperties": False
+}
+
+
+create_group_examples = [
+    {
+        "groupConfiguration": config_examples[0],
+        "launchConfiguration": launch_server_config_examples[0]
+    },
+    {
+        "groupConfiguration": config_examples[0],
+        "launchConfiguration": launch_server_config_examples[0],
+        "scalingPolicies": []
+    },
+    {
+        "groupConfiguration": config_examples[1],
+        "launchConfiguration": launch_server_config_examples[1],
+        "scalingPolicies": policy_examples
     }
 ]
