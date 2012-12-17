@@ -16,7 +16,7 @@ from otter.json_schema.scaling_group import (
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
-from otter.test.rest.request import RestAPITestMixin
+from otter.test.rest.request import DummyException, RestAPITestMixin
 
 # import groups in order to get the routes created - the assignment is a trick
 # to ignore pyflakes
@@ -24,18 +24,9 @@ import otter.rest.groups as _g
 groups = _g
 
 
-class DummyException(Exception):
-    """
-    A dummy exception to be passed around as if it was a real one.
-
-    This way we are certain to throw a completely unhandled exception
-    """
-    pass
-
-
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/autoscale`` endpoints
+    Tests for ``/{tenantId}/autoscale`` endpoints (create, list)
     """
     endpoint = "/v1.0/11111/autoscale"
     invalid_methods = ("DELETE", "PUT")
@@ -144,7 +135,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/autoscale/{groupId}`` endpoints
+    Tests for ``/{tenantId}/autoscale/{groupId}`` endpoints (view manifest,
+    view state, delete)
     """
     endpoint = "/v1.0/11111/autoscale/one"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk

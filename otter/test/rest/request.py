@@ -95,6 +95,15 @@ def request(root_resource, method, endpoint, headers=None, body=None):
         mock_request).addCallback(build_response)
 
 
+class DummyException(Exception):
+    """
+    A dummy exception to be passed around as if it was a real one.
+
+    This way we are certain to throw a completely unhandled exception
+    """
+    pass
+
+
 class RestAPITestMixin(DeferredTestMixin):
     """
     Setup and teardown for tests for the REST API endpoints
