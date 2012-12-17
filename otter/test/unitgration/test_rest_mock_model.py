@@ -17,9 +17,9 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.models.mock import MockScalingGroupCollection
-from otter.scaling_groups_rest import set_store
+from otter.rest.application import set_store
 
-from otter.test.test_rest import request
+from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
 
 

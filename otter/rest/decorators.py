@@ -3,8 +3,10 @@ Wrapper for handling faults in a scalable fashion
 """
 
 from functools import wraps
-
 import json
+
+import jsonschema
+
 from twisted.internet import defer
 from twisted.python import log
 
@@ -69,6 +71,18 @@ def fails_with(mapping):
     return decorator
 
 
+def select_dict(subset, superset):
+    """
+    Selects a subset of entries from the superset
+    :return: the subset as a dict
+    """
+    res = {}
+    for key in subset:
+        if key in superset:
+            res[key] = superset[key]
+    return res
+
+
 def succeeds_with(success_code):
     """
     Map a result.  In success case, returns the success_code, otherwise uses
@@ -90,13 +104,31 @@ def succeeds_with(success_code):
     return decorator
 
 
-def select_dict(subset, superset):
+class InvalidJsonError(Exception):
+    """Null"""
+    pass
+
+
+def validate_body(schema):
     """
-    Selects a subset of entries from the superset
-    :return: the superset as a dict
+    Decorator that validates dependent on the schema passed in.
+    See http://json-schema.org/ for schema documentation.
+
+    :return: decorator
     """
-    res = {}
-    for key in subset:
-        if key in superset:
-            res[key] = superset[key]
-    return res
+    def decorator(f):
+        @wraps(f)
+        def _(request, *args, **kwargs):
+            try:
+                request.content.seek(0)
+                data = json.loads(request.content.read())
+                jsonschema.validate(data, schema)
+            except ValueError as e:
+                return defer.fail(InvalidJsonError())
+            except jsonschema.ValidationError, e:
+                return defer.fail(e)
+            kwargs['data'] = data
+            return f(request, *args, **kwargs)
+
+        return _
+    return decorator
