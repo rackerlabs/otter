@@ -85,7 +85,7 @@ def get_autoscale_links(tenant_id, group_id=None, format="json", api_version="1.
         else
     """
     api = "v{0}".format(api_version)
-    path_parts = [get_url_root(), api, tenant_id, "autoscale"]
+    path_parts = [get_url_root(), api, tenant_id, "groups"]
     if group_id is not None:
         path_parts.append(group_id)
 

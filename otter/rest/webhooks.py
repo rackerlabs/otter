@@ -3,8 +3,8 @@ Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the webhooks associated with a particular scaling group's particular scaling
 policy.
 
-(/tenantId/autoscale/groupId/policy/policyId/webhook
-/tenantId/autoscale/groupId/policy/policyId/webhook/webhookId)
+(/tenantId/groups/groupId/policy/policyId/webhook
+/tenantId/groups/groupId/policy/policyId/webhook/webhookId)
 """
 
 import json
@@ -17,7 +17,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_url_root
 
 
-@app.route(('/<string:tenantId>/autoscale/<string:groupId>'
+@app.route(('/<string:tenantId>/groups/<string:groupId>'
             '/policy/<string:policyId>/webhook'),
            methods=['GET'])
 @fails_with(exception_codes)
@@ -57,7 +57,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
     return deferred
 
 
-@app.route(('/<string:tenantId>/autoscale/<string:groupId>'
+@app.route(('/<string:tenantId>/groups/<string:groupId>'
             '/policy/<string:policyId>/webhook'),
            methods=['POST'])
 @fails_with(exception_codes)
@@ -82,7 +82,7 @@ def create_webhook(request, tenantId, groupId, policyId, data):
     def send_redirect(groupId, policyId, webhookId):
         request.setHeader(
             "Location",
-            "{0}/{1}/autoscale/{2}/policy/{3}/webhook/{4}".format(
+            "{0}/{1}/groups/{2}/policy/{3}/webhook/{4}".format(
                 get_url_root(),
                 tenantId,
                 groupId,
@@ -97,7 +97,7 @@ def create_webhook(request, tenantId, groupId, policyId, data):
     return deferred
 
 
-@app.route(('/<string:tenantId>/autoscale/<string:groupId>'
+@app.route(('/<string:tenantId>/groups/<string:groupId>'
             '/policy/<string:policyId>/webhook/<string:webhookId>'),
            methods=['GET'])
 @fails_with(exception_codes)
@@ -126,7 +126,7 @@ def view_webhook(request, tenantId, groupId, policyId, webhookId):
     return deferred
 
 
-@app.route(('/<string:tenantId>/autoscale/<string:groupId>'
+@app.route(('/<string:tenantId>/groups/<string:groupId>'
             '/policy/<string:policyId>/webhook/<string:webhookId>'),
            methods=['PUT'])
 @fails_with(exception_codes)
@@ -170,7 +170,7 @@ def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
     return deferred
 
 
-@app.route(('/<string:tenantId>/autoscale/<string:groupId>/policy/'
+@app.route(('/<string:tenantId>/groups/<string:groupId>/policy/'
             '<string:policyId>/webhook/<string:webhookId>'),
            methods=['DELETE'])
 @fails_with(exception_codes)
