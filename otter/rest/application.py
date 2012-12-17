@@ -66,7 +66,23 @@ def get_autoscale_links(tenant_id, group_id=None, format="json", api_version="1.
 
     Otherwise, the return value will just be the link.
 
-    :param link_blob":
+    :param tenant_id: the tenant ID of the user
+    :type tenant_id: ``str``
+
+    :param group_id: the scaling group UUID - if not provided then the link(s)
+        provided will be just the link to listing all scaling groups for the
+        tenant ID/creating an autoscale group.
+    :type group_id: ``str`` or ``None``
+
+    :param format: whether to return a bunch of links in JSON format
+    :type format: ``str`` that should be 'json' if the JSON format is desired
+
+    :param api_version: Which API version to provide links to - generally
+        should not be overriden
+    :type api_version: ``str``
+
+    :return: JSON blob if `format="json"` is given, a ``str`` containing a link
+        else
     """
     api = "v{0}".format(api_version)
     path_parts = [get_url_root(), api, tenant_id, "autoscale"]
