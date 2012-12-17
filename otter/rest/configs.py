@@ -111,8 +111,7 @@ def view_launch_config(request, tenantId, groupId):
                     "personality": [
                         {
                             "path": '/root/.ssh/authorized_keys',
-                            "contents": (
-                                "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
                     "networks": [
@@ -165,8 +164,7 @@ def edit_launch_config(request, tenantId, groupId, data):
                     "personality": [
                         {
                             "path": '/root/.ssh/authorized_keys',
-                            "contents": (
-                                "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
                     "networks": [

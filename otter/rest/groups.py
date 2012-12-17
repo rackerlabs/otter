@@ -113,8 +113,7 @@ def create_new_scaling_group(request, tenantId, data):
                         "personality": [
                             {
                                 "path": '/root/.ssh/authorized_keys',
-                                "contents": (
-                                    "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                             }
                         ],
                         "networks": [
@@ -203,8 +202,7 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                         "personality": [
                             {
                                 "path": '/root/.ssh/authorized_keys',
-                                "contents": (
-                                    "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
+                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                             }
                         ],
                         "networks": [
