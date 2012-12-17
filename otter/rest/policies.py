@@ -1,8 +1,9 @@
 """
-Autoscale REST endpoints having to do with editing/modifying the configuration
-or launch configuration for a scaling group.
+Autoscale REST endpoints having to do with creating/reading/updating/deleting
+the scaling policies associated with a particular scaling group.
 
-(/tenantId/autoscale/groupId/config and /tenantId/autoscale/groupId/launch)
+(/tenantId/autoscale/groupId/policy and
+/tenantId/autoscale/groupId/policy/policyId)
 """
 
 import json
