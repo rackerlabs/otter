@@ -2,7 +2,7 @@
 Autoscale REST endpoints having to do with editing/modifying the configuration
 or launch configuration for a scaling group.
 
-(/tenantId/autoscale/groupId/config and /tenantId/autoscale/groupId/launch)
+(/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
 """
 
 import json
@@ -18,7 +18,7 @@ from otter.rest.application import app, get_store
 # TODO: in the implementation story, the interface get scaling group
 #       definition should be changed to remove colo, and the mock store and
 #       corresponding tests also changed
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/config',
+@app.route('/<string:tenantId>/groups/<string:groupId>/config',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -51,7 +51,7 @@ def view_config_for_scaling_group(request, tenantId, groupId):
 # TODO: in the implementation story, the interface get scaling group
 #       definition should be changed to remove colo, and the mock store and
 #       corresponding tests also changed
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/config',
+@app.route('/<string:tenantId>/groups/<string:groupId>/config',
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -84,7 +84,7 @@ def edit_config_for_scaling_group(request, tenantId, groupId, data):
     return deferred
 
 
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/launch',
+@app.route('/<string:tenantId>/groups/<string:groupId>/launch',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -135,7 +135,7 @@ def view_launch_config(request, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/launch',
+@app.route('/<string:tenantId>/groups/<string:groupId>/launch',
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)

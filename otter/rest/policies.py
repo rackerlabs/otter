@@ -2,8 +2,7 @@
 Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the scaling policies associated with a particular scaling group.
 
-(/tenantId/autoscale/groupId/policy and
-/tenantId/autoscale/groupId/policy/policyId)
+(/tenantId/groups/groupId/policy and /tenantId/groups/groupId/policy/policyId)
 """
 
 import json
@@ -16,7 +15,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_url_root
 
 
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -57,7 +56,7 @@ def get_policies(request, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
@@ -82,7 +81,7 @@ def create_policy(request, tenantId, groupId, data):
     def send_redirect(groupId, policyId):
         request.setHeader(
             "Location",
-            "{0}/{1}/autoscale/{2}/policy/{3}".format(
+            "{0}/{1}/groups/{2}/policy/{3}".format(
                 get_url_root(),
                 tenantId,
                 groupId,
@@ -97,7 +96,7 @@ def create_policy(request, tenantId, groupId, data):
 
 
 @app.route(
-    '/<string:tenantId>/autoscale/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
     methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -121,7 +120,7 @@ def view_policy(request, tenantId, groupId, policyId):
 
 
 @app.route(
-    '/<string:tenantId>/autoscale/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
     methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -148,7 +147,7 @@ def edit_policy(request, tenantId, groupId, policyId, data):
 
 
 @app.route(
-    '/<string:tenantId>/autoscale/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
     methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)

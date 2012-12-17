@@ -26,9 +26,9 @@ groups = _g
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/autoscale`` endpoints (create, list)
+    Tests for ``/{tenantId}/groups`` endpoints (create, list)
     """
-    endpoint = "/v1.0/11111/autoscale"
+    endpoint = "/v1.0/11111/groups"
     invalid_methods = ("DELETE", "PUT")
 
     def test_list_unknown_error_is_500(self):
@@ -81,15 +81,15 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             {
                 'id': '1',
                 'links': [
-                    {"href": '/v1.0/11111/autoscale/1', "rel": "self"},
-                    {"href": '/11111/autoscale/1', "rel": "bookmark"}
+                    {"href": '/v1.0/11111/groups/1', "rel": "self"},
+                    {"href": '/11111/groups/1', "rel": "bookmark"}
                 ]
             },
             {
                 'id': '2',
                 'links': [
-                    {"href": '/v1.0/11111/autoscale/2', "rel": "self"},
-                    {"href": '/11111/autoscale/2', "rel": "bookmark"}
+                    {"href": '/v1.0/11111/groups/2', "rel": "self"},
+                    {"href": '/11111/groups/2', "rel": "bookmark"}
                 ]
             }
         ])
@@ -128,17 +128,17 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         }
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body),
-                                '/v1.0/11111/autoscale/1')
+                                '/v1.0/11111/groups/1')
         self.mock_store.create_scaling_group.assert_called_once_with(
             '11111', request_body)
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/autoscale/{groupId}`` endpoints (view manifest,
+    Tests for ``/{tenantId}/groups/{groupId}`` endpoints (view manifest,
     view state, delete)
     """
-    endpoint = "/v1.0/11111/autoscale/one"
+    endpoint = "/v1.0/11111/groups/one"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
 
     def test_group_delete(self):
