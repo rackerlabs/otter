@@ -109,9 +109,6 @@ class RestAPITestMixin(DeferredTestMixin):
         self.mock_store = mock.MagicMock()
         set_store(self.mock_store)
 
-        self.mock_store.list_scaling_groups.return_value = {'dfw':
-                                                            self.mock_groups}
-
     def assert_status_code(self, expected_status, endpoint=None,
                            method="GET", body="", location=None):
         """

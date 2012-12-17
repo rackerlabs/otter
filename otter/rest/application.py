@@ -48,7 +48,7 @@ def set_store(store):
     _store = store
 
 
-def get_links(tenant_id, group_id=None, format="json", api_version="1.0"):
+def get_autoscale_links(tenant_id, group_id=None, format="json", api_version="1.0"):
     """
     Generates links into the autoscale system, based on the ids given.  If
     the format is "json", then a JSON blob will be given in the form of::
