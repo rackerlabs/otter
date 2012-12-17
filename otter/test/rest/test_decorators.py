@@ -2,15 +2,18 @@
 Unit tests for the fault system
 """
 
+from cStringIO import StringIO
+import json
+import mock
+
+from jsonschema import ValidationError
+
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 
+from otter.rest.decorators import (
+    fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError)
 from otter.test.utils import DeferredTestMixin
-from mock import MagicMock
-
-import json
-
-from otter.util.fault import fails_with, select_dict, succeeds_with
 
 
 class BlahError(Exception):
@@ -27,7 +30,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
     """Test case for the fault system"""
     def setUp(self):
         """ Basic Setup and patch the log """
-        self.mockRequest = MagicMock()
+        self.mockRequest = mock.MagicMock()
         self.mockRequest.code = None
 
         def mockResponseCode(code):
@@ -194,3 +197,89 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             "details": ""
         })
         self.flushLoggedErrors(BlahError)
+
+
+class ValidateBodyTestCase(DeferredTestMixin, TestCase):
+    """
+    Tests for the `validate_body` decorator
+    """
+
+    def setUp(self):
+        """
+        Set up a mock requst object that can be read, also patch jsonschema
+        """
+        self.request_content = StringIO()
+        self.request = mock.MagicMock(spec=["content"],
+                                      content=self.request_content)
+
+        self.validate_patch = mock.patch(
+            'otter.rest.decorators.jsonschema.validate')
+        self.mock_validate = self.validate_patch.start()
+
+    def tearDown(self):
+        """
+        Unpatch jsonschema
+        """
+        self.validate_patch.stop()
+
+    def test_success_case(self):
+        """
+        The decorator should seek to the request content's beginning, attempt
+        to load it via JSON, validates, and then passes the decorated function
+        the json data as the keyword "data"
+        """
+        expected_value = {'hey': 'there'}
+        schema = {'some': 'schema'}
+
+        json.dump(expected_value, self.request_content)
+        self.request_content.seek(4)  # do not start at the begining
+        self.mock_validate.return_value = None  # validation should pass
+
+        @validate_body(schema)
+        def handle_body(request, *args, **kwargs):
+            return defer.succeed((args, kwargs))
+
+        args = (1, 2, 3)
+        kwargs = {'one': 'two'}
+
+        d = handle_body(self.request, *args, **kwargs)
+        result = self.assert_deferred_succeeded(d)
+
+        # assert that it was validated
+        self.mock_validate.assert_called_once_with(expected_value, schema)
+
+        # assert that the json was parsed and passed back in the 'data' keyword
+        expected_kwargs = dict(kwargs)
+        expected_kwargs['data'] = expected_value
+        self.assertEqual(result, (args, expected_kwargs))
+
+    def test_not_json_error(self):
+        """
+        If the request content isn't actually json, the decorator returns a
+        InvalidJsonError failure.
+        """
+        self.request_content.write('not actually json')
+        self.mock_validate.return_value = None  # would otherwise pass
+
+        @validate_body({})
+        def handle_body(request, *args, **kwargs):
+            return defer.succeed((args, kwargs))
+
+        self.assert_deferred_failed(handle_body(self.request), InvalidJsonError)
+
+    def test_validation_error(self):
+        """
+        If the request fails to validate, the decorator returns a
+        ValidationError failure
+        """
+        def fail_to_validate(*args, **kwargs):
+            raise ValidationError("Failure!")
+
+        self.request.content.write('{}')
+        self.mock_validate.side_effect = fail_to_validate
+
+        @validate_body({})
+        def handle_body(request, *args, **kwargs):
+            return defer.succeed((args, kwargs))
+
+        self.assert_deferred_failed(handle_body(self.request), ValidationError)
