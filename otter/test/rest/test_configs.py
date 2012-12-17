@@ -26,7 +26,7 @@ configs = _c
 
 class GroupConfigTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/autoscale/{groupId}/config`` endpoints
+    Tests for ``/{tenantId}/groups/{groupId}/config`` endpoints
     """
     skip = "Not implemented yet."
 

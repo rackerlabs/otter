@@ -1,6 +1,6 @@
 """
 Autoscale REST endpoints having to do with a group or collection of groups
-(/tenantId/autoscale and /tenantId/autoscale/groupId)
+(/tenantId/groups and /tenantId/groups/groupId)
 """
 
 import json
@@ -13,7 +13,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
 
 
-@app.route('/<string:tenantId>/autoscale',  methods=['GET'])
+@app.route('/<string:tenantId>/groups',  methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
 def list_all_scaling_groups(request, tenantId):
@@ -27,11 +27,11 @@ def list_all_scaling_groups(request, tenantId):
             "id": "{groupId1}"
             "links": [
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId1}"
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
                 "rel": "self"
               },
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId1}"
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}"
                 "rel": "bookmark"
               }
             ]
@@ -40,11 +40,11 @@ def list_all_scaling_groups(request, tenantId):
             "id": "{groupId2}"
             "links": [
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/autoscale/{groupId2}",
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
                 "rel": "self"
               },
               {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/autoscale/{groupId2}"
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId2}"
                 "rel": "bookmark"
               }
             ]
@@ -75,7 +75,7 @@ def list_all_scaling_groups(request, tenantId):
 #       changed, and the mock store and corresponding tests also changed.
 # C
 
-@app.route('/<string:tenantId>/autoscale', methods=['POST'])
+@app.route('/<string:tenantId>/groups', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(sg_schema.create_group)
@@ -166,7 +166,7 @@ def create_new_scaling_group(request, tenantId, data):
 #       changed to remove colo, and the mock store and corresponding tests
 #       also changed
 # R
-@app.route('/<string:tenantId>/autoscale/<string:groupId>', methods=['GET'])
+@app.route('/<string:tenantId>/groups/<string:groupId>', methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
 def view_manifest_config_for_scaling_group(request, tenantId, groupId):
@@ -252,7 +252,7 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
 # Feature: Force delete, which stops scaling, deletes all servers for you, then
 #       deletes the scaling group.
 # D
-@app.route('/<string:tenantId>/autoscale/<string:groupId>', methods=['DELETE'])
+@app.route('/<string:tenantId>/groups/<string:groupId>', methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
 def delete_scaling_group(request, tenantId, groupId):
@@ -265,7 +265,7 @@ def delete_scaling_group(request, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/autoscale/<string:groupId>/state',
+@app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)

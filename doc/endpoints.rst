@@ -2,7 +2,7 @@
 Endpoint APIs
 ====================
 
-Base Endpoint   /:tenant_id/autoscaling/
+Base Endpoint   /:tenant_id/groups/
 
 ========= ===================================== ===========================================================================================
 Method    Endpoint                              Details

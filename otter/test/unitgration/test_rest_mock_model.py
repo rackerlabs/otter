@@ -72,7 +72,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         }
 
         wrapper = self.assert_deferred_succeeded(
-            request('POST', '/v1.0/11111/scaling_groups/dfw',
+            request('POST', '/v1.0/11111/groups/dfw',
                     body=json.dumps(config)))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -141,7 +141,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         Asserts that there are ``number`` number of scaling groups
         """
         wrapper = self.assert_deferred_succeeded(
-            request('GET', '/v1.0/11111/scaling_groups'))
+            request('GET', '/v1.0/11111/groups'))
         self.assertEqual(200, wrapper.response.code)
 
         all_groups = json.loads(wrapper.content)
