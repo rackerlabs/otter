@@ -10,7 +10,7 @@ from twisted.internet import defer
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.json_schema.scaling_group import config as group_config_schema
+from otter.json_schema.scaling_group import config, launch_config
 from otter.test.utils import DeferredTestMixin
 
 
@@ -32,19 +32,32 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         Calls ``view_config()``, and validates that it returns a config
         dictionary containing relevant configuration values, as specified by
-        the :data:`group_config_schema`
+        the :data:`config`
 
         :return: the return value of ``view_config()``
         """
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
-        schema = deepcopy(group_config_schema)
+        schema = deepcopy(config)
         for property_name in schema['properties']:
             schema['properties'][property_name]['required'] = True
 
         result = self.assert_deferred_succeeded(
             defer.maybeDeferred(self.group.view_config, *args, **kwargs))
         validate(result, schema)
+        return result
+
+    def validate_view_launch_config_return_value(self, *args, **kwargs):
+        """
+        Calls ``view_launch_config()``, and validates that it returns a launch
+        config dictionary containing relevant configuration values, as
+        specified by the :data:`launch_config`
+
+        :return: the return value of ``view_launch_config()``
+        """
+        result = self.assert_deferred_succeeded(
+            defer.maybeDeferred(self.group.view_config, *args, **kwargs))
+        validate(result, launch_config)
         return result
 
     def validate_view_state_return_value(self, *args, **kwargs):
