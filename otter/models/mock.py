@@ -94,6 +94,14 @@ class MockScalingGroup:
             return defer.fail(self.error)
         return defer.succeed(self.config)
 
+    def view_launch_config(self):
+        """
+        :return: :class:`Deferred` that fires with a view of the launch config
+        """
+        if self.config is None:
+            return defer.fail(self.error)
+        return defer.succeed(self.launch)
+
     def view_state(self):
         """
         :return: :class:`Deferred` that fires with a view of the state
@@ -127,6 +135,19 @@ class MockScalingGroup:
 
         # make sure the steady state is still within bounds
         return self.set_steady_state(self.steady_state)
+
+    def update_launch_config(self, data):
+        """
+        Update the launch config parameters based on the attributes in
+        ``data``.  Overwrites the existing launch config.  Note - no error
+        checking here happens, so it's possible to get the launch config into
+        an improper state.
+        """
+        if self.config is None:
+            return defer.fail(self.error)
+
+        self.launch = data
+        return defer.succeed(None)
 
     def set_steady_state(self, steady_state):
         """
