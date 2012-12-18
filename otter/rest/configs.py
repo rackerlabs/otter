@@ -7,8 +7,6 @@ or launch configuration for a scaling group.
 
 import json
 
-from twisted.internet import defer
-
 from otter.json_schema import scaling_group as sg_schema
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
@@ -129,8 +127,8 @@ def view_launch_config(request, tenantId, groupId):
             }
         }
     """
-    rec = get_store().get_launch_config(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.view_config)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.view_launch_config()
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -188,6 +186,6 @@ def edit_launch_config(request, tenantId, groupId, data):
     Nova should validate the image before saving the new config.
     Users may have an invalid configuration based on dependencies.
     """
-    rec = get_store().get_launch_config(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.update_launch_config, data)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.update_launch_config(data)
     return deferred
