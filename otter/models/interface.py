@@ -69,9 +69,8 @@ class IScalingGroup(Interface):
     def update_config(config):
         """
         Update the scaling group configuration paramaters based on the
-        attributes in ``config``.  This updates the already-existing values,
-        rather than overwrites them.  (Enforce override-only updates should
-        happen elsewhere.)
+        attributes in ``config``.  This can update the already-existing values,
+        or just overwrite them - it is up to the implementation.
 
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.scaling_group.config`

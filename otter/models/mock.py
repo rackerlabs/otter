@@ -77,7 +77,7 @@ class MockScalingGroup:
                 'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
-            self.update_config(creation['config'])
+            self.update_config(creation['config'], partial_update=True)
             self.launch = creation['launch']
             self.policies = creation.get('policies', None) or []
         else:
@@ -107,21 +107,24 @@ class MockScalingGroup:
             'paused': self.paused
         })
 
-    def update_config(self, data):
+    def update_config(self, data, partial_update=False):
         """
         Update the scaling group configuration paramaters based on the
-        attributes in ``data``.
+        attributes in ``data``.  Has the option to partially update the config,
+        since when creating the model there could be default variables.
 
         :return: :class:`Deferred` that fires with None
         """
         if self.config is None:
             return defer.fail(self.error)
 
-        valid_keys = ('name', 'cooldown', 'minEntities', 'maxEntities',
-                      'metadata')
-        for key in data:
-            if key in valid_keys:
+        # if not partial update, just replace the whole thing
+        if partial_update:
+            self.config = dict(self.config)
+            for key in data:
                 self.config[key] = data[key]
+        else:
+            self.config = data
 
         # make sure the steady state is still within bounds
         return self.set_steady_state(self.steady_state)
