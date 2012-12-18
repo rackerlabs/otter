@@ -210,6 +210,20 @@ class ServerLaunchConfigTestCase(TestCase):
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, scaling_group.launch_config)
 
+    def test_no_args_do_not_validate(self):
+        """
+        If no arguments are provided, the launch config fails to validate
+        """
+        invalid = {
+            "type": "launch_server",
+            "args": {}
+        }
+        self.assertRaisesRegexp(
+            ValidationError, "'server' is a required property",
+            validate, invalid, scaling_group.launch_server)
+        self.assertRaisesRegexp(ValidationError, 'not of type',
+                                validate, invalid, scaling_group.launch_config)
+
 
 class ScalingPolicyTestCase(TestCase):
     """

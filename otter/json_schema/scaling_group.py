@@ -44,7 +44,8 @@ launch_server = {
                         "http://docs.rackspace.com/servers/api/v2/"
                         "cs-devguide/content/CreateServers.html."
                         "Whatever attributes are passed here will apply to "
-                        "all new servers (including the name attribute).")
+                        "all new servers (including the name attribute)."),
+                    "required": True
                 },
                 "loadBalancers": {
                     "type": "array",
