@@ -76,17 +76,17 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         If the group does succeed, an attempt to get the config returns a 200
         and the actual group config
         """
-        request_body = {
+        config = {
             'name': 'blah',
             'cooldown': 35,
             'minEntities': 1,
             'maxEntities': 5,
             'metadata': {'something': 'that'}
         }
-        self.mock_group.view_config.return_value = defer.succeed(request_body)
+        self.mock_group.view_config.return_value = defer.succeed(config)
 
-        body = self.assert_status_code(200)
-        self.assertEqual(json.loads(body), request_body)
+        response_body = self.assert_status_code(200)
+        self.assertEqual(json.loads(response_body), config)
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.view_config.assert_called_once_with()
