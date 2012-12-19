@@ -157,7 +157,9 @@ def create_new_scaling_group(request, tenantId, data):
             "Location", get_autoscale_links(tenantId, uuid, format=None))
 
     deferred = defer.maybeDeferred(
-        get_store().create_scaling_group, tenantId, data)
+        get_store().create_scaling_group, tenantId,
+        data['groupConfiguration'], data['launchConfiguration'],
+        data.get('scalingPolicies', None))
     deferred.addCallback(send_redirect)
     return deferred
 
