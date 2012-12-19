@@ -70,7 +70,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         """
         wrapper = self.assert_deferred_succeeded(request(
             root, 'POST', '/v1.0/11111/groups', body=json.dumps({
-                "groupConfiguration": config_examples[0],
+                "groupConfiguration": config_examples[1],
                 "launchConfiguration": launch_server_config_examples[0]
             })))
 
@@ -89,7 +89,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
 
         response = json.loads(wrapper.content)
         self.assertEqual(response.get('groupConfiguration', None),
-                         config_examples[0])
+                         config_examples[1])
         self.assertEqual(response.get('launchConfiguration', None),
                          launch_server_config_examples[0])
 

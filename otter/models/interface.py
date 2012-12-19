@@ -35,10 +35,10 @@ class IScalingGroup(Interface):
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
 
-        :return: a dictionary with 3 keys: ``config`` containing the
-            group configuration dictionary, ``launch`` containing the launch
-            configuration dictionary, and ``policies`` containing a list of all
-            the scaling policies
+        :return: a dictionary with 3 keys: ``groupConfiguration`` containing
+            the group configuration dictionary, ``launchConfiguration``
+            containing the launch configuration dictionary, and
+            ``scalingPolicies`` containing a list of all the scaling policies
         :rtype: ``dict``
         """
         pass
