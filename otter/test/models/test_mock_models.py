@@ -311,6 +311,21 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             {'config': self.config, 'launch': launch, 'policies': policies})
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
+    def create_group_creates_min_entities(self, mock_sgrp):
+        """
+        Creating a scaling group means that the minimum number of entities as
+        specified by the config is created as well.
+        """
+        self.config['minEntities'] = 5
+        launch = {"launch": "config"}
+        policies = [1, 2, 3]
+        self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.tenant_id, self.config, launch, policies))
+
+        self.assertEqual(len(mock_sgrp.return_value.pending_entities), 5)
+
+    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):
         """
         Creating a scaling group with all arguments except policies passes None

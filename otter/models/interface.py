@@ -158,6 +158,16 @@ class IScalingGroupCollection(Interface):
         Create scaling group based on the tenant id, the configuration
         paramaters, the launch config, and optional scaling policies.
 
+        Validation of the config, launch config, and policies should have
+        already happened by this point (whether they refer to real other
+        entities, that the config's ``maxEntities`` should be greater than or
+        equal to ``minEntities``, etc.).
+
+        On successful creation, of a scaling group, the minimum entities
+        parameter should immediately be enforced.  Therefore, if the minimum
+        is greater than zero, that number of entities should be created after
+        scaling group creation.
+
         :param tenant_id: the tenant ID of the tenant the scaling group
             belongs to
         :type tenant_id: ``str``

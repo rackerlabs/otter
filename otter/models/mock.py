@@ -2,6 +2,7 @@
  Mock interface for the front-end scaling groups engine
 """
 from collections import defaultdict
+from uuid import uuid4
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError)
@@ -216,7 +217,8 @@ class MockScalingGroupCollection:
 
     def create_scaling_group(self, tenant, config, launch, policies=None):
         """
-        Create the scaling group
+        Create the scaling group, and create config's ``minEntities`` number
+        of pending entities on the scaling group.
 
         :return: :class:`Deferred` that fires with the uuid of the created
             scaling group
@@ -226,6 +228,8 @@ class MockScalingGroupCollection:
         self.data[tenant][uuid] = MockScalingGroup(
             tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
+        self.data[tenant][uuid].pending_entities = [
+            uuid4() for i in xrange(config['minEntities'])]
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):
