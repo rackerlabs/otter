@@ -5,8 +5,6 @@ Autoscale REST endpoints having to do with a group or collection of groups
 
 import json
 
-from twisted.internet import defer
-
 from otter.json_schema import scaling_group as sg_schema
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
@@ -61,7 +59,7 @@ def list_all_scaling_groups(request, tenantId):
                 'links': get_autoscale_links(tenantId, group.uuid)
             } for group in groups]
 
-    deferred = defer.maybeDeferred(get_store().list_scaling_groups, tenantId)
+    deferred = get_store().list_scaling_groups(tenantId)
     deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred
@@ -156,9 +154,8 @@ def create_new_scaling_group(request, tenantId, data):
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
 
-    deferred = defer.maybeDeferred(
-        get_store().create_scaling_group, tenantId,
-        data['groupConfiguration'], data['launchConfiguration'],
+    deferred = get_store().create_scaling_group(
+        tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
     deferred.addCallback(send_redirect)
     return deferred
@@ -262,9 +259,7 @@ def delete_scaling_group(request, tenantId, groupId):
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
     """
-    deferred = defer.maybeDeferred(get_store().delete_scaling_group,
-                                   tenantId, groupId)
-    return deferred
+    return get_store().delete_scaling_group(tenantId, groupId)
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
