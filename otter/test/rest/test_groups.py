@@ -160,6 +160,44 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/one"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
 
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(OneGroupTestCase, self).setUp()
+        self.mock_group.uuid = "one"
+
+    def test_view_manifest_404(self):
+        """
+        Viewing the manifest of a non-existant group fails with a 404.
+        """
+        self.mock_group.view_manifest.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
+
+        response_body = self.assert_status_code(404, method="GET")
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_manifest.assert_called_once_with()
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_view_manifest(self):
+        """
+        Viewing the manifest of an existant group returns whatever the
+        implementation's `view_manifest()` method returns, in string format
+        """
+        self.mock_group.view_manifest.return_value = defer.succeed(
+            {'whatever': 'result'})
+
+        response_body = self.assert_status_code(200, method="GET")
+        self.assertEqual('{"whatever": "result"}', response_body)
+
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_manifest.assert_called_once_with()
+
     def test_group_delete(self):
         """
         Deleting an existing group succeeds with a 204.
@@ -176,7 +214,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         Deleting a non-existant group fails with a 404.
         """
         self.mock_store.delete_scaling_group.return_value = defer.fail(
-            NoSuchScalingGroupError('11111', 'one'))
+            NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.delete_scaling_group.assert_called_once_with(

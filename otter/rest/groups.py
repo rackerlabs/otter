@@ -242,7 +242,8 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
             ]
         }
     """
-    raise NotImplementedError()
+    group = get_store().get_scaling_group(tenantId, groupId)
+    return group.view_manifest().addCallback(json.dumps)
 
 
 # TODO: in the implementation story, the interface delete definition should be
