@@ -28,10 +28,21 @@ class IScalingGroup(Interface):
     """
     Scaling group record
     """
-    # Immutable once the scaling group is created
-    uuid = Attribute("UUID of the scaling group.")
+    uuid = Attribute("UUID of the scaling group - immutable.")
 
-    # State values
+    def view_manifest():
+        """
+        The manifest contains everything required to configure this scaling:
+        the config, the launch config, and all the scaling policies.
+
+        :return: a dictionary with 3 keys: ``config`` containing the
+            group configuration dictionary, ``launch`` containing the launch
+            configuration dictionary, and ``policies`` containing a list of all
+            the scaling policies
+        :rtype: ``dict``
+        """
+        pass
+
     def view_config():
         """
         :return: a view of the config, as specified by
