@@ -11,6 +11,22 @@ import zope.interface
 from twisted.internet import defer
 
 
+def generate_entity_links(tenant_id, entity_ids,
+                          region="dfw", entity_type="servers", api_version="2"):
+    """
+    :return: a mapping entity ids to some generated links for them based on
+        the parameters given
+    :rtype: ``dict``
+    """
+
+    link_str = 'http://{0}.{1}.api.rackspacecloud.com/v{2}/{3}/{1}'.format(
+        region, entity_type, api_version, tenant_id)
+    return dict([
+        (entity_id,
+         [{'rel': 'self', 'href': '{0}/{1}'.format(link_str, entity_id)}])
+        for entity_id in entity_ids])
+
+
 class MockScalingGroup:
     """
     Mock scaling group record
@@ -66,8 +82,8 @@ class MockScalingGroup:
 
         # state that may be changed
         self.steady_state = 0
-        self.active_entities = []
-        self.pending_entities = []
+        self.active_entities = {}
+        self.pending_entities = {}
         self.paused = False
 
         if creation is not None:
@@ -199,6 +215,25 @@ class MockScalingGroup:
             "Scaling group {0} has no such active entity {1}".format(
                 self.uuid, entity_id)))
 
+    # ---- not interface methods
+
+    def add_entities(self, pending=None, active=None):
+        """
+        Takes a list of pending entity ids and active entity ids, and adds
+        them to the group's list of pending entitys and active entities,
+        respectively.
+
+        :param pending: list of pending entity ids
+        :type pending: ``list`` or ``tuple``
+
+        :param active: list of active entity ids
+        :type active: ``list`` or ``tuple``
+        """
+        mapping = ((pending or [], self.pending_entities),
+                   (active or [], self.active_entities))
+        for entity_ids, dictionary in mapping:
+            dictionary.update(generate_entity_links(self.tenant_id, entity_ids))
+
 
 class MockScalingGroupCollection:
     """
@@ -213,7 +248,6 @@ class MockScalingGroupCollection:
         # If all authorization passes, and the user doesn't exist in the store,
         # then they must be a valid new user.  Just create an account for them.
         self.data = defaultdict(dict)
-        self.uuid = 0
 
     def create_scaling_group(self, tenant, config, launch, policies=None):
         """
@@ -223,13 +257,14 @@ class MockScalingGroupCollection:
         :return: :class:`Deferred` that fires with the uuid of the created
             scaling group
         """
-        self.uuid += 1
-        uuid = '{0}'.format(self.uuid)
+        uuid = str(uuid4())
         self.data[tenant][uuid] = MockScalingGroup(
             tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
-        self.data[tenant][uuid].pending_entities = [
-            uuid4() for i in xrange(config['minEntities'])]
+
+        self.data[tenant][uuid].add_entities(
+            pending=[str(uuid4()) for i in xrange(config['minEntities'])])
+
         return defer.succeed(uuid)
 
     def delete_scaling_group(self, tenant, uuid):

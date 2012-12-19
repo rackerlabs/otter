@@ -63,23 +63,54 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        The state of the scaling group consists of a list unique IDs of the
-        current entities in the scaling group, the a list of the unique IDs
-        of the pending entities in the scaling group, the desired steady state
-        number of entities, and a boolean specifying whether scaling is
-        currently paused.
+        The state of the scaling group consists of a mapping of entity id's to
+        entity links for the current entities in the scaling group, a mapping
+        of entity id's to entity links for the pending entities in the scaling
+        group, the desired steady state number of entities, and a boolean
+        specifying whether scaling is currently paused.
+
+        The entity links are in JSON link format.
 
         :return: a view of the state of the scaling group in the form::
 
-            {
-                'active': [
-                    '7e8b8ef3-ea06-44d2-8418-4bff11acc9fe',
-                    '18aefdc0-abfd-4b40-a800-201f326fabe3'
-                ],
-                'pending': ['ccc26371-79dc-4839-b0ec-e6c3f31f415d'],
-                'steadyState': 3,
-                'paused': false
-            }
+        {
+          "active": {
+            "{instanceId1}": [
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                "rel": "bookmark"
+              }
+            ],
+            "{instanceId2}": [
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
+                "rel": "bookmark"
+              }
+            ]
+          },
+          "pending": {
+            "{instanceId3}": [
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
+                "rel": "bookmark"
+              }
+            ]
+          },
+          "steadyState": 3,
+          "paused": false
+        }
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``

@@ -82,10 +82,31 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         # must actually have all the properties
         result = self.assert_deferred_succeeded(
             self.group.view_state(*args, **kwargs))
-        array_of_strings = {
-            'type': 'array',
-            'items': {'type': "string"},
-            'uniqueItems': True
+        entity_schema = {
+            'type': 'object',
+            'patternProperties': {
+                "^\S+$": {
+                    'type': 'array',
+                    'required': True,
+                    'uniqueItems': True,
+                    'minItems': 1,
+                    'items': {
+                        "type": "object",
+                        "properties": {
+                            'rel': {
+                                'type': 'string',
+                                'required': True
+                            },
+                            'href': {
+                                'type': 'string',
+                                'required': True
+                            }
+                        },
+                        "additionalProperties": False
+                    }
+                }
+            },
+            'additionalProperties': False
         }
         validate(result, {
             'type': 'object',
@@ -99,8 +120,8 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
                     'type': 'boolean',
                     'required': True
                 },
-                'active': array_of_strings,
-                'pending': array_of_strings
+                'active': entity_schema,
+                'pending': entity_schema
             },
             'additionalProperties': False
         })
