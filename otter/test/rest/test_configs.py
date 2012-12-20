@@ -1,6 +1,7 @@
 """
-Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
-all scaling groups, and creating/viewing/deleting a scaling group.
+Tests for :mod:`otter.rest.groups`, which include the endpoints for viewing
+and updating a scaling group config, and viewing and updating a launch config
+for a scaling group.
 """
 
 import json
@@ -14,7 +15,7 @@ from twisted.trial.unittest import TestCase
 # from otter.json_schema.scaling_group import (
 #     config_examples, launch_server_config_examples as launch_examples)
 from otter.models.interface import NoSuchScalingGroupError
-# from otter.rest.decorators import InvalidJsonError
+from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
@@ -26,125 +27,148 @@ configs = _c
 
 class GroupConfigTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups/{groupId}/config`` endpoints
+    Tests for ``/{tenantId}/groups/{groupId}/config`` endpoint, which updates
+    and views the config part of a scaling group (having to do with the min,
+    max, and steady state number of entities, as well as the metadata
+    associated with the group).
     """
-    skip = "Not implemented yet."
+    endpoint = "/v1.0/11111/groups/1/config"
+    invalid_methods = ("DELETE", "POST")
 
-    def test_group_get(self):
+    def setUp(self):
         """
-        Tries to get a group
+        Set up a mock group to be used for viewing and updating configurations
         """
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        super(GroupConfigTestCase, self).setUp()
+        self.mock_group = mock.MagicMock(
+            spec=('uuid', 'view_config', 'update_config'), uuid='1')
+        self.mock_store.get_scaling_group.return_value = self.mock_group
 
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.view_config.return_value = defer.succeed(request_body)
-
-        self.mock_store.get_scaling_group.return_value = mock_group
-
-        self.assert_status_code(200, self.endpoint + '/one', 'GET')
-
-        self.mock_store.get_scaling_group.assert_called_once_with('11111',
-                                                                  'dfw', 'one')
-        mock_group.view_config.assert_called_once_with()
-
-    def test_group_get_404(self):
+    def test_get_group_config_404(self):
         """
-        Tries to get a group, only to get a 404
+        If the group does not exist, an attempt to get the config returns a 404
         """
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.view_config.return_value = defer.fail(
-            NoSuchScalingGroupError('dfw', '11111', 'one'))
-
-        self.mock_store.get_scaling_group.return_value = mock_group
-
-        self.assert_status_code(404, self.endpoint + '/one', 'GET')
-
-        self.mock_store.get_scaling_group.assert_called_once_with('11111',
-                                                                  'dfw', 'one')
-        mock_group.view_config.assert_called_once_with()
-        self.flushLoggedErrors(NoSuchScalingGroupError)
-
-    def test_group_modify(self):
-        """
-        Tries to modify a group
-        """
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.update_config.return_value = None
-
-        self.mock_store.get_scaling_group.return_value = mock_group
-
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
-
-        self.assert_status_code(204, self.endpoint + '/one', 'PUT',
-                                json.dumps(request_body))
-        self.mock_store.get_scaling_group.assert_called_once_with('11111',
-                                                                  'dfw',
-                                                                  'one')
-        mock_group.update_config.assert_called_once_with(request_body)
-
-    def test_group_modify_missing_input_400(self):
-        """
-        Checks that an invalid update won't be called
-        """
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.update_config.return_value = None
-
-        self.mock_store.get_scaling_group.return_value = mock_group
-
-        request_body = {}
-
-        response_body = self.assert_status_code(400, self.endpoint + '/one',
-                                                'PUT',
-                                                json.dumps(request_body))
+        self.mock_group.view_config.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', '1'))
+        response_body = self.assert_status_code(404)
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
-        self.assertEqual(mock_group.update_config.called, False)
-        self.flushLoggedErrors(ValidationError)
 
-    def test_group_modify_not_found_404(self):
-        """
-        Checks that if you try to modify a not-found object it fails
-        """
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.update_config.return_value = defer.fail(
-            NoSuchScalingGroupError('dfw', '11111', 'one'))
-
-        self.mock_store.get_scaling_group.return_value = mock_group
-
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
-
-        self.assert_status_code(404, self.endpoint + '/one', 'PUT',
-                                json.dumps(request_body))
-        mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_group.view_config.assert_called_once_with()
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_entity_modify_fail_500(self):
+    def test_get_group_config_500(self):
         """
-        Checks to make sure that if the update fails for some strange
-        reason, a 500 is returned
+        Unknown errors return a 500 as a response http code.
         """
-        mock_group = mock.MagicMock()
-        mock_group.uuid = 'one'
-        mock_group.region = 'dfw'
-        mock_group.update_config.return_value = defer.fail(DummyException())
+        self.mock_group.view_config.return_value = defer.fail(DummyException())
+        response_body = self.assert_status_code(500)
+        resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.return_value = mock_group
+        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_group.view_config.assert_called_once_with()
+        self.assertEqual(resp['type'], 'InternalError')
+        self.flushLoggedErrors(DummyException)
+
+    def test_get_group_config_succeeds(self):
+        """
+        If the group does succeed, an attempt to get the config returns a 200
+        and the actual group config
+        """
+        config = {
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1,
+            'maxEntities': 5,
+            'metadata': {'something': 'that'}
+        }
+        self.mock_group.view_config.return_value = defer.succeed(config)
+
+        response_body = self.assert_status_code(200)
+        self.assertEqual(json.loads(response_body), config)
+
+        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_group.view_config.assert_called_once_with()
+
+    def test_update_group_config_404(self):
+        """
+        If you try to modify a not-found object it fails with a 404 not found
+        """
+        self.mock_group.update_config.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
 
         request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        response_body = self.assert_status_code(404, method='PUT',
+                                                body=json.dumps(request_body))
+        resp = json.loads(response_body)
 
-        self.assert_status_code(500, self.endpoint + '/one', 'PUT',
-                                json.dumps(request_body))
-        self.mock_store.get_scaling_group.assert_called_once_with('11111',
-                                                                  'dfw', 'one')
-        mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_update_group_config_fail_500(self):
+        """
+        If the update fails for some strange reason, a 500 is returned
+        """
+        self.mock_group.update_config.return_value = defer.fail(
+            DummyException())
+
+        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        response_body = self.assert_status_code(500, method="PUT",
+                                                body=json.dumps(request_body))
+        resp = json.loads(response_body)
+
+        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
+
+    def test_update_group_config_success(self):
+        """
+        If the update succeeds, the data is updated and a 204 is returned
+        """
+        self.mock_group.update_config.return_value = defer.succeed(None)
+        request_body = {
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1,
+            'maxEntities': 5,
+            'metadata': {'something': 'that'}
+        }
+        response_body = self.assert_status_code(204, method='PUT',
+                                                body=json.dumps(request_body))
+        self.assertEqual(response_body, "")
+        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_group.update_config.assert_called_once_with(request_body)
+
+    def test_group_modify_bad_or_missing_input_400(self):
+        """
+        Checks that an update with no PUT data will fail with a 400
+        """
+        for request_body in ("", "{", "adf"):
+            self.mock_group.update_config.return_value = None
+            response_body = self.assert_status_code(400, method='PUT',
+                                                    body=request_body)
+            resp = json.loads(response_body)
+
+            self.assertEqual(resp['type'], 'InvalidJsonError')
+            self.assertTrue(not self.mock_group.update_config.called)
+            self.flushLoggedErrors(InvalidJsonError)
+
+    def test_group_modify_bad_schema_400(self):
+        """
+        Checks that an update with PUT data with the wrong schema fails with a
+        400
+        """
+        invalids = ({"name": "1"}, {},
+                    {'name': '1', 'cooldown': 5, 'minEntities': 1, "hat": "2"})
+        for request_body in invalids:
+            self.mock_group.update_config.return_value = None
+            response_body = self.assert_status_code(
+                400, method='PUT', body=json.dumps(request_body))
+            resp = json.loads(response_body)
+
+            self.assertEqual(resp['type'], 'ValidationError')
+            self.assertTrue(not self.mock_group.update_config.called)
+            self.flushLoggedErrors(ValidationError)

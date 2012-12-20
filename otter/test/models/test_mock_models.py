@@ -125,28 +125,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('active', None), [])
 
-    def test_update_config_updates_ignores_invalid_keys(self):
+    def test_update_config_overwrites_existing_data(self):
         """
-        Passing in a dict only updates the desired fields that are provided
-        """
-        expected = {
-            'cooldown': 1000,
-            'metadata': {'UPDATED': 'UPDATED'},
-            'minEntities': 100,
-            'maxEntities': 1000,
-            'name': 'UPDATED'
-        }
-        extra = dict(expected)
-        extra['non-param'] = 'UPDATED'
-
-        self.assert_deferred_succeeded(self.group.update_config(extra))
-        result = self.validate_view_config_return_value()
-        self.assertEqual(result, expected)
-
-    def test_update_config_does_not_overwrite_existing_non_provided_keys(self):
-        """
-        If certain keys are not provided in the update dictionary, the keys
-        that are not provided are not overwritten.
+        Passing in a dict only overwrites the existing dict unless the
+        `partial_update` flag is passed as True
         """
         expected = {
             'cooldown': 1000,
@@ -156,8 +138,24 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'name': 'UPDATED'
         }
         self.assert_deferred_succeeded(self.group.update_config(expected))
-        self.assert_deferred_succeeded(self.group.update_config({}))
         result = self.validate_view_config_return_value()
+        self.assertEqual(result, expected)
+
+    def test_update_config_does_not_overwrite_existing_non_provided_keys(self):
+        """
+        If certain keys are not provided in the update dictionary and the
+        `partial_update` flag is provided as True, the keys that are not
+        provided are not overwritten.
+        """
+        self.assert_deferred_succeeded(self.group.update_config(
+            {}, partial_update=True))
+        result = self.validate_view_config_return_value()
+
+        # because the returned value has the defaults filled in even if they
+        # were not provided
+        expected = dict(self.config)
+        expected['maxEntities'] = None
+        expected['metadata'] = {}
         self.assertEqual(result, expected)
 
     def test_update_config_min_updates_steady_state(self):
@@ -165,9 +163,14 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If the updated min is greater than the current steady state, the
         current steady state is set to that min
         """
-        self.assert_deferred_succeeded(self.group.update_config({
-            'minEntities': 5
-        }))
+        updated = {
+            'name': '',
+            'cooldown': 0,
+            'minEntities': 5,
+            'maxEntities': 10,
+            'metadata': {}
+        }
+        self.assert_deferred_succeeded(self.group.update_config(updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -176,10 +179,15 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If the updated max is less than the current steady state, the
         current steady state is set to that max
         """
+        updated = {
+            'name': '',
+            'cooldown': 0,
+            'minEntities': 0,
+            'maxEntities': 5,
+            'metadata': {}
+        }
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        self.assert_deferred_succeeded(self.group.update_config({
-            'maxEntities': 5
-        }))
+        self.assert_deferred_succeeded(self.group.update_config(updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -295,7 +303,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         for method in ('view_config', 'view_state'):
             self.assert_deferred_succeeded(getattr(group, method)())
 
-        self.assert_deferred_succeeded(group.update_config({}))
+        self.assert_deferred_succeeded(group.update_config({
+            'name': '1', 'minEntities': 0, 'cooldown': 0, 'maxEntities': None,
+            'metadata': {}
+        }))
         self.assert_deferred_succeeded(group.set_steady_state(1))
 
         group.active_entities = ["1"]
@@ -314,8 +325,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             self.assert_deferred_failed(getattr(group, method)(),
                                         NoSuchScalingGroupError)
 
-        self.assert_deferred_failed(group.update_config({}),
-                                    NoSuchScalingGroupError)
+        self.assert_deferred_failed(group.update_config(
+            {
+                'name': '1',
+                'minEntities': 0,
+                'cooldown': 0,
+                'maxEntities': None,
+                'metadata': {}
+            }), NoSuchScalingGroupError)
+
         self.assert_deferred_failed(group.set_steady_state(1),
                                     NoSuchScalingGroupError)
         self.assert_deferred_failed(group.bounce_entity("1"),
