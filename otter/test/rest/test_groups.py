@@ -2,9 +2,8 @@
 Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
 all scaling groups, and creating/viewing/deleting a scaling group.
 """
-
 import json
-from jsonschema import ValidationError
+from jsonschema import validate, ValidationError
 
 import mock
 
@@ -18,6 +17,7 @@ from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.rest.response_schema import group_state
 
 # import groups in order to get the routes created - the assignment is a trick
 # to ignore pyflakes
@@ -223,3 +223,77 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+
+class GroupStateTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{groupId}/state`` endpoint
+    """
+    endpoint = "/v1.0/11111/groups/one/state"
+    invalid_methods = ("DELETE", "POST", "PUT")  # cannot update in bulk
+
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(GroupStateTestCase, self).setUp()
+        self.mock_group.uuid = "one"
+
+    def test_view_state_404(self):
+        """
+        Viewing the state of a non-existant group fails with a 404.
+        """
+        self.mock_group.view_state.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
+
+        response_body = self.assert_status_code(404, method="GET")
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_state.assert_called_once_with()
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_view_state(self):
+        """
+        Viewing the state of an existant group returns whatever the
+        implementation's `view_state()` method returns, in string format, with
+        the links reformatted so that they a list of dictionaries containing
+        the attributes "id" and "links"
+        """
+        def make_link(rel):
+            return {
+                "rel": rel,
+                "href": "http://{0}".format(rel)
+            }
+
+        self.mock_group.view_state.return_value = defer.succeed({
+            'active': {
+                "1": [make_link("rel"), make_link("bookmark")],
+                "2": [make_link("rel")]
+            },
+            'pending': {
+                "3": [make_link("rel")]
+            },
+            'steadyState': 5,
+            'paused': False
+        })
+
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        validate(resp, group_state)
+        self.assertEqual(resp, {
+            'active': [
+                {'id': '1', 'links': [make_link("rel"), make_link("bookmark")]},
+                {'id': '2', 'links': [make_link("rel")]}
+            ],
+            'pending': [{'id': '3', 'links': [make_link("rel")]}],
+            'steadyState': 5,
+            'paused': False
+        })
+
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_state.assert_called_once_with()

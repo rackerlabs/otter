@@ -1,14 +1,13 @@
 """
 Tests for :mod:`otter.models.interface`
 """
-from copy import deepcopy
-
 from jsonschema import validate
 
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.json_schema.scaling_group import config, create_group, launch_config
+from otter.json_schema.scaling_group import create_group, launch_config
+from otter.test.models import interface_schema
 from otter.test.utils import DeferredTestMixin
 
 
@@ -47,15 +46,9 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_config()``
         """
-        # unlike updating or inputing a group config, the returned config
-        # must actually have all the properties
-        schema = deepcopy(config)
-        for property_name in schema['properties']:
-            schema['properties'][property_name]['required'] = True
-
         result = self.assert_deferred_succeeded(
             self.group.view_config(*args, **kwargs))
-        validate(result, schema)
+        validate(result, interface_schema.group_config)
         return result
 
     def validate_view_launch_config_return_value(self, *args, **kwargs):
@@ -78,53 +71,9 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_state()``
         """
-        # unlike updating or inputing a group config, the returned config
-        # must actually have all the properties
         result = self.assert_deferred_succeeded(
             self.group.view_state(*args, **kwargs))
-        entity_schema = {
-            'type': 'object',
-            'patternProperties': {
-                "^\S+$": {
-                    'type': 'array',
-                    'required': True,
-                    'uniqueItems': True,
-                    'minItems': 1,
-                    'items': {
-                        "type": "object",
-                        "properties": {
-                            'rel': {
-                                'type': 'string',
-                                'required': True
-                            },
-                            'href': {
-                                'type': 'string',
-                                'required': True
-                            }
-                        },
-                        "additionalProperties": False
-                    }
-                }
-            },
-            'additionalProperties': False
-        }
-        validate(result, {
-            'type': 'object',
-            'properties': {
-                'steadyState': {
-                    'type': 'integer',
-                    'minimum': 0,
-                    'required': True
-                },
-                'paused': {
-                    'type': 'boolean',
-                    'required': True
-                },
-                'active': entity_schema,
-                'pending': entity_schema
-            },
-            'additionalProperties': False
-        })
+        validate(result, interface_schema.group_state)
         return result
 
 
