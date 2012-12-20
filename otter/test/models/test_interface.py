@@ -5,8 +5,6 @@ from copy import deepcopy
 
 from jsonschema import validate
 
-from twisted.internet import defer
-
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
@@ -43,7 +41,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
             schema['properties'][property_name]['required'] = True
 
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view_config, *args, **kwargs))
+            self.group.view_config(*args, **kwargs))
         validate(result, schema)
         return result
 
@@ -56,7 +54,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         :return: the return value of ``view_launch_config()``
         """
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view_config, *args, **kwargs))
+            self.group.view_config(*args, **kwargs))
         validate(result, launch_config)
         return result
 
@@ -70,7 +68,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view_state, *args, **kwargs))
+            self.group.view_state(*args, **kwargs))
         array_of_strings = {
             'type': 'array',
             'items': {'type': "string"},
@@ -118,8 +116,8 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_scaling_groups()``
         """
-        result = self.assert_deferred_succeeded(defer.maybeDeferred(
-            self.collection.list_scaling_groups, *args, **kwargs))
+        result = self.assert_deferred_succeeded(
+            self.collection.list_scaling_groups(*args, **kwargs))
 
         # not valid JSON, since the ultimate objects are IScalingGroup
         # objects, so assert that it's a dictionary, all its
@@ -138,7 +136,6 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``get_scaling_group()``
         """
-        result = self.assert_deferred_succeeded(defer.maybeDeferred(
-            self.collection.get_scaling_group, *args, **kwargs))
+        result = self.collection.get_scaling_group(*args, **kwargs)
         self.assertTrue(IScalingGroup.providedBy(result))
         return result
