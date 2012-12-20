@@ -180,4 +180,6 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     #     self.assert_number_of_scaling_groups(1)
     #     self.edit_and_view_scaling_group(path)
 
-    #     # TODO: once the manifest view is implemented, add
+    #     # TODO: once the manifest view is implemented, add this test back in
+    #     # to view/modify the configuration, and check that the modified config
+    #     # also appears in the manifested view
