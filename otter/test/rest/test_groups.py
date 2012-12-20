@@ -11,13 +11,14 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.scaling_group import (
-    config_examples, launch_server_config_examples as launch_examples,
+    config_examples, create_group as create_group_schema,
+    launch_server_config_examples as launch_examples,
     policy_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.rest.response_schema import group_state
+from otter.test.rest import response_schema
 
 # import groups in order to get the routes created - the assignment is a trick
 # to ignore pyflakes
@@ -63,7 +64,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.return_value = defer.succeed([])
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
-        self.assertEqual(json.loads(body), [])
+
+        resp = json.loads(body)
+        self.assertEqual(resp, [])
+        validate(resp, response_schema.link_list)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_returned_group_list_gets_translated(self, mock_url):
@@ -78,7 +82,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         ])
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
-        self.assertEqual(json.loads(body), [
+
+        resp = json.loads(body)
+        validate(resp, response_schema.link_list)
+        self.assertEqual(resp, [
             {
                 'id': '1',
                 'links': [
@@ -188,11 +195,17 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         Viewing the manifest of an existant group returns whatever the
         implementation's `view_manifest()` method returns, in string format
         """
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'whatever': 'result'})
+        expected = {
+            'groupConfiguration': config_examples[0],
+            'launchConfiguration': launch_examples[0],
+            'scalingPolicies': policy_examples
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(expected)
 
         response_body = self.assert_status_code(200, method="GET")
-        self.assertEqual('{"whatever": "result"}', response_body)
+        resp = json.loads(response_body)
+        validate(resp, create_group_schema)
+        self.assertEqual(resp, expected)
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
@@ -283,7 +296,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
 
-        validate(resp, group_state)
+        validate(resp, response_schema.group_state)
         self.assertEqual(resp, {
             'active': [
                 {'id': '1', 'links': [make_link("rel"), make_link("bookmark")]},
