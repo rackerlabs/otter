@@ -70,6 +70,7 @@ class MockScalingGroup:
         self.paused = False
 
         if creation is not None:
+            self.error = None
             self.config = {
                 'name': "",
                 'cooldown': 0,
@@ -90,7 +91,7 @@ class MockScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed(self.config)
 
@@ -98,7 +99,7 @@ class MockScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the launch config
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed(self.launch)
 
@@ -106,7 +107,7 @@ class MockScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the state
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed({
             'steadyState': self.steady_state,
@@ -123,7 +124,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         # if not partial update, just replace the whole thing
@@ -143,7 +144,7 @@ class MockScalingGroup:
         checking here happens, so it's possible to get the launch config into
         an improper state.
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         self.launch = data
@@ -159,7 +160,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         self.steady_state = max(steady_state, self.config['minEntities'])
@@ -174,7 +175,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         if entity_id in self.active_entities:
