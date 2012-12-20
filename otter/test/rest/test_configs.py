@@ -153,7 +153,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             resp = json.loads(response_body)
 
             self.assertEqual(resp['type'], 'InvalidJsonError')
-            self.assertTrue(not self.mock_group.update_config.called)
+            self.assertFalse(self.mock_group.update_config.called)
             self.flushLoggedErrors(InvalidJsonError)
 
     def test_group_modify_bad_schema_400(self):
@@ -170,7 +170,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             resp = json.loads(response_body)
 
             self.assertEqual(resp['type'], 'ValidationError')
-            self.assertTrue(not self.mock_group.update_config.called)
+            self.assertFalse(self.mock_group.update_config.called)
             self.flushLoggedErrors(ValidationError)
 
 
@@ -293,7 +293,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             resp = json.loads(response_body)
 
             self.assertEqual(resp['type'], 'InvalidJsonError')
-            self.assertTrue(not self.mock_group.update_launch_config.called)
+            self.assertFalse(self.mock_group.update_launch_config.called)
             self.flushLoggedErrors(InvalidJsonError)
 
     def test_launch_config_modify_bad_schema_400(self):
@@ -309,5 +309,5 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             resp = json.loads(response_body)
 
             self.assertEqual(resp['type'], 'ValidationError')
-            self.assertTrue(not self.mock_group.update_launch_config.called)
+            self.assertFalse(self.mock_group.update_launch_config.called)
             self.flushLoggedErrors(ValidationError)
