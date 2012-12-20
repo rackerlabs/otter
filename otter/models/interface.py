@@ -41,6 +41,15 @@ class IScalingGroup(Interface):
         """
         pass
 
+    def view_launch_config():
+        """
+        :return: a view of the launch config, as specified by
+            :data:`otter.json_schema.scaling_group.launch_config`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
     def view_state():
         """
         The state of the scaling group consists of a list unique IDs of the
@@ -75,6 +84,20 @@ class IScalingGroup(Interface):
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.scaling_group.config`
         :type config: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+        pass
+
+    def update_launch_config(launch_config):
+        """
+        Update the scaling group launch configuration parameters based on the
+        attributes in ``launch_config``.  This can update the already-existing
+        values, or just overwrite them - it is up to the implementation.
+
+        :param launch_config: launch config data in JSON format, as specified
+            by :data:`otter.json_schema.scaling_group.launch_config`
+        :type launch_config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """

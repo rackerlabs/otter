@@ -5,12 +5,10 @@ from copy import deepcopy
 
 from jsonschema import validate
 
-from twisted.internet import defer
-
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.json_schema.scaling_group import config as group_config_schema
+from otter.json_schema.scaling_group import config, launch_config
 from otter.test.utils import DeferredTestMixin
 
 
@@ -32,19 +30,32 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         Calls ``view_config()``, and validates that it returns a config
         dictionary containing relevant configuration values, as specified by
-        the :data:`group_config_schema`
+        the :data:`config`
 
         :return: the return value of ``view_config()``
         """
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
-        schema = deepcopy(group_config_schema)
+        schema = deepcopy(config)
         for property_name in schema['properties']:
             schema['properties'][property_name]['required'] = True
 
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view_config, *args, **kwargs))
+            self.group.view_config(*args, **kwargs))
         validate(result, schema)
+        return result
+
+    def validate_view_launch_config_return_value(self, *args, **kwargs):
+        """
+        Calls ``view_launch_config()``, and validates that it returns a launch
+        config dictionary containing relevant configuration values, as
+        specified by the :data:`launch_config`
+
+        :return: the return value of ``view_launch_config()``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.view_config(*args, **kwargs))
+        validate(result, launch_config)
         return result
 
     def validate_view_state_return_value(self, *args, **kwargs):
@@ -57,7 +68,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         # unlike updating or inputing a group config, the returned config
         # must actually have all the properties
         result = self.assert_deferred_succeeded(
-            defer.maybeDeferred(self.group.view_state, *args, **kwargs))
+            self.group.view_state(*args, **kwargs))
         array_of_strings = {
             'type': 'array',
             'items': {'type': "string"},
@@ -105,8 +116,8 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_scaling_groups()``
         """
-        result = self.assert_deferred_succeeded(defer.maybeDeferred(
-            self.collection.list_scaling_groups, *args, **kwargs))
+        result = self.assert_deferred_succeeded(
+            self.collection.list_scaling_groups(*args, **kwargs))
 
         # not valid JSON, since the ultimate objects are IScalingGroup
         # objects, so assert that it's a dictionary, all its
@@ -125,7 +136,6 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``get_scaling_group()``
         """
-        result = self.assert_deferred_succeeded(defer.maybeDeferred(
-            self.collection.get_scaling_group, *args, **kwargs))
+        result = self.collection.get_scaling_group(*args, **kwargs)
         self.assertTrue(IScalingGroup.providedBy(result))
         return result

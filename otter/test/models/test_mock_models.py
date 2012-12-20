@@ -28,9 +28,17 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'cooldown': 0,
             'minEntities': 0
         }
+        # this is the config with all the default vals
+        self.output_config = {
+            'name': '',
+            'cooldown': 0,
+            'minEntities': 0,
+            'maxEntities': None,
+            'metadata': {}
+        }
         self.launch_config = {
             "type": "launch_server",
-            "args": {"server": {}}
+            "args": {"server": {"these are": "some args"}}
         }
         self.policies = []
         self.group = MockScalingGroup(
@@ -44,13 +52,16 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         all parameters even though only a few were passed in)
         """
         result = self.validate_view_config_return_value()
-        self.assertEqual(result, {
-            'name': '',
-            'cooldown': 0,
-            'minEntities': 0,
-            'maxEntities': None,
-            'metadata': {}
-        })
+        self.assertEqual(result, self.output_config)
+
+    def test_view_launch_config_returns_what_it_was_created_with(self):
+        """
+        The view config that is returned by the MockScalingGroup is the same
+        one it was created with.  There is currently no validation for what
+        goes in and hence what goes out, so just check if they are the same.
+        """
+        result = self.assert_deferred_succeeded(self.group.view_launch_config())
+        self.assertEqual(result, self.launch_config)
 
     def test_view_state_returns_valid_scheme(self):
         """
@@ -191,6 +202,46 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
+    def test_update_config_does_not_change_launch_config(self):
+        """
+        When the config is updated, the launch config doesn't change.
+        """
+        self.assert_deferred_succeeded(self.group.update_config({
+            'cooldown': 1000,
+            'metadata': {'UPDATED': 'UPDATED'},
+            'minEntities': 100,
+            'maxEntities': 1000,
+            'name': 'UPDATED'
+        }))
+        self.assertEqual(
+            self.assert_deferred_succeeded(self.group.view_launch_config()),
+            self.launch_config)
+
+    def test_update_launch_config_overwrites_existing_data(self):
+        """
+        There is no partial update for the launch config.  Whatever
+        `update_launch_config` is called with is what will be saved.
+        """
+        updated = {
+            "type": "launch_server",
+            "args": {"server": {"here are": "new args"}}
+        }
+        self.assert_deferred_succeeded(self.group.update_launch_config(updated))
+        result = self.assert_deferred_succeeded(self.group.view_launch_config())
+        self.assertEqual(result, updated)
+
+    def test_update_launch_config_does_not_change_config(self):
+        """
+        When the launch_config is updated, the config doesn't change.
+        """
+        self.assert_deferred_succeeded(self.group.update_launch_config({
+            "type": "launch_server",
+            "args": {"server": {"here are": "new args"}}
+        }))
+        self.assertEqual(
+            self.assert_deferred_succeeded(self.group.view_config()),
+            self.output_config)
+
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -300,7 +351,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state'):
             self.assert_deferred_succeeded(getattr(group, method)())
 
         self.assert_deferred_succeeded(group.update_config({
@@ -321,7 +372,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state'):
             self.assert_deferred_failed(getattr(group, method)(),
                                         NoSuchScalingGroupError)
 

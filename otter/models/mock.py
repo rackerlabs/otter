@@ -70,6 +70,7 @@ class MockScalingGroup:
         self.paused = False
 
         if creation is not None:
+            self.error = None
             self.config = {
                 'name': "",
                 'cooldown': 0,
@@ -90,15 +91,23 @@ class MockScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed(self.config)
+
+    def view_launch_config(self):
+        """
+        :return: :class:`Deferred` that fires with a view of the launch config
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+        return defer.succeed(self.launch)
 
     def view_state(self):
         """
         :return: :class:`Deferred` that fires with a view of the state
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed({
             'steadyState': self.steady_state,
@@ -115,7 +124,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         # if not partial update, just replace the whole thing
@@ -128,6 +137,19 @@ class MockScalingGroup:
         # make sure the steady state is still within bounds
         return self.set_steady_state(self.steady_state)
 
+    def update_launch_config(self, data):
+        """
+        Update the launch config parameters based on the attributes in
+        ``data``.  Overwrites the existing launch config.  Note - no error
+        checking here happens, so it's possible to get the launch config into
+        an improper state.
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        self.launch = data
+        return defer.succeed(None)
+
     def set_steady_state(self, steady_state):
         """
         Sets the steady state value
@@ -138,7 +160,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         self.steady_state = max(steady_state, self.config['minEntities'])
@@ -153,7 +175,7 @@ class MockScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        if self.config is None:
+        if self.error is not None:
             return defer.fail(self.error)
 
         if entity_id in self.active_entities:
