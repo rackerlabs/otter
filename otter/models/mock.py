@@ -120,7 +120,6 @@ class MockScalingGroup:
 
         # if not partial update, just replace the whole thing
         if partial_update:
-            self.config = dict(self.config)
             for key in data:
                 self.config[key] = data[key]
         else:
