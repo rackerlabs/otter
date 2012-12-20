@@ -43,7 +43,7 @@ def view_config_for_scaling_group(request, tenantId, groupId):
         }
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.view_config)
+    deferred = rec.view_config()
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -80,7 +80,7 @@ def edit_config_for_scaling_group(request, tenantId, groupId, data):
     a mimimal schema, and if so, what happens with defaults?
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.update_config, data)
+    deferred = rec.update_config(data)
     return deferred
 
 

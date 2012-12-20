@@ -36,7 +36,8 @@ class IScalingGroup(Interface):
         """
         :return: a view of the config, as specified by
             :data:`otter.json_schema.scaling_group.config`
-        :rtype: ``dict``
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
         """
         pass
 
@@ -60,22 +61,22 @@ class IScalingGroup(Interface):
                 'paused': false
             }
 
-        :rtype: ``dict``
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
         """
         pass
 
     def update_config(config):
         """
         Update the scaling group configuration paramaters based on the
-        attributes in ``config``.  This updates the already-existing values,
-        rather than overwrites them.  (Enforce override-only updates should
-        happen elsewhere.)
+        attributes in ``config``.  This can update the already-existing values,
+        or just overwrite them - it is up to the implementation.
 
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.scaling_group.config`
         :type config: ``dict``
 
-        :return: None
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
         pass
 
@@ -93,6 +94,8 @@ class IScalingGroup(Interface):
             value is less than ``min_entities``, the value will be set to
             ``min_entities``.
         :type steady_state: ``int``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
         pass
 
@@ -104,7 +107,7 @@ class IScalingGroup(Interface):
         :param entity_id: the uuid of the entity to delete
         :type entity_id: ``str``
 
-        :return: None
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises: NoSuchEntityError if the entity is not a member of the scaling
             group
@@ -140,7 +143,7 @@ class IScalingGroupCollection(Interface):
         :type data: ``list`` of ``dict``
 
         :return: uuid of the newly created scaling group
-        :rtype: 'str'
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
         """
         pass
 
@@ -154,7 +157,7 @@ class IScalingGroupCollection(Interface):
         :param scaling_group_id: the uuid of the scaling group to delete
         :type scaling_group_id: ``str``
 
-        :return: None
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
@@ -168,7 +171,9 @@ class IScalingGroupCollection(Interface):
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
 
-        :return: ``list`` of :class:`IScalingGroup` providers
+        :return: a list of scaling groups
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a
+            ``list`` of :class:`IScalingGroup` providers
         """
         pass
 
@@ -184,6 +189,7 @@ class IScalingGroupCollection(Interface):
         :type tenant_id: ``str``
 
         :return: scaling group model object
-        :rtype: :class:`IScalingGroup` provider
+        :rtype: :class:`IScalingGroup` provider (no
+            :class:`twisted.internet.defer.Deferred`)
         """
         pass
