@@ -46,6 +46,18 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
+    def test_view_manifest_has_all_info(self):
+        """
+        View manifest should return a dictionary that conforms to the JSON
+        schema
+        """
+        result = self.validate_view_manifest_return_value()
+        self.assertEqual(result, {
+            'groupConfiguration': self.output_config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': []
+        })
+
     def test_default_view_config_has_all_info(self):
         """
         View should return a dictionary that conforms to the JSON schema (has

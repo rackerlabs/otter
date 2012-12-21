@@ -15,12 +15,20 @@ from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
 
+from otter.json_schema.scaling_group import (
+    config_examples, launch_server_config_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.models.mock import MockScalingGroupCollection
-from otter.rest.application import set_store
+from otter.rest.application import root, set_store
 
 from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
+
+# make all the route endpoints
+import otter.rest.groups as _g
+groups = _g
+import otter.rest.configs as _c
+configs = _c
 
 
 class MockStoreRestTestCase(DeferredTestMixin, TestCase):
@@ -46,34 +54,25 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     In the case of in-memory stores, fixtures can be loaded and duplicated.
     """
 
-    skip = "All broken"
-
     def setUp(self):
         """
         Replace the store every time with a clean one.
         """
         store = MockScalingGroupCollection()
-        store.mock_add_tenant('11111')
         set_store(store)
 
-    def _create_and_view_scaling_group(self):
+    def create_and_view_scaling_group(self):
         """
         Creating a scaling group with a valid config returns with a 200 OK and
         a Location header pointing to the new scaling group.
-        """
-        config = {
-            'name': 'created',
-            'cooldown': 10,
-            'minEntities': 1,
-            'maxEntities': 8,
-            'metadata': {
-                'somekey': 'somevalue'
-            }
-        }
 
-        wrapper = self.assert_deferred_succeeded(
-            request('POST', '/v1.0/11111/groups/dfw',
-                    body=json.dumps(config)))
+        :return: the path to the new scaling group resource
+        """
+        wrapper = self.assert_deferred_succeeded(request(
+            root, 'POST', '/v1.0/11111/groups', body=json.dumps({
+                "groupConfiguration": config_examples[1],
+                "launchConfiguration": launch_server_config_examples[0]
+            })))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
@@ -85,13 +84,46 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         # now make sure the Location header points to something good!
         path = urlsplit(headers[0])[2].rstrip('/')
 
-        wrapper = self.assert_deferred_succeeded(request('GET', path))
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), config)
+
+        response = json.loads(wrapper.content)
+        self.assertEqual(response.get('groupConfiguration', None),
+                         config_examples[1])
+        self.assertEqual(response.get('launchConfiguration', None),
+                         launch_server_config_examples[0])
 
         return path
 
-    def _edit_and_view_scaling_group(self, path):
+    def delete_and_view_scaling_group(self, path):
+        """
+        Deleting a scaling group returns with a 204 no content.  The next
+        attempt to view the scaling group should return a 404 not found.
+        """
+        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Delete failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 404)
+
+        # flush any logged errors
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def assert_number_of_scaling_groups(self, number):
+        """
+        Asserts that there are ``number`` number of scaling groups
+        """
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', '/v1.0/11111/groups'))
+        self.assertEqual(200, wrapper.response.code)
+
+        groups = json.loads(wrapper.content)
+        self.assertEqual(len(groups), number)
+
+    def edit_and_view_scaling_group_config(self, path):
         """
         Editing the config of a scaling group with a valid config returns with
         a 204 no content.  The next attempt to view the scaling group should
@@ -119,52 +151,35 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
         self.assertEqual(json.loads(wrapper.content), config)
 
-    def _delete_and_view_scaling_group(self, path):
+    def test_crd_scaling_group(self):
         """
-        Deleting a scaling group returns with a 204 no content.  The next
-        attempt to view the scaling group should return a 404 not found.
-        """
-        wrapper = self.assert_deferred_succeeded(request('DELETE', path))
-        self.assertEqual(wrapper.response.code, 204,
-                         "Delete failed: {0}".format(wrapper.content))
-        self.assertEqual(wrapper.content, "")
-
-        # now try to view
-        wrapper = self.assert_deferred_succeeded(request('GET', path))
-        self.assertEqual(wrapper.response.code, 404)
-
-        # flush any logged errors
-        self.flushLoggedErrors(NoSuchScalingGroupError)
-
-    def assert_number_of_scaling_groups(self, number):
-        """
-        Asserts that there are ``number`` number of scaling groups
-        """
-        wrapper = self.assert_deferred_succeeded(
-            request('GET', '/v1.0/11111/groups'))
-        self.assertEqual(200, wrapper.response.code)
-
-        all_groups = json.loads(wrapper.content)
-        groups = [group for region in all_groups.values() for group in region]
-        self.assertEqual(len(groups), number)
-
-    def test_crud(self):
-        """
-        Start with no scaling groups.  Create one, make sure it's listed.
-        View the config, edit the config, then delete it and make sure its
-        no longer listed.
+        Start with no scaling groups.  Create one, make sure it's listed, then
+        delete it and make sure it's no longer listed.
         """
         # start with no scaling groups
         self.assert_number_of_scaling_groups(0)
-        path = self._create_and_view_scaling_group()
-
-        # there should be one scaling group now
-        self.assert_number_of_scaling_groups(1)
-        self._edit_and_view_scaling_group(path)
+        path = self.create_and_view_scaling_group()
 
         # there should still be one scaling group
         self.assert_number_of_scaling_groups(1)
-        self._delete_and_view_scaling_group(path)
+        self.delete_and_view_scaling_group(path)
 
         # there should be no scaling groups now
         self.assert_number_of_scaling_groups(0)
+
+    # def test_ru_scaling_config(self):
+    #     """
+    #     Create the scaling group - view just the config, then edit the config.
+    #     It should be changed in the scaling config view.
+    #     """
+    #     # start with no scaling groups
+    #     self.assert_number_of_scaling_groups(0)
+    #     path, manifest = self.create_and_view_scaling_group()
+
+    #     # there should be one scaling group now
+    #     self.assert_number_of_scaling_groups(1)
+    #     self.edit_and_view_scaling_group(path)
+
+    #     # TODO: once the manifest view is implemented, add this test back in
+    #     # to view/modify the configuration, and check that the modified config
+    #     # also appears in the manifested view

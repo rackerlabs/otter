@@ -87,6 +87,19 @@ class MockScalingGroup:
             self.launch = None
             self.policies = None
 
+    def view_manifest(self):
+        """
+        :return: :class:`Deferred` that fires with a view of the config
+        """
+        if self.config is None:
+            return defer.fail(self.error)
+
+        return defer.succeed({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': self.policies
+        })
+
     def view_config(self):
         """
         :return: :class:`Deferred` that fires with a view of the config
