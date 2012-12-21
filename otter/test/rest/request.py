@@ -13,8 +13,9 @@ from twisted.internet import defer
 from twisted.web import server, http
 from twisted.web.resource import getChildForRequest
 
+from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.rest.application import root, set_store
-from otter.test.utils import DeferredTestMixin
+from otter.test.utils import iMock, DeferredTestMixin
 
 
 def _render(resource, request):
@@ -115,7 +116,10 @@ class RestAPITestMixin(DeferredTestMixin):
 
         :return: None
         """
-        self.mock_store = mock.MagicMock()
+        self.mock_store = iMock(IScalingGroupCollection)
+        self.mock_group = iMock(IScalingGroup)
+        self.mock_store.get_scaling_group.return_value = self.mock_group
+
         set_store(self.mock_store)
 
     def assert_status_code(self, expected_status, endpoint=None,

@@ -1,8 +1,10 @@
 """
 Mixins and utilities to be used for testing.
 """
-
+import mock
 import os
+
+from zope.interface import directlyProvides
 
 from twisted.python.failure import Failure
 from twisted.internet.defer import Deferred
@@ -91,3 +93,22 @@ def fixture(fixture_name):
         'fixtures',
         fixture_name
     )).read()
+
+
+def iMock(iface, **kwargs):
+    """
+    Creates a mock object that provides a particular interface.
+
+    :param iface: the interface to provide
+    :type iface: :class:``zope.interface.Interface``
+
+    :returns: a mock object that is specced to have the attributes and methods
+        as a provider of the interface
+    :rtype: :class:``mock.MagicMock``
+    """
+    if 'spec' in kwargs:
+        del kwargs['spec']
+
+    imock = mock.MagicMock(spec=iface.names(), **kwargs)
+    directlyProvides(imock, iface)
+    return imock

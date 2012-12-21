@@ -12,7 +12,8 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.scaling_group import (
-    config_examples, launch_server_config_examples as launch_examples)
+    config_examples, launch_server_config_examples as launch_examples,
+    policy_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
@@ -124,13 +125,31 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed("1")
         request_body = {
             'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0]
+            'launchConfiguration': launch_examples[0],
+            'scalingPolicies': policy_examples
         }
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body),
                                 '/v1.0/11111/groups/1')
         self.mock_store.create_scaling_group.assert_called_once_with(
-            '11111', request_body)
+            '11111', config_examples[0], launch_examples[0], policy_examples)
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_group_create_no_scaling_policies(self, mock_url):
+        """
+        Tries to create a scaling group, but if no scaling policy is provided
+        the the interface is called with None in place of scaling policies
+        """
+        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+        request_body = {
+            'groupConfiguration': config_examples[0],
+            'launchConfiguration': launch_examples[0],
+        }
+        self.assert_status_code(201, None,
+                                'POST', json.dumps(request_body),
+                                '/v1.0/11111/groups/1')
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            '11111', config_examples[0], launch_examples[0], None)
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
@@ -140,6 +159,44 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
     endpoint = "/v1.0/11111/groups/one"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
+
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(OneGroupTestCase, self).setUp()
+        self.mock_group.uuid = "one"
+
+    def test_view_manifest_404(self):
+        """
+        Viewing the manifest of a non-existant group fails with a 404.
+        """
+        self.mock_group.view_manifest.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
+
+        response_body = self.assert_status_code(404, method="GET")
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_manifest.assert_called_once_with()
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_view_manifest(self):
+        """
+        Viewing the manifest of an existant group returns whatever the
+        implementation's `view_manifest()` method returns, in string format
+        """
+        self.mock_group.view_manifest.return_value = defer.succeed(
+            {'whatever': 'result'})
+
+        response_body = self.assert_status_code(200, method="GET")
+        self.assertEqual('{"whatever": "result"}', response_body)
+
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_manifest.assert_called_once_with()
 
     def test_group_delete(self):
         """
@@ -157,7 +214,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         Deleting a non-existant group fails with a 404.
         """
         self.mock_store.delete_scaling_group.return_value = defer.fail(
-            NoSuchScalingGroupError('11111', 'one'))
+            NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.delete_scaling_group.assert_called_once_with(
