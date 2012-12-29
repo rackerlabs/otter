@@ -1,0 +1,458 @@
+<mockup version="1.0" skin="sketch" fontFace="Balsamiq Sans" measuredW="2153" measuredH="3817" mockupW="2100" mockupH="3759">
+  <controls>
+    <control controlID="3" controlTypeID="com.balsamiq.mockups::TextInput" x="419" y="236" w="189" h="-1" measuredW="93" measuredH="27" zOrder="0" locked="false" isInGroup="-1">
+      <controlProperties>
+        <state>up</state>
+        <text>ScalingGroup1</text>
+      </controlProperties>
+    </control>
+    <control controlID="4" controlTypeID="com.balsamiq.mockups::Label" x="201" y="236" w="-1" h="-1" measuredW="40" measuredH="21" zOrder="1" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Name</text>
+      </controlProperties>
+    </control>
+    <control controlID="5" controlTypeID="com.balsamiq.mockups::Label" x="201" y="275" w="82" h="19" measuredW="60" measuredH="21" zOrder="2" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Cooldown</text>
+      </controlProperties>
+    </control>
+    <control controlID="6" controlTypeID="com.balsamiq.mockups::Label" x="201" y="308" w="103" h="28" measuredW="99" measuredH="21" zOrder="3" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Minimum%20Entities</text>
+      </controlProperties>
+    </control>
+    <control controlID="7" controlTypeID="com.balsamiq.mockups::HelpButton" x="265" y="275" w="-1" h="-1" measuredW="18" measuredH="18" zOrder="4" locked="false" isInGroup="-1"/>
+    <control controlID="8" controlTypeID="com.balsamiq.mockups::NumericStepper" x="419" y="312" w="39" h="-1" measuredW="39" measuredH="24" zOrder="5" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>1</text>
+      </controlProperties>
+    </control>
+    <control controlID="9" controlTypeID="com.balsamiq.mockups::Label" x="201" y="352" w="103" h="24" measuredW="104" measuredH="21" zOrder="6" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Maximum%20Entities</text>
+      </controlProperties>
+    </control>
+    <control controlID="10" controlTypeID="com.balsamiq.mockups::NumericStepper" x="419" y="356" w="-1" h="-1" measuredW="41" measuredH="24" zOrder="7" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>3</text>
+      </controlProperties>
+    </control>
+    <control controlID="11" controlTypeID="com.balsamiq.mockups::TextInput" x="419" y="272" w="188" h="-1" measuredW="69" measuredH="27" zOrder="8" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>5%20Minutes</text>
+      </controlProperties>
+    </control>
+    <control controlID="12" controlTypeID="com.balsamiq.mockups::HRule" x="207" y="395" w="731" h="-1" measuredW="100" measuredH="10" zOrder="9" locked="false" isInGroup="-1"/>
+    <control controlID="14" controlTypeID="com.balsamiq.mockups::SubTitle" x="201" y="157" w="-1" h="-1" measuredW="295" measuredH="33" zOrder="10" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Scaling%20Group%20Configuration</text>
+      </controlProperties>
+    </control>
+    <control controlID="15" controlTypeID="com.balsamiq.mockups::SubTitle" x="201" y="420" w="-1" h="-1" measuredW="224" measuredH="33" zOrder="11" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Launch%20Configuration</text>
+      </controlProperties>
+    </control>
+    <control controlID="20" controlTypeID="com.balsamiq.mockups::Label" x="237" y="453" w="516" h="51" measuredW="247" measuredH="21" zOrder="12" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>What%20should%20we%20do%20on%20an%20autoscale%20event%3F</text>
+      </controlProperties>
+    </control>
+    <control controlID="21" controlTypeID="com.balsamiq.mockups::Button" x="425" y="785" w="204" h="27" measuredW="133" measuredH="27" zOrder="13" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Add%20Load%20Balancer</text>
+      </controlProperties>
+    </control>
+    <control controlID="22" controlTypeID="com.balsamiq.mockups::Label" x="201" y="785" w="109" h="21" measuredW="89" measuredH="21" zOrder="14" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Load%20Balancer</text>
+      </controlProperties>
+    </control>
+    <control controlID="25" controlTypeID="com.balsamiq.mockups::Label" x="201" y="997" w="-1" h="-1" measuredW="85" measuredH="21" zOrder="15" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Block%20Storage</text>
+      </controlProperties>
+    </control>
+    <control controlID="26" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="1039" w="502" h="148" measuredW="333" measuredH="53" zOrder="16" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Name%20%5E%2C%20Region%20%5Ev%2C%20Type%2C%20Size%20v%0AVolume-1%2C%20Dallas%20%28DFW%29%2C%20Standard%20%28SATA%29%2C%20100GB</text>
+      </controlProperties>
+    </control>
+    <control controlID="27" controlTypeID="com.balsamiq.mockups::Button" x="425" y="994" w="202" h="27" measuredW="113" measuredH="27" zOrder="17" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Attach%20Volumes</text>
+      </controlProperties>
+    </control>
+    <control controlID="31" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="821" w="502" h="148" measuredW="308" measuredH="53" zOrder="18" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Name%20%5E%2C%20Protocol%3APort%20%5Ev%2C%20Node%20Count%20v%0ALoad%20Balancer-1%2C%20HTTP%3A80%2C%201</text>
+      </controlProperties>
+    </control>
+    <control controlID="32" controlTypeID="com.balsamiq.mockups::HRule" x="207" y="1334" w="731" h="-1" measuredW="100" measuredH="10" zOrder="19" locked="false" isInGroup="-1"/>
+    <control controlID="34" controlTypeID="com.balsamiq.mockups::SubTitle" x="213" y="1388" w="-1" h="-1" measuredW="164" measuredH="33" zOrder="20" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Scaling%20Policies</text>
+      </controlProperties>
+    </control>
+    <control controlID="35" controlTypeID="com.balsamiq.mockups::Paragraph" x="237" y="1421" w="468" h="80" measuredW="200" measuredH="80" zOrder="21" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Scaling%20policies%20control%20how%20much%20your%20cloud%20scales%20when%20they%20are%20triggered</text>
+      </controlProperties>
+    </control>
+    <control controlID="36" controlTypeID="com.balsamiq.mockups::MultilineButton" x="694" y="1236" w="-1" h="-1" measuredW="208" measuredH="71" zOrder="22" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Save%20Here%0AYou%20can%20add%20Scaling%20Policies%20later</text>
+      </controlProperties>
+    </control>
+    <control controlID="37" controlTypeID="com.balsamiq.mockups::DataGrid" x="213" y="1501" w="726" h="262" measuredW="354" measuredH="143" zOrder="23" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Name%2C%20Direction%2C%20Adjustment%2C%20Cooldown%0A%5BScale%20Up%2010%25%5D%2C%20Up%2C%2010%25%2C%205%20Minutes%0A%5BScale%20Down%2010%25%5D%2C%20Down%2C%2010%25%2C%205%20Minutes%0A%5BScale%20Up%201%20Server%5D%2C%20Up%2C%201%20Server%2C%205%20Minutes%0A%5BScale%20Down%201%20Server%5D%2C%20Down%2C%201%20Server%2C%205%20Minutes</text>
+      </controlProperties>
+    </control>
+    <control controlID="40" controlTypeID="com.balsamiq.mockups::Button" x="212" y="1462" w="202" h="27" measuredW="82" measuredH="27" zOrder="24" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Add%20Policy</text>
+      </controlProperties>
+    </control>
+    <control controlID="41" controlTypeID="__group__" x="1015" y="1489" w="462" h="261" measuredW="462" measuredH="261" zOrder="25" locked="false" isInGroup="-1">
+      <groupChildrenDescriptors>
+        <control controlID="0" controlTypeID="com.balsamiq.mockups::Tooltip" x="40" y="0" w="422" h="261" measuredW="45" measuredH="0" zOrder="0" locked="false" isInGroup="41">
+          <controlProperties>
+            <text/>
+          </controlProperties>
+        </control>
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::Label" x="74" y="31" w="-1" h="-1" measuredW="44" measuredH="21" zOrder="1" locked="false" isInGroup="41">
+          <controlProperties>
+            <align>right</align>
+            <text>Name%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="2" controlTypeID="com.balsamiq.mockups::TextInput" x="131" y="28" w="203" h="-1" measuredW="79" measuredH="27" zOrder="2" locked="false" isInGroup="41"/>
+        <control controlID="3" controlTypeID="com.balsamiq.mockups::ComboBox" x="131" y="71" w="206" h="-1" measuredW="82" measuredH="23" zOrder="3" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>Scale%20Up</text>
+          </controlProperties>
+        </control>
+        <control controlID="4" controlTypeID="com.balsamiq.mockups::Label" x="0" y="71" w="118" h="25" measuredW="56" measuredH="21" zOrder="4" locked="false" isInGroup="41">
+          <controlProperties>
+            <align>right</align>
+            <text>Direction</text>
+          </controlProperties>
+        </control>
+        <control controlID="5" controlTypeID="com.balsamiq.mockups::Label" x="134" y="31" w="-1" h="-1" measuredW="60" measuredH="21" zOrder="5" locked="false" isInGroup="41">
+          <controlProperties>
+            <align>right</align>
+            <color>10066329</color>
+            <text>MyPolicy1</text>
+          </controlProperties>
+        </control>
+        <control controlID="6" controlTypeID="com.balsamiq.mockups::Label" x="48" y="114" w="-1" h="-1" measuredW="70" measuredH="21" zOrder="6" locked="false" isInGroup="41">
+          <controlProperties>
+            <align>right</align>
+            <text>Adjustment</text>
+          </controlProperties>
+        </control>
+        <control controlID="7" controlTypeID="com.balsamiq.mockups::Label" x="58" y="156" w="-1" h="-1" measuredW="60" measuredH="21" zOrder="7" locked="false" isInGroup="41">
+          <controlProperties>
+            <align>right</align>
+            <text>Cooldown</text>
+          </controlProperties>
+        </control>
+        <control controlID="9" controlTypeID="com.balsamiq.mockups::Button" x="70" y="208" w="-1" h="-1" measuredW="69" measuredH="27" zOrder="8" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>Create%21</text>
+          </controlProperties>
+        </control>
+        <control controlID="10" controlTypeID="com.balsamiq.mockups::Link" x="151" y="210" w="-1" h="-1" measuredW="46" measuredH="21" zOrder="9" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>Cancel</text>
+          </controlProperties>
+        </control>
+        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="196" y="113" w="206" h="-1" measuredW="79" measuredH="23" zOrder="10" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>Percent</text>
+          </controlProperties>
+        </control>
+        <control controlID="14" controlTypeID="com.balsamiq.mockups::NumericStepper" x="134" y="112" w="-1" h="-1" measuredW="47" measuredH="24" zOrder="11" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>10</text>
+          </controlProperties>
+        </control>
+        <control controlID="15" controlTypeID="com.balsamiq.mockups::NumericStepper" x="134" y="154" w="47" h="-1" measuredW="41" measuredH="24" zOrder="12" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>3</text>
+          </controlProperties>
+        </control>
+        <control controlID="17" controlTypeID="com.balsamiq.mockups::ComboBox" x="195" y="154" w="-1" h="-1" measuredW="75" measuredH="23" zOrder="13" locked="false" isInGroup="41">
+          <controlProperties>
+            <text>Minutes</text>
+          </controlProperties>
+        </control>
+      </groupChildrenDescriptors>
+    </control>
+    <control controlID="42" controlTypeID="com.balsamiq.mockups::Button" x="425" y="548" w="204" h="27" measuredW="107" measuredH="27" zOrder="26" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Choose%20Image</text>
+      </controlProperties>
+    </control>
+    <control controlID="43" controlTypeID="com.balsamiq.mockups::Label" x="201" y="548" w="109" h="21" measuredW="43" measuredH="21" zOrder="27" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Image</text>
+      </controlProperties>
+    </control>
+    <control controlID="44" controlTypeID="com.balsamiq.mockups::DataGrid" x="425" y="584" w="502" h="148" measuredW="411" measuredH="53" zOrder="28" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Selected%2C%20Name%20%5E%2C%20Parent%20Server%20%2C%20Date%20Created%20v%0A%5Bx%5D%2C%20Core-1%2C%20Core%2C%20Aug%207%202012%20-%204%3A57%20pm%20UTC</text>
+      </controlProperties>
+    </control>
+    <control controlID="45" controlTypeID="com.balsamiq.mockups::Label" x="242" y="190" w="476" h="21" measuredW="228" measuredH="21" zOrder="29" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Set%20the%20limits%20of%20your%20Autoscaling%20Group</text>
+      </controlProperties>
+    </control>
+    <control controlID="47" controlTypeID="__group__" x="1059" y="1823" w="1094" h="451" measuredW="1094" measuredH="451" zOrder="30" locked="false" isInGroup="-1">
+      <groupChildrenDescriptors>
+        <control controlID="0" controlTypeID="com.balsamiq.mockups::Tooltip" x="24" y="0" w="798" h="451" measuredW="45" measuredH="0" zOrder="0" locked="false" isInGroup="47">
+          <controlProperties>
+            <text/>
+          </controlProperties>
+        </control>
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::Label" x="74" y="35" w="-1" h="-1" measuredW="44" measuredH="21" zOrder="1" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <text>Name%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="2" controlTypeID="com.balsamiq.mockups::TextInput" x="139" y="31" w="203" h="-1" measuredW="79" measuredH="27" zOrder="2" locked="false" isInGroup="47"/>
+        <control controlID="3" controlTypeID="com.balsamiq.mockups::ComboBox" x="139" y="74" w="206" h="-1" measuredW="82" measuredH="23" zOrder="3" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Scale%20Up</text>
+          </controlProperties>
+        </control>
+        <control controlID="4" controlTypeID="com.balsamiq.mockups::Label" x="0" y="75" w="118" h="25" measuredW="60" measuredH="21" zOrder="4" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <text>Direction%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="5" controlTypeID="com.balsamiq.mockups::Label" x="142" y="34" w="-1" h="-1" measuredW="60" measuredH="21" zOrder="5" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <color>10066329</color>
+            <text>MyPolicy1</text>
+          </controlProperties>
+        </control>
+        <control controlID="6" controlTypeID="com.balsamiq.mockups::Label" x="44" y="118" w="-1" h="-1" measuredW="74" measuredH="21" zOrder="6" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <text>Adjustment%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="7" controlTypeID="com.balsamiq.mockups::Label" x="54" y="160" w="-1" h="-1" measuredW="64" measuredH="21" zOrder="7" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <text>Cooldown%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="9" controlTypeID="com.balsamiq.mockups::Button" x="54" y="386" w="-1" h="-1" measuredW="54" measuredH="27" zOrder="8" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Save</text>
+          </controlProperties>
+        </control>
+        <control controlID="10" controlTypeID="com.balsamiq.mockups::Link" x="125" y="389" w="-1" h="-1" measuredW="46" measuredH="21" zOrder="9" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Cancel</text>
+          </controlProperties>
+        </control>
+        <control controlID="12" controlTypeID="com.balsamiq.mockups::ComboBox" x="204" y="116" w="206" h="-1" measuredW="79" measuredH="23" zOrder="10" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Percent</text>
+          </controlProperties>
+        </control>
+        <control controlID="14" controlTypeID="com.balsamiq.mockups::NumericStepper" x="142" y="115" w="-1" h="-1" measuredW="47" measuredH="24" zOrder="11" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>10</text>
+          </controlProperties>
+        </control>
+        <control controlID="15" controlTypeID="com.balsamiq.mockups::NumericStepper" x="142" y="157" w="47" h="-1" measuredW="41" measuredH="24" zOrder="12" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>3</text>
+          </controlProperties>
+        </control>
+        <control controlID="17" controlTypeID="com.balsamiq.mockups::ComboBox" x="203" y="157" w="-1" h="-1" measuredW="75" measuredH="23" zOrder="13" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Minutes</text>
+          </controlProperties>
+        </control>
+        <control controlID="18" controlTypeID="com.balsamiq.mockups::DataGrid" x="139" y="235" w="633" h="136" measuredW="518" measuredH="55" zOrder="14" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Name%20%5E%2C%20Cooldown%20%5Ev%2C%20Public%20URL%0APagerduty%2C%203%20min%2C%20http%3A//api.rackspace.com/2.0/account/12345678/AutoScale/%5Cr941aed660b278246f29ddaced1</text>
+          </controlProperties>
+        </control>
+        <control controlID="20" controlTypeID="com.balsamiq.mockups::Label" x="41" y="199" w="-1" h="-1" measuredW="77" measuredH="21" zOrder="15" locked="false" isInGroup="47">
+          <controlProperties>
+            <align>right</align>
+            <text>Public%20URLs%3A</text>
+          </controlProperties>
+        </control>
+        <control controlID="21" controlTypeID="com.balsamiq.mockups::Button" x="139" y="196" w="-1" h="-1" measuredW="111" measuredH="27" zOrder="16" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Add%20Public%20URL</text>
+          </controlProperties>
+        </control>
+        <control controlID="23" controlTypeID="com.balsamiq.mockups::StickyNote" x="891" y="304" w="203" h="123" measuredW="109" measuredH="123" zOrder="17" locked="false" isInGroup="47">
+          <controlProperties>
+            <text>Click%20to%20copy.%0ACan%27t%20click%20to%20navigate%20to%20URL%20%28would%20be%20bad%21%21%29</text>
+          </controlProperties>
+        </control>
+        <control controlID="24" controlTypeID="com.balsamiq.mockups::HelpButton" x="96" y="238" w="-1" h="-1" measuredW="18" measuredH="18" zOrder="18" locked="false" isInGroup="47"/>
+      </groupChildrenDescriptors>
+    </control>
+    <control controlID="48" controlTypeID="com.balsamiq.mockups::SubTitle" x="1072" y="1445" w="-1" h="-1" measuredW="178" measuredH="33" zOrder="31" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Add%20policy%20dialog</text>
+      </controlProperties>
+    </control>
+    <control controlID="49" controlTypeID="com.balsamiq.mockups::SubTitle" x="1089" y="1778" w="-1" h="-1" measuredW="176" measuredH="33" zOrder="32" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Edit%20policy%20dialog</text>
+      </controlProperties>
+    </control>
+    <control controlID="51" controlTypeID="com.balsamiq.mockups::HRule" x="186" y="2317" w="731" h="-1" measuredW="100" measuredH="10" zOrder="33" locked="false" isInGroup="-1"/>
+    <control controlID="52" controlTypeID="com.balsamiq.mockups::MultilineButton" x="681" y="2218" w="-1" h="-1" measuredW="235" measuredH="71" zOrder="34" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Save%20Here%0AYou%20can%20attach%20Alarms%20to%20Policies%20later</text>
+      </controlProperties>
+    </control>
+    <control controlID="53" controlTypeID="com.balsamiq.mockups::SubTitle" x="186" y="2361" w="-1" h="-1" measuredW="197" measuredH="33" zOrder="35" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Monitoring%20Checks</text>
+      </controlProperties>
+    </control>
+    <control controlID="54" controlTypeID="com.balsamiq.mockups::Paragraph" x="213" y="2394" w="468" h="80" measuredW="200" measuredH="80" zOrder="36" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Have%20Rackspace%20Cloud%20Monitoring%20trigger%20Scale%20Events</text>
+      </controlProperties>
+    </control>
+    <control controlID="56" controlTypeID="__group__" x="1045" y="2454" w="498" h="167" measuredW="498" measuredH="167" zOrder="37" locked="false" isInGroup="-1">
+      <groupChildrenDescriptors>
+        <control controlID="20" controlTypeID="__group__" x="0" y="0" w="498" h="167" measuredW="498" measuredH="167" zOrder="0" locked="false" isInGroup="56">
+          <groupChildrenDescriptors>
+            <control controlID="0" controlTypeID="com.balsamiq.mockups::Tooltip" x="0" y="0" w="498" h="167" measuredW="45" measuredH="0" zOrder="0" locked="false" isInGroup="20">
+              <controlProperties>
+                <text/>
+              </controlProperties>
+            </control>
+            <control controlID="1" controlTypeID="com.balsamiq.mockups::Label" x="36" y="30" w="-1" h="-1" measuredW="79" measuredH="21" zOrder="1" locked="false" isInGroup="20">
+              <controlProperties>
+                <align>right</align>
+                <text>Check%20Type%3A</text>
+              </controlProperties>
+            </control>
+            <control controlID="2" controlTypeID="com.balsamiq.mockups::ComboBox" x="131" y="29" w="206" h="-1" measuredW="114" measuredH="23" zOrder="2" locked="false" isInGroup="20">
+              <controlProperties>
+                <text>Load%20Average</text>
+              </controlProperties>
+            </control>
+            <control controlID="3" controlTypeID="com.balsamiq.mockups::Button" x="36" y="116" w="-1" h="-1" measuredW="69" measuredH="27" zOrder="3" locked="false" isInGroup="20">
+              <controlProperties>
+                <text>Create%21</text>
+              </controlProperties>
+            </control>
+            <control controlID="4" controlTypeID="com.balsamiq.mockups::Link" x="117" y="118" w="-1" h="-1" measuredW="46" measuredH="21" zOrder="4" locked="false" isInGroup="20">
+              <controlProperties>
+                <text>Cancel</text>
+              </controlProperties>
+            </control>
+            <control controlID="5" controlTypeID="com.balsamiq.mockups::Label" x="15" y="73" w="-1" h="-1" measuredW="101" measuredH="21" zOrder="5" locked="false" isInGroup="20">
+              <controlProperties>
+                <align>right</align>
+                <text>Send%20Alarms%20To%3A</text>
+              </controlProperties>
+            </control>
+            <control controlID="6" controlTypeID="com.balsamiq.mockups::ComboBox" x="131" y="72" w="206" h="-1" measuredW="181" measuredH="23" zOrder="6" locked="false" isInGroup="20">
+              <controlProperties>
+                <text>Scale%20Up%2010%25%20%28Autoscale%29</text>
+              </controlProperties>
+            </control>
+          </groupChildrenDescriptors>
+        </control>
+      </groupChildrenDescriptors>
+    </control>
+    <control controlID="57" controlTypeID="com.balsamiq.mockups::DataGrid" x="186" y="2474" w="726" h="262" measuredW="234" measuredH="143" zOrder="38" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Type%2C%20Autoscale%20Policy%0A%5BLoad%20Average%5D%2C%20%5BScale%20Up%2010%25%5D%0A%5BLoad%20Average%5D%2C%20%5BScale%20Down%2010%25%5D%0A%5BLoad%20Average%5D%2C%20%5BScale%20Up%201%20Server%5D%0A%5BLoad%20Average%5D%2C%20%5BScale%20Down%201%20Server%5D</text>
+      </controlProperties>
+    </control>
+    <control controlID="58" controlTypeID="com.balsamiq.mockups::Button" x="186" y="2435" w="202" h="27" measuredW="105" measuredH="27" zOrder="39" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Create%20Check</text>
+      </controlProperties>
+    </control>
+    <control controlID="61" controlTypeID="com.balsamiq.mockups::MultilineButton" x="681" y="2872" w="232" h="77" measuredW="70" measuredH="55" zOrder="40" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Save</text>
+      </controlProperties>
+    </control>
+    <control controlID="66" controlTypeID="com.balsamiq.mockups::Title" x="53" y="58" w="-1" h="-1" measuredW="202" measuredH="50" zOrder="41" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Autoscaling</text>
+      </controlProperties>
+    </control>
+    <control controlID="70" controlTypeID="com.balsamiq.mockups::VSplitter" x="151" y="3038" w="1746" h="-1" measuredW="100" measuredH="11" zOrder="42" locked="false" isInGroup="-1"/>
+    <control controlID="71" controlTypeID="com.balsamiq.mockups::Image" x="1265" y="3189" w="-1" h="-1" measuredW="291" measuredH="556" zOrder="43" locked="false" isInGroup="-1">
+      <controlProperties>
+        <filter>true</filter>
+        <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.48.08%2520PM.png</src>
+      </controlProperties>
+    </control>
+    <control controlID="72" controlTypeID="com.balsamiq.mockups::CallOut" x="1326" y="3690" w="-1" h="-1" measuredW="169" measuredH="43" zOrder="44" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Create%20Autoscale%20Group</text>
+      </controlProperties>
+    </control>
+    <control controlID="73" controlTypeID="com.balsamiq.mockups::Title" x="176" y="3112" w="-1" h="-1" measuredW="191" measuredH="50" zOrder="45" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Placement</text>
+      </controlProperties>
+    </control>
+    <control controlID="74" controlTypeID="__group__" x="161" y="3195" w="1061" h="136" measuredW="1061" measuredH="136" zOrder="46" locked="false" isInGroup="-1">
+      <controlProperties>
+        <crop>0%2C0%2C1000%2C599</crop>
+      </controlProperties>
+      <groupChildrenDescriptors>
+        <control controlID="0" controlTypeID="com.balsamiq.mockups::Image" x="0" y="0" w="-1" h="-1" measuredW="1061" measuredH="227" zOrder="0" locked="false" isInGroup="74">
+          <controlProperties>
+            <filter>true</filter>
+            <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.44.34%2520PM.png</src>
+          </controlProperties>
+        </control>
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="540" y="95" w="-1" h="-1" measuredW="92" measuredH="39" zOrder="1" locked="false" isInGroup="74">
+          <controlProperties>
+            <text>Autoscaling</text>
+          </controlProperties>
+        </control>
+      </groupChildrenDescriptors>
+    </control>
+    <control controlID="78" controlTypeID="__group__" x="212" y="3373" w="759" h="444" measuredW="759" measuredH="444" zOrder="47" locked="false" isInGroup="-1">
+      <groupChildrenDescriptors>
+        <control controlID="0" controlTypeID="com.balsamiq.mockups::Image" x="0" y="0" w="-1" h="-1" measuredW="759" measuredH="444" zOrder="0" locked="false" isInGroup="78">
+          <controlProperties>
+            <filter>true</filter>
+            <src>./assets/Screen%2520Shot%25202012-12-05%2520at%25201.52.34%2520PM.png</src>
+          </controlProperties>
+        </control>
+        <control controlID="1" controlTypeID="com.balsamiq.mockups::CallOut" x="72" y="281" w="-1" h="-1" measuredW="238" measuredH="40" zOrder="1" locked="false" isInGroup="78">
+          <controlProperties>
+            <text>Create%20Autoscale%20Group%20from%20Image</text>
+          </controlProperties>
+        </control>
+      </groupChildrenDescriptors>
+    </control>
+    <control controlID="79" controlTypeID="com.balsamiq.mockups::SubTitle" x="1048" y="2409" w="-1" h="-1" measuredW="216" measuredH="33" zOrder="48" locked="false" isInGroup="-1">
+      <controlProperties>
+        <text>Create%20check%20dialog</text>
+      </controlProperties>
+    </control>
+  </controls>
+</mockup>

@@ -15,10 +15,18 @@ Developer documentation
    :maxdepth: 2
 
    architecture
+   dev_process
    standards
 
-API documentation
------------------
+Endpoint API documentation
+--------------------------
+.. toctree::
+   :maxdepth: 3
+
+   endpoints
+
+Code API documentation
+----------------------
 
 .. toctree::
    :maxdepth: 3

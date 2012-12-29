@@ -4,7 +4,7 @@ PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR}
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
-UNITTESTS ?= ${CODEDIR}/test
+UNITTESTS ?= ${CODEDIR}
 CQLSHARGS ?= localhost 9170
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
@@ -13,22 +13,30 @@ DEV_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACT
 CONTROL_SETUP    = $(shell ls schema/setup/control_*.cql | sort)
 CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 
-test:	unit integration
+test: unit integration
 
 run:
-	PYTHONPATH=".:${PYTHONPATH}" twistd -n web --resource-script=${CODEDIR}/server.rpy
+	twistd -n web --resource-script=${CODEDIR}/server.rpy
+
+env:
+	./scripts/bootstrap-virtualenv.sh
 
 lint:
 	${PYTHONLINT} ${PYDIRS}
 
 unit:
-	PYTHONPATH=".:${PYTHONPATH}" trial --random 0 ${UNITTESTS}
+ifneq ($(JENKINS_URL), )
+	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
+	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+else
+	trial --random 0 ${UNITTESTS}
+endif
 
 integration:
-	echo "integration test here"
+	@echo "integration test here"
 
 coverage:
-	PYTHONPATH=".:${PYTHONPATH}" coverage run --source=${CODEDIR} --branch `which trial` ${CODEDIR}/test && coverage html -d _trial_coverage --omit="${CODEDIR}/test/*"
+	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
 	rm -rf _builddoc	
@@ -37,7 +45,7 @@ cleandocs:
 docs: cleandocs
 	cp -r ${DOCDIR} _builddoc
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
-	PYTHONPATH=".:${PYTHONPATH}" sphinx-build -b html _builddoc htmldoc
+	sphinx-build -b html _builddoc htmldoc
 	rm -rf _builddoc
 
 schema: FORCE schema-setup schema-teardown

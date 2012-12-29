@@ -6,42 +6,83 @@
 # requirements from requirements.txt and otter into the virtualenv then
 # creates a tarball for distribution and a sha checksum for verification.
 #
+# This only runs on Ubuntu.  It is intended to be used by chef (recipe[otter::dev])
+# and Jenkins.
+#
 
 set -e
 
 NAME="otter-deploy"
+TARGET=${TARGET:="$NAME"}
+DIST_DIR=${DIST_DIR:="."}
 
 TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
-SHA256="sha256sum"
 
+LSB="$(lsb_release -cs)-$(lsb_release -rs)-"
+BUILD_NUMBER="-${BUILD_NUMBER}"
 
-LSB=""
-
-if [[ $(which lsb_release) != "" ]]; then
-    LSB="$(lsb_release -cs)-$(lsb_release -rs)-"
+if [[ "$1" == "--dev" ]]; then
+    LSB="dev"
+    GIT_REV=""
+    BUILD_NUMBER=""
 fi
 
-if [[ "${BUILD_NUMBER}" != "" ]]; then
-    BUILD_NUMBER="-${BUILD_NUMBER}"
-fi
-
-if [[ $(which sha256sum) == "" ]]; then
-    SHA256="shasum -a 256"
-fi
-
-DIST="${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
+DIST="${DIST_DIR}/${NAME}-${LSB}${GIT_REV}${BUILD_NUMBER}.tar.gz"
 
 # terrarium install's arguments are a list of requirements.txt formatted files
 # This creates a ".self.txt" which contains only '.' indicating to install
 # the current directory as if it were a requirement.
-echo "." > ./.self.txt
+
+SELF_DEP="$(pwd)"
+
+if [[ "$1" == "--dev" ]]; then
+    SELF_DEP="-e ${SELF_DEP}";
+fi
+
+echo "${SELF_DEP}" > ./.self.txt
 
 echo "Building virtualenv..."
-terrarium --target ${NAME} install ./requirements.txt ./.self.txt
+terrarium --target ${TARGET} install ./requirements.txt ./.self.txt
+
+if [[ "$1" == "--dev" ]]; then
+    #
+    # When using the -e argument in requirements.txt the files get installed
+    # in 'editable' mode.
+    #
+    # This means the files are not copied into the virtualenv but their path
+    # is written to an easy-install.pth file to be added to sys.path.
+    #
+    # The issue is that pip install -e (and therefore -e in requirements.txt)
+    # writes a _relative_ path to the easy-install.pth file.
+    #
+    # This terrible piece of shell scripting rewrites all the relative paths
+    # so you can still move the dev virtualenv outside of the otter repo
+    # directory.
+    #
+    echo "Rewriting relative paths in easy-install.pth..."
+    easy_install_pth=$(find ${TARGET} -name "easy-install.pth")
+    site_packages=$(dirname ${easy_install_pth})
+    egg_links=$(find ${TARGET} -name "*.egg-link")
+
+    IFS=$(echo)
+    for link in ${egg_links}; do
+        link_val=$(cat ${link})
+        real_path=$(cd ${site_packages}; cd ${link_val}; pwd);
+        echo "Changing ${link_val} to ${real_path}"
+        sed -ie "s|^${link_val}\$|${real_path}\n|g" ${easy_install_pth}
+    done
+
+    unset IFS
+fi
 
 echo "Generating distribution tarball..."
-tar -zcvf ${DIST} ${NAME}
+tar -zcvf ${DIST} -C ${TARGET} \
+    --dereference \
+    --hard-dereference \
+    --exclude 'local' \
+    --exclude-vcs .;
 
 echo "Calculating checksum..."
-${SHA256} ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
+sha256sum ${DIST} | awk '{print $1}' > ${DIST}.sha256.txt
+

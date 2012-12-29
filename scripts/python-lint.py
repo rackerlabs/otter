@@ -20,6 +20,10 @@ import re
 import sys
 from plumbum import local, cli, commands
 
+pep8_options = [
+    '--max-line-length=105'
+]
+
 
 def lint(to_lint):
     """
@@ -29,7 +33,7 @@ def lint(to_lint):
 
     """
     exit_code = 0
-    for linter, options in (('pyflakes', []), ('pep8', [])):
+    for linter, options in (('pyflakes', []), ('pep8', pep8_options)):
         try:
             output = local[linter](*(options + to_lint))
         except commands.ProcessExecutionError as e:
