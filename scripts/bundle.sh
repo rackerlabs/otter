@@ -42,8 +42,15 @@ fi
 
 echo "${SELF_DEP}" > ./.self.txt
 
+REQUIREMENTS="./requirements.txt ./.self.txt"
+
+if [[ "$1" == "--dev" ]]; then
+    # if bundling for development, also include the development requirements
+    REQUIREMENTS="./dev_requirements.txt $REQUIREMENTS"
+fi
+
 echo "Building virtualenv..."
-terrarium --target ${TARGET} install ./requirements.txt ./.self.txt
+terrarium --target ${TARGET} install $REQUIREMENTS
 
 if [[ "$1" == "--dev" ]]; then
     #
