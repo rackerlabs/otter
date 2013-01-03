@@ -150,7 +150,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     def test_ru_scaling_config(self):
         """
         Editing the config of a scaling group with a valid config returns with
-        a 204 no content.  The next attempt to view the scaling group should
+        a 204 no content.  The next attempt to view the scaling config should
         return the new config.  The steady state numbers get updated as well,
         if necessary.
         """
@@ -194,8 +194,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     def test_ru_launch_config(self):
         """
         Editing the launch config of a scaling group with a valid launch config
-        returns with a 204 no content.  The next attempt to view the scaling
-        group should return the new config.
+        returns with a 204 no content.  The next attempt to view the launch
+        config should return the new launch config.
         """
         # make sure there is a scaling group
         path = self.create_and_view_scaling_group() + '/launch'
