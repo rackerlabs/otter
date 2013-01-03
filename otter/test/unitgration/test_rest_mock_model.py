@@ -24,12 +24,6 @@ from otter.rest.application import root, set_store
 from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
 
-# make all the route endpoints
-import otter.rest.groups as _g
-groups = _g
-import otter.rest.configs as _c
-configs = _c
-
 
 class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     """
