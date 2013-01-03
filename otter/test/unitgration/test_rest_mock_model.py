@@ -151,7 +151,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         """
         Editing the config of a scaling group with a valid config returns with
         a 204 no content.  The next attempt to view the scaling group should
-        return the new config.  The steady state
+        return the new config.  The steady state numbers get updated as well,
+        if necessary.
         """
         # make sure there is a scaling group
         path = self.create_and_view_scaling_group()
@@ -189,3 +190,26 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertTrue(not response['paused'])
         self.assertTrue(len(response['pending']),
                         config_examples[1]['minEntities'] + 5)
+
+    def test_ru_launch_config(self):
+        """
+        Editing the launch config of a scaling group with a valid launch config
+        returns with a 204 no content.  The next attempt to view the scaling
+        group should return the new config.
+        """
+        # make sure there is a scaling group
+        path = self.create_and_view_scaling_group() + '/launch'
+        edited_launch = launch_server_config_examples[1]
+
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'PUT', path, body=json.dumps(edited_launch)))
+
+        self.assertEqual(wrapper.response.code, 204,
+                         "Edit failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view again - the config should be the edited config
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 200)
+        self.assertEqual(json.loads(wrapper.content), edited_launch)
