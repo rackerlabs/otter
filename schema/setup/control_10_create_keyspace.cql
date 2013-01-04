@@ -1,1 +1,1 @@
-CREATE KEYSPACE @@KEYSPACE@@ WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor=@@REPLICATION_FACTOR@@;
+CREATE KEYSPACE @@KEYSPACE@@ WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '@@REPLICATION_FACTOR@@'};

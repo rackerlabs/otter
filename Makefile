@@ -51,14 +51,16 @@ docs: cleandocs
 schema: FORCE schema-setup schema-teardown
 
 schema-setup:
-	echo "-- *** Generated Schema ***" > schema/setup.cql
+	echo "-- *** Generated Schema ***" > schema/setup-dev.cql
+	echo "-- *** Generated Schema ***" > schema/setup-prod.cql
 	for f in $(CONTROL_SETUP); do \
 	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/setup-prod.cql; \
 	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/setup-dev.cql; \
 	done \
 
 schema-teardown:
-	echo "-- *** Generated Schema ***" > schema/teardown.cql
+	echo "-- *** Generated Schema ***" > schema/teardown-dev.cql
+	echo "-- *** Generated Schema ***" > schema/teardown-prod.cql
 	for f in $(CONTROL_TEARDOWN); do \
 	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/teardown-prod.cql; \
 	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/teardown-dev.cql; \
