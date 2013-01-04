@@ -1,9 +1,11 @@
 """ CQL Batch wrapper"""
 
+from silverberg.client import ConsistencyLevel
+
 
 class Batch:
     """ CQL Batch wrapper"""
-    def __init__(self, statements, params, consistency='ONE',
+    def __init__(self, statements, params, consistency=ConsistencyLevel.ONE,
                  timestamp=None):
         self.statements = statements
         self.params = params
@@ -11,10 +13,9 @@ class Batch:
         self.timestamp = timestamp
 
     def _generate(self):
-        str = 'BEGIN BATCH USING CONSISTENCY '
-        str += self.consistency + ' '
+        str = 'BEGIN BATCH '
         if self.timestamp is not None:
-            str += 'AND WITH TIMESTAMP {} '.format(self.timestamp)
+            str += 'USING TIMESTAMP {} '.format(self.timestamp)
         str += ' '.join(self.statements)
         str += ' APPLY BATCH;'
         return str
@@ -23,4 +24,4 @@ class Batch:
         """
         Execute the CQL batch against the given client object
         """
-        return client.execute(self._generate(), self.params)
+        return client.execute(self._generate(), self.params, self.consistency)

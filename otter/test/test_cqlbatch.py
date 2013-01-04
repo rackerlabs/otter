@@ -5,6 +5,8 @@ import mock
 from twisted.internet import defer
 from otter.test.utils import DeferredTestMixin
 
+from silverberg.client import ConsistencyLevel
+
 
 class CqlBatchTestCase(DeferredTestMixin, TestCase):
     """
@@ -25,9 +27,10 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         batch = Batch(['INSERT * INTO BLAH', 'INSERT * INTO BLOO'], {})
         d = batch.execute(self.connection)
         self.assert_deferred_succeeded(d)
-        expected = 'BEGIN BATCH USING CONSISTENCY ONE INSERT * INTO BLAH'
+        expected = 'BEGIN BATCH INSERT * INTO BLAH'
         expected += ' INSERT * INTO BLOO APPLY BATCH;'
-        self.connection.execute.assert_called_once_with(expected, {})
+        self.connection.execute.assert_called_once_with(expected, {},
+                                                        ConsistencyLevel.ONE)
 
     def test_batch_param(self):
         """
@@ -38,9 +41,10 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
                       params)
         d = batch.execute(self.connection)
         self.assert_deferred_succeeded(d)
-        expected = 'BEGIN BATCH USING CONSISTENCY ONE INSERT :blah INTO BLAH'
+        expected = 'BEGIN BATCH INSERT :blah INTO BLAH'
         expected += ' INSERT * INTO BLOO APPLY BATCH;'
-        self.connection.execute.assert_called_once_with(expected, params)
+        self.connection.execute.assert_called_once_with(expected, params,
+                                                        ConsistencyLevel.ONE)
 
     def test_batch_ts(self):
         """
@@ -49,17 +53,20 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         batch = Batch(['INSERT * INTO BLAH'], {}, timestamp=123)
         d = batch.execute(self.connection)
         self.assert_deferred_succeeded(d)
-        expected = 'BEGIN BATCH USING CONSISTENCY ONE AND WITH TIMESTAMP 123'
+        expected = 'BEGIN BATCH USING TIMESTAMP 123'
         expected += ' INSERT * INTO BLAH APPLY BATCH;'
-        self.connection.execute.assert_called_once_with(expected, {})
+        self.connection.execute.assert_called_once_with(expected, {},
+                                                        ConsistencyLevel.ONE)
 
     def test_batch_consistency(self):
         """
         Test a simple batch with consistency set
         """
-        batch = Batch(['INSERT * INTO BLAH'], {}, consistency='QUORUM')
+        batch = Batch(['INSERT * INTO BLAH'], {},
+                      consistency=ConsistencyLevel.QUORUM)
         d = batch.execute(self.connection)
         self.assert_deferred_succeeded(d)
-        expected = 'BEGIN BATCH USING CONSISTENCY QUORUM'
+        expected = 'BEGIN BATCH'
         expected += ' INSERT * INTO BLAH APPLY BATCH;'
-        self.connection.execute.assert_called_once_with(expected, {})
+        self.connection.execute.assert_called_once_with(expected, {},
+                                                        ConsistencyLevel.QUORUM)
