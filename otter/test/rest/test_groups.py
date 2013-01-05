@@ -13,7 +13,7 @@ from twisted.trial.unittest import TestCase
 from otter.json_schema.scaling_group import (
     config_examples, create_group as create_group_schema,
     launch_server_config_examples as launch_examples,
-    policy_examples)
+    policy_examples, policy_list_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
@@ -128,7 +128,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         request_body = {
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
-            'scalingPolicies': policy_examples
+            'scalingPolicies': policy_list_examples
         }
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body),

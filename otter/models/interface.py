@@ -24,6 +24,14 @@ class NoSuchEntityError(Exception):
     pass
 
 
+class NoSuchPolicyError(Exception):
+    """
+    Error to be raised when attempting operations on an policy that does not
+    exist.
+    """
+    pass
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -176,6 +184,62 @@ class IScalingGroup(Interface):
 
         :raises: NoSuchEntityError if the entity is not a member of the scaling
             group
+        """
+        pass
+
+    def create_policy(data):
+        """
+        Creates a new policy with the data given.
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``str``
+
+        :return: the UUID of the newly created scaling policy
+        """
+        pass
+
+    def update_policy(policy_id, data):
+        """
+        Updates an existing policy with the data given.
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``str``
+
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
+    def list_policies():
+        """
+        :return: a list of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
+    def get_policy(policy_id):
+        """
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
+    def delete_policy(policy_id):
+        """
+        Delete the scaling policy
+
+        :param policy_id: the ID of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         pass
 

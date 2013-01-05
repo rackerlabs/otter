@@ -7,19 +7,17 @@ the scaling policies associated with a particular scaling group.
 
 import json
 
-from twisted.internet import defer
-
 from otter.json_schema import scaling_group as sg_schema
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
-from otter.rest.application import app, get_store, get_url_root
+from otter.rest.application import app, get_store, get_autoscale_links
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/policy',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_policies(request, tenantId, groupId):
+def list_policies(request, tenantId, groupId):
     """
     Get a mapping of scaling policy IDs to scaling policies in the group.
     Each policy describes an id, name, type, adjustment, and cooldown.
@@ -50,8 +48,8 @@ def get_policies(request, tenantId, groupId):
             }
         }
     """
-    rec = get_store().get_policies(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.view_policies)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.list_policies()
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -78,19 +76,19 @@ def create_policy(request, tenantId, groupId, data):
 
     """
 
-    def send_redirect(groupId, policyId):
+    def send_redirect(policyId):
         request.setHeader(
             "Location",
-            "{0}/{1}/groups/{2}/policy/{3}".format(
-                get_url_root(),
+            get_autoscale_links(
                 tenantId,
                 groupId,
-                policyId
+                policyId,
+                format=None
             )
         )
 
-    rec = get_store().get_policy(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.create_policy, data)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.create_policy(data)
     deferred.addCallback(send_redirect)
     return deferred
 
@@ -100,7 +98,7 @@ def create_policy(request, tenantId, groupId, data):
     methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_policy(request, tenantId, groupId, policyId):
+def get_policy(request, tenantId, groupId, policyId):
     """
     Get a scaling policy which describes a name, type, adjustment, and
     cooldown. This data is returned in the body of the response in JSON format.
@@ -113,8 +111,8 @@ def view_policy(request, tenantId, groupId, policyId):
             "cooldown": 150
         }
     """
-    rec = get_store().get_policy(tenantId, groupId, policyId)
-    deferred = defer.maybeDeferred(rec.view_policy)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.get_policy(policyId)
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -125,7 +123,7 @@ def view_policy(request, tenantId, groupId, policyId):
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(sg_schema.policy)
-def edit_policy(request, tenantId, groupId, policyId, data):
+def update_policy(request, tenantId, groupId, policyId, data):
     """
     Updates a scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
@@ -141,8 +139,8 @@ def edit_policy(request, tenantId, groupId, policyId, data):
 
 
     """
-    rec = get_store().get_policy(tenantId, groupId)
-    deferred = defer.maybeDeferred(rec.edit_policy, data)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.update_policy(policyId, data)
     return deferred
 
 
@@ -155,6 +153,6 @@ def delete_policy(request, tenantId, groupId, policyId):
     """
     Delete a scaling policy. If successful, no response body will be returned.
     """
-    deferred = defer.maybeDeferred(get_store().delete_policy,
-                                   tenantId, groupId, policyId)
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.delete_policy(policyId)
     return deferred

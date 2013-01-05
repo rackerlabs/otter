@@ -103,7 +103,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result, {
             'groupConfiguration': self.output_config,
             'launchConfiguration': self.launch_config,
-            'scalingPolicies': []
+            'scalingPolicies': {}
         })
 
     def test_default_view_config_has_all_info(self):
