@@ -342,6 +342,13 @@ policy = {
 }
 
 
+policy_list = {
+    "type": "object",
+    "Properties": [policy],
+    "required": False
+}
+
+
 policy_examples = [
     {
         "name": "scale up by 10",
@@ -386,11 +393,7 @@ create_group = {
     "properties": {
         'groupConfiguration': config,
         'launchConfiguration': launch_config,
-        'scalingPolicies': {
-            'type': 'array',
-            'items': policy,
-            'uniqueItems': True
-        }
+        'scalingPolicies': policy_list
     },
     "additionalProperties": False
 }
@@ -404,11 +407,11 @@ create_group_examples = [
     {
         "groupConfiguration": config_examples[0],
         "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": []
-    },
+        "scalingPolicies": policy_list_examples
+        },
     {
         "groupConfiguration": config_examples[1],
         "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": policy_examples
+        "scalingPolicies": policy_list_examples
     }
 ]
