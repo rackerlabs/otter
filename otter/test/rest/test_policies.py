@@ -70,7 +70,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
 
         (self.mock_group.
             create_policy.
-            return_value) = defer.succeed("1")
+            return_value) = defer.succeed(None)
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
 
@@ -87,10 +87,24 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             return_value) = defer.succeed("1")
         request_body = policy_examples[0]
         self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body),
-                                '/v1.0/11111/groups/1/policy/1')
+                                'POST', json.dumps(request_body))
         self.mock_group.create_policy.assert_called_once_with(
             policy_examples[0])
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_policy_create_multiple_is_invalid(self, mock_url):
+        """
+        Tries to create multiple policies with one request. Should fail.
+        """
+        (self.mock_group.
+            create_policy.
+            return_value) = defer.succeed(None)
+        request_body = policy_examples
+        response_body = self.assert_status_code(400, None, 'POST',
+                                json.dumps(request_body))
+        self.flushLoggedErrors(ValidationError)
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'ValidationError')
 
 
 class OnePolicyTestCase(RestAPITestMixin, TestCase):
