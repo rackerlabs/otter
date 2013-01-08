@@ -2,6 +2,7 @@
  Mock interface for the front-end scaling groups engine
 """
 from collections import defaultdict
+from uuid import uuid4
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError,
@@ -231,7 +232,7 @@ class MockScalingGroup:
 
         :return: the UUID of the newly created scaling policy
         """
-        policy_id = 1
+        policy_id = str(uuid4())
         self.policies[policy_id] = data
         return defer.succceed(policy_id)
 
@@ -293,8 +294,7 @@ class MockScalingGroupCollection:
         :return: :class:`Deferred` that fires with the uuid of the created
             scaling group
         """
-        self.uuid += 1
-        uuid = '{0}'.format(self.uuid)
+        uuid = str(uuid4())
         self.data[tenant][uuid] = MockScalingGroup(
             tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})

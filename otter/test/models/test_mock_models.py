@@ -40,7 +40,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = []
+        self.policies = {
+            "name": "set number of servers to 10",
+            "steadyState": 10,
+            "cooldown": 3
+        }
         self.group = MockScalingGroup(
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
@@ -55,7 +59,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result, {
             'groupConfiguration': self.output_config,
             'launchConfiguration': self.launch_config,
-            'scalingPolicies': {}
+            'scalingPolicies': self.policies
         })
 
     def test_default_view_config_has_all_info(self):
@@ -295,7 +299,23 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         scaling group with the specified configuration.
         """
         launch = {"launch": "config"}
-        policies = [1, 2, 3]
+        policies = {
+            "f236a93f-a46d-455c-9403-f26838011522": {
+                "name": "scale up by 10",
+                "change": 10,
+                "cooldown": 5
+            },
+            "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
+                "name": "scale down a 5.5 percent because of a tweet",
+                "changePercent": -5.5,
+                "cooldown": 6
+            },
+            "228dbf91-7b15-4d21-8de2-fa584f01a440": {
+                "name": "set number of servers to 10",
+                "steadyState": 10,
+                "cooldown": 3
+            }
+        }
         self.assertEqual(self.validate_list_return_value(self.tenant_id), [],
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
