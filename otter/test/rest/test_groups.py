@@ -13,7 +13,7 @@ from twisted.trial.unittest import TestCase
 from otter.json_schema.scaling_group import (
     config_examples, create_group as create_group_schema,
     launch_server_config_examples as launch_examples,
-    policy_examples, policy_list_examples)
+    policy_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
@@ -120,7 +120,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'ValidationError')
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
-    def test_group_create(self, mock_url):
+    def test_group_create_one_policy(self, mock_url):
         """
         Tries to create a scaling group
         """
@@ -135,6 +135,24 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                                 '/v1.0/11111/groups/1')
         self.mock_store.create_scaling_group.assert_called_once_with(
             '11111', config_examples[0], launch_examples[0], policy_examples[0])
+
+    # TODO
+    # @mock.patch('otter.rest.application.get_url_root', return_value="")
+    # def test_group_create_many_policies(self, mock_url):
+    #     """
+    #     Tries to create a scaling group
+    #     """
+    #     self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+    #     request_body = {
+    #         'groupConfiguration': config_examples[0],
+    #         'launchConfiguration': launch_examples[0],
+    #         'scalingPolicies': policy_examples
+    #     }
+    #     self.assert_status_code(201, None,
+    #                             'POST', json.dumps(request_body),
+    #                             '/v1.0/11111/groups/1')
+    #     self.mock_store.create_scaling_group.assert_called_once_with(
+    #         '11111', config_examples[0], launch_examples[0], policy_examples)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_group_create_no_scaling_policies(self, mock_url):
