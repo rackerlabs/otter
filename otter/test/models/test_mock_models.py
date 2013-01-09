@@ -40,11 +40,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = {
+        self.policies = [{
             "name": "set number of servers to 10",
             "steadyState": 10,
             "cooldown": 3
-        }
+        }]
         self.group = MockScalingGroup(
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,

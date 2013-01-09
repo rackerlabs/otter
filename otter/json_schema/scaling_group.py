@@ -342,6 +342,12 @@ policy = {
 }
 
 
+create_policy_array = {
+    "type": "array",
+    "items": [policy]
+}
+
+
 policy_list = {
     "type": "object",
     "patternProperties": {
@@ -400,7 +406,7 @@ create_group = {
     "properties": {
         'groupConfiguration': config,
         'launchConfiguration': launch_config,
-        'scalingPolicies': policy
+        'scalingPolicies': create_policy_array
     },
     "additionalProperties": False
 }
@@ -414,11 +420,11 @@ create_group_examples = [
     {
         "groupConfiguration": config_examples[0],
         "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": policy_examples[0]
+        "scalingPolicies": [policy_examples[0]]
     },
     {
         "groupConfiguration": config_examples[1],
         "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": policy_examples[1]
+        "scalingPolicies": [policy_examples[1], policy_examples[2]]
     }
 ]

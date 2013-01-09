@@ -232,9 +232,12 @@ class MockScalingGroup:
 
         :return: the UUID of the newly created scaling policy
         """
-        policy_id = str(uuid4())
-        self.policies[policy_id] = data
-        return defer.succceed(policy_id)
+        self.policies = {}
+        for policy in data:
+            policy_id = str(uuid4())
+            self.policies[policy_id] = policy
+
+        return defer.succceed(self.policies.keys())
 
     def update_policy(self, policy_id, data):
         """
