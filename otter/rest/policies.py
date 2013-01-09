@@ -58,7 +58,7 @@ def list_policies(request, tenantId, groupId):
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(sg_schema.policy)
+@validate_body(sg_schema.create_policy_array)
 def create_policy(request, tenantId, groupId, data):
     """
     Create a new scaling policy. Scaling policies must include a name, type,
