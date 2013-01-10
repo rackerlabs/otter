@@ -20,6 +20,10 @@ group configuration.  There are also example configs and launch configs.
 # problems with their launch configuration, or perhaps accept the launch
 # configuration and return a warning list of all possible problems.
 
+#
+# Launch Schemas
+#
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -183,6 +187,9 @@ launch_server_config_examples = [
 ]
 
 
+#
+# Config Schemas
+#
 config = {
     "type": "object",
     "description": ("Configuration options for the scaling group, "
@@ -256,6 +263,10 @@ config_examples = [
     }
 ]
 
+
+#
+# Policy Schemas
+#
 
 policy = {
     "type": [
@@ -399,15 +410,19 @@ policy_list_examples = {
 }
 
 
+#
+# Aggregate and Manifest Schemas
+#
+
 create_group = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": create_policy_array,
+        "scalingPolicies": create_policy_array
     },
-    "additionalProperties": False,
+    "additionalProperties": False
 }
 
 
@@ -417,10 +432,9 @@ create_group_return_value = {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": policy_list,
+        "scalingPolicies": policy_list
     },
-    "additionalProperties": False,
-
+    "additionalProperties": False
 }
 
 create_group_examples = [

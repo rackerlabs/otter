@@ -61,18 +61,18 @@ def list_policies(request, tenantId, groupId):
 @validate_body(sg_schema.create_policy_array)
 def create_policy(request, tenantId, groupId, data):
     """
-    Create a new scaling policy. Scaling policies must include a name, type,
-    adjustment, and cooldown.
+    Create one or many new scaling policies.
+    Scaling policies must include a name, type, adjustment, and cooldown.
     The response header will point to the newly created policy.
     This data provided in the request body in JSON format.
 
     Example request::
 
-        {
+        [{
             "name": "scale up by one server",
             "change": 1,
             "cooldown": 150
-        }
+        }]
 
     """
 

@@ -80,7 +80,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_policy_create(self, mock_url):
         """
-        Tries to create a policy
+        Tries to create a set of policies.
         """
         (self.mock_group.
             create_policy.
@@ -121,7 +121,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
     def test_view_policy_404(self):
         """
-        Viewing the manifest of a non-existant group fails with a 404.
+        Getting a nonexistant policy results in 404.
         """
         (self.mock_group.
             get_policy.
@@ -149,7 +149,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
     def test_update_policy_failure_404(self):
         """
-        If you try to update a non existant policy, return 404.
+        If you try to update a non existant policy, fails with a 404.
         """
         (self.mock_group.
             update_policy.
@@ -166,7 +166,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
     def test_delete_policy_success(self):
         """
-        Replace existing details of a policy with new details.
+        Try to delete a policy.
         """
         (self.mock_group.
             delete_policy.
@@ -179,7 +179,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
     def test_delete_policy_failure_404(self):
         """
-        If you try to update a non existant policy, return 404.
+        Try to delete a nonexistant policy, fails with a 404.
         """
         (self.mock_group.
             delete_policy.
