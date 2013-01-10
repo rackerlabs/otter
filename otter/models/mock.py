@@ -82,7 +82,9 @@ class MockScalingGroup:
             }
             self.update_config(creation['config'], partial_update=True)
             self.launch = creation['launch']
-            self.policies = creation.get('policies', None) or {}
+            self.policies = {}
+            if creation['policies']:
+                self.create_policy(creation['policies'])
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
@@ -208,7 +210,7 @@ class MockScalingGroup:
             ``dict``
         """
         if self.policies is None:
-            return defer.fail(self.error)
+            return defer.succeed({})
         return defer.succeed(self.policies)
 
     def get_policy(self, policy_id):
@@ -218,10 +220,10 @@ class MockScalingGroup:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        if self.policies is None:
-            return defer.fail(NoSuchPolicyError(policy_id))
         if policy_id in self.policies:
-            return defer.succeed(self.policies.policy_id)
+            return defer.succeed(self.policies[policy_id])
+        else:
+            return defer.fail(NoSuchPolicyError(policy_id))
 
     def create_policy(self, data):
         """
@@ -232,12 +234,11 @@ class MockScalingGroup:
 
         :return: the UUID of the newly created scaling policy
         """
-        self.policies = {}
         for policy in data:
             policy_id = str(uuid4())
             self.policies[policy_id] = policy
 
-        return defer.succceed(self.policies.keys())
+        return defer.succeed(self.policies.keys())
 
     def update_policy(self, policy_id, data):
         """
@@ -253,9 +254,9 @@ class MockScalingGroup:
         """
         if policy_id in self.policies:
             self.policies[policy_id] = data
-            return defer.succceed(None)
+            return defer.succeed(None)
         else:
-            return defer.fail(NoSuchPolicyError)
+            return defer.fail(NoSuchPolicyError(policy_id))
 
     def delete_policy(self, policy_id):
         """
@@ -270,9 +271,9 @@ class MockScalingGroup:
         """
         if policy_id in self.policies:
             del self.policies[policy_id]
-            return defer.succceed(None)
+            return defer.succeed(None)
         else:
-            return defer.fail(NoSuchPolicyError)
+            return defer.fail(NoSuchPolicyError(policy_id))
 
 
 class MockScalingGroupCollection:

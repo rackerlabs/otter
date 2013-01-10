@@ -355,8 +355,7 @@ policy_list = {
             "type": "object",
             "required": True,
             "items": [policy]
-        },
-        "additionalProperties": False,
+        }
     },
     "required": False
 }
@@ -404,13 +403,25 @@ create_group = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
     "properties": {
-        'groupConfiguration': config,
-        'launchConfiguration': launch_config,
-        'scalingPolicies': create_policy_array
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": create_policy_array,
     },
-    "additionalProperties": False
+    "additionalProperties": False,
 }
 
+
+create_group_return_value = {
+    "type": "object",
+    "description": "Schema of the JSON returned from creating a scaling group.",
+    "properties": {
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": policy_list,
+    },
+    "additionalProperties": False,
+
+}
 
 create_group_examples = [
     {

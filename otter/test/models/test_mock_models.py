@@ -6,7 +6,8 @@ import mock
 from twisted.trial.unittest import TestCase
 
 from otter.models.mock import MockScalingGroup, MockScalingGroupCollection
-from otter.models.interface import NoSuchScalingGroupError, NoSuchEntityError
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
+    NoSuchPolicyError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -56,11 +57,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         schema
         """
         result = self.validate_view_manifest_return_value()
-        self.assertEqual(result, {
-            'groupConfiguration': self.output_config,
-            'launchConfiguration': self.launch_config,
-            'scalingPolicies': self.policies
-        })
+        self.assertEqual(result['groupConfiguration'], self.output_config)
+        self.assertEqual(result['launchConfiguration'], self.launch_config)
+        self.assertEqual(result['scalingPolicies'].values(), self.policies)
 
     def test_default_view_config_has_all_info(self):
         """
@@ -257,6 +256,84 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(
             self.assert_deferred_succeeded(self.group.view_config()),
             self.output_config)
+
+    def test_create_new_scaling_policy(self):
+        """
+        Add a new policy to the scaling group.
+        """
+        new_policy = [{
+            "name": "set number of servers to 3000",
+            "steadyState": 3000,
+            "cooldown": 300
+        }]
+
+        self.assert_deferred_succeeded(self.group.create_policy(new_policy))
+        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertIn(new_policy[0], result.values())
+
+    def test_get_policy_succeeds(self):
+        """
+        Try to get a policy by looking up all available UUIDs, and getting one.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        result = self.assert_deferred_succeeded(
+            self.group.list_policies())
+        self.assertIn(uuid, result)
+
+    def test_get_nonexistent_policy_fails(self):
+        """
+        Get a policy by a fake UUID, should return NoSuchPolicyError
+        """
+        uuid = "Otters are so cute!"
+        deferred = self.group.get_policy(uuid)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_policy(self):
+        """
+        Delete a policy, check that it is actually deleted.
+        """
+        deferred = self.group.delete_policy("puppies")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_nonexistent_policy_fails(self):
+        """
+        Delete a policy, check that it is actually deleted.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        self.assert_deferred_succeeded(self.group.delete_policy(uuid))
+        result = self.assert_deferred_succeeded(
+            self.group.list_policies())
+        self.assertNotIn(uuid, result)
+
+    def test_update_policy_succeeds(self):
+        """
+        Get a UUID and attempt to update the policy.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        update_data = {
+            "name": "Otters are not good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
+        result = self.assert_deferred_succeeded(
+            self.group.get_policy(uuid))
+        self.assertEqual(update_data, result)
+
+    def test_update_nonexistent_policy_fails(self):
+        """
+        Attempt to update a nonexistant policy.
+        """
+        update_data = {
+            "name": "puppies are good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        deferred = self.group.update_policy("puppies", update_data)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

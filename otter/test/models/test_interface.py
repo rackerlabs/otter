@@ -8,7 +8,8 @@ from jsonschema import validate
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.json_schema.scaling_group import config, create_group, launch_config
+from otter.json_schema.scaling_group import (config, create_group_return_value,
+    launch_config)
 from otter.test.utils import DeferredTestMixin
 
 
@@ -36,7 +37,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         result = self.assert_deferred_succeeded(
             self.group.view_manifest(*args, **kwargs))
-        validate(result, create_group)
+        validate(result, create_group_return_value)
         return result
 
     def validate_view_config_return_value(self, *args, **kwargs):
