@@ -19,11 +19,6 @@ from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
-# import groups in order to get the routes created - the assignment is a trick
-# to ignore pyflakes
-import otter.rest.configs as _c
-configs = _c
-
 
 class GroupConfigTestCase(RestAPITestMixin, TestCase):
     """
