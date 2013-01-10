@@ -277,35 +277,35 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         policy_list = self.assert_deferred_succeeded(self.group.list_policies())
         uuid = policy_list.keys()[0]
-        result = self.assert_deferred_succeeded(
-            self.group.list_policies())
-        self.assertIn(uuid, result)
+        value = policy_list.values()[0]
+        result = self.assert_deferred_succeeded(self.group.get_policy(uuid))
+        self.assertEqual(value, result)
 
     def test_get_nonexistent_policy_fails(self):
         """
-        Get a policy by a fake UUID, should return NoSuchPolicyError
+        Get a policy that doesn't exist, should return NoSuchPolicyError
         """
         uuid = "Otters are so cute!"
         deferred = self.group.get_policy(uuid)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
-    def test_delete_policy(self):
-        """
-        Delete a policy, check that it is actually deleted.
-        """
-        deferred = self.group.delete_policy("puppies")
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
-
-    def test_delete_nonexistent_policy_fails(self):
+    def test_delete_policy_fails(self):
         """
         Delete a policy, check that it is actually deleted.
         """
         policy_list = self.assert_deferred_succeeded(self.group.list_policies())
         uuid = policy_list.keys()[0]
         self.assert_deferred_succeeded(self.group.delete_policy(uuid))
-        result = self.assert_deferred_succeeded(
-            self.group.list_policies())
+        result = self.assert_deferred_succeeded(self.group.list_policies())
         self.assertNotIn(uuid, result)
+        self.assertEqual({}, result)
+
+    def test_delete_nonexistent_policy_fails(self):
+        """
+        Delete a policy that doesn't exist. Should return with NoSuchPolicyError
+        """
+        deferred = self.group.delete_policy("puppies")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     def test_update_policy_succeeds(self):
         """
