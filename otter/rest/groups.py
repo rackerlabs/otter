@@ -263,11 +263,23 @@ def delete_scaling_group(request, tenantId, groupId):
     return get_store().delete_scaling_group(tenantId, groupId)
 
 
+def _format_links(link_dict):
+    """
+    Transforms a mapping of entity_id's and their links to a dictionary
+    with an id parameter and a link parameter
+    """
+    return [
+        {
+            'id': entity_id,
+            'links': entity_links
+        } for entity_id, entity_links in link_dict.iteritems()]
+
+
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_scaling_group_state(request, tenantId, coloId, groupId):
+def get_scaling_group_state(request, tenantId, groupId):
     """
     Get the current state of the scaling group, including the current set of
     active entities, the current set of pending entities, the desired number
@@ -277,24 +289,60 @@ def get_scaling_group_state(request, tenantId, coloId, groupId):
     Example response::
 
         {
-            "active": [
+          "active": [
+            {
+              "id": "{instanceId1}"
+              "links": [
                 {
-                    "id": "{instance_id}",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                  "rel": "self"
                 },
                 {
-                    "id": "{instance_id}",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                  "rel": "bookmark"
                 }
-            ],
-            "pending": [
+              ]
+            },
+            {
+              "id": "{instanceId2}"
+              "links": [
                 {
-                    "id": "{instance_id}",
-                    "link": "https://dfw.servers.api.rackspacecloud.com/v2/203515/servers/{instance_id}"
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
+                  "rel": "self"
+                },
+                {
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
+                  "rel": "bookmark"
                 }
-            ],
-            "steadyState": 3,
-            "paused": false
+              ]
+            }
+          ],
+          "pending": [
+            {
+              "id": "{instanceId3}"
+              "links": [
+                {
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
+                  "rel": "self"
+                },
+                {
+                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
+                  "rel": "bookmark"
+                }
+              ]
+            }
+          ],
+          "steadyState": 3,
+          "paused": false
         }
     """
-    raise NotImplementedError()
+    def reformat_active_and_pending(state_blob):
+        for key in ('active', 'pending'):
+            state_blob[key] = _format_links(state_blob[key])
+        return state_blob
+
+    group = get_store().get_scaling_group(tenantId, groupId)
+    deferred = group.view_state()
+    deferred.addCallback(reformat_active_and_pending)
+    deferred.addCallback(json.dumps)
+    return deferred
