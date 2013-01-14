@@ -277,11 +277,14 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
 
+        return_data = {}
+
         for policy in data:
             policy_id = str(uuid4())
             self.policies[policy_id] = policy
+            return_data[policy_id] = policy
 
-        return defer.succeed(self.policies.keys())
+        return defer.succeed(return_data)
 
     def update_policy(self, policy_id, data):
         """
