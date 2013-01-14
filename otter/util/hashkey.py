@@ -2,6 +2,8 @@
 import random
 
 """ Cribbed off of the way ELE works """
+
+
 def generate_random_str(len):
     chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     out_str = ""
