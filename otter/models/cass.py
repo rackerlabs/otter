@@ -2,7 +2,7 @@
  Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError)
+                                    NoSuchScalingGroupError)
 import zope.interface
 
 from twisted.internet import defer
@@ -17,6 +17,12 @@ class CassBadDataError(Exception):
     exist.
     """
     pass
+
+
+def _serial_json_data(data, ver):
+    dataOut = data.copy()
+    dataOut["_ver"] = ver
+    return json.dumps(dataOut)
 
 
 class CassScalingGroup:
@@ -75,9 +81,6 @@ class CassScalingGroup:
         self.cflist = cflist
     
     def view_manifest(self):
-        """
-        :return: :class:`Deferred` that fires with a view of the config
-        """
         pass
 
     def view_config(self):
@@ -110,15 +113,30 @@ class CassScalingGroup:
         """
         pass
  
-    def update_config(self, data, partial_update=False):
+    def update_config(self, data):
         """
         Update the scaling group configuration paramaters based on the
-        attributes in ``data``.  Has the option to partially update the config,
-        since when creating the model there could be default variables.
-
+        attributes in ``data``.
+        
         :return: :class:`Deferred` that fires with None
         """
-        pass
+        def _do_update_config(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous 
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                       "INSERT INTO scaling_config(accountId, groupId, data) VALUES (:accountId, :groupId, :scaling)"]
+            b = Batch(queries, {"accountId": self.tenant_id, 
+                                "groupId" : self.uuid,
+                                "scaling" : _serial_json_data(data,1)})
+            d = b.execute(self.connection);
+            return d
+
+        d = self._ensure_there()
+        d.addCallback(_do_update_config)
+        return d
 
     def update_launch_config(self, data):
         """
@@ -127,7 +145,24 @@ class CassScalingGroup:
         checking here happens, so it's possible to get the launch config into
         an improper state.
         """
-        pass
+        def _do_update_launch(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous 
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                       "INSERT INTO launch_config(accountId, groupId, data) VALUES (:accountId, :groupId, :launch)"]
+            b = Batch(queries, {"accountId": self.tenant_id, 
+                                "groupId" : self.uuid,
+                                "launch" : _serial_json_data(data,1)})
+            d = b.execute(self.connection);
+            return d
+
+        d = self._ensure_there()
+        d.addCallback(_do_update_launch)
+        return d
+
 
     def set_steady_state(self, steady_state):
         """
@@ -148,8 +183,20 @@ class CassScalingGroup:
         :return: :class:`Deferred` that fires with None
         """
         pass
+        
+    def _ensure_there(self):
+        query = "SELECT data FROM scaling_config ";
+        varcl = "WHERE accountId = :accountId AND groupId = :groupId"
+        d = self.connection.execute(query + varcl + ";",
+                                       {"accountId": self.tenant_id, 
+                                        "groupId" : self.uuid})
+        d.addCallback(self._grab_json_data)
+        return d
 
     def _grab_json_data(self, rawResponse):
+        if rawResponse is None:
+            err = CassBadDataError("None")
+            return defer.fail(err)
         if len(rawResponse) == 0:
             err = NoSuchScalingGroupError(self.tenant_id, self.uuid)
             return defer.fail(err)
@@ -166,6 +213,8 @@ class CassScalingGroup:
         data = None
         try:
             data = json.loads(rec)
+            if "_ver" in data:
+                del data["_ver"]
             return defer.succeed(data)
         except ValueError:
             err = CassBadDataError("Bad data")
@@ -239,8 +288,8 @@ class CassScalingGroupCollection:
                    "INSERT INTO launch_config(accountId, groupId, data) VALUES (:accountId, :groupId, :launch)"]
         b = Batch(queries, {"accountId": tenant_id, 
                             "groupId" : scaling_group_id,
-                            "scaling" : config,
-                            "launch" : launch,
+                            "scaling" : _serial_json_data(config,1),
+                            "launch" : _serial_json_data(launch,1),
                             })
         d = b.execute(self.connection);
         return d
@@ -281,7 +330,37 @@ class CassScalingGroupCollection:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a
             ``list`` of :class:`IScalingGroup` providers
         """
-        pass
+        
+        def _grab_list(rawResponse):
+            if rawResponse is None:
+                err = CassBadDataError("None")
+                return defer.fail(err)
+            if len(rawResponse) == 0:
+                err = NoSuchScalingGroupError(self.tenant_id, self.uuid)
+                return defer.fail(err)
+            data = []
+            for row in rawResponse:         
+                if 'cols' not in row:
+                    err = CassBadDataError("No cols")
+                    return defer.fail(err)
+                rec = None
+                for rawRec in row['cols']:
+                    if rawRec['name'] is 'groupid':
+                        rec = rawRec['value']
+                if rec is None:
+                    err = CassBadDataError("No data")
+                    return defer.fail(err)
+                data.append(CassScalingGroup(tenant_id, rec,
+                                self.connection, self.cflist))
+            return defer.succeed(data)
+        
+        
+        query = "SELECT groupid FROM scaling_config ";
+        varcl = "WHERE accountId = :accountId;"
+        d = self.connection.execute(query + varcl + ";",
+                                       {"accountId": tenant_id})
+        d.addCallback(_grab_list)
+        return d
 
     def get_scaling_group(self, tenant_id, scaling_group_id):
         """
