@@ -2,9 +2,8 @@
 Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
 all scaling groups, and creating/viewing/deleting a scaling group.
 """
-
 import json
-from jsonschema import ValidationError
+from jsonschema import validate, ValidationError
 
 import mock
 
@@ -12,17 +11,14 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.scaling_group import (
-    config_examples, launch_server_config_examples as launch_examples,
+    config_examples, create_group as create_group_schema,
+    launch_server_config_examples as launch_examples,
     policy_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-
-# import groups in order to get the routes created - the assignment is a trick
-# to ignore pyflakes
-import otter.rest.groups as _g
-groups = _g
+from otter.test.rest import response_schema
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
@@ -63,7 +59,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.return_value = defer.succeed([])
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
-        self.assertEqual(json.loads(body), [])
+
+        resp = json.loads(body)
+        self.assertEqual(resp, [])
+        validate(resp, response_schema.link_list)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_returned_group_list_gets_translated(self, mock_url):
@@ -78,7 +77,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         ])
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
-        self.assertEqual(json.loads(body), [
+
+        resp = json.loads(body)
+        validate(resp, response_schema.link_list)
+        self.assertEqual(resp, [
             {
                 'id': '1',
                 'links': [
@@ -188,11 +190,17 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         Viewing the manifest of an existant group returns whatever the
         implementation's `view_manifest()` method returns, in string format
         """
-        self.mock_group.view_manifest.return_value = defer.succeed(
-            {'whatever': 'result'})
+        expected = {
+            'groupConfiguration': config_examples[0],
+            'launchConfiguration': launch_examples[0],
+            'scalingPolicies': policy_examples
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(expected)
 
         response_body = self.assert_status_code(200, method="GET")
-        self.assertEqual('{"whatever": "result"}', response_body)
+        resp = json.loads(response_body)
+        validate(resp, create_group_schema)
+        self.assertEqual(resp, expected)
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
@@ -223,3 +231,77 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+
+class GroupStateTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{groupId}/state`` endpoint
+    """
+    endpoint = "/v1.0/11111/groups/one/state"
+    invalid_methods = ("DELETE", "POST", "PUT")  # cannot update in bulk
+
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(GroupStateTestCase, self).setUp()
+        self.mock_group.uuid = "one"
+
+    def test_view_state_404(self):
+        """
+        Viewing the state of a non-existant group fails with a 404.
+        """
+        self.mock_group.view_state.return_value = defer.fail(
+            NoSuchScalingGroupError('11111', 'one'))
+
+        response_body = self.assert_status_code(404, method="GET")
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_state.assert_called_once_with()
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_view_state(self):
+        """
+        Viewing the state of an existant group returns whatever the
+        implementation's `view_state()` method returns, in string format, with
+        the links reformatted so that they a list of dictionaries containing
+        the attributes "id" and "links"
+        """
+        def make_link(rel):
+            return {
+                "rel": rel,
+                "href": "http://{0}".format(rel)
+            }
+
+        self.mock_group.view_state.return_value = defer.succeed({
+            'active': {
+                "1": [make_link("rel"), make_link("bookmark")],
+                "2": [make_link("rel")]
+            },
+            'pending': {
+                "3": [make_link("rel")]
+            },
+            'steadyState': 5,
+            'paused': False
+        })
+
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+
+        validate(resp, response_schema.group_state)
+        self.assertEqual(resp, {
+            'active': [
+                {'id': '1', 'links': [make_link("rel"), make_link("bookmark")]},
+                {'id': '2', 'links': [make_link("rel")]}
+            ],
+            'pending': [{'id': '3', 'links': [make_link("rel")]}],
+            'steadyState': 5,
+            'paused': False
+        })
+
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            '11111', 'one')
+        self.mock_group.view_state.assert_called_once_with()

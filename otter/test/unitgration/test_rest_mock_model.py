@@ -24,12 +24,6 @@ from otter.rest.application import root, set_store
 from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
 
-# make all the route endpoints
-import otter.rest.groups as _g
-groups = _g
-import otter.rest.configs as _c
-configs = _c
-
 
 class MockStoreRestTestCase(DeferredTestMixin, TestCase):
     """
@@ -81,6 +75,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         headers = wrapper.response.headers.getRawHeaders('Location')
         self.assertTrue(headers is not None)
         self.assertEqual(1, len(headers))
+
         # now make sure the Location header points to something good!
         path = urlsplit(headers[0])[2].rstrip('/')
 
@@ -92,6 +87,17 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
                          config_examples[1])
         self.assertEqual(response.get('launchConfiguration', None),
                          launch_server_config_examples[0])
+
+        # make sure the created group has enough pending entities, and is
+        # not paused
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', path + '/state'))
+        self.assertEqual(wrapper.response.code, 200)
+
+        response = json.loads(wrapper.content)
+        self.assertTrue(not response['paused'])
+        self.assertTrue(len(response['pending']),
+                        config_examples[1]['minEntities'])
 
         return path
 
@@ -107,6 +113,9 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
 
         # now try to view
         wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 404)
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', path + '/state'))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
