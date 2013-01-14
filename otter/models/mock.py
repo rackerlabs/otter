@@ -238,11 +238,14 @@ class MockScalingGroup:
 
     def list_policies(self):
         """
-        :return: a list of the policies, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
+        if self.error is not None:
+            return defer.fail(self.error)
+
         if self.policies is None:
             return defer.succeed({})
         return defer.succeed(self.policies)
@@ -254,6 +257,9 @@ class MockScalingGroup:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
+        if self.error is not None:
+            return defer.fail(self.error)
+
         if policy_id in self.policies:
             return defer.succeed(self.policies[policy_id])
         else:
@@ -264,10 +270,13 @@ class MockScalingGroup:
         Creates a new policy with the data given.
 
         :param data: the details of the scaling policy in JSON format
-        :type data: ``str``
+        :type data: ``list`` of ``dict``
 
         :return: the UUID of the newly created scaling policy
         """
+        if self.error is not None:
+            return defer.fail(self.error)
+
         for policy in data:
             policy_id = str(uuid4())
             self.policies[policy_id] = policy
@@ -278,14 +287,20 @@ class MockScalingGroup:
         """
         Updates an existing policy with the data given.
 
+        :param policy_id: the uuid of the entity to update
+        :type policy_id: ``str``
+
         :param data: the details of the scaling policy in JSON format
-        :type data: ``str``
+        :type data: ``dict``
 
         :return: a policy, as specified by
             :data:`otter.json_schema.scaling_group.policy`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
+        if self.error is not None:
+            return defer.fail(self.error)
+
         if policy_id in self.policies:
             self.policies[policy_id] = data
             return defer.succeed(None)
@@ -303,6 +318,9 @@ class MockScalingGroup:
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
+        if self.error is not None:
+            return defer.fail(self.error)
+
         if policy_id in self.policies:
             del self.policies[policy_id]
             return defer.succeed(None)

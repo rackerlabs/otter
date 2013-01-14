@@ -355,7 +355,8 @@ policy = {
 
 create_policy_array = {
     "type": "array",
-    "items": [policy]
+    "items": [policy],
+    "uniqueItems": True
 }
 
 
@@ -368,7 +369,8 @@ policy_list = {
             "items": [policy]
         }
     },
-    "required": False
+    "required": False,
+    "additionalProperties": False
 }
 
 

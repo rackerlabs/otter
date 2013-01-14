@@ -189,12 +189,13 @@ class IScalingGroup(Interface):
 
     def create_policy(data):
         """
-        Create a new scaling policy.
+        Create a set of new scaling policies.
 
         :param data: the details of the scaling policy in JSON format
-        :type data: ``list`` of ``dict``
+        :type data: ``dict`` of ``dict``
 
-        :return: the UUID of the newly created scaling policy
+        :return: the UUID and full details of the newly created scaling policies
+            as specified by :data:`otter.json_schema.scaling_group.policy_list`
         """
         pass
 
@@ -203,13 +204,13 @@ class IScalingGroup(Interface):
         Updates an existing policy with the data given.
 
         :param policy_id: the uuid of the entity to update
-        :type policy_id: ``string``
+        :type policy_id: ``str``
 
         :param data: the details of the scaling policy in JSON format
         :type data: ``dict``
 
-        :return: a policy, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
+        :return: a UUID with policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
@@ -217,8 +218,8 @@ class IScalingGroup(Interface):
 
     def list_policies():
         """
-        :return: a list of the policies, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
