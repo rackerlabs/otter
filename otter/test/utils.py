@@ -6,9 +6,6 @@ import os
 
 from zope.interface import directlyProvides
 
-from twisted.python.failure import Failure
-from twisted.internet.defer import Deferred
-
 
 class DeferredTestMixin(object):
     """
@@ -16,39 +13,13 @@ class DeferredTestMixin(object):
     failed
     """
 
-    def assert_deferred_fired(self, deferred):
-        """
-        Asserts that the deferred has fired (either an errback or a callback),
-        and returns the result (either the return value or the failure)
-
-        :param deferred: the ``Deferred`` to check
-        :type deferred: :class:`twisted.internet.defer.Deferred`
-
-        :return: whatever the ``Deferred`` fires with, or a
-            :class:`twisted.python.failure.Failure`
-        """
-        if not isinstance(deferred, Deferred):
-            self.fail("Not a deferred")
-
-        output = []
-        deferred.addBoth(lambda result: output.append(result))
-        self.assertTrue(len(output) == 1, "Deferred should have fired")
-        return output[0]
-
     def assert_deferred_succeeded(self, deferred):
         """
-        Asserts that the deferred has callbacked, and not errbacked, and
-        returns the result.
-
-        :param deferred: the ``Deferred`` to check
-        :type deferred: :class:`twisted.internet.defer.Deferred`
-
-        :return: whatever the ``Deferred`` fires with
+        Synonym for self.successResultOf - provided for compatibility and
+        because self.assert_deferred_failed is still needed to check for
+        expected failures.
         """
-        result = self.assert_deferred_fired(deferred)
-        if isinstance(result, Failure):
-            self.fail("Deferred errbacked with {0!r}".format(result))
-        return result
+        return self.successResultOf(deferred)
 
     def assert_deferred_failed(self, deferred, *expected_failures):
         """
@@ -69,16 +40,11 @@ class DeferredTestMixin(object):
         :return: whatever the Exception was that was expected, or None if the
             test failed
         """
-        result = self.assert_deferred_fired(deferred)
-        if not isinstance(result, Failure):
-            self.fail("Did not errback - instead callbacked with {0!r}".format(
-                result))
-        else:
-            if (len(expected_failures) > 0 and
-                    not result.check(*expected_failures)):
-                self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
-                    expected_failures, result))
-        return result
+        failure = self.failureResultOf(deferred)
+        if expected_failures and not failure.check(*expected_failures):
+            self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
+                expected_failures, failure))
+        return failure
 
 
 def fixture(fixture_name):
