@@ -88,8 +88,9 @@ class CassScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        query = "SELECT data FROM scaling_config "
-        varcl = "WHERE accountId = :accountId AND groupId = :groupId"
+        query = "SELECT data FROM "
+        query += self.cflist["config"]
+        varcl = " WHERE accountId = :accountId AND groupId = :groupId"
         d = self.connection.execute(query + varcl + ";",
                                     {"accountId": self.tenant_id,
                                         "groupId": self.uuid})
@@ -100,8 +101,9 @@ class CassScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the launch config
         """
-        query = "SELECT data FROM launch_config "
-        varcl = "WHERE accountId = :accountId AND groupId = :groupId"
+        query = "SELECT data FROM "
+        query += self.cflist["launch"]
+        varcl = " WHERE accountId = :accountId AND groupId = :groupId"
         d = self.connection.execute(query + varcl + ";",
                                     {"accountId": self.tenant_id,
                                         "groupId": self.uuid})
@@ -127,8 +129,10 @@ class CassScalingGroup:
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [
-                "INSERT INTO scaling_config(accountId, groupId, data) VALUES (:accountId, :groupId, :scaling)"]
+            cqlstr = "INSERT INTO " + self.cflist["config"]
+            cqlstr += "(accountId, groupId, data) VALUES (:accountId, :groupId, :scaling)"
+            queries = [cqlstr
+                       ]
             b = Batch(queries, {"accountId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "scaling": _serial_json_data(data, 1)})
@@ -152,8 +156,10 @@ class CassScalingGroup:
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
+            cqlstr = "INSERT INTO " + self.cflist["launch"]
+            cqlstr += "(accountId, groupId, data) VALUES (:accountId, :groupId, :launch)"
             queries = [
-                "INSERT INTO launch_config(accountId, groupId, data) VALUES (:accountId, :groupId, :launch)"]
+                cqlstr]
             b = Batch(queries, {"accountId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "launch": _serial_json_data(data, 1)})
@@ -185,8 +191,8 @@ class CassScalingGroup:
         pass
 
     def _ensure_there(self):
-        query = "SELECT data FROM scaling_config "
-        varcl = "WHERE accountId = :accountId AND groupId = :groupId"
+        query = "SELECT data FROM " + self.cflist["config"]
+        varcl = " WHERE accountId = :accountId AND groupId = :groupId"
         d = self.connection.execute(query + varcl + ";",
                                     {"accountId": self.tenant_id,
                                         "groupId": self.uuid})
@@ -284,9 +290,12 @@ class CassScalingGroupCollection:
 
         scaling_group_id = generate_random_str(10)
 
+        insertinto = "INSERT INTO "
+        cols = "(accountId, groupId, data) VALUES (:accountId, :groupId, "
+
         queries = [
-            "INSERT INTO scaling_config(accountId, groupId, data) VALUES (:accountId, :groupId, :scaling)",
-            "INSERT INTO launch_config(accountId, groupId, data) VALUES (:accountId, :groupId, :launch)"]
+            insertinto + self.cflist["config"] + cols + ":scaling)",
+            insertinto + self.cflist["launch"] + cols + ":launch)"]
         b = Batch(queries, {"accountId": tenant_id,
                             "groupId": scaling_group_id,
                             "scaling": _serial_json_data(config, 1),
@@ -311,12 +320,12 @@ class CassScalingGroupCollection:
             doesn't exist for this tenant id
         """
 
-        varcl = "WHERE accountId = :accountId AND groupId = :groupId"
+        varcl = " WHERE accountId = :accountId AND groupId = :groupId"
 
         queries = [
-            "DELETE FROM scaling_config " + varcl,
-            "DELETE FROM launch_config " + varcl,
-            "DELETE FROM scaling_policies " + varcl]
+            "DELETE FROM " + self.cflist["config"] + varcl,
+            "DELETE FROM " + self.cflist["launch"] + varcl,
+            "DELETE FROM scaling_policies" + varcl]
         b = Batch(
             queries, {"accountId": tenant_id, "groupId": scaling_group_id})
         b.execute(self.connection)
@@ -356,8 +365,8 @@ class CassScalingGroupCollection:
                                              self.connection, self.cflist))
             return defer.succeed(data)
 
-        query = "SELECT groupid FROM scaling_config "
-        varcl = "WHERE accountId = :accountId;"
+        query = "SELECT groupid FROM " + self.cflist["config"]
+        varcl = " WHERE accountId = :accountId;"
         d = self.connection.execute(query + varcl + ";",
                                     {"accountId": tenant_id})
         d.addCallback(_grab_list)

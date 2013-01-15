@@ -250,7 +250,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mockdata = [
             {'cols': [{'timestamp': None, 'name': 'groupid',
                        'value': 'group1', 'ttl': None}], 'key': ''},
-            {'cols': [{'timestamp': None, 'name': 'groupid', 'value': 'group3', 'ttl': None}], 'key': ''}]
+            {'cols': [{'timestamp': None, 'name': 'groupid',
+                       'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'accountId': '123'}
         expectedCql = "SELECT groupid FROM scaling_config WHERE accountid=:accountId"
