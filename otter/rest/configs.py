@@ -7,7 +7,7 @@ or launch configuration for a scaling group.
 
 import json
 
-from otter.json_schema import scaling_group as sg_schema
+from otter.json_schema import group_schemas
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store
@@ -53,7 +53,7 @@ def view_config_for_scaling_group(request, tenantId, groupId):
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.config)
+@validate_body(group_schemas.config)
 def edit_config_for_scaling_group(request, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
@@ -137,7 +137,7 @@ def view_launch_config(request, tenantId, groupId):
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.launch_config)
+@validate_body(group_schemas.launch_config)
 def edit_launch_config(request, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the

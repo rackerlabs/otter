@@ -15,8 +15,7 @@ from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema.scaling_group import (
-    config_examples, launch_server_config_examples)
+from otter.json_schema.group_examples import config, launch_server_config
 from otter.models.interface import NoSuchScalingGroupError
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
@@ -64,8 +63,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         """
         wrapper = self.assert_deferred_succeeded(request(
             root, 'POST', '/v1.0/11111/groups', body=json.dumps({
-                "groupConfiguration": config_examples[1],
-                "launchConfiguration": launch_server_config_examples[0]
+                "groupConfiguration": config[1],
+                "launchConfiguration": launch_server_config[0]
             })))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -84,9 +83,9 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
 
         response = json.loads(wrapper.content)
         self.assertEqual(response.get('groupConfiguration', None),
-                         config_examples[1])
+                         config[1])
         self.assertEqual(response.get('launchConfiguration', None),
-                         launch_server_config_examples[0])
+                         launch_server_config[0])
 
         # make sure the created group has enough pending entities, and is
         # not paused
@@ -97,7 +96,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         response = json.loads(wrapper.content)
         self.assertTrue(not response['paused'])
         self.assertTrue(len(response['pending']),
-                        config_examples[1]['minEntities'])
+                        config[1]['minEntities'])
 
         return path
 

@@ -1,12 +1,12 @@
 """
-Tests for :mod:`otter.jsonschema.scaling_group`
+Tests for :mod:`otter.jsonschema.group_schemas`
 """
 from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
 from jsonschema import Draft3Validator, validate, ValidationError
 
-from otter.json_schema import scaling_group
+from otter.json_schema import group_schemas, group_examples, rest_schemas
 
 
 class ScalingGroupConfigTestCase(TestCase):
@@ -17,22 +17,22 @@ class ScalingGroupConfigTestCase(TestCase):
         """
         The schema itself is valid Draft 3 schema
         """
-        Draft3Validator.check_schema(scaling_group.config)
+        Draft3Validator.check_schema(group_schemas.config)
 
     def test_all_properties_have_descriptions(self):
         """
         All the properties in the schema should have descriptions
         """
-        for property_name in scaling_group.config['properties']:
-            prop = scaling_group.config['properties'][property_name]
+        for property_name in group_schemas.config['properties']:
+            prop = group_schemas.config['properties'][property_name]
             self.assertTrue('description' in prop)
 
     def test_valid_examples_validate(self):
         """
         The examples in the config examples all validate.
         """
-        for example in scaling_group.config_examples:
-            validate(example, scaling_group.config)
+        for example in group_examples.config:
+            validate(example, group_schemas.config)
 
     def test_extra_values_does_not_validate(self):
         """
@@ -45,7 +45,7 @@ class ScalingGroupConfigTestCase(TestCase):
             'what': 'not expected'
         }
         self.assertRaisesRegexp(ValidationError, "Additional properties",
-                                validate, invalid, scaling_group.config)
+                                validate, invalid, group_schemas.config)
 
     def test_long_name_value_does_not_validate(self):
         """
@@ -57,7 +57,7 @@ class ScalingGroupConfigTestCase(TestCase):
             'minEntities': 1,
         }
         self.assertRaisesRegexp(ValidationError, "is too long",
-                                validate, invalid, scaling_group.config)
+                                validate, invalid, group_schemas.config)
 
     def test_invalid_metadata_does_not_validate(self):
         """
@@ -79,7 +79,7 @@ class ScalingGroupConfigTestCase(TestCase):
         for invalid, error_regexp in invalids:
             base['metadata'] = invalid
             self.assertRaisesRegexp(ValidationError, error_regexp,
-                                    validate, base, scaling_group.config)
+                                    validate, base, group_schemas.config)
 
 
 class GeneralLaunchConfigTestCase(TestCase):
@@ -90,7 +90,7 @@ class GeneralLaunchConfigTestCase(TestCase):
         """
         The schema itself is a valid Draft 3 schema
         """
-        Draft3Validator.check_schema(scaling_group.launch_config)
+        Draft3Validator.check_schema(group_schemas.launch_config)
 
     def test_must_have_lauch_server_type(self):
         """
@@ -98,7 +98,7 @@ class GeneralLaunchConfigTestCase(TestCase):
         """
         self.assertRaisesRegexp(
             ValidationError, "'type' is a required property",
-            validate, {"args": {"server": {}}}, scaling_group.launch_config)
+            validate, {"args": {"server": {}}}, group_schemas.launch_config)
 
     def test_invalid_launch_config_type_does_not_validate(self):
         """
@@ -107,7 +107,7 @@ class GeneralLaunchConfigTestCase(TestCase):
         """
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, {'type': '_testtesttesttest'},
-                                scaling_group.launch_config)
+                                group_schemas.launch_config)
 
     def test_other_launch_config_type(self):
         """
@@ -124,7 +124,7 @@ class GeneralLaunchConfigTestCase(TestCase):
                 "args": {}
             }
         }
-        schema = deepcopy(scaling_group.launch_config)
+        schema = deepcopy(group_schemas.launch_config)
         schema['type'].append(other_type)
         validate({"type": "_testtesttesttest", "args": {"what": "who"}},
                  schema)
@@ -139,8 +139,8 @@ class ServerLaunchConfigTestCase(TestCase):
         """
         The launch server config examples all validate.
         """
-        for example in scaling_group.launch_server_config_examples:
-            validate(example, scaling_group.launch_config)
+        for example in group_examples.launch_server_config:
+            validate(example, group_schemas.launch_config)
 
     def test_invalid_load_balancer_does_not_validate(self):
         """
@@ -160,11 +160,11 @@ class ServerLaunchConfigTestCase(TestCase):
             base["args"]["loadBalancers"] = [invalid]
             # the type fails ot valdiate because of 'not of type'
             self.assertRaisesRegexp(ValidationError, 'not of type', validate,
-                                    base, scaling_group.launch_server)
+                                    base, group_schemas.launch_server)
             # because the type schema fails to validate, the config schema
             # fails to validate because it is not the given type
             self.assertRaisesRegexp(ValidationError, 'not of type', validate,
-                                    base, scaling_group.launch_config)
+                                    base, group_schemas.launch_config)
 
     def test_duplicate_load_balancers_do_not_validate(self):
         """
@@ -184,11 +184,11 @@ class ServerLaunchConfigTestCase(TestCase):
         # the type fails ot valdiate because of the load balancers are not
         # unique
         self.assertRaisesRegexp(ValidationError, 'non-unique elements',
-                                validate, invalid, scaling_group.launch_server)
+                                validate, invalid, group_schemas.launch_server)
         # because the type schema fails to validate, the config schema
         # fails to validate because it is not the given type
         self.assertRaisesRegexp(ValidationError, 'not of type',
-                                validate, invalid, scaling_group.launch_config)
+                                validate, invalid, group_schemas.launch_config)
 
     def test_unspecified_args_do_not_validate(self):
         """
@@ -204,11 +204,11 @@ class ServerLaunchConfigTestCase(TestCase):
         }
         # the type fails ot valdiate because of the additional 'hat' property
         self.assertRaisesRegexp(ValidationError, 'Additional properties',
-                                validate, invalid, scaling_group.launch_server)
+                                validate, invalid, group_schemas.launch_server)
         # because the type schema fails to validate, the config schema
         # fails to validate because it is not the given type
         self.assertRaisesRegexp(ValidationError, 'not of type',
-                                validate, invalid, scaling_group.launch_config)
+                                validate, invalid, group_schemas.launch_config)
 
     def test_no_args_do_not_validate(self):
         """
@@ -220,9 +220,9 @@ class ServerLaunchConfigTestCase(TestCase):
         }
         self.assertRaisesRegexp(
             ValidationError, "'server' is a required property",
-            validate, invalid, scaling_group.launch_server)
+            validate, invalid, group_schemas.launch_server)
         self.assertRaisesRegexp(ValidationError, 'not of type',
-                                validate, invalid, scaling_group.launch_config)
+                                validate, invalid, group_schemas.launch_config)
 
 
 class ScalingPolicyTestCase(TestCase):
@@ -233,14 +233,14 @@ class ScalingPolicyTestCase(TestCase):
         """
         The schema itself is a valid Draft 3 schema
         """
-        Draft3Validator.check_schema(scaling_group.policy)
+        Draft3Validator.check_schema(group_schemas.policy)
 
     def test_valid_examples_validate(self):
         """
         The scaling policy examples all validate.
         """
-        for example in scaling_group.policy_examples:
-            validate(example, scaling_group.policy)
+        for example in group_examples.policy:
+            validate(example, group_schemas.policy)
 
     def test_either_change_or_changePercent_or_steadyState(self):
         """
@@ -257,7 +257,7 @@ class ScalingPolicyTestCase(TestCase):
                 invalid[one_only[index]] = 5
             self.assertRaisesRegexp(
                 ValidationError, 'not of type',
-                validate, invalid, scaling_group.policy)
+                validate, invalid, group_schemas.policy)
 
     def test_set_steady_state_must_not_be_negative(self):
         """
@@ -270,7 +270,7 @@ class ScalingPolicyTestCase(TestCase):
         }
         self.assertRaisesRegexp(
             ValidationError, 'minimum',
-            validate, invalid, scaling_group.policy)
+            validate, invalid, group_schemas.policy)
 
     def test_no_other_properties_valid(self):
         """
@@ -286,7 +286,7 @@ class ScalingPolicyTestCase(TestCase):
         }
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
-            validate, invalid, scaling_group.policy)
+            validate, invalid, group_schemas.policy)
 
 
 class CreateScalingGroupTestCase(TestCase):
@@ -298,27 +298,27 @@ class CreateScalingGroupTestCase(TestCase):
         """
         The schema itself is a valid Draft 3 schema
         """
-        Draft3Validator.check_schema(scaling_group.create_group)
+        Draft3Validator.check_schema(rest_schemas.create_group_request)
 
     def test_valid_examples_validate(self):
         """
         The scaling policy examples all validate.
         """
-        for example in scaling_group.create_group_examples:
-            validate(example, scaling_group.create_group)
+        for example in rest_schemas.create_group_request_examples:
+            validate(example, rest_schemas.create_group_request)
 
     def test_wrong_launch_config_fails(self):
         """
         Not including a launchConfiguration or including an invalid ones will
         fail to validate.
         """
-        invalid = {'groupConfiguration': scaling_group.config_examples[0]}
+        invalid = {'groupConfiguration': group_examples.config[0]}
         self.assertRaisesRegexp(
             ValidationError, 'launchConfiguration',
-            validate, invalid, scaling_group.create_group)
+            validate, invalid, rest_schemas.create_group_request)
         invalid['launchConfiguration'] = {}
         self.assertRaises(ValidationError,
-                          validate, invalid, scaling_group.create_group)
+                          validate, invalid, rest_schemas.create_group_request)
 
     def test_wrong_group_config_fails(self):
         """
@@ -326,13 +326,13 @@ class CreateScalingGroupTestCase(TestCase):
         fail to validate.
         """
         invalid = {'launchConfiguration':
-                   scaling_group.launch_server_config_examples[0]}
+                   group_examples.launch_server_config[0]}
         self.assertRaisesRegexp(
             ValidationError, 'groupConfiguration',
-            validate, invalid, scaling_group.create_group)
+            validate, invalid, rest_schemas.create_group_request)
         invalid['groupConfiguration'] = {}
         self.assertRaises(ValidationError,
-                          validate, invalid, scaling_group.create_group)
+                          validate, invalid, rest_schemas.create_group_request)
 
     def test_wrong_scaling_policy_fails(self):
         """
@@ -341,8 +341,8 @@ class CreateScalingGroupTestCase(TestCase):
         """
         self.assertRaises(
             ValidationError, validate, {
-                'groupConfiguration': scaling_group.config_examples[0],
+                'groupConfiguration': group_examples.config[0],
                 'launchConfiguration':
-                scaling_group.launch_server_config_examples[0],
+                group_examples.launch_server_config[0],
                 'scalingPolicies': {"Hello!": "Yes quite."}
-            }, scaling_group.create_group)
+            }, rest_schemas.create_group_request)

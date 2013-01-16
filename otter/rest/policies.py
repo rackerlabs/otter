@@ -7,7 +7,7 @@ the scaling policies associated with a particular scaling group.
 
 import json
 
-from otter.json_schema import scaling_group as sg_schema
+from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
@@ -112,7 +112,7 @@ def list_policies(request, tenantId, groupId):
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(sg_schema.create_policy_array)
+@validate_body(rest_schemas.create_policy_array)
 def create_policy(request, tenantId, groupId, data):
     """
     Create one or many new scaling policies.
@@ -176,7 +176,7 @@ def get_policy(request, tenantId, groupId, policyId):
     methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.policy)
+@validate_body(group_schemas.policy)
 def update_policy(request, tenantId, groupId, policyId, data):
     """
     Updates a scaling policy. Scaling policies must include a name, type,

@@ -5,7 +5,7 @@ Autoscale REST endpoints having to do with a group or collection of groups
 
 import json
 
-from otter.json_schema import scaling_group as sg_schema
+from otter.json_schema.rest_schemas import create_group_request
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
@@ -76,7 +76,7 @@ def list_all_scaling_groups(request, tenantId):
 @app.route('/<string:tenantId>/groups', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(sg_schema.create_group)
+@validate_body(create_group_request)
 def create_new_scaling_group(request, tenantId, data):
     """
     Create a new scaling group, given the general scaling group configuration,
