@@ -344,5 +344,5 @@ class CreateScalingGroupTestCase(TestCase):
                 'groupConfiguration': scaling_group.config_examples[0],
                 'launchConfiguration':
                 scaling_group.launch_server_config_examples[0],
-                'scalingPolicies': [{}]
+                'scalingPolicies': {"Hello!": "Yes quite."}
             }, scaling_group.create_group)
