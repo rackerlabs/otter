@@ -49,7 +49,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.succeed('hello')
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.assertEqual('hello', r)
 
@@ -65,7 +65,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.succeed('hello')
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.assertEqual('hello', r)
 
@@ -80,7 +80,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(BlahError('fail'))
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         faultDoc = json.loads(r)
@@ -103,7 +103,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(DetailsError('fail'))
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         faultDoc = json.loads(r)
@@ -126,7 +126,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(DetailsError('fail'))
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         faultDoc = json.loads(r)
@@ -161,7 +161,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(BlahError('fail'))
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
         faultDoc = json.loads(r)
@@ -186,7 +186,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(BlahError('fail'))
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_fired(d)
+        r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 
         faultDoc = json.loads(r)
