@@ -16,8 +16,8 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 CREATE COLUMNFAMILY scaling_config (
-    accountId ascii, 
+    tenantId ascii, 
     groupId ascii, 
     data ascii, 
-    PRIMARY KEY(accountId, groupId)
+    PRIMARY KEY(tenantId, groupId)
     );

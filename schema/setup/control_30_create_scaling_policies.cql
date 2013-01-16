@@ -16,9 +16,9 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 CREATE TABLE scaling_policies (
-    accountId ascii,
+    tenantId ascii,
     groupId ascii, 
     polId ascii, 
     data ascii,
-    PRIMARY KEY(accountId, groupId, polId)
+    PRIMARY KEY(tenantId, groupId, polId)
     );

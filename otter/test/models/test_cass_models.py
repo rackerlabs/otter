@@ -67,6 +67,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                       self.connection, cflist)
 
     def test_view_config(self):
+        """
+        Test that you can call view and receive a valid parsed response
+        """
         mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
@@ -77,13 +80,16 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.view_config()
         r = self.assert_deferred_succeeded(d)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
         self.assertEqual(r, {})
 
     def test_view_config_corrupt(self):
+        """
+        Test what happens if you retrieve a corrupt JSON record (e.g. database corruption)
+        """
         mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
@@ -94,46 +100,60 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
     def test_view_config_empty(self):
+        """
+        Tests what happens if you try to view a group that doesn't exist.
+        """
         mock = []
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
     def test_view_config_bad(self):
+        """
+        This should probably never happen, but just in case, make sure
+        that it does the right thing
+        """
         mock = [{}]
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
     def test_view_config_none(self):
-        # This will probably never happen.  Just in case.
+        """
+        This should probably never happen, but just in case, make sure
+        that it does the right thing
+        """
         mock = None
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
     def test_view_launch(self):
+        """
+        Test that you can call view and receive a valid parsed response
+        for the launch config
+        """
         mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
@@ -144,13 +164,16 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.view_launch_config()
         r = self.assert_deferred_succeeded(d)
         expectedCql = "SELECT data FROM launch_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
         self.assertEqual(r, {})
 
     def test_update_config(self):
+        """
+        Test that you can update a config
+        """
         mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
@@ -161,25 +184,32 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(accountId, groupId, data) VALUES "
-        expectedCql += "(:accountId, :groupId, :scaling) APPLY BATCH;"
+        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, groupId, data) VALUES "
+        expectedCql += "(:tenantId, :groupId, :scaling) APPLY BATCH;"
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
-                        "accountId": '11111'}
+                        "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
     def test_update_bad(self):
+        """
+        Tests that you can't just create a scaling group by sending
+        an update to a nonexistant group
+        """
         self.returns = [[], None]
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "accountId = :accountId AND groupId = :groupId;"
-        expectedData = {"accountId": "11111", "groupId": "12345678"}
+        expectedCql += "tenantId = :tenantId AND groupId = :groupId;"
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
     def test_update_launch(self):
+        """
+        Test that you can update a launch config
+        """
         mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
@@ -190,11 +220,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_launch_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO launch_config(accountId, groupId, data) VALUES "
-        expectedCql += "(:accountId, :groupId, :launch) APPLY BATCH;"
+        expectedCql = "BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
+        expectedCql += "(:tenantId, :groupId, :launch) APPLY BATCH;"
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
-                        "accountId": '11111'}
+                        "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
@@ -226,18 +256,22 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_key = self.hashkey_patch.start()
 
     def tearDown(self):
+        """ Stop patching the generate_random_str """
         self.hashkey_patch.stop()
 
     def test_create(self):
+        """
+        Test that you can create a group
+        """
         expectedData = {
             'scaling': '{"_ver": 1}',
             'launch': '{"_ver": 1}',
             'groupId': '12345678',
-            'accountId': '123'}
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(accountId, "
-        expectedCql += "groupId, data) VALUES (:accountId, :groupId, "
-        expectedCql += ":scaling) INSERT INTO launch_config(accountId, "
-        expectedCql += "groupId, data) VALUES (:accountId, :groupId, :launch) "
+            'tenantId': '123'}
+        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, "
+        expectedCql += "groupId, data) VALUES (:tenantId, :groupId, "
+        expectedCql += ":scaling) INSERT INTO launch_config(tenantId, "
+        expectedCql += "groupId, data) VALUES (:tenantId, :groupId, :launch) "
         expectedCql += "APPLY BATCH;"
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {})
@@ -247,14 +281,17 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         ConsistencyLevel.ONE)
 
     def test_list(self):
+        """
+        Test that you can list a bunch of configs.
+        """
         mockdata = [
             {'cols': [{'timestamp': None, 'name': 'groupid',
                        'value': 'group1', 'ttl': None}], 'key': ''},
             {'cols': [{'timestamp': None, 'name': 'groupid',
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
-        expectedData = {'accountId': '123'}
-        expectedCql = "SELECT groupid FROM scaling_config WHERE accountid=:accountId"
+        expectedData = {'tenantId': '123'}
+        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId=:tenantId"
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)
@@ -268,6 +305,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         ConsistencyLevel.ONE)
 
     def test_get(self):
+        """
+        Tests that you can get a config
+        (note that it doesn't request the database)
+        """
         g = self.collection.get_scaling_group('123', '12345678')
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
