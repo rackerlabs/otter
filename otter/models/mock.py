@@ -5,7 +5,8 @@ from collections import defaultdict
 from uuid import uuid4
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError)
+                                    NoSuchScalingGroupError, NoSuchEntityError,
+                                    NoSuchPolicyError)
 import zope.interface
 
 from twisted.internet import defer
@@ -48,7 +49,7 @@ class MockScalingGroup:
 
     :ivar policies: scaling policies of the group, each of which is specified
         by :data:`otter.json_schema.scaling_group.scaling_policy`
-    :type config: ``list``
+    :type config: ``dict``
 
     :ivar steady: the desired steady state number of entities -
         defaults to the minimum if not given.  This how many entities the
@@ -97,7 +98,9 @@ class MockScalingGroup:
             }
             self.update_config(creation['config'], partial_update=True)
             self.launch = creation['launch']
-            self.policies = creation.get('policies', None) or []
+            self.policies = {}
+            if creation['policies']:
+                self.create_policy(creation['policies'])
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
@@ -216,7 +219,6 @@ class MockScalingGroup:
                 self.uuid, entity_id)))
 
     # ---- not interface methods
-
     def add_entities(self, pending=None, active=None):
         """
         Takes a list of pending entity ids and active entity ids, and adds
@@ -233,6 +235,103 @@ class MockScalingGroup:
                    (active or [], self.active_entities))
         for entity_ids, dictionary in mapping:
             dictionary.update(generate_entity_links(self.tenant_id, entity_ids))
+
+    def list_policies(self):
+        """
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if self.policies is None:
+            return defer.succeed({})
+        return defer.succeed(self.policies)
+
+    def get_policy(self, policy_id):
+        """
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            return defer.succeed(self.policies[policy_id])
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
+
+    def create_policy(self, data):
+        """
+        Creates a new policy with the data given.
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``list`` of ``dict``
+
+        :return: the UUID of the newly created scaling policy
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        return_data = {}
+
+        for policy in data:
+            policy_id = str(uuid4())
+            self.policies[policy_id] = policy
+            return_data[policy_id] = policy
+
+        return defer.succeed(return_data)
+
+    def update_policy(self, policy_id, data):
+        """
+        Updates an existing policy with the data given.
+
+        :param policy_id: the uuid of the entity to update
+        :type policy_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            self.policies[policy_id] = data
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
+
+    def delete_policy(self, policy_id):
+        """
+        Delete the scaling policy
+
+        :param policy_id: the ID of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            del self.policies[policy_id]
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
 
 
 class MockScalingGroupCollection:

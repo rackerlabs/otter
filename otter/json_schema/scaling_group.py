@@ -20,6 +20,10 @@ group configuration.  There are also example configs and launch configs.
 # problems with their launch configuration, or perhaps accept the launch
 # configuration and return a warning list of all possible problems.
 
+#
+# Launch Schemas
+#
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -183,6 +187,9 @@ launch_server_config_examples = [
 ]
 
 
+#
+# Config Schemas
+#
 config = {
     "type": "object",
     "description": ("Configuration options for the scaling group, "
@@ -256,6 +263,10 @@ config_examples = [
     }
 ]
 
+
+#
+# Policy Schemas
+#
 
 policy = {
     "type": [
@@ -342,6 +353,27 @@ policy = {
 }
 
 
+create_policy_array = {
+    "type": "array",
+    "items": [policy],
+    "uniqueItems": True
+}
+
+
+policy_list = {
+    "type": "object",
+    "patternProperties": {
+        "^\S+$": {
+            "type": "object",
+            "required": True,
+            "items": [policy]
+        }
+    },
+    "required": False,
+    "additionalProperties": False
+}
+
+
 policy_examples = [
     {
         "name": "scale up by 10",
@@ -361,21 +393,51 @@ policy_examples = [
 ]
 
 
+policy_list_examples = {
+    "f236a93f-a46d-455c-9403-f26838011522": {
+        "name": "scale up by 10",
+        "change": 10,
+        "cooldown": 5
+    },
+    "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
+        "name": "scale down a 5.5 percent because of a tweet",
+        "changePercent": -5.5,
+        "cooldown": 6
+    },
+    "228dbf91-7b15-4d21-8de2-fa584f01a440": {
+        "name": "set number of servers to 10",
+        "steadyState": 10,
+        "cooldown": 3
+    }
+}
+
+
+#
+# Aggregate and Manifest Schemas
+#
+
 create_group = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
     "properties": {
-        'groupConfiguration': config,
-        'launchConfiguration': launch_config,
-        'scalingPolicies': {
-            'type': 'array',
-            'items': policy,
-            'uniqueItems': True
-        }
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": create_policy_array
     },
     "additionalProperties": False
 }
 
+
+create_group_return_value = {
+    "type": "object",
+    "description": "Schema of the JSON returned from creating a scaling group.",
+    "properties": {
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": policy_list
+    },
+    "additionalProperties": False
+}
 
 create_group_examples = [
     {
@@ -385,11 +447,11 @@ create_group_examples = [
     {
         "groupConfiguration": config_examples[0],
         "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": []
+        "scalingPolicies": [policy_examples[0]]
     },
     {
         "groupConfiguration": config_examples[1],
         "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": policy_examples
+        "scalingPolicies": [policy_examples[1], policy_examples[2]]
     }
 ]

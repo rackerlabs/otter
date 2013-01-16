@@ -188,7 +188,6 @@ test after you get your :class:`Deferred`, assert that the :class:`Deferred` has
 run the tests on the result of that :class:`Deferred`.
 
 In :mod:`test.utils`, three methods are provided to help test :class:`Deferred` code:
-:meth:`test.utils.DeferredTestingMixin.assert_deferred_fired`,
 :meth:`test.utils.DeferredTestingMixin.assert_deferred_succeeded`, and
 :meth:`test.utils.DeferredTestingMixin.assert_deferred_failed`.
 
