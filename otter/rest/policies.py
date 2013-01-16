@@ -28,7 +28,7 @@ def list_policies(request, tenantId, groupId):
         {
             "policies": [
                 {
-                    "id":"ab2b2865-2e9d-4422-a6aa-5af184f81d7b",
+                    "id":"{policyId1}",
                     "data": {
                         "name": "scale up by one server",
                         "change": 1,
@@ -36,17 +36,17 @@ def list_policies(request, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
                             "rel": "self"
                         },
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId1}"
                             "rel": "bookmark"
                         }
                     ]
                 },
                 {
-                    "id": "a64b4aa8-03f5-4c46-9bc0-add7c3795809",
+                    "id": "{policyId2}",
                     "data": {
                         "name": "scale up ten percent",
                         "changePercent": 10,
@@ -54,17 +54,17 @@ def list_policies(request, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}"
                             "rel": "self"
                         },
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId2}"
                             "rel": "bookmark"
                         }
                     ]
                 },
                 {
-                    "id":"30faf2d1-39db-4c85-9505-07cbe7ab5569",
+                    "id":"{policyId3}",
                     "data": {
                         "name": "scale down one server",
                         "change": -1,
@@ -72,17 +72,17 @@ def list_policies(request, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}"
                             "rel": "self"
                         },
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId3}"
                             "rel": "bookmark"
                         }
                     ]
                 },
                 {
-                    "id": "dde7c707-750d-4df5-9828-687bb77cb8fd",
+                    "id": "{policyId4}",
                     "data": {
                         "name": "scale down ten percent",
                         "changePercent": -10,
@@ -90,11 +90,11 @@ def list_policies(request, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}"
                             "rel": "self"
                         },
                         {
-                            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId4}"
                             "rel": "bookmark"
                         }
                     ]

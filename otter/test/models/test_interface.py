@@ -7,7 +7,7 @@ from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.json_schema.scaling_group import (create_group_return_value,
-    launch_config)
+                                             launch_config)
 from otter.test.models import interface_schema
 from otter.test.utils import DeferredTestMixin
 

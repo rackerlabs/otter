@@ -8,10 +8,10 @@ from twisted.trial.unittest import TestCase
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
-    NoSuchPolicyError)
+                                    NoSuchPolicyError)
 
 from otter.json_schema.scaling_group import policy_list
-from jsonschema import validate, ValidationError
+from jsonschema import validate
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -561,7 +561,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                         "group is {0!r}".format(group))
 
         for method in ('view_config', 'view_launch_config', 'view_state',
-            'list_policies'):
+                       'list_policies'):
             self.assert_deferred_succeeded(getattr(group, method)())
 
         self.assert_deferred_succeeded(group.update_config({
