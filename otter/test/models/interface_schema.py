@@ -4,7 +4,7 @@ model interface.
 """
 from copy import deepcopy
 
-from otter.json_schema.scaling_group import config as input_config
+from otter.json_schema.group_schemas import config as input_config
 from otter.test.rest.response_schema import group_state as rest_group_state
 
 entity_schema = {
