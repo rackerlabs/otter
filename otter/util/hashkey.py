@@ -5,6 +5,7 @@ import random
 
 
 def generate_random_str(len):
+    """ Generate a random string of size len """
     chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     out_str = ""
     for i in xrange(len):
