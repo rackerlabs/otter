@@ -59,7 +59,8 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         data
         """
         self.mock_group.create_policy.return_value = defer.succeed(None)
-        self.assert_status_code(400, None, 'POST', '{')
+        self.assert_status_code(400, None, 'POST', '[')
+        self.assert_status_code(400, None, 'POST', '{},{}')
         self.flushLoggedErrors(InvalidJsonError)
 
     def test_policy_create_invalid_schema_400(self):
@@ -104,7 +105,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Set up a mock group to be used for viewing and updating policies
         """
-        self.policy_id = "{0}".format("1")
+        self.policy_id = "1"
         super(OnePolicyTestCase, self).setUp()
 
     def test_view_policy(self):
@@ -125,7 +126,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         (self.mock_group.
             get_policy.
-            return_value) = defer.fail(NoSuchPolicyError('11111', '1'))
+            return_value) = defer.fail(NoSuchPolicyError('11111', '111', '1'))
 
         response_body = self.assert_status_code(404, method="GET")
         resp = json.loads(response_body)
@@ -163,6 +164,41 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             self.policy_id, policy_examples[0])
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
+
+    def test_update_policy_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.update_policy.return_value = defer.fail(error)
+        self.assert_status_code(500, method="PUT",
+                                body=json.dumps(policy_examples[1]))
+        self.flushLoggedErrors()
+
+    def test_policy_update_bad_input_400(self):
+        """
+        Checks that the serialization checks and rejects unserializable
+        data
+        """
+        self.mock_group.update_policy.return_value = defer.succeed(None)
+        self.assert_status_code(400, None, 'PUT', '[')
+        self.assert_status_code(400, None, 'PUT', '{},{}')
+        self.flushLoggedErrors(InvalidJsonError)
+
+    def test_policy_update_invalid_schema_400(self):
+        """
+        Checks that the scaling policy schema is obeyed --
+        an empty schema is bad.
+        """
+
+        (self.mock_group.
+            update_policy.
+            return_value) = defer.succeed(None)
+        response_body = self.assert_status_code(400, None, 'PUT', '["tacos"]')
+        self.flushLoggedErrors(ValidationError)
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'ValidationError')
 
     def test_delete_policy_success(self):
         """

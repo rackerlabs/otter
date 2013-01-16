@@ -10,6 +10,9 @@ from otter.models.mock import (
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
     NoSuchPolicyError)
 
+from otter.json_schema.scaling_group import policy_list
+from jsonschema import validate, ValidationError
+
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
@@ -340,6 +343,14 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(new_policy, create_return_value.values())
         self.assertIn(new_policy[0], result.values())
 
+    def test_list_policies(self):
+        """
+        List all policies and validate the formatting.
+        """
+
+        resp = self.assert_deferred_succeeded(self.group.list_policies())
+        validate(resp, policy_list)
+
     def test_get_policy_succeeds(self):
         """
         Try to get a policy by looking up all available UUIDs, and getting one.
@@ -549,7 +560,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_launch_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state',
+            'list_policies'):
             self.assert_deferred_succeeded(getattr(group, method)())
 
         self.assert_deferred_succeeded(group.update_config({
@@ -570,7 +582,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_launch_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state',
+                       'list_policies'):
             self.assert_deferred_failed(getattr(group, method)(),
                                         NoSuchScalingGroupError)
 

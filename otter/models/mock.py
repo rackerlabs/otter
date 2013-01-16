@@ -263,7 +263,8 @@ class MockScalingGroup:
         if policy_id in self.policies:
             return defer.succeed(self.policies[policy_id])
         else:
-            return defer.fail(NoSuchPolicyError(policy_id))
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
 
     def create_policy(self, data):
         """
@@ -308,7 +309,8 @@ class MockScalingGroup:
             self.policies[policy_id] = data
             return defer.succeed(None)
         else:
-            return defer.fail(NoSuchPolicyError(policy_id))
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
 
     def delete_policy(self, policy_id):
         """
@@ -328,7 +330,8 @@ class MockScalingGroup:
             del self.policies[policy_id]
             return defer.succeed(None)
         else:
-            return defer.fail(NoSuchPolicyError(policy_id))
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                self.uuid, policy_id))
 
 
 class MockScalingGroupCollection:
