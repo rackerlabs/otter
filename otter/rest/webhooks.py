@@ -11,7 +11,7 @@ import json
 
 from twisted.internet import defer
 
-from otter.json_schema import scaling_group as sg_schema
+from otter.json_schema import group_schemas
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_url_root
@@ -62,7 +62,7 @@ def view_all_webhooks(request, tenantId, groupId, policyId):
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(sg_schema.policy)
+@validate_body(group_schemas.policy)
 def create_webhook(request, tenantId, groupId, policyId, data):
     """
     Create a new scaling policy webhook. Scaling policies must include a name
@@ -131,7 +131,7 @@ def view_webhook(request, tenantId, groupId, policyId, webhookId):
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.policy)
+@validate_body(group_schemas.policy)
 def edit_webhook(request, tenantId, groupId, policyId, webhookId, data):
     """
     Update an existing webhook.

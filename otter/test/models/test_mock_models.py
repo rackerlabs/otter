@@ -10,7 +10,7 @@ from otter.models.mock import (
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
                                     NoSuchPolicyError)
 
-from otter.json_schema.scaling_group import policy_list
+from otter.json_schema.rest_schemas import policy_list
 from jsonschema import validate
 
 from otter.test.models.test_interface import (
