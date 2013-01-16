@@ -198,7 +198,7 @@ class CassScalingGroup:
             ``dict``
         """
         pass
-        
+
     def get_policy(self, policy_id):
         """
         :return: a policy, as specified by
@@ -248,7 +248,6 @@ class CassScalingGroup:
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         pass
-
 
     def _ensure_there(self):
         query = "SELECT data FROM " + self.cflist["config"]
