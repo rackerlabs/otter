@@ -7,7 +7,11 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import NoSuchScalingGroupError, NoSuchEntityError
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
+    NoSuchPolicyError)
+
+from otter.json_schema.scaling_group import policy_list
+from jsonschema import validate, ValidationError
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -88,7 +92,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = []
+        self.policies = [{
+            "name": "set number of servers to 10",
+            "steadyState": 10,
+            "cooldown": 3
+        }]
         self.group = MockScalingGroup(
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
@@ -100,11 +108,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         schema
         """
         result = self.validate_view_manifest_return_value()
-        self.assertEqual(result, {
-            'groupConfiguration': self.output_config,
-            'launchConfiguration': self.launch_config,
-            'scalingPolicies': []
-        })
+        self.assertEqual(result['groupConfiguration'], self.output_config)
+        self.assertEqual(result['launchConfiguration'], self.launch_config)
+        self.assertEqual(result['scalingPolicies'].values(), self.policies)
 
     def test_default_view_config_has_all_info(self):
         """
@@ -321,6 +327,94 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.assert_deferred_succeeded(self.group.view_config()),
             self.output_config)
 
+    def test_create_new_scaling_policy(self):
+        """
+        Add a new policy to the scaling group.
+        """
+        new_policy = [{
+            "name": "set number of servers to 3000",
+            "steadyState": 3000,
+            "cooldown": 300
+        }]
+
+        create_return_value = self.assert_deferred_succeeded(
+            self.group.create_policy(new_policy))
+        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertEqual(new_policy, create_return_value.values())
+        self.assertIn(new_policy[0], result.values())
+
+    def test_list_policies(self):
+        """
+        List all policies and validate the formatting.
+        """
+
+        resp = self.assert_deferred_succeeded(self.group.list_policies())
+        validate(resp, policy_list)
+
+    def test_get_policy_succeeds(self):
+        """
+        Try to get a policy by looking up all available UUIDs, and getting one.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        value = policy_list.values()[0]
+        result = self.assert_deferred_succeeded(self.group.get_policy(uuid))
+        self.assertEqual(value, result)
+
+    def test_get_nonexistent_policy_fails(self):
+        """
+        Get a policy that doesn't exist, should return NoSuchPolicyError
+        """
+        uuid = "Otters are so cute!"
+        deferred = self.group.get_policy(uuid)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_policy_fails(self):
+        """
+        Delete a policy, check that it is actually deleted.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        self.assert_deferred_succeeded(self.group.delete_policy(uuid))
+        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertNotIn(uuid, result)
+        self.assertEqual({}, result)
+
+    def test_delete_nonexistent_policy_fails(self):
+        """
+        Delete a policy that doesn't exist. Should return with NoSuchPolicyError
+        """
+        deferred = self.group.delete_policy("puppies")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_update_policy_succeeds(self):
+        """
+        Get a UUID and attempt to update the policy.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        update_data = {
+            "name": "Otters are not good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
+        result = self.assert_deferred_succeeded(
+            self.group.get_policy(uuid))
+        self.assertEqual(update_data, result)
+
+    def test_update_nonexistent_policy_fails(self):
+        """
+        Attempt to update a nonexistant policy.
+        """
+        update_data = {
+            "name": "puppies are good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        deferred = self.group.update_policy("puppies", update_data)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -362,7 +456,23 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         scaling group with the specified configuration.
         """
         launch = {"launch": "config"}
-        policies = [1, 2, 3]
+        policies = {
+            "f236a93f-a46d-455c-9403-f26838011522": {
+                "name": "scale up by 10",
+                "change": 10,
+                "cooldown": 5
+            },
+            "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
+                "name": "scale down a 5.5 percent because of a tweet",
+                "changePercent": -5.5,
+                "cooldown": 6
+            },
+            "228dbf91-7b15-4d21-8de2-fa584f01a440": {
+                "name": "set number of servers to 10",
+                "steadyState": 10,
+                "cooldown": 3
+            }
+        }
         self.assertEqual(self.validate_list_return_value(self.tenant_id), [],
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
@@ -450,7 +560,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_launch_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state',
+            'list_policies'):
             self.assert_deferred_succeeded(getattr(group, method)())
 
         self.assert_deferred_succeeded(group.update_config({
@@ -471,7 +582,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        for method in ('view_config', 'view_launch_config', 'view_state'):
+        for method in ('view_config', 'view_launch_config', 'view_state',
+                       'list_policies'):
             self.assert_deferred_failed(getattr(group, method)(),
                                         NoSuchScalingGroupError)
 
