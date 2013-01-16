@@ -82,6 +82,9 @@ class CassScalingGroup:
         self.cflist = cflist
 
     def view_manifest(self):
+        """
+        :return: :class:`Deferred` that fires with a view of the config
+        """
         pass
 
     def view_config(self):
