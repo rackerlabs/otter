@@ -12,8 +12,9 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema.scaling_group import (
-    config_examples, launch_server_config_examples as launch_examples)
+from otter.json_schema.group_examples import (
+    config as config_examples,
+    launch_server_config as launch_examples)
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
