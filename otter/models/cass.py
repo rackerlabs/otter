@@ -190,6 +190,66 @@ class CassScalingGroup:
         """
         pass
 
+    def list_policies(self):
+        """
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+        
+    def get_policy(self, policy_id):
+        """
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
+    def create_policy(self, data):
+        """
+        Creates a new policy with the data given.
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``list`` of ``dict``
+
+        :return: the UUID of the newly created scaling policy
+        """
+        pass
+
+    def update_policy(self, policy_id, data):
+        """
+        Updates an existing policy with the data given.
+
+        :param policy_id: the uuid of the entity to update
+        :type policy_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        pass
+
+    def delete_policy(self, policy_id):
+        """
+        Delete the scaling policy
+
+        :param policy_id: the ID of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+
     def _ensure_there(self):
         query = "SELECT data FROM " + self.cflist["config"]
         varcl = " WHERE accountId = :accountId AND groupId = :groupId"
