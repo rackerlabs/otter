@@ -12,16 +12,15 @@ from twisted.trial.unittest import TestCase
 
 from otter.json_schema.group_examples import (
     launch_server_config as launch_examples,
-    config as config_examples)
-from otter.json_schema.rest_schemas import (
-    create_group_request as create_group_schema,
-    policy_examples)
+    config as config_examples,
+    policy as policy_examples)
+
+from otter.json_schema import rest_schemas
 
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.rest import response_schema
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
@@ -64,8 +63,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
 
         resp = json.loads(body)
-        self.assertEqual(resp, [])
-        validate(resp, response_schema.link_list)
+        self.assertEqual(resp, {"groups": []})
+        validate(resp, rest_schemas.list_groups_response)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_returned_group_list_gets_translated(self, mock_url):
@@ -82,23 +81,25 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
 
         resp = json.loads(body)
-        validate(resp, response_schema.link_list)
-        self.assertEqual(resp, [
-            {
-                'id': '1',
-                'links': [
-                    {"href": '/v1.0/11111/groups/1', "rel": "self"},
-                    {"href": '/11111/groups/1', "rel": "bookmark"}
-                ]
-            },
-            {
-                'id': '2',
-                'links': [
-                    {"href": '/v1.0/11111/groups/2', "rel": "self"},
-                    {"href": '/11111/groups/2', "rel": "bookmark"}
-                ]
-            }
-        ])
+        validate(resp, rest_schemas.list_groups_response)
+        self.assertEqual(resp, {
+            "groups": [
+                {
+                    'id': '1',
+                    'links': [
+                        {"href": '/v1.0/11111/groups/1', "rel": "self"},
+                        {"href": '/11111/groups/1', "rel": "bookmark"}
+                    ]
+                },
+                {
+                    'id': '2',
+                    'links': [
+                        {"href": '/v1.0/11111/groups/2', "rel": "self"},
+                        {"href": '/11111/groups/2', "rel": "bookmark"}
+                    ]
+                }
+            ]
+        })
 
     def test_group_create_bad_input_400(self):
         """
@@ -223,7 +224,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        validate(resp, create_group_schema)
+        validate(resp, rest_schemas.create_group_request)
         self.assertEqual(resp, expected)
 
         self.mock_store.get_scaling_group.assert_called_once_with(
@@ -315,7 +316,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
 
-        validate(resp, response_schema.group_state)
+        validate(resp, rest_schemas.group_state)
         self.assertEqual(resp, {
             'active': [
                 {'id': '1', 'links': [make_link("rel"), make_link("bookmark")]},

@@ -128,8 +128,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
             request(root, 'GET', '/v1.0/11111/groups'))
         self.assertEqual(200, wrapper.response.code)
 
-        groups = json.loads(wrapper.content)
-        self.assertEqual(len(groups), number)
+        response = json.loads(wrapper.content)
+        self.assertEqual(len(response["groups"]), number)
 
     def test_crd_scaling_group(self):
         """

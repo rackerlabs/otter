@@ -20,7 +20,8 @@ def list_all_scaling_groups(request, tenantId):
 
     Example response::
 
-        [
+      {
+        "groups": [
           {
             "id": "{groupId1}"
             "links": [
@@ -48,16 +49,20 @@ def list_all_scaling_groups(request, tenantId):
             ]
           }
         ]
+      }
     """
     def format_list(groups):
         # if this list of groups is ever too large, or getting the link
         # becomes a more time consuming task, perhaps this map should be done
         # cooperatively
-        return [
-            {
-                'id': group.uuid,
-                'links': get_autoscale_links(tenantId, group.uuid)
-            } for group in groups]
+        return {
+            "groups": [
+                {
+                    'id': group.uuid,
+                    'links': get_autoscale_links(tenantId, group.uuid)
+                } for group in groups
+            ]
+        }
 
     deferred = get_store().list_scaling_groups(tenantId)
     deferred.addCallback(format_list)

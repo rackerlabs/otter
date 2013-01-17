@@ -2,11 +2,114 @@
 JSON schemas for the rest responses from autoscale
 """
 
+from uuid import uuid4
+
 from otter.json_schema.group_schemas import policy, config, launch_config
 from otter.json_schema.group_examples import (
     launch_server_config as launch_server_config_examples,
     config as config_examples,
     policy as policy_examples)
+
+
+example_url_root = "https://dfw.autoscale.api.rackspacecloud.com"
+
+# subschemas
+links = {
+    'type': 'array',
+    'description': "Generic schema for a JSON link",
+    'required': True,
+    'uniqueItems': True,
+    'items': {
+        'rel': {
+            'type': 'string',
+            'required': True
+        },
+        'href': {
+            'type': 'string',
+            'required': True
+        }
+    },
+    'minLength': 1
+}
+
+list_of_links = {
+    'type': 'array',
+    'items': {
+        'type': 'object',
+        'properties': {
+            'id': {
+                'type': ['string', 'integer'],
+                'required': True
+            },
+            'links': links
+        },
+        'additionalProperties': False
+    },
+    'uniqueItems': True,
+    'required': True
+}
+
+# endpoint request and response schemas and examples
+list_groups_response = {
+    "type": "object",
+    "properties": {
+        "groups": list_of_links
+    },
+    "additionalProperties": False
+}
+
+list_groups_example = (lambda gid1, gid2: {
+    "groups": [
+        {
+            "id": gid1,
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{gid}".format(
+                        url_root=example_url_root, gid=gid1),
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{gid}".format(
+                        url_root=example_url_root, gid=gid1),
+                    "rel": "bookmark"
+                }
+            ]
+        },
+        {
+            "id": gid2,
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{gid}".format(
+                        url_root=example_url_root, gid=gid2),
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{gid}".format(
+                        url_root=example_url_root, gid=gid1),
+                    "rel": "bookmark"
+                }
+            ]
+        }
+    ]
+})(uuid4(), uuid4())
+
+group_state = {
+    'type': 'object',
+    'properties': {
+        'steadyState': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        },
+        'paused': {
+            'type': 'boolean',
+            'required': True
+        },
+        'active': list_of_links,
+        'pending': list_of_links
+    },
+    'additionalProperties': False
+}
 
 
 create_policy_array = {
