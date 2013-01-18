@@ -154,15 +154,99 @@ def create_new_scaling_group(request, tenantId, data):
 
     The ``scalingPolicies`` attribute can also be an empty list, or just left
     out entirely.
+
+    Example response body to the above request::
+
+        {
+            "group": {
+                "id": "{groupId}"
+                "links": [
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1"
+                    }
+                },
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
+                            },
+                            "personality": [
+                                {
+                                    "path": '/root/.ssh/authorized_keys',
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                }
+                            ],
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
+                            ],
+                        },
+                        "loadBalancers": [
+                            {
+                                "loadBalancerId": 2200,
+                                "port": 8081
+                            }
+                        ]
+                    }
+                },
+                "scalingPolicies": [
+                    {
+                        "name": "scale up by 10",
+                        "change": 10,
+                        "cooldown": 5
+                    }
+                    {
+                        "name": 'scale down 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
+                    },
+                    {
+                        "name": 'set number of servers to 10',
+                        "steadyState": 10,
+                        "cooldown": 3
+                    }
+                ]
+            }
+        }
+
     """
-    def send_redirect(uuid):
+    def send_redirect(uuid, data):
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
+        wrapped = {
+            "id": uuid,
+            "links": get_autoscale_links(tenantId, uuid)
+        }
+        wrapped.update(data)
+        return {"group": wrapped}
 
     deferred = get_store().create_scaling_group(
         tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
-    deferred.addCallback(send_redirect)
+    deferred.addCallback(send_redirect, data)
+    deferred.addCallback(json.dumps)
     return deferred
 
 
@@ -182,6 +266,17 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
     Example response::
 
         {
+            "id": "{groupId}"
+            "links": [
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                "rel": "self"
+              },
+              {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                "rel": "bookmark"
+              }
+            ],
             "groupConfiguration": {
                 "name": "workers",
                 "cooldown": 60,
@@ -247,8 +342,16 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
             ]
         }
     """
+    def openstack_formatting(data, uuid):
+        data["id"] = uuid
+        data["links"] = get_autoscale_links(tenantId, uuid)
+        return {"group": data}
+
     group = get_store().get_scaling_group(tenantId, groupId)
-    return group.view_manifest().addCallback(json.dumps)
+    deferred = group.view_manifest()
+    deferred.addCallback(openstack_formatting, group.uuid)
+    deferred.addCallback(json.dumps)
+    return deferred
 
 
 # TODO: in the implementation story, the interface delete definition should be

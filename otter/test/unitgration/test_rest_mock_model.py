@@ -61,15 +61,20 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
 
         :return: the path to the new scaling group resource
         """
+        request_body = {
+            "groupConfiguration": config[1],
+            "launchConfiguration": launch_server_config[0]
+        }
         wrapper = self.assert_deferred_succeeded(request(
-            root, 'POST', '/v1.0/11111/groups', body=json.dumps({
-                "groupConfiguration": config[1],
-                "launchConfiguration": launch_server_config[0]
-            })))
+            root, 'POST', '/v1.0/11111/groups', body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
-        self.assertEqual(wrapper.content, "")
+        response = json.loads(wrapper.content)
+        for key in request_body:
+            self.assertEqual(response["group"][key], request_body[key])
+        for key in ("id", "links"):
+            self.assertTrue(key in response["group"])
 
         headers = wrapper.response.headers.getRawHeaders('Location')
         self.assertTrue(headers is not None)
@@ -82,9 +87,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
-        self.assertEqual(response.get('groupConfiguration', None),
-                         config[1])
-        self.assertEqual(response.get('launchConfiguration', None),
+        self.assertEqual(response["group"]['groupConfiguration'], config[1])
+        self.assertEqual(response["group"]['launchConfiguration'],
                          launch_server_config[0])
 
         # make sure the created group has enough pending entities, and is

@@ -124,59 +124,65 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'ValidationError')
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
-    def test_group_create_one_policy(self, mock_url):
+    def _test_successful_create(self, request_body, mock_url):
+        """
+        Tries to create a scaling group with the given request body (which
+        should succeed) - and test the response
+        """
+        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1')
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            '11111',
+            request_body['groupConfiguration'],
+            request_body['launchConfiguration'],
+            request_body.get('scalingPolicies', None)
+        )
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_group_response)
+
+        expected = {
+            "id": "1",
+            "links": [
+                {"href": "/v1.0/11111/groups/1", "rel": "self"},
+                {"href": "/11111/groups/1", "rel": "bookmark"}
+            ],
+            'groupConfiguration': request_body['groupConfiguration'],
+            'launchConfiguration': request_body['launchConfiguration']
+        }
+        if 'scalingPolicies' in request_body:
+            expected['scalingPolicies'] = request_body['scalingPolicies']
+        self.assertEqual(resp, {"group": expected})
+
+    def test_group_create_one_policy(self):
         """
         Tries to create a scaling group
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-        request_body = {
+        self._test_successful_create({
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
             'scalingPolicies': [policy_examples[0]]
-        }
-        self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body),
-                                '/v1.0/11111/groups/1')
-        self.mock_store.create_scaling_group.assert_called_once_with(
-            '11111',
-            config_examples[0],
-            launch_examples[0],
-            [policy_examples[0]]
-        )
+        })
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
-    def test_group_create_many_policies(self, mock_url):
+    def test_group_create_many_policies(self):
         """
         Tries to create a scaling group
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-        request_body = {
+        self._test_successful_create({
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
             'scalingPolicies': policy_examples
-        }
-        self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body),
-                                '/v1.0/11111/groups/1')
-        self.mock_store.create_scaling_group.assert_called_once_with(
-            '11111', config_examples[0], launch_examples[0], policy_examples)
+        })
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
-    def test_group_create_no_scaling_policies(self, mock_url):
+    def test_group_create_no_scaling_policies(self):
         """
         Tries to create a scaling group, but if no scaling policy is provided
         the the interface is called with None in place of scaling policies
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-        request_body = {
+        self._test_successful_create({
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
-        }
-        self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body),
-                                '/v1.0/11111/groups/1')
-        self.mock_store.create_scaling_group.assert_called_once_with(
-            '11111', config_examples[0], launch_examples[0], None)
+        })
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
