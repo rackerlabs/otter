@@ -43,7 +43,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         cflist = {"config": "scaling_config",
                   "launch": "launch_config",
-                  "policies": "policies"}
+                  "policies": "scaling_policies"}
         self.tenant_id = '11111'
         self.config = {
             'name': '',
@@ -241,7 +241,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.return_value = defer.succeed(None)
         cflist = {"config": "scaling_config",
                   "launch": "launch_config",
-                  "policies": "policies"}
+                  "policies": "scaling_policies"}
         self.collection = CassScalingGroupCollection(self.connection, cflist)
         self.tenant_id = 'goo1234'
         self.config = {
@@ -252,7 +252,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'metadata': {}
         }
         self.hashkey_patch = mock.patch(
-            'otter.models.cass.generate_random_str')
+            'otter.models.cass.generate_key_str')
         self.mock_key = self.hashkey_patch.start()
 
     def tearDown(self):

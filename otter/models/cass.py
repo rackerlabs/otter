@@ -7,7 +7,7 @@ import zope.interface
 
 from twisted.internet import defer
 from otter.util.cqlbatch import Batch
-from otter.util.hashkey import generate_random_str
+from otter.util.hashkey import generate_key_str
 
 import json
 
@@ -24,6 +24,13 @@ def _serial_json_data(data, ver):
     dataOut = data.copy()
     dataOut["_ver"] = ver
     return json.dumps(dataOut)
+
+_cql = {
+    "view": "SELECT data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;",
+    "insert": "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})",
+    "delete": "DELETE FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId",
+    "list": "SELECT groupid FROM {cf} WHERE tenantId = :tenantId;"
+}
 
 
 class CassScalingGroup:
@@ -91,10 +98,8 @@ class CassScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        query = "SELECT data FROM "
-        query += self.cflist["config"]
-        varcl = " WHERE tenantId = :tenantId AND groupId = :groupId"
-        d = self.connection.execute(query + varcl + ";",
+        query = _cql["view"].format(cf=self.cflist["config"])
+        d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                         "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
@@ -104,10 +109,8 @@ class CassScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the launch config
         """
-        query = "SELECT data FROM "
-        query += self.cflist["launch"]
-        varcl = " WHERE tenantId = :tenantId AND groupId = :groupId"
-        d = self.connection.execute(query + varcl + ";",
+        query = _cql["view"].format(cf=self.cflist["launch"])
+        d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                         "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
@@ -132,8 +135,8 @@ class CassScalingGroup:
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = "INSERT INTO " + self.cflist["config"]
-            cqlstr += "(tenantId, groupId, data) VALUES (:tenantId, :groupId, :scaling)"
+            cqlstr = _cql["insert"].format(cf=self.cflist["config"], name=":scaling")
+
             queries = [cqlstr
                        ]
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -159,8 +162,8 @@ class CassScalingGroup:
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = "INSERT INTO " + self.cflist["launch"]
-            cqlstr += "(tenantId, groupId, data) VALUES (:tenantId, :groupId, :launch)"
+            cqlstr = _cql["insert"].format(cf=self.cflist["launch"], name=":launch")
+
             queries = [
                 cqlstr]
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -253,9 +256,8 @@ class CassScalingGroup:
         pass
 
     def _ensure_there(self):
-        query = "SELECT data FROM " + self.cflist["config"]
-        varcl = " WHERE tenantId = :tenantId AND groupId = :groupId"
-        d = self.connection.execute(query + varcl + ";",
+        query = _cql["view"].format(cf=self.cflist["config"])
+        d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                         "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
@@ -350,14 +352,11 @@ class CassScalingGroupCollection:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
         """
 
-        scaling_group_id = generate_random_str(10)
-
-        insertinto = "INSERT INTO "
-        cols = "(tenantId, groupId, data) VALUES (:tenantId, :groupId, "
+        scaling_group_id = generate_key_str('scalinggroup')
 
         queries = [
-            insertinto + self.cflist["config"] + cols + ":scaling)",
-            insertinto + self.cflist["launch"] + cols + ":launch)"]
+            _cql["insert"].format(cf=self.cflist["config"], name=":scaling"),
+            _cql["insert"].format(cf=self.cflist["launch"], name=":launch")]
         b = Batch(queries, {"tenantId": tenant_id,
                             "groupId": scaling_group_id,
                             "scaling": _serial_json_data(config, 1),
@@ -382,12 +381,10 @@ class CassScalingGroupCollection:
             doesn't exist for this tenant id
         """
 
-        varcl = " WHERE tenantId = :tenantId AND groupId = :groupId"
-
         queries = [
-            "DELETE FROM " + self.cflist["config"] + varcl,
-            "DELETE FROM " + self.cflist["launch"] + varcl,
-            "DELETE FROM scaling_policies" + varcl]
+            _cql["insert"].format(cf=self.cflist["config"]),
+            _cql["insert"].format(cf=self.cflist["launch"]),
+            _cql["insert"].format(cf=self.cflist["policies"])]
         b = Batch(
             queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
         b.execute(self.connection)
@@ -427,9 +424,8 @@ class CassScalingGroupCollection:
                                              self.connection, self.cflist))
             return defer.succeed(data)
 
-        query = "SELECT groupid FROM " + self.cflist["config"]
-        varcl = " WHERE tenantId = :tenantId;"
-        d = self.connection.execute(query + varcl + ";",
+        query = _cql["list"].format(cf=self.cflist["config"])
+        d = self.connection.execute(query,
                                     {"tenantId": tenant_id})
         d.addCallback(_grab_list)
         return d

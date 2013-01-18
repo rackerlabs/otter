@@ -3,7 +3,7 @@
 from silverberg.client import ConsistencyLevel
 
 
-class Batch:
+class Batch(object):
     """ CQL Batch wrapper"""
     def __init__(self, statements, params, consistency=ConsistencyLevel.ONE,
                  timestamp=None):
