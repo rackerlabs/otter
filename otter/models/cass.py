@@ -141,8 +141,7 @@ class CassScalingGroup(object):
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "scaling": _serial_json_data(data, 1)})
-            d = b.execute(self.connection)
-            return d
+            return b.execute(self.connection)
 
         d = self._ensure_there()
         d.addCallback(_do_update_config)
