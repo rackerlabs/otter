@@ -26,12 +26,10 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql = {
-    "view": "SELECT data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;",
-    "insert": "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})",
-    "delete": "DELETE FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId",
-    "list": "SELECT groupid FROM {cf} WHERE tenantId = :tenantId;"
-}
+_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;"
+_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})"
+_cql_delete = "DELETE FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId"
+_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId;"
 
 
 class CassScalingGroup(object):
@@ -97,7 +95,7 @@ class CassScalingGroup(object):
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        query = _cql["view"].format(cf=self.cflist["config"])
+        query = _cql_view.format(cf=self.cflist["config"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -108,7 +106,7 @@ class CassScalingGroup(object):
         """
         :return: :class:`Deferred` that fires with a view of the launch config
         """
-        query = _cql["view"].format(cf=self.cflist["launch"])
+        query = _cql_view.format(cf=self.cflist["launch"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -134,7 +132,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = _cql["insert"].format(cf=self.cflist["config"], name=":scaling")
+            cqlstr = _cql_insert.format(cf=self.cflist["config"], name=":scaling")
 
             queries = [cqlstr
                        ]
@@ -160,7 +158,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = _cql["insert"].format(cf=self.cflist["launch"], name=":launch")
+            cqlstr = _cql_insert.format(cf=self.cflist["launch"], name=":launch")
 
             queries = [
                 cqlstr]
@@ -254,7 +252,7 @@ class CassScalingGroup(object):
         raise NotImplementedError()
 
     def _ensure_there(self):
-        query = _cql["view"].format(cf=self.cflist["config"])
+        query = _cql_view.format(cf=self.cflist["config"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -353,8 +351,8 @@ class CassScalingGroupCollection:
         scaling_group_id = generate_key_str('scalinggroup')
 
         queries = [
-            _cql["insert"].format(cf=self.cflist["config"], name=":scaling"),
-            _cql["insert"].format(cf=self.cflist["launch"], name=":launch")]
+            _cql_insert.format(cf=self.cflist["config"], name=":scaling"),
+            _cql_insert.format(cf=self.cflist["launch"], name=":launch")]
         b = Batch(queries, {"tenantId": tenant_id,
                             "groupId": scaling_group_id,
                             "scaling": _serial_json_data(config, 1),
@@ -380,9 +378,9 @@ class CassScalingGroupCollection:
         """
 
         queries = [
-            _cql["delete"].format(cf=self.cflist["config"]),
-            _cql["delete"].format(cf=self.cflist["launch"]),
-            _cql["delete"].format(cf=self.cflist["policies"])]
+            _cql_delete.format(cf=self.cflist["config"]),
+            _cql_delete.format(cf=self.cflist["launch"]),
+            _cql_delete.format(cf=self.cflist["policies"])]
         b = Batch(
             queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
         b.execute(self.connection)
@@ -421,7 +419,7 @@ class CassScalingGroupCollection:
                                              self.connection, self.cflist))
             return defer.succeed(data)
 
-        query = _cql["list"].format(cf=self.cflist["config"])
+        query = _cql_list.format(cf=self.cflist["config"])
         d = self.connection.execute(query,
                                     {"tenantId": tenant_id})
         d.addCallback(_grab_list)
