@@ -25,6 +25,7 @@ def _serial_json_data(data, ver):
     dataOut["_ver"] = ver
     return json.dumps(dataOut)
 
+
 _cql = {
     "view": "SELECT data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;",
     "insert": "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})",
@@ -33,9 +34,9 @@ _cql = {
 }
 
 
-class CassScalingGroup:
+class CassScalingGroup(object):
     """
-    Mock scaling group record
+    Scaling group record
 
     :ivar tenant_id: the tenant ID of the scaling group - once set, should not
         be updated
@@ -79,9 +80,7 @@ class CassScalingGroup:
 
     def __init__(self, tenant_id, uuid, connection, cflist):
         """
-        Creates a MockScalingGroup object.  If the actual scaling group should
-        be created, a creation argument is provided containing the config, the
-        launch config, and optional scaling policies.
+        Creates a CassScalingGroup object.
         """
         self.tenant_id = tenant_id
         self.uuid = uuid
@@ -101,7 +100,7 @@ class CassScalingGroup:
         query = _cql["view"].format(cf=self.cflist["config"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                        "groupId": self.uuid})
+                                     "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
         return d
 
@@ -112,7 +111,7 @@ class CassScalingGroup:
         query = _cql["view"].format(cf=self.cflist["launch"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                        "groupId": self.uuid})
+                                     "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
         return d
 
@@ -120,7 +119,7 @@ class CassScalingGroup:
         """
         :return: :class:`Deferred` that fires with a view of the state
         """
-        pass
+        raise NotImplementedError()
 
     def update_config(self, data):
         """
@@ -186,7 +185,7 @@ class CassScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        pass
+        raise NotImplementedError()
 
     def bounce_entity(self, entity_id):
         """
@@ -194,7 +193,7 @@ class CassScalingGroup:
 
         :return: :class:`Deferred` that fires with None
         """
-        pass
+        raise NotImplementedError()
 
     def list_policies(self):
         """
@@ -203,7 +202,7 @@ class CassScalingGroup:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        pass
+        raise NotImplementedError()
 
     def get_policy(self, policy_id):
         """
@@ -212,7 +211,7 @@ class CassScalingGroup:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        pass
+        raise NotImplementedError()
 
     def create_policy(self, data):
         """
@@ -223,7 +222,7 @@ class CassScalingGroup:
 
         :return: the UUID of the newly created scaling policy
         """
-        pass
+        raise NotImplementedError()
 
     def update_policy(self, policy_id, data):
         """
@@ -240,7 +239,7 @@ class CassScalingGroup:
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        pass
+        raise NotImplementedError()
 
     def delete_policy(self, policy_id):
         """
@@ -253,32 +252,32 @@ class CassScalingGroup:
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
+        raise NotImplementedError()
 
     def _ensure_there(self):
         query = _cql["view"].format(cf=self.cflist["config"])
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                        "groupId": self.uuid})
+                                     "groupId": self.uuid})
         d.addCallback(self._grab_json_data)
         return d
 
     def _grab_json_data(self, rawResponse):
         if rawResponse is None:
-            err = CassBadDataError("None")
+            err = CassBadDataError("received unexpected None response")
             return defer.fail(err)
         if len(rawResponse) == 0:
             err = NoSuchScalingGroupError(self.tenant_id, self.uuid)
             return defer.fail(err)
         if 'cols' not in rawResponse[0]:
-            err = CassBadDataError("No cols")
+            err = CassBadDataError("Received malformed response with no cols")
             return defer.fail(err)
         rec = None
         for rawRec in rawResponse[0]['cols']:
             if rawRec['name'] is 'data':
                 rec = rawRec['value']
         if rec is None:
-            err = CassBadDataError("No data")
+            err = CassBadDataError("Received malformed response without the ")
             return defer.fail(err)
         data = None
         try:
@@ -382,9 +381,9 @@ class CassScalingGroupCollection:
         """
 
         queries = [
-            _cql["insert"].format(cf=self.cflist["config"]),
-            _cql["insert"].format(cf=self.cflist["launch"]),
-            _cql["insert"].format(cf=self.cflist["policies"])]
+            _cql["delete"].format(cf=self.cflist["config"]),
+            _cql["delete"].format(cf=self.cflist["launch"]),
+            _cql["delete"].format(cf=self.cflist["policies"])]
         b = Batch(
             queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
         b.execute(self.connection)
@@ -406,8 +405,7 @@ class CassScalingGroupCollection:
                 err = CassBadDataError("None")
                 return defer.fail(err)
             if len(rawResponse) == 0:
-                err = NoSuchScalingGroupError(self.tenant_id, self.uuid)
-                return defer.fail(err)
+                return defer.succeed([])
             data = []
             for row in rawResponse:
                 if 'cols' not in row:

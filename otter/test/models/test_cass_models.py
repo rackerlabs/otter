@@ -291,7 +291,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId=:tenantId"
+        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId = :tenantId;"
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)
@@ -300,9 +300,23 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             self.assertEqual(row.tenant_id, '123')
         self.assertEqual(r[0].uuid, 'group1')
         self.assertEqual(r[1].uuid, 'group3')
-        self.connection.execute.assert_called_once_With(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.ONE)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData)
+
+    def test_list_empty(self):
+        """
+        Test that you can list a bunch of configs.
+        """
+        mockdata = []
+
+        expectedData = {'tenantId': '123'}
+        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId = :tenantId;"
+        self.connection.execute.return_value = defer.succeed(mockdata)
+        d = self.collection.list_scaling_groups('123')
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(len(r), 0)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData)
 
     def test_get(self):
         """

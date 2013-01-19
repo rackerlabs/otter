@@ -1,13 +1,11 @@
 """ Hash key related library code """
 import uuid
 
-""" Cribbed off of the way ELE works """
 
-
-def generate_key_str(type):
+def generate_key_str(keytype):
     """
-    Generates a random string.
+    Generates an opaque unique identifier
 
     Generally returns a UUID, but we're accepting a type paramater
     """
-    return uuid.uuid5(uuid.NAMESPACE_DNS, "autoscale.api.rackspacecloud.com")
+    return uuid.uuid4()
