@@ -179,7 +179,7 @@ policy_list_examples = {
 }
 
 
-# schemas for group creation
+# ----- schemas for group creation
 create_group_request = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
@@ -216,6 +216,7 @@ create_group_request_examples = [
 # that it is wrapped in an extra dictionary with the "group" key and has
 create_group_response = _openstackify_schema("group", create_group_request,
                                              True)
+create_group_response["description"] = "Schema of the create group response."
 
 create_group_response_examples = [
     {
