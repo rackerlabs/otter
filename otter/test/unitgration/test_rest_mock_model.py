@@ -131,34 +131,6 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         groups = json.loads(wrapper.content)
         self.assertEqual(len(groups), number)
 
-    def edit_and_view_scaling_group_config(self, path):
-        """
-        Editing the config of a scaling group with a valid config returns with
-        a 204 no content.  The next attempt to view the scaling group should
-        return the new config.
-        """
-        config = {
-            'name': 'edited',
-            'cooldown': 5,
-            'minEntities': 3,
-            'maxEntities': 10,
-            'metadata': {
-                'anotherkey': 'anothervalue'
-            }
-        }
-
-        wrapper = self.assert_deferred_succeeded(
-            request('PUT', path, body=json.dumps(config)))
-
-        self.assertEqual(wrapper.response.code, 204,
-                         "Edit failed: {0}".format(wrapper.content))
-        self.assertEqual(wrapper.content, "")
-
-        # now try to view
-        wrapper = self.assert_deferred_succeeded(request('GET', path))
-        self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), config)
-
     def test_crd_scaling_group(self):
         """
         Start with no scaling groups.  Create one, make sure it's listed, then
@@ -175,19 +147,69 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         # there should be no scaling groups now
         self.assert_number_of_scaling_groups(0)
 
-    # def test_ru_scaling_config(self):
-    #     """
-    #     Create the scaling group - view just the config, then edit the config.
-    #     It should be changed in the scaling config view.
-    #     """
-    #     # start with no scaling groups
-    #     self.assert_number_of_scaling_groups(0)
-    #     path, manifest = self.create_and_view_scaling_group()
+    def test_ru_scaling_config(self):
+        """
+        Editing the config of a scaling group with a valid config returns with
+        a 204 no content.  The next attempt to view the scaling config should
+        return the new config.  The steady state numbers get updated as well,
+        if necessary.
+        """
+        # make sure there is a scaling group
+        path = self.create_and_view_scaling_group()
+        config_path = path + '/config'
+        edited_config = {
+            'name': 'updated_config',
+            'cooldown': 5,
+            'minEntities': config[1]['minEntities'] + 5,
+            'maxEntities': (config[1]['maxEntities'] or 10) + 5,
+            'metadata': {
+                'anotherkey': 'anothervalue'
+            }
+        }
 
-    #     # there should be one scaling group now
-    #     self.assert_number_of_scaling_groups(1)
-    #     self.edit_and_view_scaling_group(path)
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'PUT', config_path, body=json.dumps(edited_config)))
 
-    #     # TODO: once the manifest view is implemented, add this test back in
-    #     # to view/modify the configuration, and check that the modified config
-    #     # also appears in the manifested view
+        self.assertEqual(wrapper.response.code, 204,
+                         "Edit failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view again - the config should be the edited config
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', config_path))
+        self.assertEqual(wrapper.response.code, 200)
+        self.assertEqual(json.loads(wrapper.content), edited_config)
+
+        # make sure the created group has updated pending entities, and is
+        # still not paused
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', path + '/state'))
+        self.assertEqual(wrapper.response.code, 200)
+
+        response = json.loads(wrapper.content)
+        self.assertTrue(not response['paused'])
+        self.assertTrue(len(response['pending']),
+                        config[1]['minEntities'] + 5)
+
+    def test_ru_launch_config(self):
+        """
+        Editing the launch config of a scaling group with a valid launch config
+        returns with a 204 no content.  The next attempt to view the launch
+        config should return the new launch config.
+        """
+        # make sure there is a scaling group
+        path = self.create_and_view_scaling_group() + '/launch'
+        edited_launch = launch_server_config[1]
+
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'PUT', path, body=json.dumps(edited_launch)))
+
+        self.assertEqual(wrapper.response.code, 204,
+                         "Edit failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view again - the config should be the edited config
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 200)
+        self.assertEqual(json.loads(wrapper.content), edited_launch)

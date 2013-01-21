@@ -155,6 +155,10 @@ class MockScalingGroup:
         attributes in ``data``.  Has the option to partially update the config,
         since when creating the model there could be default variables.
 
+        Every time this is updated, the steady state and the number of entities
+        should be checked/modified to ensure compliance with the minimum and
+        maximum number of entities.
+
         :return: :class:`Deferred` that fires with None
         """
         if self.error is not None:
