@@ -217,27 +217,44 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_view_manifest(self):
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_view_manifest(self, url_root):
         """
         Viewing the manifest of an existant group returns whatever the
         implementation's `view_manifest()` method returns, in string format
         """
-        expected = {
+        manifest = {
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
-            'scalingPolicies': policy_examples
+            'scalingPolicies': {"5": policy_examples[0].copy()}
         }
-        self.mock_group.view_manifest.return_value = defer.succeed(expected)
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        validate(resp, rest_schemas.create_group_request)
-        self.assertEqual(resp, expected)
+        validate(resp, rest_schemas.view_manifest_response)
+
+        expected = manifest.copy()
+        expected["scalingPolicies"] = [policy_examples[0].copy()]
+        expected["scalingPolicies"][0].update({
+            "id": "5",
+            "links": [
+                {"href": "/v1.0/11111/groups/one/policy/5", "rel": "self"},
+                {"href": "/11111/groups/one/policy/5", "rel": "bookmark"}
+            ]
+        })
+        expected.update({
+            "id": "one",
+            "links": [
+                {"href": "/v1.0/11111/groups/one", "rel": "self"},
+                {"href": "/11111/groups/one", "rel": "bookmark"}
+            ]
+        })
+        self.assertEqual(resp, {'group': expected})
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
         self.mock_group.view_manifest.assert_called_once_with()
-    test_view_manifest.skip = "Broken as API changes"
 
     def test_group_delete(self):
         """

@@ -46,7 +46,8 @@ class IScalingGroup(Interface):
         :return: a dictionary with 3 keys: ``groupConfiguration`` containing
             the group configuration dictionary, ``launchConfiguration``
             containing the launch configuration dictionary, and
-            ``scalingPolicies`` containing a list of all the scaling policies
+            ``scalingPolicies`` containing a dictionary of the scaling policies
+            mapped to their UUIDs
         :rtype: ``dict``
         """
         pass

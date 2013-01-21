@@ -377,6 +377,15 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
     def openstack_formatting(data, uuid):
         data["id"] = uuid
         data["links"] = get_autoscale_links(tenantId, uuid)
+
+        policies = []
+        for policy_id, policy in data["scalingPolicies"].iteritems():
+            policy["id"] = policy_id
+            policy["links"] = get_autoscale_links(tenantId, uuid, policy_id)
+            policies.append(policy)
+
+        data["scalingPolicies"] = policies
+
         return {"group": data}
 
     group = get_store().get_scaling_group(tenantId, groupId)

@@ -129,6 +129,12 @@ group_state = {
 }
 
 
+view_policy = deepcopy(policy)
+view_policy["properties"].update(link_objects["properties"])
+for type_blob in view_policy["type"]:
+    type_blob["properties"].update(link_objects["properties"])
+
+
 create_policy_array = {
     "type": "array",
     "items": [policy],
@@ -217,3 +223,22 @@ create_group_response_examples = [
     }
     for request in create_group_request_examples
 ]
+
+
+# ----- schemas for manifest viewing
+view_manifest_response = _openstackify_schema("group", {
+    "type": "object",
+    "description": ("Schema of the JSON used to display the scaling group's "
+                    "manifested view."),
+    "properties": {
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": {
+            "type": "array",
+            "items": [view_policy],
+            "uniqueItems": True,
+            "required": True
+        }
+    },
+    "additionalProperties": False
+}, True)
