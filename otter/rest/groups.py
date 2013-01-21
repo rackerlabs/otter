@@ -412,18 +412,6 @@ def delete_scaling_group(request, tenantId, groupId):
     return get_store().delete_scaling_group(tenantId, groupId)
 
 
-def _format_links(link_dict):
-    """
-    Transforms a mapping of entity_id's and their links to a dictionary
-    with an id parameter and a link parameter
-    """
-    return [
-        {
-            'id': entity_id,
-            'links': entity_links
-        } for entity_id, entity_links in link_dict.iteritems()]
-
-
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
 @fails_with(exception_codes)
@@ -489,7 +477,11 @@ def get_scaling_group_state(request, tenantId, groupId):
     """
     def reformat_active_and_pending(state_blob):
         for key in ('active', 'pending'):
-            state_blob[key] = _format_links(state_blob[key])
+            state_blob[key] = [
+                {
+                    'id': entity_id,
+                    'links': entity_links
+                } for entity_id, entity_links in state_blob[key].iteritems()]
 
         state_blob["id"] = groupId
         state_blob["links"] = get_autoscale_links(tenantId, groupId)

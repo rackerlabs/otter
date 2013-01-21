@@ -43,11 +43,8 @@ class IScalingGroup(Interface):
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
 
-        :return: a dictionary with 3 keys: ``groupConfiguration`` containing
-            the group configuration dictionary, ``launchConfiguration``
-            containing the launch configuration dictionary, and
-            ``scalingPolicies`` containing a dictionary of the scaling policies
-            mapped to their UUIDs
+        :return: a dictionary corresponding to the JSON schema at
+            ``otter.json_schema.model_schemas.view_manifest``
         :rtype: ``dict``
         """
         pass
@@ -55,7 +52,7 @@ class IScalingGroup(Interface):
     def view_config():
         """
         :return: a view of the config, as specified by
-            :data:`otter.json_schema.scaling_group.config`
+            :data:`otter.json_schema.group_schemas.config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
@@ -64,7 +61,7 @@ class IScalingGroup(Interface):
     def view_launch_config():
         """
         :return: a view of the launch config, as specified by
-            :data:`otter.json_schema.scaling_group.launch_config`
+            :data:`otter.json_schema.group_schemas.launch_config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
@@ -80,46 +77,8 @@ class IScalingGroup(Interface):
 
         The entity links are in JSON link format.
 
-        :return: a view of the state of the scaling group in the form::
-
-        {
-          "active": {
-            "{instanceId1}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                "rel": "bookmark"
-              }
-            ],
-            "{instanceId2}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
-                "rel": "bookmark"
-              }
-            ]
-          },
-          "pending": {
-            "{instanceId3}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
-                "rel": "bookmark"
-              }
-            ]
-          },
-          "steadyState": 3,
-          "paused": false
-        }
+        :return: a view of the state of the scaling group corresponding to the
+            JSON schema at ``otter.json_schema.model_schemas.group_state``
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
