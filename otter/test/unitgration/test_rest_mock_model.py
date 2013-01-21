@@ -98,8 +98,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
-        self.assertTrue(not response['paused'])
-        self.assertTrue(len(response['pending']),
+        self.assertTrue(not response["group"]['paused'])
+        self.assertTrue(len(response["group"]['pending']),
                         config[1]['minEntities'])
 
         return path
@@ -191,8 +191,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
-        self.assertTrue(not response['paused'])
-        self.assertTrue(len(response['pending']),
+        self.assertTrue(not response['group']['paused'])
+        self.assertTrue(len(response['group']['pending']),
                         config[1]['minEntities'] + 5)
 
     def test_ru_launch_config(self):

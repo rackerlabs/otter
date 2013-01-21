@@ -110,7 +110,7 @@ list_groups_response = {
     "additionalProperties": False
 }
 
-group_state = {
+group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
         'steadyState': {
@@ -126,7 +126,7 @@ group_state = {
         'pending': list_of_links
     },
     'additionalProperties': False
-}
+}, True)
 
 
 view_policy = deepcopy(policy)
