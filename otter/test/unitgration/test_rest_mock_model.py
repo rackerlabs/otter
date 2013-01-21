@@ -182,7 +182,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         wrapper = self.assert_deferred_succeeded(
             request(root, 'GET', config_path))
         self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), edited_config)
+        self.assertEqual(json.loads(wrapper.content),
+                         {'groupConfiguration': edited_config})
 
         # make sure the created group has updated pending entities, and is
         # still not paused
@@ -216,4 +217,5 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         wrapper = self.assert_deferred_succeeded(
             request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), edited_launch)
+        self.assertEqual(json.loads(wrapper.content),
+                         {'launchConfiguration': edited_launch})

@@ -225,6 +225,11 @@ create_group_response_examples = [
 ]
 
 
+# ----- schemas for viewing configs
+view_config = _openstackify_schema("groupConfiguration", config, False)
+view_launch_config = _openstackify_schema("launchConfiguration", launch_config,
+
+                                          False)
 # ----- schemas for manifest viewing
 view_manifest_response = _openstackify_schema("group", {
     "type": "object",
