@@ -160,8 +160,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         edited_config = {
             'name': 'updated_config',
             'cooldown': 5,
-            'minEntities': config_examples[1]['minEntities'] + 5,
-            'maxEntities': (config_examples[1]['maxEntities'] or 10) + 5,
+            'minEntities': config[1]['minEntities'] + 5,
+            'maxEntities': (config[1]['maxEntities'] or 10) + 5,
             'metadata': {
                 'anotherkey': 'anothervalue'
             }
@@ -189,7 +189,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         response = json.loads(wrapper.content)
         self.assertTrue(not response['paused'])
         self.assertTrue(len(response['pending']),
-                        config_examples[1]['minEntities'] + 5)
+                        config[1]['minEntities'] + 5)
 
     def test_ru_launch_config(self):
         """
@@ -199,7 +199,7 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         """
         # make sure there is a scaling group
         path = self.create_and_view_scaling_group() + '/launch'
-        edited_launch = launch_server_config_examples[1]
+        edited_launch = launch_server_config[1]
 
         wrapper = self.assert_deferred_succeeded(
             request(root, 'PUT', path, body=json.dumps(edited_launch)))
