@@ -1,3 +1,7 @@
+"""
+Upload a specified artifact to cloudfiles
+"""
+
 import os
 import sys
 from libcloud.storage.types import Provider, ContainerDoesNotExistError
