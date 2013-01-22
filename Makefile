@@ -39,7 +39,7 @@ coverage:
 	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
-	rm -rf _builddoc	
+	rm -rf _builddoc
 	rm -rf htmldoc
 
 docs: cleandocs
@@ -75,8 +75,8 @@ clean: cleandocs
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
 	rm -rf otter-deploy*
-	rm schema/setup-*.cql
-	rm schema/teardown-*.cql
+	rm -rf schema/setup-*.cql
+	rm -rf schema/teardown-*.cql
 
 bundle:
 	./scripts/bundle.sh
