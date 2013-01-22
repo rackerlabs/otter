@@ -98,8 +98,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
-        self.assertTrue(not response['paused'])
-        self.assertTrue(len(response['pending']),
+        self.assertTrue(not response["group"]['paused'])
+        self.assertTrue(len(response["group"]['pending']),
                         config[1]['minEntities'])
 
         return path
@@ -182,7 +182,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         wrapper = self.assert_deferred_succeeded(
             request(root, 'GET', config_path))
         self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), edited_config)
+        self.assertEqual(json.loads(wrapper.content),
+                         {'groupConfiguration': edited_config})
 
         # make sure the created group has updated pending entities, and is
         # still not paused
@@ -191,8 +192,8 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
-        self.assertTrue(not response['paused'])
-        self.assertTrue(len(response['pending']),
+        self.assertTrue(not response['group']['paused'])
+        self.assertTrue(len(response['group']['pending']),
                         config[1]['minEntities'] + 5)
 
     def test_ru_launch_config(self):
@@ -216,4 +217,5 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         wrapper = self.assert_deferred_succeeded(
             request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content), edited_launch)
+        self.assertEqual(json.loads(wrapper.content),
+                         {'launchConfiguration': edited_launch})

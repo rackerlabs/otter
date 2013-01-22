@@ -377,6 +377,15 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
     def openstack_formatting(data, uuid):
         data["id"] = uuid
         data["links"] = get_autoscale_links(tenantId, uuid)
+
+        policies = []
+        for policy_id, policy in data["scalingPolicies"].iteritems():
+            policy["id"] = policy_id
+            policy["links"] = get_autoscale_links(tenantId, uuid, policy_id)
+            policies.append(policy)
+
+        data["scalingPolicies"] = policies
+
         return {"group": data}
 
     group = get_store().get_scaling_group(tenantId, groupId)
@@ -403,18 +412,6 @@ def delete_scaling_group(request, tenantId, groupId):
     return get_store().delete_scaling_group(tenantId, groupId)
 
 
-def _format_links(link_dict):
-    """
-    Transforms a mapping of entity_id's and their links to a dictionary
-    with an id parameter and a link parameter
-    """
-    return [
-        {
-            'id': entity_id,
-            'links': entity_links
-        } for entity_id, entity_links in link_dict.iteritems()]
-
-
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
 @fails_with(exception_codes)
@@ -429,57 +426,66 @@ def get_scaling_group_state(request, tenantId, groupId):
     Example response::
 
         {
-          "active": [
-            {
-              "id": "{instanceId1}"
-              "links": [
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                  "rel": "self"
-                },
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                  "rel": "bookmark"
-                }
-              ]
-            },
-            {
-              "id": "{instanceId2}"
-              "links": [
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
-                  "rel": "self"
-                },
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
-                  "rel": "bookmark"
-                }
-              ]
-            }
-          ],
-          "pending": [
-            {
-              "id": "{instanceId3}"
-              "links": [
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
-                  "rel": "self"
-                },
-                {
-                  "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
-                  "rel": "bookmark"
-                }
-              ]
-            }
-          ],
-          "steadyState": 3,
-          "paused": false
+          "group": {
+            "active": [
+              {
+                "id": "{instanceId1}"
+                "links": [
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+                    "rel": "bookmark"
+                  }
+                ]
+              },
+              {
+                "id": "{instanceId2}"
+                "links": [
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
+                    "rel": "bookmark"
+                  }
+                ]
+              }
+            ],
+            "pending": [
+              {
+                "id": "{instanceId3}"
+                "links": [
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
+                    "rel": "bookmark"
+                  }
+                ]
+              }
+            ],
+            "steadyState": 3,
+            "paused": false
+          }
         }
     """
     def reformat_active_and_pending(state_blob):
         for key in ('active', 'pending'):
-            state_blob[key] = _format_links(state_blob[key])
-        return state_blob
+            state_blob[key] = [
+                {
+                    'id': entity_id,
+                    'links': entity_links
+                } for entity_id, entity_links in state_blob[key].iteritems()]
+
+        state_blob["id"] = groupId
+        state_blob["links"] = get_autoscale_links(tenantId, groupId)
+        return {"group": state_blob}
 
     group = get_store().get_scaling_group(tenantId, groupId)
     deferred = group.view_state()
