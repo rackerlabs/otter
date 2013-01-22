@@ -111,7 +111,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result['groupConfiguration'], self.output_config)
         self.assertEqual(result['launchConfiguration'], self.launch_config)
         self.assertEqual(result['scalingPolicies'].values(), self.policies)
-    test_view_manifest_has_all_info.skip = "Broken as API changes"
 
     def test_default_view_config_has_all_info(self):
         """

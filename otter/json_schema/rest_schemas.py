@@ -110,7 +110,7 @@ list_groups_response = {
     "additionalProperties": False
 }
 
-group_state = {
+group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
         'steadyState': {
@@ -126,7 +126,13 @@ group_state = {
         'pending': list_of_links
     },
     'additionalProperties': False
-}
+}, True)
+
+
+view_policy = deepcopy(policy)
+view_policy["properties"].update(link_objects["properties"])
+for type_blob in view_policy["type"]:
+    type_blob["properties"].update(link_objects["properties"])
 
 
 create_policy_array = {
@@ -217,3 +223,27 @@ create_group_response_examples = [
     }
     for request in create_group_request_examples
 ]
+
+
+# ----- schemas for viewing configs
+view_config = _openstackify_schema("groupConfiguration", config, False)
+view_launch_config = _openstackify_schema("launchConfiguration", launch_config,
+
+                                          False)
+# ----- schemas for manifest viewing
+view_manifest_response = _openstackify_schema("group", {
+    "type": "object",
+    "description": ("Schema of the JSON used to display the scaling group's "
+                    "manifested view."),
+    "properties": {
+        "groupConfiguration": config,
+        "launchConfiguration": launch_config,
+        "scalingPolicies": {
+            "type": "array",
+            "items": [view_policy],
+            "uniqueItems": True,
+            "required": True
+        }
+    },
+    "additionalProperties": False
+}, True)

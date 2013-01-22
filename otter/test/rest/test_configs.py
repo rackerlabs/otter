@@ -5,7 +5,7 @@ for a scaling group.
 """
 
 import json
-from jsonschema import ValidationError
+from jsonschema import validate, ValidationError
 
 import mock
 
@@ -15,6 +15,7 @@ from twisted.trial.unittest import TestCase
 from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples)
+from otter.json_schema import rest_schemas
 from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
@@ -81,8 +82,9 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         }
         self.mock_group.view_config.return_value = defer.succeed(config)
 
-        response_body = self.assert_status_code(200)
-        self.assertEqual(json.loads(response_body), config)
+        response_body = json.loads(self.assert_status_code(200))
+        validate(response_body, rest_schemas.view_config)
+        self.assertEqual(response_body, {'groupConfiguration': config})
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.view_config.assert_called_once_with()
@@ -227,8 +229,10 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         self.mock_group.view_launch_config.return_value = defer.succeed(
             launch_examples[0])
 
-        body = self.assert_status_code(200)
-        self.assertEqual(json.loads(body), launch_examples[0])
+        response_body = self.assert_status_code(200)
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.view_launch_config)
+        self.assertEqual(resp, {'launchConfiguration': launch_examples[0]})
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()

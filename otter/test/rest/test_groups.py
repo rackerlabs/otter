@@ -217,27 +217,49 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_view_manifest(self):
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_view_manifest(self, url_root):
         """
         Viewing the manifest of an existant group returns whatever the
         implementation's `view_manifest()` method returns, in string format
         """
-        expected = {
+        manifest = {
             'groupConfiguration': config_examples[0],
             'launchConfiguration': launch_examples[0],
-            'scalingPolicies': policy_examples
+            'scalingPolicies': {"5": policy_examples[0].copy()}
         }
-        self.mock_group.view_manifest.return_value = defer.succeed(expected)
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        validate(resp, rest_schemas.create_group_request)
+        validate(resp, rest_schemas.view_manifest_response)
+
+        expected_policy = policy_examples[0].copy()
+        expected_policy.update({
+            "id": "5",
+            "links": [
+                {"href": "/v1.0/11111/groups/one/policy/5", "rel": "self"},
+                {"href": "/11111/groups/one/policy/5", "rel": "bookmark"}
+            ]
+        })
+
+        expected = {
+            'group': {
+                'groupConfiguration': config_examples[0],
+                'launchConfiguration': launch_examples[0],
+                'scalingPolicies': [expected_policy],
+                "id": "one",
+                "links": [
+                    {"href": "/v1.0/11111/groups/one", "rel": "self"},
+                    {"href": "/11111/groups/one", "rel": "bookmark"}
+                ]
+            }
+        }
         self.assertEqual(resp, expected)
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
         self.mock_group.view_manifest.assert_called_once_with()
-    test_view_manifest.skip = "Broken as API changes"
 
     def test_group_delete(self):
         """
@@ -296,7 +318,8 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_view_state(self):
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_view_state(self, url_root):
         """
         Viewing the state of an existant group returns whatever the
         implementation's `view_state()` method returns, in string format, with
@@ -325,15 +348,20 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
 
         validate(resp, rest_schemas.group_state)
-        self.assertEqual(resp, {
+        self.assertEqual(resp, {"group": {
             'active': [
                 {'id': '1', 'links': [make_link("rel"), make_link("bookmark")]},
                 {'id': '2', 'links': [make_link("rel")]}
             ],
             'pending': [{'id': '3', 'links': [make_link("rel")]}],
             'steadyState': 5,
-            'paused': False
-        })
+            'paused': False,
+            'id': "one",
+            "links": [
+                {"href": "/v1.0/11111/groups/one", "rel": "self"},
+                {"href": "/11111/groups/one", "rel": "bookmark"}
+            ]
+        }})
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
