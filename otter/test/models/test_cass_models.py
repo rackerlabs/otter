@@ -41,9 +41,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.connection.execute.side_effect = _responses
 
-        cflist = {"config": "scaling_config",
-                  "launch": "launch_config",
-                  "policies": "scaling_policies"}
         self.tenant_id = '11111'
         self.config = {
             'name': '',
@@ -64,7 +61,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }
         self.policies = []
         self.group = CassScalingGroup(self.tenant_id, '12345678',
-                                      self.connection, cflist)
+                                      self.connection)
 
     def test_view_config(self):
         """
@@ -239,10 +236,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """ Setup the mocks """
         self.connection = mock.MagicMock()
         self.connection.execute.return_value = defer.succeed(None)
-        cflist = {"config": "scaling_config",
-                  "launch": "launch_config",
-                  "policies": "scaling_policies"}
-        self.collection = CassScalingGroupCollection(self.connection, cflist)
+        self.collection = CassScalingGroupCollection(self.connection)
         self.tenant_id = 'goo1234'
         self.config = {
             'name': 'blah',

@@ -76,14 +76,16 @@ class CassScalingGroup(object):
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, tenant_id, uuid, connection, cflist):
+    def __init__(self, tenant_id, uuid, connection):
         """
         Creates a CassScalingGroup object.
         """
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
-        self.cflist = cflist
+        self.config_table = "scaling_config"
+        self.launch_table = "launch_config"
+        self.policies_table = "scaling_policies"
 
     def view_manifest(self):
         """
@@ -95,7 +97,7 @@ class CassScalingGroup(object):
         """
         :return: :class:`Deferred` that fires with a view of the config
         """
-        query = _cql_view.format(cf=self.cflist["config"])
+        query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -106,7 +108,7 @@ class CassScalingGroup(object):
         """
         :return: :class:`Deferred` that fires with a view of the launch config
         """
-        query = _cql_view.format(cf=self.cflist["launch"])
+        query = _cql_view.format(cf=self.launch_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -132,10 +134,8 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = _cql_insert.format(cf=self.cflist["config"], name=":scaling")
+            queries = [_cql_insert.format(cf=self.config_table, name=":scaling")]
 
-            queries = [cqlstr
-                       ]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "scaling": _serial_json_data(data, 1)})
@@ -158,10 +158,8 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            cqlstr = _cql_insert.format(cf=self.cflist["launch"], name=":launch")
+            queries = [_cql_insert.format(cf=self.launch_table, name=":launch")]
 
-            queries = [
-                cqlstr]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "launch": _serial_json_data(data, 1)})
@@ -252,7 +250,7 @@ class CassScalingGroup(object):
         raise NotImplementedError()
 
     def _ensure_there(self):
-        query = _cql_view.format(cf=self.cflist["config"])
+        query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -261,30 +259,25 @@ class CassScalingGroup(object):
 
     def _grab_json_data(self, rawResponse):
         if rawResponse is None:
-            err = CassBadDataError("received unexpected None response")
-            return defer.fail(err)
+            raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            err = NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            return defer.fail(err)
+            raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
         if 'cols' not in rawResponse[0]:
-            err = CassBadDataError("Received malformed response with no cols")
-            return defer.fail(err)
+            raise CassBadDataError("Received malformed response with no cols")
         rec = None
         for rawRec in rawResponse[0]['cols']:
             if rawRec['name'] is 'data':
                 rec = rawRec['value']
         if rec is None:
-            err = CassBadDataError("Received malformed response without the ")
-            return defer.fail(err)
+            raise CassBadDataError("Received malformed response without the ")
         data = None
         try:
             data = json.loads(rec)
             if "_ver" in data:
                 del data["_ver"]
-            return defer.succeed(data)
+            return data
         except ValueError:
-            err = CassBadDataError("Bad data")
-            return defer.fail(err)
+            raise CassBadDataError("Bad data")
 
 
 class CassScalingGroupCollection:
@@ -310,7 +303,7 @@ class CassScalingGroupCollection:
     """
     zope.interface.implements(IScalingGroupCollection)
 
-    def __init__(self, connection, cflist):
+    def __init__(self, connection):
         """
         Init
 
@@ -319,7 +312,9 @@ class CassScalingGroupCollection:
         :param cflist: Column family list
         """
         self.connection = connection
-        self.cflist = cflist
+        self.config_table = "scaling_config"
+        self.launch_table = "launch_config"
+        self.policies_table = "scaling_policies"
 
     def create_scaling_group(self, tenant_id, config, launch, policies=None):
         """
@@ -351,8 +346,8 @@ class CassScalingGroupCollection:
         scaling_group_id = generate_key_str('scalinggroup')
 
         queries = [
-            _cql_insert.format(cf=self.cflist["config"], name=":scaling"),
-            _cql_insert.format(cf=self.cflist["launch"], name=":launch")]
+            _cql_insert.format(cf=self.config_table, name=":scaling"),
+            _cql_insert.format(cf=self.launch_table, name=":launch")]
         b = Batch(queries, {"tenantId": tenant_id,
                             "groupId": scaling_group_id,
                             "scaling": _serial_json_data(config, 1),
@@ -378,9 +373,9 @@ class CassScalingGroupCollection:
         """
 
         queries = [
-            _cql_delete.format(cf=self.cflist["config"]),
-            _cql_delete.format(cf=self.cflist["launch"]),
-            _cql_delete.format(cf=self.cflist["policies"])]
+            _cql_delete.format(cf=self.config_table),
+            _cql_delete.format(cf=self.launch_table),
+            _cql_delete.format(cf=self.policies_table)]
         b = Batch(
             queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
         b.execute(self.connection)
@@ -416,10 +411,10 @@ class CassScalingGroupCollection:
                     err = CassBadDataError("No data")
                     return defer.fail(err)
                 data.append(CassScalingGroup(tenant_id, rec,
-                                             self.connection, self.cflist))
+                                             self.connection))
             return defer.succeed(data)
 
-        query = _cql_list.format(cf=self.cflist["config"])
+        query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": tenant_id})
         d.addCallback(_grab_list)
@@ -441,4 +436,4 @@ class CassScalingGroupCollection:
             :class:`twisted.internet.defer.Deferred`)
         """
         return CassScalingGroup(tenant_id, scaling_group_id,
-                                self.connection, self.cflist)
+                                self.connection)
