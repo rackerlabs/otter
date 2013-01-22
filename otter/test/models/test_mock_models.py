@@ -10,9 +10,6 @@ from otter.models.mock import (
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
                                     NoSuchPolicyError)
 
-from otter.json_schema.rest_schemas import policy_list
-from jsonschema import validate
-
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
@@ -343,13 +340,27 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(new_policy, create_return_value.values())
         self.assertIn(new_policy[0], result.values())
 
-    def test_list_policies(self):
+    def test_list_empty_policies(self):
         """
-        List all policies and validate the formatting.
+        If there are no policies, list policies conforms to the schema and
+        also is an empty dictionary
         """
+        self.group = MockScalingGroup(
+            self.tenant_id, 1,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': None})
+        self.assertEqual(self.validate_list_policies_return_value(), {})
 
-        resp = self.assert_deferred_succeeded(self.group.list_policies())
-        validate(resp, policy_list)
+    def test_list_all_policies(self):
+        """
+        List existing policies returns a dictionary of the policy mapped to the
+        ID
+        """
+        policies_dict = self.validate_list_policies_return_value()
+        self.assertEqual(len(policies_dict), len(self.policies))
+        policies = policies_dict.values()
+        for a_policy in self.policies:
+            self.assertIn(a_policy, policies)
 
     def test_get_policy_succeeds(self):
         """

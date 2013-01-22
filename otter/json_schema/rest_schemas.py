@@ -142,39 +142,6 @@ create_policy_array = {
 }
 
 
-policy_list = {
-    "type": "object",
-    "patternProperties": {
-        "^\S+$": {
-            "type": "object",
-            "required": True,
-            "items": [policy]
-        }
-    },
-    "required": False,
-    "additionalProperties": False
-}
-
-
-policy_list_examples = {
-    "f236a93f-a46d-455c-9403-f26838011522": {
-        "name": "scale up by 10",
-        "change": 10,
-        "cooldown": 5
-    },
-    "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
-        "name": "scale down a 5.5 percent because of a tweet",
-        "changePercent": -5.5,
-        "cooldown": 6
-    },
-    "228dbf91-7b15-4d21-8de2-fa584f01a440": {
-        "name": "set number of servers to 10",
-        "steadyState": 10,
-        "cooldown": 3
-    }
-}
-
-
 # ----- schemas for group creation
 create_group_request = {
     "type": "object",
