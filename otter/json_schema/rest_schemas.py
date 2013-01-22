@@ -19,16 +19,19 @@ links = {
     'required': True,
     'uniqueItems': True,
     'items': {
-        'rel': {
-            'type': 'string',
-            'required': True
+        'type': 'object',
+        'properties': {
+            'rel': {
+                'type': 'string',
+                'required': True
+            },
+            'href': {
+                'type': 'string',
+                'required': True
+            }
         },
-        'href': {
-            'type': 'string',
-            'required': True
-        }
-    },
-    'minLength': 1
+        'additionalProperties': False
+    }
 }
 
 link_objects = {
@@ -74,7 +77,7 @@ def make_example_links(group_id):
     }
 
 
-def _openstackify_schema(key, schema, include_id=False):
+def _openstackify_schema(key, schema, include_id=False, paginated=False):
     """
     To make responses more open-stack like, wrap everything in a dictionary
     with a particular key corresponding to what the resource is.  Something
@@ -86,29 +89,41 @@ def _openstackify_schema(key, schema, include_id=False):
 
     Also, if the resource needs to include an ID of something, add id and links
     as required properties to this copy of the original schema.
+
+    :param key: The openstack key to use
+    :type key: ``str``
+
+    :param schema: The actual schema that defines the data
+    :type schema: ``dict``
+
+    :param include_id: to embed an id and links key into the schema - is it
+        an instance of something
+    :type include_id: ``bool``
+
+    :param paginated: Whether to include a list of paginated of links under
+        the key "<key>_links"
+    :type paginated: ``bool``
     """
     openstackified = deepcopy(schema)
     openstackified['required'] = True
     if include_id:
         openstackified["properties"].update(link_objects["properties"])
 
+    properties = {key: openstackified}
+
+    if paginated:
+        properties["{0}_links".format(key)] = links
+
     return {
         "type": "object",
-        "properties": {
-            key: openstackified
-        }
+        "properties": properties,
+        "additionalProperties": False
     }
 
 # ----------- endpoint request and response schemas and examples ---------
 
-list_groups_response = {
-    "type": "object",
-    "properties": {
-        "groups": list_of_links,
-        "groups_links": links
-    },
-    "additionalProperties": False
-}
+list_groups_response = _openstackify_schema("groups", list_of_links,
+                                            paginated=True)
 
 group_state = _openstackify_schema("group", {
     'type': 'object',
@@ -133,6 +148,20 @@ view_policy = deepcopy(policy)
 view_policy["properties"].update(link_objects["properties"])
 for type_blob in view_policy["type"]:
     type_blob["properties"].update(link_objects["properties"])
+
+
+list_policies_response = {
+    "type": "object",
+    "properties": {
+        "policies": {
+            "type": "array",
+            "items": [view_policy],
+            "uniqueItems": True,
+            "required": True
+        },
+        "policies_links": links
+    }
+}
 
 
 create_policy_array = {

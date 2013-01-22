@@ -5,7 +5,7 @@ for a scaling group.
 """
 
 import json
-from jsonschema import ValidationError
+from jsonschema import validate, ValidationError
 
 import mock
 
@@ -13,15 +13,11 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.group_examples import policy as policy_examples
+from otter.json_schema import rest_schemas
 from otter.models.interface import NoSuchPolicyError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-
-# import groups in order to get the routes created - the assignment is a trick
-# to ignore pyflakes
-import otter.rest.policies as _p
-policies = _p
 
 
 class AllPoliciesTestCase(RestAPITestMixin, TestCase):
@@ -36,9 +32,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         If an unexpected exception is raised, endpoint returns a 500.
         """
         error = DummyException('what')
-        (self.mock_group.
-            list_policies.
-            return_value) = defer.fail(error)
+        self.mock_group.list_policies.return_value = defer.fail(error)
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
@@ -47,12 +41,47 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         If there are no policies for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
         """
-        (self.mock_group.
-            list_policies.
-            return_value) = defer.succeed({})
-        body = self.assert_status_code(200)
+        self.mock_group.list_policies.return_value = defer.succeed({})
+        response_body = self.assert_status_code(200)
         self.mock_group.list_policies.assert_called_once()
-        self.assertEqual(json.loads(body), {})
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        self.assertEqual(resp, {
+            "policies": [],
+            "policies_links": []
+        })
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_policy_dictionary_gets_translated(self, url_root):
+        """
+        When there are policies returned as a dict, a properly formed JSON blob
+        containing ids and links are returned with a 200 (OK) status
+        """
+        self.mock_group.list_policies.return_value = defer.succeed({
+            '5': policy_examples()[0]
+        })
+        response_body = self.assert_status_code(200)
+        self.mock_group.list_policies.assert_called_once()
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        expected = policy_examples()[0]
+        expected['id'] = '5'
+        expected['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5'
+            },
+            {
+                'rel': 'bookmark',
+                'href': '/11111/groups/1/policies/5'
+            }
+        ]
+        self.assertEqual(resp, {
+            "policies": [expected],
+            "policies_links": []
+        })
 
     def test_policy_create_bad_input_400(self):
         """

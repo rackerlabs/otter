@@ -102,8 +102,22 @@ def list_policies(request, tenantId, groupId):
             ]
         }
     """
+    def format_policies(policy_dict):
+        policy_list = []
+        for policy_uuid, policy_item in policy_dict.iteritems():
+            policy_item['id'] = policy_uuid
+            policy_item['links'] = get_autoscale_links(
+                tenantId, groupId, policy_uuid)
+            policy_list.append(policy_item)
+
+        return {
+            'policies': policy_list,
+            "policies_links": []
+        }
+
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.list_policies()
+    deferred.addCallback(format_policies)
     deferred.addCallback(json.dumps)
     return deferred
 
