@@ -87,11 +87,11 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         (self.mock_group.
             create_policies.
             return_value) = defer.succeed("1")
-        request_body = policy_examples
+        request_body = policy_examples()
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body))
         self.mock_group.create_policies.assert_called_once_with(
-            policy_examples)
+            policy_examples())
 
 
 class OnePolicyTestCase(RestAPITestMixin, TestCase):
@@ -115,11 +115,11 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         (self.mock_group.
             get_policy.
-            return_value) = defer.succeed(policy_examples[0])
+            return_value) = defer.succeed(policy_examples()[0])
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        self.mock_group.get_policy.assert_equal(resp, policy_examples[0])
+        self.mock_group.get_policy.assert_equal(resp, policy_examples()[0])
 
     def test_view_policy_404(self):
         """
@@ -143,11 +143,11 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             return_value) = defer.succeed(None)
 
         response_body = self.assert_status_code(
-            204, method="PUT", body=json.dumps(policy_examples[1]))
+            204, method="PUT", body=json.dumps(policy_examples()[1]))
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_policy.assert_called_once_with(
-            self.policy_id, policy_examples[1])
+            self.policy_id, policy_examples()[1])
 
     def test_update_policy_failure_404(self):
         """
@@ -158,11 +158,11 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             return_value) = defer.fail(NoSuchPolicyError('11111', '1'))
 
         response_body = self.assert_status_code(
-            404, method="PUT", body=json.dumps(policy_examples[0]))
+            404, method="PUT", body=json.dumps(policy_examples()[0]))
         resp = json.loads(response_body)
 
         self.mock_group.update_policy.assert_called_once_with(
-            self.policy_id, policy_examples[0])
+            self.policy_id, policy_examples()[0])
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
@@ -173,7 +173,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         error = DummyException('what')
         self.mock_group.update_policy.return_value = defer.fail(error)
         self.assert_status_code(500, method="PUT",
-                                body=json.dumps(policy_examples[1]))
+                                body=json.dumps(policy_examples()[1]))
         self.flushLoggedErrors()
 
     def test_policy_update_bad_input_400(self):

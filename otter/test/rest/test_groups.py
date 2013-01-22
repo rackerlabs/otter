@@ -45,8 +45,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         error = DummyException('what')
         request_body = {
-            'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0]
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0]
         }
         self.mock_store.create_scaling_group.return_value = defer.fail(error)
         self.assert_status_code(500, method="POST",
@@ -160,9 +160,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Tries to create a scaling group
         """
         self._test_successful_create({
-            'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0],
-            'scalingPolicies': [policy_examples[0]]
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'scalingPolicies': [policy_examples()[0]]
         })
 
     def test_group_create_many_policies(self):
@@ -170,9 +170,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Tries to create a scaling group
         """
         self._test_successful_create({
-            'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0],
-            'scalingPolicies': policy_examples
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'scalingPolicies': policy_examples()
         })
 
     def test_group_create_no_scaling_policies(self):
@@ -181,8 +181,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         the the interface is called with None in place of scaling policies
         """
         self._test_successful_create({
-            'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0],
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
         })
 
 
@@ -224,9 +224,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         implementation's `view_manifest()` method returns, in string format
         """
         manifest = {
-            'groupConfiguration': config_examples[0],
-            'launchConfiguration': launch_examples[0],
-            'scalingPolicies': {"5": policy_examples[0].copy()}
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'scalingPolicies': {"5": policy_examples()[0]}
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
@@ -234,7 +234,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         validate(resp, rest_schemas.view_manifest_response)
 
-        expected_policy = policy_examples[0].copy()
+        expected_policy = policy_examples()[0]
         expected_policy.update({
             "id": "5",
             "links": [
@@ -245,8 +245,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         expected = {
             'group': {
-                'groupConfiguration': config_examples[0],
-                'launchConfiguration': launch_examples[0],
+                'groupConfiguration': config_examples()[0],
+                'launchConfiguration': launch_examples()[0],
                 'scalingPolicies': [expected_policy],
                 "id": "one",
                 "links": [

@@ -160,18 +160,18 @@ create_group_request = {
 
 create_group_request_examples = [
     {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0]
+        "groupConfiguration": config_examples()[0],
+        "launchConfiguration": launch_server_config_examples()[0]
     },
     {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": [policy_examples[0]]
+        "groupConfiguration": config_examples()[0],
+        "launchConfiguration": launch_server_config_examples()[0],
+        "scalingPolicies": [policy_examples()[0]]
     },
     {
-        "groupConfiguration": config_examples[1],
-        "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": [policy_examples[1], policy_examples[2]]
+        "groupConfiguration": config_examples()[1],
+        "launchConfiguration": launch_server_config_examples()[1],
+        "scalingPolicies": policy_examples()[1:3]
     }
 ]
 
