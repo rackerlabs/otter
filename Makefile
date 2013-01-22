@@ -2,10 +2,16 @@ CODEDIR=otter
 SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR}
+CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
 UNITTESTS ?= ${CODEDIR}
-
-
+CQLSHARGS ?= localhost 9170
+CONTROL_KEYSPACE ?= OTTER
+REPLICATION_FACTOR ?= 3
+CONTROL_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/$(REPLICATION_FACTOR)/g
+DEV_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/1/g
+CONTROL_SETUP    = $(shell ls schema/setup/control_*.cql | sort)
+CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 
 test: unit integration
 
@@ -33,7 +39,7 @@ coverage:
 	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
 
 cleandocs:
-	rm -rf _builddoc
+	rm -rf _builddoc	
 	rm -rf htmldoc
 
 docs: cleandocs
@@ -42,6 +48,26 @@ docs: cleandocs
 	sphinx-build -b html _builddoc htmldoc
 	rm -rf _builddoc
 
+schema: FORCE schema-setup schema-teardown
+
+schema-setup:
+	echo "-- *** Generated Schema ***" > schema/setup-dev.cql
+	echo "-- *** Generated Schema ***" > schema/setup-prod.cql
+	for f in $(CONTROL_SETUP); do \
+	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/setup-prod.cql; \
+	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/setup-dev.cql; \
+	done \
+
+schema-teardown:
+	echo "-- *** Generated Schema ***" > schema/teardown-dev.cql
+	echo "-- *** Generated Schema ***" > schema/teardown-prod.cql
+	for f in $(CONTROL_TEARDOWN); do \
+	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/teardown-prod.cql; \
+	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/teardown-dev.cql; \
+	done \
+
+FORCE:
+
 clean: cleandocs
 	find . -name '*.pyc' -delete
 	find . -name '.coverage' -delete
@@ -49,6 +75,8 @@ clean: cleandocs
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
 	rm -rf otter-deploy*
+	rm schema/setup-*.cql
+	rm schema/teardown-*.cql
 
 bundle:
 	./scripts/bundle.sh
