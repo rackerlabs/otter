@@ -20,7 +20,8 @@ def list_all_scaling_groups(request, tenantId):
 
     Example response::
 
-        [
+      {
+        "groups": [
           {
             "id": "{groupId1}"
             "links": [
@@ -47,17 +48,23 @@ def list_all_scaling_groups(request, tenantId):
               }
             ]
           }
-        ]
+        ],
+        "groups_links": []
+      }
     """
     def format_list(groups):
         # if this list of groups is ever too large, or getting the link
         # becomes a more time consuming task, perhaps this map should be done
         # cooperatively
-        return [
-            {
-                'id': group.uuid,
-                'links': get_autoscale_links(tenantId, group.uuid)
-            } for group in groups]
+        return {
+            "groups": [
+                {
+                    'id': group.uuid,
+                    'links': get_autoscale_links(tenantId, group.uuid)
+                } for group in groups
+            ],
+            "groups_links": []
+        }
 
     deferred = get_store().list_scaling_groups(tenantId)
     deferred.addCallback(format_list)
@@ -133,7 +140,7 @@ def create_new_scaling_group(request, tenantId, data):
                     "name": "scale up by 10",
                     "change": 10,
                     "cooldown": 5
-                }
+                },
                 {
                     "name": 'scale down 5.5 percent',
                     "changePercent": -5.5,
@@ -149,15 +156,99 @@ def create_new_scaling_group(request, tenantId, data):
 
     The ``scalingPolicies`` attribute can also be an empty list, or just left
     out entirely.
+
+    Example response body to the above request::
+
+        {
+            "group": {
+                "id": "{groupId}",
+                "links": [
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1"
+                    }
+                },
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
+                            },
+                            "personality": [
+                                {
+                                    "path": '/root/.ssh/authorized_keys',
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                }
+                            ],
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
+                            ],
+                        },
+                        "loadBalancers": [
+                            {
+                                "loadBalancerId": 2200,
+                                "port": 8081
+                            }
+                        ]
+                    }
+                },
+                "scalingPolicies": [
+                    {
+                        "name": "scale up by 10",
+                        "change": 10,
+                        "cooldown": 5
+                    }
+                    {
+                        "name": 'scale down 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
+                    },
+                    {
+                        "name": 'set number of servers to 10',
+                        "steadyState": 10,
+                        "cooldown": 3
+                    }
+                ]
+            }
+        }
+
     """
-    def send_redirect(uuid):
+    def send_redirect(uuid, data):
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
+        wrapped = {
+            "id": uuid,
+            "links": get_autoscale_links(tenantId, uuid)
+        }
+        wrapped.update(data)
+        return {"group": wrapped}
 
     deferred = get_store().create_scaling_group(
         tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
-    deferred.addCallback(send_redirect)
+    deferred.addCallback(send_redirect, data)
+    deferred.addCallback(json.dumps)
     return deferred
 
 
@@ -177,73 +268,122 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
     Example response::
 
         {
-            "groupConfiguration": {
-                "name": "workers",
-                "cooldown": 60,
-                "minEntities": 5,
-                "maxEntities": 100,
-                "metadata": {
-                    "firstkey": "this is a string",
-                    "secondkey": "1",
-                }
-            },
-            "launchConfiguration": {
-                "type": "launch_server",
-                "args": {
-                    "server": {
-                        "flavorRef": 3,
-                        "name": "webhead",
-                        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                        "OS-DCF:diskConfig": "AUTO",
-                        "metadata": {
-                            "mykey": "myvalue"
+            "group": {
+                "id": "{groupId}",
+                "links": [
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1",
+                    }
+                },
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
+                            },
+                            "personality": [
+                                {
+                                    "path": '/root/.ssh/authorized_keys',
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                }
+                            ],
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
+                            ],
                         },
-                        "personality": [
+                        "loadBalancers": [
                             {
-                                "path": '/root/.ssh/authorized_keys',
-                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                "loadBalancerId": 2200,
+                                "port": 8081
                             }
+                        ]
+                    }
+                },
+                "scalingPolicies": [
+                    {
+                        "id": "{policyId1}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                            "rel": "self"
+                          },
+                          {
+                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId1}"
+                            "rel": "bookmark"
+                          }
                         ],
-                        "networks": [
-                            {
-                                "uuid": "11111111-1111-1111-1111-111111111111"
-                            }
+                        "name": "scale up by 10",
+                        "change": 10,
+                        "cooldown": 5
+                    }
+                    {
+                        "id": "{policyId2}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                            "rel": "self"
+                          },
+                          {
+                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId2}"
+                            "rel": "bookmark"
+                          }
                         ],
+                        "name": 'scale down 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
                     },
-                    "loadBalancers": [
-                        {
-                            "loadBalancerId": 2200,
-                            "port": 8081
-                        }
-                    ]
-                }
-            },
-            "scalingPolicies": [
-                "ab2b2865-2e9d-4422-a6aa-5af184f81d7b": {
-                    "name": "scale up by one server",
-                    "change": 1,
-                    "cooldown": 150
-                },
-                "a64b4aa8-03f5-4c46-9bc0-add7c3795809": {
-                    "name": "scale up ten percent",
-                    "changePercent": 10,
-                    "cooldown": 150
-                },
-                "30faf2d1-39db-4c85-9505-07cbe7ab5569": {
-                    "name": "scale down one server",
-                    "change": -1,
-                    "cooldown": 150
-                },
-                "dde7c707-750d-4df5-9828-687bb77cb8fd": {
-                    "name": "scale down ten percent",
-                    "changePercent": -10,
-                    "cooldown": 150
-                }
-            ]
+                    {
+                        "id": "{policyId3}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId3}"
+                            "rel": "self"
+                          },
+                          {
+                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId3}"
+                            "rel": "bookmark"
+                          }
+                        ],
+                        "name": 'set number of servers to 10',
+                        "steadyState": 10,
+                        "cooldown": 3
+                    }
+                ]
+            }
         }
     """
+    def openstack_formatting(data, uuid):
+        data["id"] = uuid
+        data["links"] = get_autoscale_links(tenantId, uuid)
+        return {"group": data}
+
     group = get_store().get_scaling_group(tenantId, groupId)
-    return group.view_manifest().addCallback(json.dumps)
+    deferred = group.view_manifest()
+    deferred.addCallback(openstack_formatting, group.uuid)
+    deferred.addCallback(json.dumps)
+    return deferred
 
 
 # TODO: in the implementation story, the interface delete definition should be
