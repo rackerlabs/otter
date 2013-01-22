@@ -63,7 +63,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.list_scaling_groups.assert_called_once_with('11111')
 
         resp = json.loads(body)
-        self.assertEqual(resp, {"groups": []})
+        self.assertEqual(resp, {"groups": [], "groups_links": []})
         validate(resp, rest_schemas.list_groups_response)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
@@ -98,7 +98,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                         {"href": '/11111/groups/2', "rel": "bookmark"}
                     ]
                 }
-            ]
+            ],
+            "groups_links": []
         })
 
     def test_group_create_bad_input_400(self):

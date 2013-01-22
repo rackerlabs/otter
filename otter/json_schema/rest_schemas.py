@@ -3,7 +3,6 @@ JSON schemas for the rest responses from autoscale
 """
 
 from copy import deepcopy
-from uuid import uuid4
 
 from otter.json_schema.group_schemas import policy, config, launch_config
 from otter.json_schema.group_examples import (
@@ -105,19 +104,10 @@ def _openstackify_schema(key, schema, include_id=False):
 list_groups_response = {
     "type": "object",
     "properties": {
-        "groups": list_of_links
+        "groups": list_of_links,
+        "groups_links": links
     },
     "additionalProperties": False
-}
-
-list_groups_response_example = {
-    "groups": [
-        {
-            "id": gid,
-            "links": make_example_links(gid)
-        }
-        for gid in (uuid4(), uuid4())
-    ]
 }
 
 group_state = {

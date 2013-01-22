@@ -48,7 +48,8 @@ def list_all_scaling_groups(request, tenantId):
               }
             ]
           }
-        ]
+        ],
+        "groups_links": []
       }
     """
     def format_list(groups):
@@ -61,7 +62,8 @@ def list_all_scaling_groups(request, tenantId):
                     'id': group.uuid,
                     'links': get_autoscale_links(tenantId, group.uuid)
                 } for group in groups
-            ]
+            ],
+            "groups_links": []
         }
 
     deferred = get_store().list_scaling_groups(tenantId)
