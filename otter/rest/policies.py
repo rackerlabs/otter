@@ -113,7 +113,7 @@ def list_policies(request, tenantId, groupId):
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(rest_schemas.create_policy_array)
-def create_policy(request, tenantId, groupId, data):
+def create_policies(request, tenantId, groupId, data):
     """
     Create one or many new scaling policies.
     Scaling policies must include a name, type, adjustment, and cooldown.
