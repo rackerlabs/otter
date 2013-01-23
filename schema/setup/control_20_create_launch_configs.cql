@@ -19,5 +19,6 @@ CREATE COLUMNFAMILY launch_config (
     tenantId ascii,
     groupId ascii, 
     data ascii, 
+    deleted boolean,
     PRIMARY KEY(tenantId, groupId)
     );
