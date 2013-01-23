@@ -88,6 +88,18 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         validate(result, model_schemas.policy_list)
         return result
 
+    def validate_create_policies_return_value(self, *args, **kwargs):
+        """
+        Calls ``list_policies``, and validates that it returns a policy
+        dictionary containing the policies mapped to their IDs
+
+        :return: the return value of ``list_policies()``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.create_policies(*args, **kwargs))
+        validate(result, model_schemas.policy_list)
+        return result
+
 
 class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
     """

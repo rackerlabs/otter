@@ -88,7 +88,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         Checks that the serialization checks and rejects unserializable
         data
         """
-        self.mock_group.create_policies.return_value = defer.succeed(None)
+        self.mock_group.create_policies.return_value = defer.succeed({})
         self.assert_status_code(400, None, 'POST', '[')
         self.assert_status_code(400, None, 'POST', '{},{}')
         self.flushLoggedErrors(InvalidJsonError)
@@ -98,10 +98,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         Checks that the scaling policy schema is obeyed --
         an empty schema is bad.
         """
-
-        (self.mock_group.
-            create_policies.
-            return_value) = defer.succeed(None)
+        self.mock_group.create_policies.return_value = defer.succeed({})
         response_body = self.assert_status_code(400, None, 'POST', '["tacos"]')
         self.flushLoggedErrors(ValidationError)
 
@@ -113,14 +110,30 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         """
         Tries to create a set of policies.
         """
-        (self.mock_group.
-            create_policies.
-            return_value) = defer.succeed("1")
-        request_body = policy_examples()
-        self.assert_status_code(201, None,
-                                'POST', json.dumps(request_body))
+        self.mock_group.create_policies.return_value = defer.succeed({
+            '5': policy_examples()[0]
+        })
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps(policy_examples()[:1]))
         self.mock_group.create_policies.assert_called_once_with(
-            policy_examples())
+            policy_examples()[:1])
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_policies_response)
+
+        expected_policy = policy_examples()[0]
+        expected_policy['id'] = '5'
+        expected_policy['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5'
+            },
+            {
+                'rel': 'bookmark',
+                'href': '/11111/groups/1/policies/5'
+            }
+        ]
+        self.assertEqual(resp, {"policies": [expected_policy]})
 
 
 class OnePolicyTestCase(RestAPITestMixin, TestCase):

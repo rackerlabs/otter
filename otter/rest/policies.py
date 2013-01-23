@@ -126,7 +126,7 @@ def list_policies(request, tenantId, groupId):
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
-@validate_body(rest_schemas.create_policy_array)
+@validate_body(rest_schemas.create_policies_request)
 def create_policies(request, tenantId, groupId, data):
     """
     Create one or many new scaling policies.
@@ -189,20 +189,25 @@ def create_policies(request, tenantId, groupId, data):
         }
     """
 
-    def send_redirect(policyId):
+    def format_policies_and_send_redirect(policy_dict):
         request.setHeader(
             "Location",
-            get_autoscale_links(
-                tenantId,
-                groupId,
-                policyId,
-                format=None
-            )
+            get_autoscale_links(tenantId, groupId, "", format=None)
         )
+
+        policy_list = []
+        for policy_uuid, policy_item in policy_dict.iteritems():
+            policy_item['id'] = policy_uuid
+            policy_item['links'] = get_autoscale_links(
+                tenantId, groupId, policy_uuid)
+            policy_list.append(policy_item)
+
+        return {'policies': policy_list}
 
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.create_policies(data)
-    deferred.addCallback(send_redirect)
+    deferred.addCallback(format_policies_and_send_redirect)
+    deferred.addCallback(json.dumps)
     return deferred
 
 

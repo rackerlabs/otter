@@ -13,7 +13,7 @@ from otter.json_schema.group_examples import (
 
 #------------- subschemas and other utilities -----------------
 
-links = {
+_links = {
     'type': 'array',
     'description': "Generic schema for a JSON link",
     'required': True,
@@ -34,21 +34,21 @@ links = {
     }
 }
 
-link_objects = {
+_link_objects = {
     'type': 'object',
     'properties': {
         'id': {
             'type': ['string', 'integer'],
             'required': True
         },
-        'links': links
+        'links': _links
     },
     'additionalProperties': False
 }
 
-list_of_links = {
+_list_of_links = {
     'type': 'array',
-    'items': link_objects,
+    'items': _link_objects,
     'uniqueItems': True,
     'required': True
 }
@@ -107,12 +107,12 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
     openstackified = deepcopy(schema)
     openstackified['required'] = True
     if include_id:
-        openstackified["properties"].update(link_objects["properties"])
+        openstackified["properties"].update(_link_objects["properties"])
 
     properties = {key: openstackified}
 
     if paginated:
-        properties["{0}_links".format(key)] = links
+        properties["{0}_links".format(key)] = _links
 
     return {
         "type": "object",
@@ -122,7 +122,7 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
 
 # ----------- endpoint request and response schemas and examples ---------
 
-list_groups_response = _openstackify_schema("groups", list_of_links,
+list_groups_response = _openstackify_schema("groups", _list_of_links,
                                             paginated=True)
 
 group_state = _openstackify_schema("group", {
@@ -137,38 +137,37 @@ group_state = _openstackify_schema("group", {
             'type': 'boolean',
             'required': True
         },
-        'active': list_of_links,
-        'pending': list_of_links
+        'active': _list_of_links,
+        'pending': _list_of_links
     },
     'additionalProperties': False
 }, True)
 
 
 view_policy = deepcopy(policy)
-view_policy["properties"].update(link_objects["properties"])
+view_policy["properties"].update(_link_objects["properties"])
 for type_blob in view_policy["type"]:
-    type_blob["properties"].update(link_objects["properties"])
+    type_blob["properties"].update(_link_objects["properties"])
 
 
-list_policies_response = {
-    "type": "object",
-    "properties": {
-        "policies": {
-            "type": "array",
-            "items": [view_policy],
-            "uniqueItems": True,
-            "required": True
-        },
-        "policies_links": links
-    }
+_view_policies_list = {
+    "type": "array",
+    "items": [view_policy],
+    "uniqueItems": True,
+    "required": True
 }
 
 
-create_policy_array = {
+list_policies_response = _openstackify_schema("policies", _view_policies_list,
+                                              paginated=True)
+
+create_policies_request = {
     "type": "array",
     "items": [policy],
     "uniqueItems": True
 }
+
+create_policies_response = _openstackify_schema("policies", _view_policies_list)
 
 
 # ----- schemas for group creation
@@ -234,12 +233,7 @@ view_manifest_response = _openstackify_schema("group", {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": {
-            "type": "array",
-            "items": [view_policy],
-            "uniqueItems": True,
-            "required": True
-        }
+        "scalingPolicies": _view_policies_list
     },
     "additionalProperties": False
 }, True)

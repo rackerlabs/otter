@@ -324,21 +324,27 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.assert_deferred_succeeded(self.group.view_config()),
             self.output_config)
 
-    def test_create_new_scaling_policy(self):
+    def test_create_new_scaling_policies(self):
         """
-        Add a new policy to the scaling group.
+        Adding new policies to the scaling group returns a dictionary of
+        scaling policies mapped to their ids
         """
-        new_policy = [{
-            "name": "set number of servers to 3000",
-            "steadyState": 3000,
-            "cooldown": 300
-        }]
-
-        create_return_value = self.assert_deferred_succeeded(
-            self.group.create_policies(new_policy))
-        result = self.assert_deferred_succeeded(self.group.list_policies())
-        self.assertEqual(new_policy, create_return_value.values())
-        self.assertIn(new_policy[0], result.values())
+        create_response = self.validate_create_policies_return_value([
+            {
+                "name": "set number of servers to 3000",
+                "steadyState": 3000,
+                "cooldown": 300
+            },
+            {
+                "name": 'scale down 10 percent',
+                "changePercent": -10,
+                "cooldown": 200
+            }
+        ])
+        list_result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertGreater(len(list_result), len(create_response))
+        for key, value in create_response.iteritems():
+            self.assertEqual(list_result[key], value)
 
     def test_list_empty_policies(self):
         """
@@ -558,6 +564,44 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
+    def _call_all_methods_on_group(self, group_id):
+        """
+        Gets a group, asserts that it's a MockScalingGroup, and runs all of its
+        calls and returns their deferreds as a list
+        """
+        group = self.validate_get_return_value(self.tenant_id, group_id)
+        self.assertTrue(isinstance(group, MockScalingGroup),
+                        "group is {0!r}".format(group))
+
+        group.active_entities = ["1"]
+
+        return [
+            group.view_config(),
+            group.view_launch_config(),
+            group.view_state(),
+            group.update_config({
+                'name': '1',
+                'minEntities': 0,
+                'cooldown': 0,
+                'maxEntities': None,
+                'metadata': {}
+            }),
+            group.update_launch_config({
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 2,
+                        "name": "worker",
+                        "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                    }
+                }
+            }),
+            group.set_steady_state(1),
+            group.bounce_entity("1"),
+            group.list_policies(),
+            group.create_policies([])
+        ]
+
     def test_get_scaling_group_returns_mock_scaling_group(self):
         """
         Getting valid scaling group returns a MockScalingGroup whose methods
@@ -566,48 +610,17 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.tenant_id, self.config, {}))  # empty launch for testing
-        group = self.validate_get_return_value(self.tenant_id, uuid)
 
-        self.assertTrue(isinstance(group, MockScalingGroup),
-                        "group is {0!r}".format(group))
-
-        for method in ('view_config', 'view_launch_config', 'view_state',
-                       'list_policies'):
-            self.assert_deferred_succeeded(getattr(group, method)())
-
-        self.assert_deferred_succeeded(group.update_config({
-            'name': '1', 'minEntities': 0, 'cooldown': 0, 'maxEntities': None,
-            'metadata': {}
-        }))
-        self.assert_deferred_succeeded(group.set_steady_state(1))
-
-        group.active_entities = ["1"]
-        self.assert_deferred_succeeded(group.bounce_entity("1"))
+        succeeded_deferreds = self._call_all_methods_on_group(uuid)
+        for deferred in succeeded_deferreds:
+            self.assert_deferred_succeeded(deferred)
 
     def test_get_scaling_group_works_but_methods_do_not(self):
         """
         Getting a scaling group that doesn't exist returns a MockScalingGropu
         whose methods will raise :class:`NoSuchScalingGroupError` exceptions.
         """
-        group = self.validate_get_return_value(self.tenant_id, 1)
-        self.assertTrue(isinstance(group, MockScalingGroup),
-                        "group is {0!r}".format(group))
+        failed_deferreds = self._call_all_methods_on_group("1")
 
-        for method in ('view_config', 'view_launch_config', 'view_state',
-                       'list_policies'):
-            self.assert_deferred_failed(getattr(group, method)(),
-                                        NoSuchScalingGroupError)
-
-        self.assert_deferred_failed(group.update_config(
-            {
-                'name': '1',
-                'minEntities': 0,
-                'cooldown': 0,
-                'maxEntities': None,
-                'metadata': {}
-            }), NoSuchScalingGroupError)
-
-        self.assert_deferred_failed(group.set_steady_state(1),
-                                    NoSuchScalingGroupError)
-        self.assert_deferred_failed(group.bounce_entity("1"),
-                                    NoSuchScalingGroupError)
+        for deferred in failed_deferreds:
+            self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
