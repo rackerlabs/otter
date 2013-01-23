@@ -3,6 +3,7 @@ JSON schemas for the rest responses from autoscale
 """
 
 from copy import deepcopy
+from itertools import cycle
 
 from otter.json_schema.group_schemas import policy, config, launch_config
 from otter.json_schema.group_examples import (
@@ -108,6 +109,20 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
     openstackified['required'] = True
     if include_id:
         openstackified["properties"].update(_link_objects["properties"])
+        if isinstance(openstackified["type"], list):
+            # include _link_object's properties as properties in the type, so
+            # it'd look like:
+            # {
+            #   <original property>...
+            #   'id': {},
+            #   ...
+            # }
+            updated = zip(_link_objects["properties"].keys(),
+                          cycle([{}]))
+
+            for schema_type in openstackified['type']:
+                if "properties" in schema_type:
+                    schema_type["properties"].update(updated)
 
     properties = {key: openstackified}
 

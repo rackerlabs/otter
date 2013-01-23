@@ -148,7 +148,8 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
     invalid_methods = ("POST")
     policy_id = "2"
 
-    def test_get_policy(self):
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_get_policy(self, url_root):
         """
         Get details of a specific policy.  The response should conform with
         the json schema.
@@ -158,6 +159,8 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
+
+        validate(resp, rest_schemas.get_policy_response)
 
         expected = policy_examples()[0]
         expected['id'] = self.policy_id
@@ -171,7 +174,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                 'href': '/11111/groups/1/policies/{0}'.format(self.policy_id)
             }
         ]
-        self.mock_group.get_policy.assert_equal(resp, {'policy': expected})
+        self.assertEqual(resp, {'policy': expected})
 
     def test_get_policy_404(self):
         """

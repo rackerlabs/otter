@@ -242,8 +242,14 @@ def get_policy(request, tenantId, groupId, policyId):
             }
         }
     """
+    def openstackify(policy_dict):
+        policy_dict['id'] = policyId
+        policy_dict['links'] = get_autoscale_links(tenantId, groupId, policyId)
+        return {'policy': policy_dict}
+
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.get_policy(policyId)
+    deferred.addCallback(openstackify)
     deferred.addCallback(json.dumps)
     return deferred
 
