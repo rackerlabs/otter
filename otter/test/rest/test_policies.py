@@ -59,7 +59,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         Checks that the serialization checks and rejects unserializable
         data
         """
-        self.mock_group.create_policy.return_value = defer.succeed(None)
+        self.mock_group.create_policies.return_value = defer.succeed(None)
         self.assert_status_code(400, None, 'POST', '[')
         self.assert_status_code(400, None, 'POST', '{},{}')
         self.flushLoggedErrors(InvalidJsonError)
@@ -71,7 +71,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         """
 
         (self.mock_group.
-            create_policy.
+            create_policies.
             return_value) = defer.succeed(None)
         response_body = self.assert_status_code(400, None, 'POST', '["tacos"]')
         self.flushLoggedErrors(ValidationError)
@@ -85,12 +85,12 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         Tries to create a set of policies.
         """
         (self.mock_group.
-            create_policy.
+            create_policies.
             return_value) = defer.succeed("1")
         request_body = policy_examples
         self.assert_status_code(201, None,
                                 'POST', json.dumps(request_body))
-        self.mock_group.create_policy.assert_called_once_with(
+        self.mock_group.create_policies.assert_called_once_with(
             policy_examples)
 
 

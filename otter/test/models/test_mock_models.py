@@ -338,7 +338,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }]
 
         create_return_value = self.assert_deferred_succeeded(
-            self.group.create_policy(new_policy))
+            self.group.create_policies(new_policy))
         result = self.assert_deferred_succeeded(self.group.list_policies())
         self.assertEqual(new_policy, create_return_value.values())
         self.assertIn(new_policy[0], result.values())
