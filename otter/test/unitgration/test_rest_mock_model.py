@@ -15,7 +15,7 @@ from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema.group_examples import config, launch_server_config
+from otter.json_schema.group_examples import config, launch_server_config, policy
 from otter.models.interface import NoSuchScalingGroupError
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
@@ -24,9 +24,10 @@ from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
 
 
-class MockStoreRestTestCase(DeferredTestMixin, TestCase):
+class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
     """
-    Test case for testing the REST API against various the mock model.
+    Test case for testing the REST API for the scaling group specific endpoints
+    (not policies or webhooks) against the mock model.
 
     This could be made a base case instead, and different implementations of
     the model interfaces should be tested using a subclass of this base case.
@@ -219,3 +220,91 @@ class MockStoreRestTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'launchConfiguration': edited_launch})
+
+
+class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
+    """
+    Test case for testing the REST API for the scaling policy specific endpoints
+    (but not webhooks) against the mock model.
+
+    As above, this could be made a base case instead... yadda yadda.
+    """
+    tenant_id = '11111'
+
+    def setUp(self):
+        """
+        Replace the store every time with a clean one.
+        """
+        store = MockScalingGroupCollection()
+        self.group_id = self.assert_deferred_succeeded(
+            store.create_scaling_group(self.tenant_id, config()[0],
+                                       launch_server_config()[0]))
+        set_store(store)
+
+        self.policies_url = '/v1.0/{tenant}/groups/{group}/policies'.format(
+            tenant=self.tenant_id, group=self.group_id)
+
+    def assert_number_of_scaling_policies(self, number):
+        """
+        Asserts that there are ``number`` number of scaling policies
+        """
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', self.policies_url))
+        self.assertEqual(200, wrapper.response.code)
+
+        response = json.loads(wrapper.content)
+        self.assertEqual(len(response["policies"]), number)
+
+    def create_and_view_scaling_policies(self):
+        """
+        Creating valid scaling policies returns with a 200 OK, a Location
+        header pointing to the list of all scaling policies, and a response
+        containing a list of the newly created scaling policy resources only.
+
+        :return: the list of new scaling policies
+        """
+        request_body = policy()  # however many of them there are
+        wrapper = self.assert_deferred_succeeded(request(
+            root, 'POST', self.policies_url, body=json.dumps(request_body)))
+
+        self.assertEqual(wrapper.response.code, 201,
+                         "Create failed: {0}".format(wrapper.content))
+        response = json.loads(wrapper.content)
+
+        self.assertEqual(len(request_body), len(response["policies"]))
+
+        # this iterates over the response policies, checks to see that each have
+        # 'id' and 'links' keys, and then checks to see that the rest of the
+        # responce policy is in the original set of policies to be created
+        for pol in response["policies"]:
+            original_pol = pol.copy()
+            for key in ('id', 'links'):
+                self.assertIn(key, pol)
+                del original_pol[key]
+
+        headers = wrapper.response.headers.getRawHeaders('Location')
+        self.assertTrue(headers is not None)
+        self.assertEqual(1, len(headers))
+
+        # now make sure the Location header points to the list policies header
+        self.assertEqual(urlsplit(headers[0])[2].rstrip('/'), self.policies_url)
+
+        return response["policies"]
+
+    def test_crud_scaling_policies(self):
+        """
+        Start with no policies.  Create some, make sure they're listed,
+        create some more because we want to verify that creation response
+        contains only the ones that were created.  Then update one of them,
+        check changes. Then delete one of them and make sure it's no longer
+        listed.
+        """
+        # start with no scaling groups
+        self.assert_number_of_scaling_policies(0)
+        first_policies = self.create_and_view_scaling_policies()
+
+        # create more scaling groups, to check the creation response
+        self.assert_number_of_scaling_policies(len(first_policies))
+        second_policies = self.create_and_view_scaling_policies()
+        self.assert_number_of_scaling_policies(len(first_policies) +
+                                               len(second_policies))
