@@ -141,7 +141,7 @@ group_state = _openstackify_schema("group", {
         'pending': _list_of_links
     },
     'additionalProperties': False
-}, True)
+}, include_id=True)
 
 
 view_policy = deepcopy(policy)
@@ -170,6 +170,9 @@ create_policies_request = {
 create_policies_response = _openstackify_schema("policies", _view_policies_list)
 
 
+get_policy_response = _openstackify_schema("policy", policy, include_id=True)
+
+
 # ----- schemas for group creation
 create_group_request = {
     "type": "object",
@@ -177,11 +180,7 @@ create_group_request = {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": {
-            "type": "array",
-            "items": [policy],
-            "uniqueItems": True
-        }
+        "scalingPolicies": create_policies_request
     },
     "additionalProperties": False
 }
@@ -206,7 +205,7 @@ create_group_request_examples = [
 # The response for create group looks almost exactly like the request, except
 # that it is wrapped in an extra dictionary with the "group" key and has
 create_group_response = _openstackify_schema("group", create_group_request,
-                                             True)
+                                             include_id=True)
 create_group_response["description"] = "Schema of the create group response."
 
 create_group_response_examples = [
@@ -221,10 +220,10 @@ create_group_response_examples = [
 
 
 # ----- schemas for viewing configs
-view_config = _openstackify_schema("groupConfiguration", config, False)
-view_launch_config = _openstackify_schema("launchConfiguration", launch_config,
+view_config = _openstackify_schema("groupConfiguration", config)
+view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
 
-                                          False)
+
 # ----- schemas for manifest viewing
 view_manifest_response = _openstackify_schema("group", {
     "type": "object",
@@ -236,4 +235,4 @@ view_manifest_response = _openstackify_schema("group", {
         "scalingPolicies": _view_policies_list
     },
     "additionalProperties": False
-}, True)
+}, include_id=True)

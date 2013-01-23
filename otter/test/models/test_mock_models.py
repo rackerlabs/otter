@@ -574,6 +574,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                         "group is {0!r}".format(group))
 
         group.active_entities = ["1"]
+        group.policies = {'2': {}}
 
         return [
             group.view_config(),
@@ -599,7 +600,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.set_steady_state(1),
             group.bounce_entity("1"),
             group.list_policies(),
-            group.create_policies([])
+            group.create_policies([]),
+            group.get_policy('2'),
+            group.update_policy('2', {}),
+            group.delete_policy('2')
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):

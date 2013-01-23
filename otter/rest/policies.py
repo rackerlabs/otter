@@ -224,9 +224,22 @@ def get_policy(request, tenantId, groupId, policyId):
     Example response::
 
         {
-            "name": "scale up by one server",
-            "change": 1,
-            "cooldown": 150
+            "policy": {
+                "id": {policyId},
+                "links": [
+                    {
+                        "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}"
+                        "rel": "self"
+                    },
+                    {
+                        "href": "{url_root}/010101/groups/{groupId}/policy/{policyId}"
+                        "rel": "bookmark"
+                    }
+                ],
+                "name": "scale up by one server",
+                "change": 1,
+                "cooldown": 150
+            }
         }
     """
     rec = get_store().get_scaling_group(tenantId, groupId)

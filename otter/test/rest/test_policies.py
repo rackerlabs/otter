@@ -114,7 +114,10 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             '5': policy_examples()[0]
         })
         response_body = self.assert_status_code(
-            201, None, 'POST', json.dumps(policy_examples()[:1]))
+            201, None, 'POST', json.dumps(policy_examples()[:1]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies')
+
         self.mock_group.create_policies.assert_called_once_with(
             policy_examples()[:1])
 
@@ -143,27 +146,34 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
     """
     endpoint = "/v1.0/11111/groups/1/policies/2"
     invalid_methods = ("POST")
+    policy_id = "2"
 
-    def setUp(self):
+    def test_get_policy(self):
         """
-        Set up a mock group to be used for viewing and updating policies
+        Get details of a specific policy.  The response should conform with
+        the json schema.
         """
-        self.policy_id = "2"
-        super(OnePolicyTestCase, self).setUp()
-
-    def test_view_policy(self):
-        """
-        Get details of a specific policy.
-        """
-        (self.mock_group.
-            get_policy.
-            return_value) = defer.succeed(policy_examples()[0])
+        self.mock_group.get_policy.return_value = defer.succeed(
+            policy_examples()[0])
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        self.mock_group.get_policy.assert_equal(resp, policy_examples()[0])
 
-    def test_view_policy_404(self):
+        expected = policy_examples()[0]
+        expected['id'] = self.policy_id
+        expected['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/{0}'.format(self.policy_id)
+            },
+            {
+                'rel': 'bookmark',
+                'href': '/11111/groups/1/policies/{0}'.format(self.policy_id)
+            }
+        ]
+        self.mock_group.get_policy.assert_equal(resp, {'policy': expected})
+
+    def test_get_policy_404(self):
         """
         Getting a nonexistant policy results in 404.
         """
