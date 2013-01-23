@@ -17,15 +17,15 @@ GET       ../:id/group                          List scaling group configuration
 PUT       ../:id/group                          Update/Create scaling group configuration details
 GET       ../:id/launch                         List info of launch configuration
 PUT       ../:id/launch                         Update/Create launch configuration
-GET       ../:id/policy                         List basic info of all scaling policies
-POST      ../:id/policy                         Create scaling policy
-GET       ../:id/policy/:id                     Get details of a specific scaling policy, including webhook details
-PUT       ../:id/policy/:id                     Update/Create details of a specific scaling policy
-DELETE    ../:id/policy/:id                     Delete a specific scaling policy
-GET       ../:id/policy/:id/webhook             List basic info for all webhooks under scaling policy
-POST      ../:id/policy/:id/webhook             Create a new public webhook for Scaling Policy
-GET       ../:id/policy/:id/webhook/:id         Get details of a specific webhook (name, URL, access details)
-PUT       ../:id/policy/:id/webhook/:id         Update webhooks under scaling policy
-DELETE    ../:id/policy/:id/webhook/:id         Delete a public webhook
+GET       ../:id/policies                       List basic info of all scaling policies
+POST      ../:id/policies                       Create scaling policy
+GET       ../:id/policies/:id                   Get details of a specific scaling policy, including webhook details
+PUT       ../:id/policies/:id                   Update/Create details of a specific scaling policy
+DELETE    ../:id/policies/:id                   Delete a specific scaling policy
+GET       ../:id/policies/:id/webhook           List basic info for all webhooks under scaling policy
+POST      ../:id/policies/:id/webhook           Create a new public webhook for Scaling Policy
+GET       ../:id/policies/:id/webhook/:id       Get details of a specific webhook (name, URL, access details)
+PUT       ../:id/policies/:id/webhook/:id       Update webhooks under scaling policy
+DELETE    ../:id/policies/:id/webhook/:id       Delete a public webhook
 GET       ../action/:hash                       Activate a public Autoscale endpoint
 ========= ===================================== ===========================================================================================

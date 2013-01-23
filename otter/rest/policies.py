@@ -13,7 +13,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -108,7 +108,7 @@ def list_policies(request, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
@@ -193,7 +193,7 @@ def create_policy(request, tenantId, groupId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -217,7 +217,7 @@ def get_policy(request, tenantId, groupId, policyId):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -244,7 +244,7 @@ def update_policy(request, tenantId, groupId, policyId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)

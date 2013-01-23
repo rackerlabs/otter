@@ -90,7 +90,7 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None, format="json",
     if group_id is not None:
         path_parts.append(group_id)
         if policy_id is not None:
-            path_parts.append("policy")
+            path_parts.append("policies")
             path_parts.append(policy_id)
 
     url = "/".join(path_parts)
