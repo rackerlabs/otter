@@ -4,7 +4,8 @@ The otter REST API implementation.
 
 # Groups, configs, etc. have to be imported else the routes never get loaded
 
-from otter.rest import groups as _g, configs as _c
+from otter.rest import groups as _g, configs as _c, policies as _p
 
 groups = _g
 configs = _c
+policies = _p

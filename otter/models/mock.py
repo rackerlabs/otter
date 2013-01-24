@@ -250,8 +250,6 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
 
-        if self.policies is None:
-            return defer.succeed({})
         return defer.succeed(self.policies)
 
     def get_policy(self, policy_id):

@@ -3,6 +3,7 @@ JSON schemas for the rest responses from autoscale
 """
 
 from copy import deepcopy
+from itertools import cycle
 
 from otter.json_schema.group_schemas import policy, config, launch_config
 from otter.json_schema.group_examples import (
@@ -13,39 +14,42 @@ from otter.json_schema.group_examples import (
 
 #------------- subschemas and other utilities -----------------
 
-links = {
+_links = {
     'type': 'array',
     'description': "Generic schema for a JSON link",
     'required': True,
     'uniqueItems': True,
     'items': {
-        'rel': {
-            'type': 'string',
-            'required': True
+        'type': 'object',
+        'properties': {
+            'rel': {
+                'type': 'string',
+                'required': True
+            },
+            'href': {
+                'type': 'string',
+                'required': True
+            }
         },
-        'href': {
-            'type': 'string',
-            'required': True
-        }
-    },
-    'minLength': 1
+        'additionalProperties': False
+    }
 }
 
-link_objects = {
+_link_objects = {
     'type': 'object',
     'properties': {
         'id': {
             'type': ['string', 'integer'],
             'required': True
         },
-        'links': links
+        'links': _links
     },
     'additionalProperties': False
 }
 
-list_of_links = {
+_list_of_links = {
     'type': 'array',
-    'items': link_objects,
+    'items': _link_objects,
     'uniqueItems': True,
     'required': True
 }
@@ -74,7 +78,7 @@ def make_example_links(group_id):
     }
 
 
-def _openstackify_schema(key, schema, include_id=False):
+def _openstackify_schema(key, schema, include_id=False, paginated=False):
     """
     To make responses more open-stack like, wrap everything in a dictionary
     with a particular key corresponding to what the resource is.  Something
@@ -86,29 +90,55 @@ def _openstackify_schema(key, schema, include_id=False):
 
     Also, if the resource needs to include an ID of something, add id and links
     as required properties to this copy of the original schema.
+
+    :param key: The openstack key to use
+    :type key: ``str``
+
+    :param schema: The actual schema that defines the data
+    :type schema: ``dict``
+
+    :param include_id: to embed an id and links key into the schema - is it
+        an instance of something
+    :type include_id: ``bool``
+
+    :param paginated: Whether to include a list of paginated of links under
+        the key "<key>_links"
+    :type paginated: ``bool``
     """
     openstackified = deepcopy(schema)
     openstackified['required'] = True
     if include_id:
-        openstackified["properties"].update(link_objects["properties"])
+        openstackified["properties"].update(_link_objects["properties"])
+        if isinstance(openstackified["type"], list):
+            # include _link_object's properties as properties in the type, so
+            # it'd look like:
+            # {
+            #   <original property>...
+            #   'id': {},
+            #   ...
+            # }
+            updated = zip(_link_objects["properties"].keys(),
+                          cycle([{}]))
+
+            for schema_type in openstackified['type']:
+                if "properties" in schema_type:
+                    schema_type["properties"].update(updated)
+
+    properties = {key: openstackified}
+
+    if paginated:
+        properties["{0}_links".format(key)] = _links
 
     return {
         "type": "object",
-        "properties": {
-            key: openstackified
-        }
+        "properties": properties,
+        "additionalProperties": False
     }
 
 # ----------- endpoint request and response schemas and examples ---------
 
-list_groups_response = {
-    "type": "object",
-    "properties": {
-        "groups": list_of_links,
-        "groups_links": links
-    },
-    "additionalProperties": False
-}
+list_groups_response = _openstackify_schema("groups", _list_of_links,
+                                            paginated=True)
 
 group_state = _openstackify_schema("group", {
     'type': 'object',
@@ -122,57 +152,40 @@ group_state = _openstackify_schema("group", {
             'type': 'boolean',
             'required': True
         },
-        'active': list_of_links,
-        'pending': list_of_links
+        'active': _list_of_links,
+        'pending': _list_of_links
     },
     'additionalProperties': False
-}, True)
+}, include_id=True)
 
 
 view_policy = deepcopy(policy)
-view_policy["properties"].update(link_objects["properties"])
+view_policy["properties"].update(_link_objects["properties"])
 for type_blob in view_policy["type"]:
-    type_blob["properties"].update(link_objects["properties"])
+    type_blob["properties"].update(_link_objects["properties"])
 
 
-create_policy_array = {
+_view_policies_list = {
+    "type": "array",
+    "items": [view_policy],
+    "uniqueItems": True,
+    "required": True
+}
+
+
+list_policies_response = _openstackify_schema("policies", _view_policies_list,
+                                              paginated=True)
+
+create_policies_request = {
     "type": "array",
     "items": [policy],
     "uniqueItems": True
 }
 
-
-policy_list = {
-    "type": "object",
-    "patternProperties": {
-        "^\S+$": {
-            "type": "object",
-            "required": True,
-            "items": [policy]
-        }
-    },
-    "required": False,
-    "additionalProperties": False
-}
+create_policies_response = _openstackify_schema("policies", _view_policies_list)
 
 
-policy_list_examples = {
-    "f236a93f-a46d-455c-9403-f26838011522": {
-        "name": "scale up by 10",
-        "change": 10,
-        "cooldown": 5
-    },
-    "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
-        "name": "scale down a 5.5 percent because of a tweet",
-        "changePercent": -5.5,
-        "cooldown": 6
-    },
-    "228dbf91-7b15-4d21-8de2-fa584f01a440": {
-        "name": "set number of servers to 10",
-        "steadyState": 10,
-        "cooldown": 3
-    }
-}
+get_policy_response = _openstackify_schema("policy", policy, include_id=True)
 
 
 # ----- schemas for group creation
@@ -182,36 +195,32 @@ create_group_request = {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": {
-            "type": "array",
-            "items": [policy],
-            "uniqueItems": True
-        }
+        "scalingPolicies": create_policies_request
     },
     "additionalProperties": False
 }
 
 create_group_request_examples = [
     {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0]
+        "groupConfiguration": config_examples()[0],
+        "launchConfiguration": launch_server_config_examples()[0]
     },
     {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": [policy_examples[0]]
+        "groupConfiguration": config_examples()[0],
+        "launchConfiguration": launch_server_config_examples()[0],
+        "scalingPolicies": [policy_examples()[0]]
     },
     {
-        "groupConfiguration": config_examples[1],
-        "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": [policy_examples[1], policy_examples[2]]
+        "groupConfiguration": config_examples()[1],
+        "launchConfiguration": launch_server_config_examples()[1],
+        "scalingPolicies": policy_examples()[1:3]
     }
 ]
 
 # The response for create group looks almost exactly like the request, except
 # that it is wrapped in an extra dictionary with the "group" key and has
 create_group_response = _openstackify_schema("group", create_group_request,
-                                             True)
+                                             include_id=True)
 create_group_response["description"] = "Schema of the create group response."
 
 create_group_response_examples = [
@@ -226,10 +235,10 @@ create_group_response_examples = [
 
 
 # ----- schemas for viewing configs
-view_config = _openstackify_schema("groupConfiguration", config, False)
-view_launch_config = _openstackify_schema("launchConfiguration", launch_config,
+view_config = _openstackify_schema("groupConfiguration", config)
+view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
 
-                                          False)
+
 # ----- schemas for manifest viewing
 view_manifest_response = _openstackify_schema("group", {
     "type": "object",
@@ -238,12 +247,7 @@ view_manifest_response = _openstackify_schema("group", {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": {
-            "type": "array",
-            "items": [view_policy],
-            "uniqueItems": True,
-            "required": True
-        }
+        "scalingPolicies": _view_policies_list
     },
     "additionalProperties": False
-}, True)
+}, include_id=True)

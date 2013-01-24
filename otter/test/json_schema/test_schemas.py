@@ -31,7 +31,7 @@ class ScalingGroupConfigTestCase(TestCase):
         """
         The examples in the config examples all validate.
         """
-        for example in group_examples.config:
+        for example in group_examples.config():
             validate(example, group_schemas.config)
 
     def test_extra_values_does_not_validate(self):
@@ -139,7 +139,7 @@ class ServerLaunchConfigTestCase(TestCase):
         """
         The launch server config examples all validate.
         """
-        for example in group_examples.launch_server_config:
+        for example in group_examples.launch_server_config():
             validate(example, group_schemas.launch_config)
 
     def test_invalid_load_balancer_does_not_validate(self):
@@ -239,7 +239,7 @@ class ScalingPolicyTestCase(TestCase):
         """
         The scaling policy examples all validate.
         """
-        for example in group_examples.policy:
+        for example in group_examples.policy():
             validate(example, group_schemas.policy)
 
     def test_either_change_or_changePercent_or_steadyState(self):
@@ -312,7 +312,7 @@ class CreateScalingGroupTestCase(TestCase):
         Not including a launchConfiguration or including an invalid ones will
         fail to validate.
         """
-        invalid = {'groupConfiguration': group_examples.config[0]}
+        invalid = {'groupConfiguration': group_examples.config()[0]}
         self.assertRaisesRegexp(
             ValidationError, 'launchConfiguration',
             validate, invalid, rest_schemas.create_group_request)
@@ -326,7 +326,7 @@ class CreateScalingGroupTestCase(TestCase):
         fail to validate.
         """
         invalid = {'launchConfiguration':
-                   group_examples.launch_server_config[0]}
+                   group_examples.launch_server_config()[0]}
         self.assertRaisesRegexp(
             ValidationError, 'groupConfiguration',
             validate, invalid, rest_schemas.create_group_request)
@@ -341,8 +341,8 @@ class CreateScalingGroupTestCase(TestCase):
         """
         self.assertRaises(
             ValidationError, validate, {
-                'groupConfiguration': group_examples.config[0],
+                'groupConfiguration': group_examples.config()[0],
                 'launchConfiguration':
-                group_examples.launch_server_config[0],
+                group_examples.launch_server_config()[0],
                 'scalingPolicies': {"Hello!": "Yes quite."}
             }, rest_schemas.create_group_request)
