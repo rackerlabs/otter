@@ -26,10 +26,14 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;"
-_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})"
-_cql_delete = "DELETE FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId"
-_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId;"
+_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+_cql_view += "groupId = :groupId AND deleted = False;"
+_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
+_cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
+_cql_update = "INSERT INTO {cf}(tenantId, groupId, data) "
+_cql_update += "VALUES (:tenantId, :groupId, {name})"
+_cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
+_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 
 
 class CassScalingGroup(object):
@@ -134,7 +138,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_insert.format(cf=self.config_table, name=":scaling")]
+            queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -158,7 +162,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_insert.format(cf=self.launch_table, name=":launch")]
+            queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,

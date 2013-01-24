@@ -19,5 +19,8 @@ CREATE COLUMNFAMILY scaling_config (
     tenantId ascii, 
     groupId ascii, 
     data ascii, 
+    deleted boolean,
     PRIMARY KEY(tenantId, groupId)
     );
+    
+CREATE INDEX deleted_scaling_config ON scaling_config (deleted);

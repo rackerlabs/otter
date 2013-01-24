@@ -20,5 +20,8 @@ CREATE TABLE scaling_policies (
     groupId ascii, 
     polId ascii, 
     data ascii,
+    deleted boolean,
     PRIMARY KEY(tenantId, groupId, polId)
     );
+    
+CREATE INDEX deleted_scaling_policies ON scaling_policies (deleted);
