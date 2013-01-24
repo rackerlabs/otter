@@ -44,7 +44,7 @@ class IScalingGroup(Interface):
         the config, the launch config, and all the scaling policies.
 
         :return: a dictionary corresponding to the JSON schema at
-            ``otter.json_schema.model_schemas.view_manifest``
+            :data:``otter.json_schema.model_schemas.view_manifest``
         :rtype: ``dict``
         """
         pass
@@ -78,7 +78,7 @@ class IScalingGroup(Interface):
         The entity links are in JSON link format.
 
         :return: a view of the state of the scaling group corresponding to the
-            JSON schema at ``otter.json_schema.model_schemas.group_state``
+            JSON schema at :data:``otter.json_schema.model_schemas.group_state``
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
@@ -147,15 +147,19 @@ class IScalingGroup(Interface):
         """
         pass
 
-    def create_policy(data):
+    def create_policies(data):
         """
         Create a set of new scaling policies.
 
-        :param data: the details of the scaling policy in JSON format
-        :type data: ``dict`` of ``dict``
+        :param data: a list of one or more scaling policies in JSON format,
+            each of which is defined by
+            :data:`otter.json_schema.group_schemas.policy`
+        :type data: ``list`` of ``dict``
 
-        :return: the UUID and full details of the newly created scaling policies
-            as specified by :data:`otter.json_schema.scaling_group.policy_list`
+        :return: dictionary of UUIDs to their matching newly created scaling
+            policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``dict`` of ``dict``
         """
         pass
 
@@ -179,7 +183,7 @@ class IScalingGroup(Interface):
     def list_policies():
         """
         :return: a dict of the policies, as specified by
-            :data:`otter.json_schema.scaling_group.policy_list`
+            :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
