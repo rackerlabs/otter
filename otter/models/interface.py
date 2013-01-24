@@ -254,6 +254,38 @@ class IScalingGroup(Interface):
         """
         pass
 
+    def list_webhooks(policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+    def create_webhook(policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: the details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
 
 class IScalingGroupCollection(Interface):
     """

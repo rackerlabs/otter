@@ -24,6 +24,20 @@ scaling group configuration, and policies.
 # Launch Schemas
 #
 
+metadata = {
+    "type": "object",
+    "description": ("User-provided key-value metadata.  Both keys and "
+                    "values should be strings not exceeding 256 "
+                    "characters in length."),
+    "patternProperties": {
+        "^.{0,256}$": {
+            "type": "string",
+            "maxLength": 256
+        }
+    },
+    "additionalProperties": False
+}
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -154,19 +168,7 @@ config = {
             "minimum": 0,
             "default": None
         },
-        "metadata": {
-            "type": "object",
-            "description": ("User-provided key-value metadata.  Both keys and "
-                            "values should be strings not exceeding 256 "
-                            "characters in length."),
-            "patternProperties": {
-                "^.{0,256}$": {
-                    "type": "string",
-                    "maxLength": 256
-                }
-            },
-            "additionalProperties": False
-        }
+        "metadata": metadata
     },
     "additionalProperties": False,
     "required": True
@@ -253,6 +255,22 @@ policy = {
                 "does not affect the global scaling group cooldown."),
             "minimum": 0,
             "required": True
+        }
+    }
+}
+
+
+webhook = {
+    "type": "object",
+    "description": "Information about a capability URL.",
+    "properties": {
+        "metadata": metadata,
+        "capabilityString": {
+            "type": "string",
+            "description": ("A random unguessable string to be HMAC-ed for the "
+                            "capability URL"),
+            "required": True,
+            "length": 64
         }
     }
 }

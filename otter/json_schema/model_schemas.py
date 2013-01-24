@@ -3,7 +3,7 @@ JSON schema to be used to verify the return values from implementations of the
 model interface.
 """
 from copy import deepcopy
-from otter.json_schema.group_schemas import config, launch_config, policy
+from otter.json_schema.group_schemas import config, launch_config, policy, webhook
 
 entity_schema = {
     'type': 'object',
@@ -138,5 +138,19 @@ policy_list = {
         }
     },
     "required": False,
+    "additionalProperties": False
+}
+
+
+webhook_list = {
+    "type": "object",
+    "description": "Schema returned by the interface for viewing all webhooks",
+    "patternProperties": {
+        "^\S+$": {
+            "type": "object",
+            "required": True,
+            "items": [webhook]
+        }
+    },
     "additionalProperties": False
 }
