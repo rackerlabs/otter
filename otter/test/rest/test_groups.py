@@ -238,8 +238,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         expected_policy.update({
             "id": "5",
             "links": [
-                {"href": "/v1.0/11111/groups/one/policy/5", "rel": "self"},
-                {"href": "/11111/groups/one/policy/5", "rel": "bookmark"}
+                {"href": "/v1.0/11111/groups/one/policies/5", "rel": "self"},
+                {"href": "/11111/groups/one/policies/5", "rel": "bookmark"}
             ]
         })
 

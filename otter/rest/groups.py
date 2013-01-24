@@ -76,10 +76,10 @@ def list_all_scaling_groups(request, tenantId):
 # (CRD = CRUD - U, because updating happens at suburls - so you can update
 # different parts)
 
-# TODO: in the implementation ticket, the interface create definition should be
-#       changed, and the mock store and corresponding tests also changed.
-# C
-
+# TODO: Currently, the response does not include scaling policy ids, because
+# we are just repeating whatever the request body was, with an ID and links
+# attached.  If we are going to create the scaling policies here too, we should
+# probably also return their ids and links, just like the manifest.
 @app.route('/<string:tenantId>/groups', methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
@@ -252,10 +252,6 @@ def create_new_scaling_group(request, tenantId, data):
     return deferred
 
 
-# TODO: in the implementation story, the interface create definition should be
-#       changed to remove colo, and the mock store and corresponding tests
-#       also changed
-# R
 @app.route('/<string:tenantId>/groups/<string:groupId>', methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -326,11 +322,11 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                         "id": "{policyId1}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}"
                             "rel": "bookmark"
                           }
                         ],
@@ -342,11 +338,11 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                         "id": "{policyId2}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId2}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}"
                             "rel": "bookmark"
                           }
                         ],
@@ -358,11 +354,11 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
                         "id": "{policyId3}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId3}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId3}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
                             "rel": "bookmark"
                           }
                         ],
@@ -395,9 +391,6 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
     return deferred
 
 
-# TODO: in the implementation story, the interface delete definition should be
-#       changed, and the mock store and corresponding tests also changed to
-#       not delete if there are existing servers.
 # Feature: Force delete, which stops scaling, deletes all servers for you, then
 #       deletes the scaling group.
 # D
