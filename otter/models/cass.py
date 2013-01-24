@@ -30,7 +30,7 @@ _cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
 _cql_view += "groupId = :groupId AND deleted = False;"
 _cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
 _cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
-_cql_delete = "UPDATE {cf} SET deleted=true WHERE tenantId = :tenantId AND groupId = :groupId"
+_cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
 _cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 
 
