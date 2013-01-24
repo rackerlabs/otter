@@ -181,8 +181,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, groupId, data, deleted) VALUES "
-        expectedCql += "(:tenantId, :groupId, :scaling, False) APPLY BATCH;"
+        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, groupId, data) VALUES "
+        expectedCql += "(:tenantId, :groupId, :scaling) APPLY BATCH;"
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "tenantId": '11111'}
@@ -217,8 +217,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_launch_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data, deleted) VALUES "
-        expectedCql += "(:tenantId, :groupId, :launch, False) APPLY BATCH;"
+        expectedCql = "BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
+        expectedCql += "(:tenantId, :groupId, :launch) APPLY BATCH;"
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "tenantId": '11111'}
