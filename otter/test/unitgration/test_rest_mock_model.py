@@ -16,12 +16,16 @@ from urlparse import urlsplit
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.group_examples import config, launch_server_config, policy
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
 from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin
+
+
+def _strip_base_url(url):
+    return urlsplit(url)[2].rstrip('/')
 
 
 class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
@@ -82,7 +86,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(1, len(headers))
 
         # now make sure the Location header points to something good!
-        path = urlsplit(headers[0])[2].rstrip('/')
+        path = _strip_base_url(headers[0])
 
         wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
@@ -261,9 +265,10 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         header pointing to the list of all scaling policies, and a response
         containing a list of the newly created scaling policy resources only.
 
-        :return: the list of new scaling policies
+        :return: a list self links to the new scaling policies (not guaranteed
+            to be in any consistent order)
         """
-        request_body = policy()  # however many of them there are
+        request_body = policy()[:-1]  # however many of them there are minus one
         wrapper = self.assert_deferred_succeeded(request(
             root, 'POST', self.policies_url, body=json.dumps(request_body)))
 
@@ -287,9 +292,58 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(1, len(headers))
 
         # now make sure the Location header points to the list policies header
-        self.assertEqual(urlsplit(headers[0])[2].rstrip('/'), self.policies_url)
+        self.assertEqual(_strip_base_url(headers[0]), self.policies_url)
 
-        return response["policies"]
+        links = [_strip_base_url(link["href"])
+                 for link in pol["links"] if link["rel"] == "self"
+                 for pol in response["policies"]]
+        return links
+
+    def update_and_view_scaling_policy(self, path):
+        """
+        Updating a scaling policy returns with a 204 no content.  When viewing
+        the policy again, it should contain the updated version.
+        """
+        request_body = policy()[-1]  # the one that was not created
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'PUT', path, body=json.dumps(request_body)))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Update failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 200)
+
+        response = json.loads(wrapper.content)
+        updated = response['policy']
+
+        self.assertIn('id', updated)
+        self.assertIn('links', updated)
+        self.assertIn(
+            path, [_strip_base_url(link["href"]) for link in updated["links"]])
+
+        del updated['id']
+        del updated['links']
+
+        self.assertEqual(updated, request_body)
+
+    def delete_and_view_scaling_policy(self, path):
+        """
+        Deleting a scaling policy returns with a 204 no content.  The next
+        attempt to view the scaling policy should return a 404 not found.
+        """
+        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Delete failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 404)
+
+        # flush any logged errors
+        self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_crud_scaling_policies(self):
         """
@@ -306,5 +360,14 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         # create more scaling groups, to check the creation response
         self.assert_number_of_scaling_policies(len(first_policies))
         second_policies = self.create_and_view_scaling_policies()
-        self.assert_number_of_scaling_policies(len(first_policies) +
-                                               len(second_policies))
+        len_total_policies = len(first_policies) + len(second_policies)
+        self.assert_number_of_scaling_policies(len_total_policies)
+
+        # update scaling policy, and there should still be the same number of
+        # policies after the update
+        self.update_and_view_scaling_policy(first_policies[0])
+        self.assert_number_of_scaling_policies(len_total_policies)
+
+        # delete a scaling policy - there should be one fewer scaling policy
+        self.delete_and_view_scaling_policy(second_policies[0])
+        self.assert_number_of_scaling_policies(len_total_policies - 1)
