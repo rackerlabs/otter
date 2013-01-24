@@ -208,14 +208,19 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def create_policy(self, data):
+    def create_policies(self, data):
         """
-        Creates a new policy with the data given.
+        Create a set of new scaling policies.
 
-        :param data: the details of the scaling policy in JSON format
+        :param data: a list of one or more scaling policies in JSON format,
+            each of which is defined by
+            :data:`otter.json_schema.group_schemas.policy`
         :type data: ``list`` of ``dict``
 
-        :return: the UUID of the newly created scaling policy
+        :return: dictionary of UUIDs to their matching newly created scaling
+            policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``dict`` of ``dict``
         """
         raise NotImplementedError()
 

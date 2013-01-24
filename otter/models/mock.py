@@ -100,7 +100,7 @@ class MockScalingGroup:
             self.launch = creation['launch']
             self.policies = {}
             if creation['policies']:
-                self.create_policy(creation['policies'])
+                self.create_policies(creation['policies'])
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
@@ -270,14 +270,19 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def create_policy(self, data):
+    def create_policies(self, data):
         """
-        Creates a new policy with the data given.
+        Create a set of new scaling policies.
 
-        :param data: the details of the scaling policy in JSON format
+        :param data: a list of one or more scaling policies in JSON format,
+            each of which is defined by
+            :data:`otter.json_schema.group_schemas.policy`
         :type data: ``list`` of ``dict``
 
-        :return: the UUID of the newly created scaling policy
+        :return: dictionary of UUIDs to their matching newly created scaling
+            policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``dict`` of ``dict``
         """
         if self.error is not None:
             return defer.fail(self.error)

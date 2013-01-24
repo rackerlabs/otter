@@ -13,7 +13,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -108,26 +108,71 @@ def list_policies(request, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policy',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['POST'])
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(rest_schemas.create_policy_array)
-def create_policy(request, tenantId, groupId, data):
+def create_policies(request, tenantId, groupId, data):
     """
     Create one or many new scaling policies.
     Scaling policies must include a name, type, adjustment, and cooldown.
-    The response header will point to the newly created policy.
+    The response header will point to the list policies endpoint.
     This data provided in the request body in JSON format.
 
     Example request::
 
-        [{
-            "name": "scale up by one server",
-            "change": 1,
-            "cooldown": 150
-        }]
+        [
+            {
+                "name": "scale up by one server",
+                "change": 1,
+                "cooldown": 150
+            },
+            {
+                "name": 'scale down a 5.5 percent because of a tweet',
+                "changePercent": -5.5,
+                "cooldown": 6
+            }
+        ]
 
+    Example response::
+
+        {
+            "policies": [
+                {
+                    "id": {policyId1},
+                    "links": [
+                        {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                            "rel": "self"
+                        },
+                        {
+                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId1}"
+                            "rel": "bookmark"
+                        }
+                    ],
+                    "name": "scale up by one server",
+                    "change": 1,
+                    "cooldown": 150
+                },
+                {
+                    "id": {policyId2},
+                    "links": [
+                        {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                            "rel": "self"
+                        },
+                        {
+                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId2}"
+                            "rel": "bookmark"
+                        }
+                    ],
+                    "name": 'scale down a 5.5 percent because of a tweet',
+                    "changePercent": -5.5,
+                    "cooldown": 6
+                }
+            ]
+        }
     """
 
     def send_redirect(policyId):
@@ -142,13 +187,13 @@ def create_policy(request, tenantId, groupId, data):
         )
 
     rec = get_store().get_scaling_group(tenantId, groupId)
-    deferred = rec.create_policy(data)
+    deferred = rec.create_policies(data)
     deferred.addCallback(send_redirect)
     return deferred
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['GET'])
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -172,7 +217,7 @@ def get_policy(request, tenantId, groupId, policyId):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -199,7 +244,7 @@ def update_policy(request, tenantId, groupId, policyId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['DELETE'])
 @fails_with(exception_codes)
 @succeeds_with(204)
