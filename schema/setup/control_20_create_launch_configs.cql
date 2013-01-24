@@ -22,3 +22,5 @@ CREATE COLUMNFAMILY launch_config (
     deleted boolean,
     PRIMARY KEY(tenantId, groupId)
     );
+    
+CREATE INDEX deleted_launch_config ON launch_config (deleted);

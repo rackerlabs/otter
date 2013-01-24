@@ -23,3 +23,5 @@ CREATE TABLE scaling_policies (
     deleted boolean,
     PRIMARY KEY(tenantId, groupId, polId)
     );
+    
+CREATE INDEX deleted_scaling_policies ON scaling_policies (deleted);

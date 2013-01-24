@@ -22,3 +22,5 @@ CREATE COLUMNFAMILY scaling_config (
     deleted boolean,
     PRIMARY KEY(tenantId, groupId)
     );
+    
+CREATE INDEX deleted_scaling_config ON scaling_config (deleted);

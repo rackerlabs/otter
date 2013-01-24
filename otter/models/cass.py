@@ -26,10 +26,12 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = "SELECT data, deleted FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId;"
-_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data) VALUES (:tenantId, :groupId, {name})"
+_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+_cql_view += "groupId = :groupId AND deleted = False;"
+_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
+_cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
 _cql_delete = "UPDATE {cf} SET deleted=true WHERE tenantId = :tenantId AND groupId = :groupId"
-_cql_list = "SELECT groupid, deleted FROM {cf} WHERE tenantId = :tenantId;"
+_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 
 
 class CassScalingGroup(object):
@@ -266,9 +268,6 @@ class CassScalingGroup(object):
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
         for rawRec in rawResponse[0]['cols']:
-            if rawRec['name'] is 'deleted':
-                if rawRec['value'] is True:
-                    raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             if rawRec['name'] is 'data':
                 rec = rawRec['value']
         if rec is None:
@@ -407,19 +406,14 @@ class CassScalingGroupCollection:
                     err = CassBadDataError("No cols")
                     return defer.fail(err)
                 rec = None
-                gone = False
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'deleted':
-                        if rawRec['value'] is True:
-                            gone = True
                     if rawRec['name'] is 'groupid':
                         rec = rawRec['value']
                 if rec is None:
                     err = CassBadDataError("No data")
                     return defer.fail(err)
-                if gone is not True:
-                    data.append(CassScalingGroup(tenant_id, rec,
-                                                 self.connection))
+                data.append(CassScalingGroup(tenant_id, rec,
+                                             self.connection))
             return defer.succeed(data)
 
         query = _cql_list.format(cf=self.config_table)
