@@ -241,7 +241,8 @@ class IScalingGroup(Interface):
 
     def delete_policy(policy_id):
         """
-        Delete the specified policy on this particular scaling group.
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
 
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
@@ -269,14 +270,14 @@ class IScalingGroup(Interface):
         """
         pass
 
-    def create_webhook(policy_id, data):
+    def create_webhooks(policy_id, data):
         """
         Creates a new capability URL for one particular scaling policy
 
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
 
-        :param data: the details of the webhook in JSON format, as specified
+        :param data: a list of details of the webhook in JSON format, as specified
             by :data:`otter.json_schema.group_schemas.webhook`
         :type data: ``dict``
 

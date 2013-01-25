@@ -247,10 +247,43 @@ class CassScalingGroup(object):
 
     def delete_policy(self, policy_id):
         """
-        Delete the scaling policy
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
 
         :param policy_id: the ID of the policy to be deleted
         :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        raise NotImplementedError()
+
+    def list_webhooks(self, policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        raise NotImplementedError()
+
+    def create_webhooks(self, policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: a list of details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
