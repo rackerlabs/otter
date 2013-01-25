@@ -380,13 +380,13 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_get_nonexistent_policy_fails(self):
         """
-        Get a policy that doesn't exist, should return NoSuchPolicyError
+        Get a policy that doesn't exist returns :class:`NoSuchPolicyError`
         """
         uuid = "Otters are so cute!"
         deferred = self.group.get_policy(uuid)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
-    def test_delete_policy_fails(self):
+    def test_delete_policy_succeeds(self):
         """
         Delete a policy, check that it is actually deleted.
         """
@@ -403,6 +403,15 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         deferred = self.group.delete_policy("puppies")
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_policy_removes_webhooks(self):
+        """
+        Deleting an existing policy removes its associated webhooks too
+        """
+        self.group.policies = {"2": {}}
+        self.group.webhooks = {"2": {}}
+        self.assert_deferred_succeeded(self.group.delete_policy("2"))
+        self.assertNotIn("2", self.group.webhooks)
 
     def test_update_policy_succeeds(self):
         """
@@ -431,6 +440,39 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }
         deferred = self.group.update_policy("puppies", update_data)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_list_webhooks_nonexistant_policy_fails(self):
+        """
+        Listing webhooks on a policy that doesn't exist fails with a
+        :class:`NoSuchPolicyError`
+        """
+        deferred = self.group.list_webhooks("otter-stacking")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_list_empty_webhooks(self):
+        """
+        If there are no webhooks, an empty dictionary is returned when
+        ``list_webhooks`` is called
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        result = self.validate_list_webhooks_return_value(uuid)
+        self.assertEqual(result, {})
+
+    def test_list_webhooks_succeeds(self):
+        """
+        If there are webhooks for a particular policy, listing webhooks returns
+        a dictionary for all of them
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        webhooks = {
+            '10': {'capabilityURL': 'hook'},
+            '11': {'capabilityURL': 'anotherhook'}
+        }
+        self.group.webhooks = {uuid: webhooks}
+        result = self.validate_list_webhooks_return_value(uuid)
+        self.assertEqual(result, webhooks)
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -574,7 +616,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                         "group is {0!r}".format(group))
 
         group.active_entities = ["1"]
-        group.policies = {'2': {}}
+        group.policies = {'1': {}, '2': {}}
 
         return [
             group.view_config(),
@@ -603,7 +645,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.create_policies([]),
             group.get_policy('2'),
             group.update_policy('2', {}),
-            group.delete_policy('2')
+            group.delete_policy('1'),
+            group.list_webhooks('2')
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):

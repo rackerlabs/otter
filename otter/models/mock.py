@@ -101,11 +101,13 @@ class MockScalingGroup:
             self.policies = {}
             if creation['policies']:
                 self.create_policies(creation['policies'])
+            self.webhooks = {}
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
             self.launch = None
             self.policies = None
+            self.webhooks = None
 
     def view_manifest(self):
         """
@@ -321,7 +323,8 @@ class MockScalingGroup:
 
     def delete_policy(self, policy_id):
         """
-        Delete the scaling policy
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
 
         :param policy_id: the ID of the policy to be deleted
         :type policy_id: ``str``
@@ -335,10 +338,53 @@ class MockScalingGroup:
 
         if policy_id in self.policies:
             del self.policies[policy_id]
+
+            if policy_id in self.webhooks:
+                del self.webhooks[policy_id]
+
             return defer.succeed(None)
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
+
+    def list_webhooks(self, policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            return defer.succeed(self.webhooks.get(policy_id, {}))
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def create_webhooks(self, policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: the details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        return defer.succeed(None)
 
 
 class MockScalingGroupCollection:
