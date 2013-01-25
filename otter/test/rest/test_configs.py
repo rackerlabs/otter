@@ -227,12 +227,12 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         returns a 200 and the actual group config
         """
         self.mock_group.view_launch_config.return_value = defer.succeed(
-            launch_examples[0])
+            launch_examples()[0])
 
         response_body = self.assert_status_code(200)
         resp = json.loads(response_body)
         validate(resp, rest_schemas.view_launch_config)
-        self.assertEqual(resp, {'launchConfiguration': launch_examples[0]})
+        self.assertEqual(resp, {'launchConfiguration': launch_examples()[0]})
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
@@ -245,11 +245,11 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             NoSuchScalingGroupError('11111', 'one'))
 
         response_body = self.assert_status_code(
-            404, method='PUT', body=json.dumps(launch_examples[0]))
+            404, method='PUT', body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples[0])
+            launch_examples()[0])
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
@@ -261,12 +261,12 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             DummyException())
 
         response_body = self.assert_status_code(
-            500, method="PUT", body=json.dumps(launch_examples[0]))
+            500, method="PUT", body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples[0])
+            launch_examples()[0])
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
@@ -276,11 +276,11 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_group.update_launch_config.return_value = defer.succeed(None)
         response_body = self.assert_status_code(
-            204, method='PUT', body=json.dumps(launch_examples[0]))
+            204, method='PUT', body=json.dumps(launch_examples()[0]))
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples[0])
+            launch_examples()[0])
 
     def test_launch_config_modify_bad_or_missing_input_400(self):
         """
@@ -301,7 +301,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         Checks that an update with PUT data with the wrong schema fails with a
         400
         """
-        invalids = (config_examples[0], {"type": "launch_server", "args": {}})
+        invalids = (config_examples()[0], {"type": "launch_server", "args": {}})
         for request_body in invalids:
             self.mock_group.update_launch_config.return_value = None
             response_body = self.assert_status_code(
