@@ -471,3 +471,19 @@ class MockScalingGroupCollection:
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(tenant, uuid, None)
+
+    def execute_webhook(self, capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
+        """
+        raise NotImplementedError()

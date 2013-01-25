@@ -5,6 +5,16 @@ Interface to be used by the scaling groups engine
 from zope.interface import Interface, Attribute
 
 
+class UnrecognizedCapabilityError(Exception):
+    """
+    Error to be raised when a capability hash is not recognized, or does not
+    exist, or has been deleted.
+    """
+    def __init__(self, capability_hash):
+        super(UnrecognizedCapabilityError, self).__init__(
+            "Unrecognized capability hash {hash}".format(hash=capability_hash))
+
+
 class NoSuchScalingGroupError(Exception):
     """
     Error to be raised when attempting operations on a scaling group that
@@ -374,5 +384,21 @@ class IScalingGroupCollection(Interface):
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider (no
             :class:`twisted.internet.defer.Deferred`)
+        """
+        pass
+
+    def execute_webhook(capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
         """
         pass
