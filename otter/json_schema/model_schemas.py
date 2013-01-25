@@ -141,6 +141,8 @@ policy_list = {
     "additionalProperties": False
 }
 
+view_webhook = deepcopy(webhook)
+view_webhook['properties']['metadata']['required'] = True
 
 webhook_list = {
     "type": "object",
@@ -149,7 +151,7 @@ webhook_list = {
         "^\S+$": {
             "type": "object",
             "required": True,
-            "items": [webhook]
+            "items": [view_webhook]
         }
     },
     "additionalProperties": False

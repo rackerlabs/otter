@@ -4,12 +4,14 @@
 from collections import defaultdict
 from uuid import uuid4
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError,
-                                    NoSuchPolicyError)
 import zope.interface
 
 from twisted.internet import defer
+
+from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
+                                    NoSuchScalingGroupError, NoSuchEntityError,
+                                    NoSuchPolicyError)
+from otter.util.hashkey import generate_capability_url
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -101,7 +103,7 @@ class MockScalingGroup:
             self.policies = {}
             if creation['policies']:
                 self.create_policies(creation['policies'])
-            self.webhooks = {}
+            self.webhooks = defaultdict(dict)
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
@@ -384,7 +386,23 @@ class MockScalingGroup:
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        return defer.succeed(None)
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            created = {}
+            for webhook_input in data:
+                webhook_real = {'metadata': {}}
+                webhook_real.update(webhook_input)
+                webhook_real['capabilityURL'] = generate_capability_url()
+                uuid = str(uuid4())
+                created[uuid] = webhook_real
+                self.webhooks[policy_id][uuid] = webhook_real
+
+            return defer.succeed(created)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
 
 
 class MockScalingGroupCollection:

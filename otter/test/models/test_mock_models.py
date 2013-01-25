@@ -467,12 +467,42 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         policy_list = self.assert_deferred_succeeded(self.group.list_policies())
         uuid = policy_list.keys()[0]
         webhooks = {
-            '10': {'capabilityURL': 'hook'},
-            '11': {'capabilityURL': 'anotherhook'}
+            '10': {'capabilityURL': 'hook', 'metadata': {}},
+            '11': {'capabilityURL': 'anotherhook', 'metadata': {}}
         }
         self.group.webhooks = {uuid: webhooks}
         result = self.validate_list_webhooks_return_value(uuid)
         self.assertEqual(result, webhooks)
+
+    def test_create_webhooks_nonexistant_policy_fails(self):
+        """
+        Creating webhooks on a policy that doesn't exist fails with a
+        :class:`NoSuchPolicyError`
+        """
+        deferred = self.group.create_webhooks("otter-stacking", [{}])
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    @mock.patch('otter.models.mock.generate_capability_url',
+                return_value="temp")
+    def test_create_webhooks_succeeds(self, fake_random):
+        """
+        Adding new webhooks to the scaling policy returns a dictionary of
+        scaling webhooks mapped to their ids
+        """
+        self.group.policies = {'2': {}}
+        # have a fake webhook already
+        self.group.webhooks = {
+            '2': {'fake': {'capabilityURL': 'fake', 'metadata': {}}}}
+
+        # create two webhooks, both empty
+        creation = self.validate_create_webhooks_return_value('2', [{}, {}])
+        self.assertEqual(len(creation), 2)
+        for webhook in creation.values():
+            self.assertEqual(webhook, {'metadata': {}, 'capabilityURL': 'temp'})
+
+        # listing should return 3
+        listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))
+        self.assertGreater(len(listing), len(creation))
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -606,7 +636,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
-    def _call_all_methods_on_group(self, group_id):
+    @mock.patch('otter.models.mock.generate_capability_url',
+                return_value="temp")
+    def _call_all_methods_on_group(self, group_id, mock_generation):
         """
         Gets a group, asserts that it's a MockScalingGroup, and runs all of its
         calls and returns their deferreds as a list
@@ -646,7 +678,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.get_policy('2'),
             group.update_policy('2', {}),
             group.delete_policy('1'),
-            group.list_webhooks('2')
+            group.list_webhooks('2'),
+            group.create_webhooks('2', [{}, {}])
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):
