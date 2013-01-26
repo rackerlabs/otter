@@ -255,17 +255,35 @@ view_manifest_response = _openstackify_schema("group", {
 
 
 # ----- schemas for viewing webhooks
-view_webhook_response = {
+_required_metadata = deepcopy(metadata)
+_required_metadata["required"] = True
+
+
+view_webhook_response = _openstackify_schema("webhook", {
     "type": "object",
     "description": "Schema of the JSON used to display a webhook.",
-    "properties": {"metadata": metadata},
+    "properties": {"metadata": _required_metadata},
     "additionalProperties": False
-}
-view_webhook_response["properties"].update(_link_objects["properties"])
+}, include_id=True)
 
-
-list_webhooks_response = _openstackify_schema("webhooks", {
+_list_of_webhooks = {
     "type": "array",
-    "items": [view_webhook_response],
+    "items": [view_webhook_response["properties"]["webhook"]],
     "uniqueItems": True
-}, paginated=True)
+}
+
+list_webhooks_response = _openstackify_schema(
+    "webhooks", _list_of_webhooks, paginated=True)
+
+create_webhooks_request = {
+    "type": "array",
+    "description": "Schema of the JSON used to create webhooks",
+    "items": {
+        "type": "object",
+        "properties": {"metadata": metadata},
+        "additionalProperties": False
+    },
+    "minItems": 1
+}
+
+create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)

@@ -141,12 +141,15 @@ policy_list = {
     "additionalProperties": False
 }
 
+_required_metadata = deepcopy(group_schemas.metadata)
+_required_metadata["required"] = True
+
 webhook = {
     "type": "object",
     "description": "Information about a capability URL.",
     "properties": {
-        "metadata": group_schemas.metadata,
-        "capabilityString": {
+        "metadata": _required_metadata,
+        "capabilityHash": {
             "type": "string",
             "description": ("A random unguessable string to be HMAC-ed for the "
                             "capability URL"),

@@ -4,7 +4,7 @@ webhooks, and creating/viewing/deleting webhooks.
 """
 
 import json
-from jsonschema import validate
+from jsonschema import validate, ValidationError
 
 import mock
 
@@ -13,6 +13,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.json_schema import rest_schemas
 from otter.models.interface import NoSuchPolicyError
+from otter.rest.decorators import InvalidJsonError
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
 
@@ -26,7 +27,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     policy_id = '2'
     endpoint = "/v1.0/11111/groups/1/policies/2/webhooks"
 
-    invalid_methods = ("DELETE", "PUT", "CREATE")
+    invalid_methods = ("DELETE", "PUT")
 
     def test_list_unknown_error_is_500(self):
         """
@@ -71,8 +72,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         # return two webhook objects
         self.mock_group.list_webhooks.return_value = defer.succeed({
-            "3": {'metadata': {}, 'capabilityURL': 'xxx'},
-            "4": {'metadata': {}, 'capabilityURL': 'yyy'}
+            "3": {'metadata': {}, 'capabilityHash': 'xxx'},
+            "4": {'metadata': {}, 'capabilityHash': 'yyy'}
         })
         body = self.assert_status_code(200)
         self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
@@ -107,85 +108,95 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             "webhooks_links": []
         })
 
-    # def test_group_create_bad_input_400(self):
-    #     """
-    #     Checks that the serialization checks and rejects unserializable
-    #     data
-    #     """
-    #     self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-    #     self.assert_status_code(400, None, 'POST', '{')
-    #     self.flushLoggedErrors(InvalidJsonError)
+    def test_create_webhooks_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.create_webhooks.return_value = defer.fail(error)
+        self.assert_status_code(500, None, 'POST', '[{}]')
+        self.mock_group.create_webhooks.assert_called_once_with(
+            self.policy_id, [{}])
+        self.flushLoggedErrors(DummyException)
 
-    # def test_group_create_invalid_schema_400(self):
-    #     """
-    #     Checks that the scaling groups schema is obeyed --
-    #     an empty schema is bad.
-    #     """
+    def test_create_webhooks_for_unknown_policy_is_404(self):
+        """
+        When create webhooks for a policy, if the policy doesn't exist and
+        :class:`NoSuchPolicyError` is raised, endpoint returns 404.
+        """
+        error = NoSuchPolicyError(
+            self.tenant_id, self.group_id, self.policy_id)
+        self.mock_group.create_webhooks.return_value = defer.fail(error)
+        self.assert_status_code(404, None, 'POST', '[{}]')
+        self.mock_group.create_webhooks.assert_called_once_with(
+            self.policy_id, [{}])
+        self.flushLoggedErrors(NoSuchPolicyError)
 
-    #     self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-    #     response_body = self.assert_status_code(400, None, 'POST', '{}')
-    #     self.flushLoggedErrors(ValidationError)
+    def test_create_webhooks_bad_input_400(self):
+        """
+        Checks that the serialization checks and rejects unserializable
+        data
+        """
+        self.mock_group.create_webhooks.return_value = defer.succeed({})
+        self.assert_status_code(400, None, 'POST', '{')
+        self.flushLoggedErrors(InvalidJsonError)
 
-    #     resp = json.loads(response_body)
-    #     self.assertEqual(resp['type'], 'ValidationError')
+    def test_group_create_invalid_schema_400(self):
+        """
+        Checks that the scaling groups schema is obeyed --
+        an empty schema is bad.
+        """
 
-    # @mock.patch('otter.rest.application.get_url_root', return_value="")
-    # def _test_successful_create(self, request_body, mock_url):
-    #     """
-    #     Tries to create a scaling group with the given request body (which
-    #     should succeed) - and test the response
-    #     """
-    #     self.mock_store.create_scaling_group.return_value = defer.succeed("1")
-    #     response_body = self.assert_status_code(
-    #         201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1')
-    #     self.mock_store.create_scaling_group.assert_called_once_with(
-    #         '11111',
-    #         request_body['groupConfiguration'],
-    #         request_body['launchConfiguration'],
-    #         request_body.get('scalingPolicies', None)
-    #     )
-    #     resp = json.loads(response_body)
-    #     validate(resp, rest_schemas.create_group_response)
+        self.mock_group.create_webhooks.return_value = defer.succeed({})
+        response_body = self.assert_status_code(400, None, 'POST', '[]')
+        self.flushLoggedErrors(ValidationError)
 
-    #     expected = {
-    #         "id": "1",
-    #         "links": [
-    #             {"href": "/v1.0/11111/groups/1", "rel": "self"},
-    #             {"href": "/11111/groups/1", "rel": "bookmark"}
-    #         ],
-    #         'groupConfiguration': request_body['groupConfiguration'],
-    #         'launchConfiguration': request_body['launchConfiguration']
-    #     }
-    #     if 'scalingPolicies' in request_body:
-    #         expected['scalingPolicies'] = request_body['scalingPolicies']
-    #     self.assertEqual(resp, {"group": expected})
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'ValidationError')
 
-    # def test_group_create_one_policy(self):
-    #     """
-    #     Tries to create a scaling group
-    #     """
-    #     self._test_successful_create({
-    #         'groupConfiguration': config_examples()[0],
-    #         'launchConfiguration': launch_examples()[0],
-    #         'scalingPolicies': [policy_examples()[0]]
-    #     })
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_webhooks_create(self, mock_url):
+        """
+        Tries to create a set of webhooks.
+        """
+        self.mock_group.create_webhooks.return_value = defer.succeed({
+            "3": {'metadata': {}, 'capabilityHash': 'xxx'},
+            "4": {'metadata': {}, 'capabilityHash': 'yyy'}
+        })
+        response_body = self.assert_status_code(
+            201, None, 'POST', '[{}, {}]',
+            # location header points to the webhooks list
+            '/v1.0/11111/groups/1/policies/2/webhooks')
 
-    # def test_group_create_many_policies(self):
-    #     """
-    #     Tries to create a scaling group
-    #     """
-    #     self._test_successful_create({
-    #         'groupConfiguration': config_examples()[0],
-    #         'launchConfiguration': launch_examples()[0],
-    #         'scalingPolicies': policy_examples()
-    #     })
+        self.mock_group.create_webhooks.assert_called_once_with(
+            self.policy_id, [{}, {}])
 
-    # def test_group_create_no_scaling_policies(self):
-    #     """
-    #     Tries to create a scaling group, but if no scaling policy is provided
-    #     the the interface is called with None in place of scaling policies
-    #     """
-    #     self._test_successful_create({
-    #         'groupConfiguration': config_examples()[0],
-    #         'launchConfiguration': launch_examples()[0],
-    #     })
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_webhooks_response)
+
+        self.assertEqual(resp, {
+            "webhooks": [
+                {
+                    'id': '3',
+                    'metadata': {},
+                    'links': [
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
+                         "rel": "self"},
+                        {"href": '/11111/groups/1/policies/2/webhooks/3',
+                         "rel": "bookmark"},
+                        {"href": '/v1.0/execute/xxx', "rel": "capability"}
+                    ]
+                },
+                {
+                    'id': '4',
+                    'metadata': {},
+                    'links': [
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
+                         "rel": "self"},
+                        {"href": '/11111/groups/1/policies/2/webhooks/4',
+                         "rel": "bookmark"},
+                        {"href": '/v1.0/execute/yyy', "rel": "capability"}
+                    ]
+                }
+            ]
+        })
