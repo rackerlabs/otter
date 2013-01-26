@@ -1,0 +1,735 @@
+HOST: http://autoscaling.api.rackspacecloud.com/
+
+--- otter-apiary ---
+---
+All comments can be written in (support [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax)
+---
+--
+Group Resource
+Autoscale REST endpoints having to do with a group or collection of groups
+(/tenantId/groups and /tenantId/groups/groupId)
+--
+Lists all the autoscaling groups per for a given tenant ID.
+GET /{tenantId}/groups
+< 200
+< Content-Type: application/json
+{
+    "groups": [
+      {
+        "id": "{groupId1}"
+        "links": [
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}"
+            "rel": "bookmark"
+          }
+        ]
+      },
+      {
+        "id": "{groupId2}"
+        "links": [
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId2}"
+            "rel": "bookmark"
+          }
+        ]
+      }
+    ],
+    "groups_links": []
+}
+
+
+Create a new scaling group, given the general scaling group configuration,
+launch configuration, and optional scaling policies.  This data provided
+in the request body in JSON format. If successful, no response body will
+be returned.
+POST /{tenantId}/groups
+> Accept: application/json
+{
+    "groupConfiguration": {
+        "name": "workers",
+        "cooldown": 60,
+        "minEntities": 5,
+        "maxEntities": 100,
+        "metadata": {
+            "firstkey": "this is a string",
+            "secondkey": "1"
+        }
+    },
+    "launchConfiguration": {
+        "type": "launch_server",
+        "args": {
+            "server": {
+                "flavorRef": 3,
+                "name": "webhead",
+                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                "OS-DCF:diskConfig": "AUTO",
+                "metadata": {
+                    "mykey": "myvalue"
+                },
+                "personality": [
+                    {
+                        "path": '/root/.ssh/authorized_keys',
+                        "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                    }
+                ],
+                "networks": [
+                    {
+                        "uuid": "11111111-1111-1111-1111-111111111111"
+                    }
+                ],
+            },
+            "loadBalancers": [
+                {
+                    "loadBalancerId": 2200,
+                    "port": 8081
+                }
+            ]
+        }
+    },
+    "scalingPolicies": [
+        {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        },
+        {
+            "name": 'scale down 5.5 percent',
+            "changePercent": -5.5,
+            "cooldown": 6
+        },
+        {
+            "name": 'set number of servers to 10',
+            "steadyState": 10,
+            "cooldown": 3
+        }
+    ]
+}
+< 201
+< Content-Type: application/json
+
+
+View manifested view of the scaling group configuration, including the
+launch configuration, and the scaling policies.  This data is returned in
+the body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}
+< 200
+< Content-Type: application/json
+{
+    "group": {
+        "id": "{groupId}",
+        "links": [
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+            "rel": "bookmark"
+          }
+        ],
+        "groupConfiguration": {
+            "name": "workers",
+            "cooldown": 60,
+            "minEntities": 5,
+            "maxEntities": 100,
+            "metadata": {
+                "firstkey": "this is a string",
+                "secondkey": "1",
+            }
+        },
+        "launchConfiguration": {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": 3,
+                    "name": "webhead",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "OS-DCF:diskConfig": "AUTO",
+                    "metadata": {
+                        "mykey": "myvalue"
+                    },
+                    "personality": [
+                        {
+                            "path": '/root/.ssh/authorized_keys',
+                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                        }
+                    ],
+                    "networks": [
+                        {
+                            "uuid": "11111111-1111-1111-1111-111111111111"
+                        }
+                    ],
+                },
+                "loadBalancers": [
+                    {
+                        "loadBalancerId": 2200,
+                        "port": 8081
+                    }
+                ]
+            }
+        },
+        "scalingPolicies": [
+            {
+                "id": "{policyId1}",
+                "links": [
+                  {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "name": "scale up by 10",
+                "change": 10,
+                "cooldown": 5
+            }
+            {
+                "id": "{policyId2}",
+                "links": [
+                  {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "name": 'scale down 5.5 percent',
+                "changePercent": -5.5,
+                "cooldown": 6
+            },
+            {
+                "id": "{policyId3}",
+                "links": [
+                  {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                    "rel": "self"
+                  },
+                  {
+                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
+                    "rel": "bookmark"
+                  }
+                ],
+                "name": 'set number of servers to 10',
+                "steadyState": 10,
+                "cooldown": 3
+            }
+        ]
+    }
+}
+
+
+Delete a scaling group if there are no entities belonging to the scaling
+group.  If successful, no response body will be returned.    
+DELETE /{tenantId}/groups/{groupId}
+< 204
+< Content-Type: application/json
+
+
+Get the current state of the scaling group, including the current set of
+active entities, the current set of pending entities, the desired number
+of entities, the current desired number of steady state servers.  This
+data is returned in the body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}/state
+< 200
+< Content-Type: application/json
+{
+  "group": {
+    "active": [
+      {
+        "id": "{instanceId1}"
+        "links": [
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
+            "rel": "bookmark"
+          }
+        ]
+      },
+      {
+        "id": "{instanceId2}"
+        "links": [
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
+            "rel": "bookmark"
+          }
+        ]
+      }
+    ],
+    "pending": [
+      {
+        "id": "{instanceId3}"
+        "links": [
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
+            "rel": "self"
+          },
+          {
+            "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
+            "rel": "bookmark"
+          }
+        ]
+      }
+    ],
+    "steadyState": 3,
+    "paused": false
+    }
+}
+
+--
+Config Resource
+Autoscale REST endpoints having to do with editing/modifying the configuration
+or launch configuration for a scaling group.
+
+(/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
+
+--
+
+Get the configuration for a scaling group, which includes the minimum
+number of entities, the maximum number of entities, global cooldown, and
+other metadata.  This data is returned in the body of the response in JSON
+format.
+GET /{tenantId}/groups/{groupId}/config
+< 200
+< Content-Type: application/json
+{
+    "groupConfiguration": {
+        "name": "workers",
+        "cooldown": 60,
+        "minEntities": 5,
+        "maxEntities": 100,
+        "metadata": {
+            "firstkey": "this is a string",
+            "secondkey": "1",
+        }
+    }
+}
+
+Edit the configuration for a scaling group, which includes the minimum
+number of entities, the maximum number of entities, global cooldown, and
+other metadata.  This data provided in the request body in JSON format.
+If successful, no response body will be returned.
+PUT /{tenantId}/groups/{groupId}/config
+> Accept: application/json
+{
+    "name": "workers",
+    "cooldown": 60,
+    "minEntities": 5,
+    "maxEntities": 100,
+    "metadata": {
+        "firstkey": "this is a string",
+        "secondkey": "1",
+    }
+}
+< 204
+< Content-Type: application/json
+
+
+Get the launch configuration for a scaling group, which includes the
+details of how to create a server, from what image, which load balancers to
+join it to, and what networks to add it to, and other metadata.
+This data is returned in the body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}/launch
+< 200
+< Content-Type: application/json
+{
+    "launchConfiguration": {
+        "type": "launch_server",
+        "args": {
+            "server": {
+                "flavorRef": 3,
+                "name": "webhead",
+                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                "OS-DCF:diskConfig": "AUTO",
+                "metadata": {
+                    "mykey": "myvalue"
+                },
+                "personality": [
+                    {
+                        "path": '/root/.ssh/authorized_keys',
+                        "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                    }
+                ],
+                "networks": [
+                    {
+                        "uuid": "11111111-1111-1111-1111-111111111111"
+                    }
+                ],
+            },
+            "loadBalancers": [
+                {
+                    "loadBalancerId": 2200,
+                    "port": 8081
+                }
+            ]
+        }
+    }
+}
+
+Edit the launch configuration for a scaling group, which includes the
+details of how to create a server, from what image, which load balancers to
+join it to, and what networks to add it to, and other metadata.
+This data provided in the request body in JSON format.
+If successful, no response body will be returned.
+PUT /{tenantId}/groups/{groupId}/launch
+> Accept: application/json
+{
+    "type": "launch_server",
+    "args": {
+        "server": {
+            "flavorRef": 3,
+            "name": "webhead",
+            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+            "OS-DCF:diskConfig": "AUTO",
+            "metadata": {
+                "mykey": "myvalue"
+            },
+            "personality": [
+                {
+                    "path": '/root/.ssh/authorized_keys',
+                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                }
+            ],
+            "networks": [
+                {
+                    "uuid": "11111111-1111-1111-1111-111111111111"
+                }
+            ],
+        },
+        "loadBalancers": [
+            {
+                "loadBalancerId": 2200,
+                "port": 8081
+            }
+        ]
+    }
+}
+< 204
+< Content-Type: application/json
+
+
+
+--
+Policies Resource
+The following section of resources iAutoscale REST endpoints having to do with creating/reading/updating/deleting
+the scaling policies associated with a particular scaling group.
+
+(/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
+--
+
+Get a list of scaling policies in the group. Each policy describes an id,
+name, type, adjustment, cooldown, and links. This data is returned in the
+body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}/policies
+< 200
+< Content-Type: application/json
+{
+    "policies": [
+        {
+            "id":"{policyId1}",
+            "data": {
+                "name": "scale up by one server",
+                "change": 1,
+                "cooldown": 150
+            },
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId1}"
+                    "rel": "bookmark"
+                }
+            ]
+        },
+        {
+            "id": "{policyId2}",
+            "data": {
+                "name": "scale up ten percent",
+                "changePercent": 10,
+                "cooldown": 150
+            },
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId2}"
+                    "rel": "bookmark"
+                }
+            ]
+        },
+        {
+            "id":"{policyId3}",
+            "data": {
+                "name": "scale down one server",
+                "change": -1,
+                "cooldown": 150
+            },
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId3}"
+                    "rel": "bookmark"
+                }
+            ]
+        },
+        {
+            "id": "{policyId4}",
+            "data": {
+                "name": "scale down ten percent",
+                "changePercent": -10,
+                "cooldown": 150
+            },
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId4}"
+                    "rel": "bookmark"
+                }
+            ]
+        }
+    ]
+}
+
+
+Create one or many new scaling policies.
+Scaling policies must include a name, type, adjustment, and cooldown.
+The response header will point to the list policies endpoint.
+An array of scaling policies is provided in the request body in JSON format.
+POST /{tenantId}/groups/{groupId}/policies
+> Accepts: application/json
+[
+    {
+        "name": "scale up by one server",
+        "change": 1,
+        "cooldown": 150
+    },
+    {
+        "name": 'scale down a 5.5 percent because of a tweet',
+        "changePercent": -5.5,
+        "cooldown": 6
+    }
+]
+< 201
+< Content-Type: application/json
+{
+    "policies": [
+        {
+            "id": {policyId1},
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId}/policy/{policyId1}"
+                    "rel": "bookmark"
+                }
+            ],
+            "name": "scale up by one server",
+            "change": 1,
+            "cooldown": 150
+        },
+        {
+            "id": {policyId2},
+            "links": [
+                {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                    "rel": "self"
+                },
+                {
+                    "href": "{url_root}/010101/groups/{groupId}/policy/{policyId2}"
+                    "rel": "bookmark"
+                }
+            ],
+            "name": 'scale down a 5.5 percent because of a tweet',
+            "changePercent": -5.5,
+            "cooldown": 6
+        }
+    ]
+}
+
+
+Get a scaling policy which describes an id, name, type, adjustment, and
+cooldown, and links.  This data is returned in the body of the response in
+JSON format.
+GET /{tenantId}/groups/{groupId}/policies/{policyId}
+< 200
+< Content-Type: application/json
+{
+    "policy": {
+        "id": {policyId},
+        "links": [
+            {
+                "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}"
+                "rel": "self"
+            },
+            {
+                "href": "{url_root}/010101/groups/{groupId}/policy/{policyId}"
+                "rel": "bookmark"
+            }
+        ],
+        "name": "scale up by one server",
+        "change": 1,
+        "cooldown": 150
+    }
+}
+
+Updates a scaling policy. Scaling policies must include a name, type,
+adjustment, and cooldown.
+If successful, no response body will be returned.
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}
+> Accepts: application/json
+{
+    "name": "scale up by two servers",
+    "change": 2,
+    "cooldown": 150
+}
+< 204
+
+
+Delete a scaling policy. If successful, no response body will be returned.
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
+< 204
+
+
+
+--
+Webhooks Resource
+Autoscale REST endpoints having to do with creating/reading/updating/deleting
+the webhooks associated with a particular scaling group's particular scaling
+policy.
+
+(/tenantId/groups/groupId/policy/policyId/webhook
+/tenantId/groups/groupId/policy/policyId/webhook/webhookId)
+--
+
+Get a mapping of IDs to their respective scaling policy webhooks.
+Each webhook has a name, url, and cooldown.
+This data is returned in the body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
+< 200
+< Content-Type: application/json
+{
+    "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
+        "name": "pagerduty",
+        "URL":
+            "autoscale.api.rackspacecloud.com/v1.0/action/
+            d0f4c14c48ad4837905ea7520cc4af700f6433ce0985e6bb87b6b461
+            7cb944abf814bd53964ddbf55b41e5812b3afe90890c0a4db75cb043
+            67e139fd62eab2e1",
+        "cooldown": 150
+    },
+    "b556078a-8c29-4129-9411-72580ffd0ba0": {
+        "name": "maas",
+        "URL":
+            "autoscale.api.rackspacecloud.com/v1.0/action/
+            db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+            d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+            f1e4df963414dbfe",
+        "cooldown": 150
+    }
+}
+
+
+Create a new scaling policy webhook. Scaling policies must include a name
+and cooldown.
+The response header will point to the generated policy webhook resource.
+This data provided in the request body in JSON format.
+POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
+> Accepts: application/json
+{
+    "name": "the best webhook ever",
+    "cooldown": 150
+}
+< 201
+
+
+Get information about a specific scaling policy webhook.
+Each webhook has a name, url, and cooldown.
+This data is returned in the body of the response in JSON format.
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+< 200
+< Content-Type: application/json
+{
+    "name": "pagerduty",
+    "URL":
+        "autoscale.api.rackspacecloud.com/v1.0/action/
+        db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+        d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+        f1e4df963414dbfe",
+    "cooldown": 150
+}
+
+
+Update an existing webhook.
+WebhookIds not recognized will be ignored with accompanying data.
+URLs will be ignored if submitted, but that will not invalidate the request.
+If successful, no response body will be returned.
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+> Accepts: application/json
+{
+    "name": "something completely different",
+    "URL":
+        "autoscale.api.rackspacecloud.com/v1.0/action/
+        db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
+        d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
+        f1e4df963414dbfe",
+    "cooldown": 777
+}
+< 204
+
+
+Delete a scaling policy webhook.
+If successful, no response body will be returned.
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+< 204
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
