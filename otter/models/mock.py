@@ -130,7 +130,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.config)
+        return defer.succeed(self.config.copy())
 
     def view_launch_config(self):
         """
@@ -138,7 +138,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.launch)
+        return defer.succeed(self.launch.copy())
 
     def view_state(self):
         """
@@ -267,7 +267,8 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         if policy_id in self.policies:
-            return defer.succeed(self.policies[policy_id])
+            # return a coyp so this store doesn't get corrupted
+            return defer.succeed(self.policies[policy_id].copy())
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
@@ -366,7 +367,8 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         if policy_id in self.policies:
-            return defer.succeed(self.webhooks.get(policy_id, {}))
+            # return a copy so this store doesn't get mutated
+            return defer.succeed(self.webhooks.get(policy_id, {}).copy())
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))

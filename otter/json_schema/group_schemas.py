@@ -258,19 +258,3 @@ policy = {
         }
     }
 }
-
-
-webhook = {
-    "type": "object",
-    "description": "Information about a capability URL.",
-    "properties": {
-        "metadata": metadata,
-        "capabilityString": {
-            "type": "string",
-            "description": ("A random unguessable string to be HMAC-ed for the "
-                            "capability URL"),
-            "required": True,
-            "length": 64
-        }
-    }
-}

@@ -3,7 +3,7 @@ JSON schema to be used to verify the return values from implementations of the
 model interface.
 """
 from copy import deepcopy
-from otter.json_schema.group_schemas import config, launch_config, policy, webhook
+from otter.json_schema import group_schemas
 
 entity_schema = {
     'type': 'object',
@@ -81,7 +81,7 @@ group_state = {
 
 # unlike updating or inputing a group config, the returned config must actually
 # have all the properties
-group_config = deepcopy(config)
+group_config = deepcopy(group_schemas.config)
 for property_name in group_config['properties']:
     group_config['properties'][property_name]['required'] = True
 
@@ -91,15 +91,15 @@ view_manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
-        "groupConfiguration": config,
-        "launchConfiguration": launch_config,
+        "groupConfiguration": group_schemas.config,
+        "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": {
             "type": "object",
             "patternProperties": {
                 "^\S+$": {
                     "type": "object",
                     "required": True,
-                    "items": [policy]
+                    "items": [group_schemas.policy]
                 }
             },
             "required": True,
@@ -134,15 +134,29 @@ policy_list = {
         "^\S+$": {
             "type": "object",
             "required": True,
-            "items": [policy]
+            "items": [group_schemas.policy]
         }
     },
     "required": False,
     "additionalProperties": False
 }
 
-view_webhook = deepcopy(webhook)
-view_webhook['properties']['metadata']['required'] = True
+webhook = {
+    "type": "object",
+    "description": "Information about a capability URL.",
+    "properties": {
+        "metadata": group_schemas.metadata,
+        "capabilityString": {
+            "type": "string",
+            "description": ("A random unguessable string to be HMAC-ed for the "
+                            "capability URL"),
+            "required": True,
+            "length": 64
+        }
+    },
+    "additionalProperties": False,
+    "required": True
+}
 
 webhook_list = {
     "type": "object",
@@ -151,7 +165,7 @@ webhook_list = {
         "^\S+$": {
             "type": "object",
             "required": True,
-            "items": [view_webhook]
+            "items": [webhook]
         }
     },
     "additionalProperties": False

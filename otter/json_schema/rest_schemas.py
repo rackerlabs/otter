@@ -5,7 +5,7 @@ JSON schemas for the rest responses from autoscale
 from copy import deepcopy
 from itertools import cycle
 
-from otter.json_schema.group_schemas import policy, config, launch_config
+from otter.json_schema.group_schemas import metadata, policy, config, launch_config
 from otter.json_schema.group_examples import (
     launch_server_config as launch_server_config_examples,
     config as config_examples,
@@ -159,6 +159,7 @@ group_state = _openstackify_schema("group", {
 }, include_id=True)
 
 
+# ----- schemas for viewing policies
 view_policy = deepcopy(policy)
 view_policy["properties"].update(_link_objects["properties"])
 for type_blob in view_policy["type"]:
@@ -251,3 +252,20 @@ view_manifest_response = _openstackify_schema("group", {
     },
     "additionalProperties": False
 }, include_id=True)
+
+
+# ----- schemas for viewing webhooks
+view_webhook_response = {
+    "type": "object",
+    "description": "Schema of the JSON used to display a webhook.",
+    "properties": {"metadata": metadata},
+    "additionalProperties": False
+}
+view_webhook_response["properties"].update(_link_objects["properties"])
+
+
+list_webhooks_response = _openstackify_schema("webhooks", {
+    "type": "array",
+    "items": [view_webhook_response],
+    "uniqueItems": True
+}, paginated=True)
