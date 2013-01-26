@@ -48,7 +48,8 @@ def set_store(store):
     _store = store
 
 
-def get_autoscale_links(tenant_id, group_id=None, policy_id=None, format="json",
+def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
+                        webhook_id=None, capability_hash=None, format="json",
                         api_version="1.0"):
     """
     Generates links into the autoscale system, based on the ids given.  If
@@ -90,16 +91,25 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None, format="json",
     if group_id is not None:
         path_parts.append(group_id)
         if policy_id is not None:
-            path_parts.append("policies")
-            path_parts.append(policy_id)
+            path_parts.extend(("policies", policy_id))
+            if webhook_id is not None:
+                path_parts.extend(("webhooks", webhook_id))
 
     url = "/".join(path_parts).rstrip('/')
 
     if format == "json":
-        return [
+        links = [
             {"href": url, "rel": "self"},
             {"href": url.replace('/{0}/'.format(api), '/'), "rel": "bookmark"}
         ]
+
+        if capability_hash is not None:
+            capability_url = "/".join(
+                [get_url_root(), api, "execute", capability_hash]).rstrip('/')
+
+            links.append({"href": capability_url, "rel": "capability"})
+
+        return links
     else:
         return url
 
