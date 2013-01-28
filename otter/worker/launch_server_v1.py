@@ -238,6 +238,15 @@ def launch_server(region, service_catalog, auth_token, launch_config):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
+
+    :param str region: A rackspace region as found in the service catalog.
+    :param list service_catalog: A list of services as returned by the auth apis.
+    :param str auth_token: The user's auth token.
+    :param dict launch_config: A launch_config args structure as defined for
+        the launch_server_v1 type.
+
+    :return: Deferred that fires when the server is "launched" based on the
+        given configuration.
     """
 
     lb_config = launch_config.get('loadBalancers', [])
@@ -261,12 +270,8 @@ def launch_server(region, service_catalog, auth_token, launch_config):
         return add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
 
     d.addCallback(_add_lb)
+    return d
 
-    def _print(results):
-        print results
-        return results
-
-    return d.addCallback(_print)
 
 if __name__ == '__main__':
     import sys
