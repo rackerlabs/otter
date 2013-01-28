@@ -28,12 +28,22 @@ def _serial_json_data(data, ver):
 
 _cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
 _cql_view += "groupId = :groupId AND deleted = False;"
+_cql_view_pol = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+_cql_view_pol += "groupId = :groupId AND polId = :polId AND deleted = False;"
 _cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
 _cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
+_cql_insert_pol = "INSERT INTO {cf}(tenantId, groupId, polId, data, deleted) "
+_cql_insert_pol += "VALUES (:tenantId, :groupId, {name}key, {name}, False)"
 _cql_update = "INSERT INTO {cf}(tenantId, groupId, data) "
 _cql_update += "VALUES (:tenantId, :groupId, {name})"
+_cql_update_pol = "INSERT INTO {cf}(tenantId, groupId, polId, data) "
+_cql_update_pol += "VALUES (:tenantId, :groupId, {name}key, {name})"
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
+_cql_delete_pol = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
+_cql_delete_pol += "AND :polId=polId"
 _cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
+_cql_list_pol = "SELECT polId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
+_cql_list_pol += "AND deleted = False;"
 
 
 class CassScalingGroup(object):
@@ -201,7 +211,36 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        def _grab_pol_list(rawResponse):
+            if rawResponse is None:
+                err = CassBadDataError("None")
+                return defer.fail(err)
+            if len(rawResponse) == 0:
+                return defer.succeed([])
+            data = {}
+            for row in rawResponse:
+                if 'cols' not in row:
+                    err = CassBadDataError("No cols")
+                    return defer.fail(err)
+                rec = None
+                groupid = None
+                for rawRec in row['cols']:
+                    if rawRec['name'] is 'polid':
+                        groupid = rawRec['value']
+                    if rawRec['name'] is 'data':
+                        rec = rawRec['value']
+                if rec is None:
+                    err = CassBadDataError("No data")
+                    return defer.fail(err)
+                data[groupid] = rec
+            return defer.succeed(data)
+
+        query = _cql_list_pol.format(cf=self.policies_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid})
+        d.addCallback(_grab_pol_list)
+        return d
 
     def get_policy(self, policy_id):
         """
@@ -210,7 +249,13 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        query = _cql_view_pol.format(cf=self.policies_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "polId": policy_id})
+        d.addCallback(self._grab_json_data)
+        return d
 
     def create_policies(self, data):
         """
@@ -226,7 +271,32 @@ class CassScalingGroup(object):
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: ``dict`` of ``dict``
         """
-        raise NotImplementedError()
+        def _do_create_pol(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+
+            queries = []
+            cqldata = {"tenantId": self.tenant_id,
+                       "groupId": self.uuid}
+
+            for i in range(len(data)):
+                polname = "policy{}".format(i)
+                polkey = generate_key_str('policy')
+                queries.append(_cql_insert_pol.format(cf=self.policies_table,
+                                                      name=":" + polname))
+                cqldata[polname] = _serial_json_data(data[i], 1)
+                cqldata[polname + "key"] = polkey
+
+            b = Batch(queries, cqldata)
+            d = b.execute(self.connection)
+            return d
+
+        d = self._ensure_there()
+        d.addCallback(_do_create_pol)
+        return d
 
     def update_policy(self, policy_id, data):
         """
@@ -243,7 +313,24 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        def _do_update_launch(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [_cql_update_pol.format(cf=self.policies_table, name=":policy")]
+
+            b = Batch(queries, {"tenantId": self.tenant_id,
+                                "groupId": self.uuid,
+                                "policykey": policy_id,
+                                "policy": _serial_json_data(data, 1)})
+            d = b.execute(self.connection)
+            return d
+
+        d = self._ensure_pol_there(policy_id)
+        d.addCallback(_do_update_launch)
+        return d
 
     def delete_policy(self, policy_id):
         """
@@ -256,13 +343,28 @@ class CassScalingGroup(object):
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        raise NotImplementedError()
+        queries = [
+            _cql_delete_pol.format(cf=self.policies_table)]
+        b = Batch(
+            queries, {"tenantId": self.tenant_id,
+                      "groupId": self.uuid,
+                      "polId": policy_id})
+        return b.execute(self.connection)
 
     def _ensure_there(self):
         query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
+        d.addCallback(self._grab_json_data)
+        return d
+
+    def _ensure_pol_there(self, policy_id):
+        query = _cql_view_pol.format(cf=self.policies_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "polId": policy_id})
         d.addCallback(self._grab_json_data)
         return d
 
@@ -357,11 +459,23 @@ class CassScalingGroupCollection:
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),
             _cql_insert.format(cf=self.launch_table, name=":launch")]
-        b = Batch(queries, {"tenantId": tenant_id,
-                            "groupId": scaling_group_id,
-                            "scaling": _serial_json_data(config, 1),
-                            "launch": _serial_json_data(launch, 1),
-                            })
+
+        data = {"tenantId": tenant_id,
+                "groupId": scaling_group_id,
+                "scaling": _serial_json_data(config, 1),
+                "launch": _serial_json_data(launch, 1),
+                }
+
+        if policies is not None:
+            for i in range(len(policies)):
+                polname = ":policy{}".format(i)
+                polkey = generate_key_str('policy')
+                queries.append(_cql_insert_pol.format(cf=self.policies_table,
+                                                      name=polname))
+                data[polname] = _serial_json_data(launch, 1)
+                data[polname + "key"] = polkey
+
+        b = Batch(queries, data)
         d = b.execute(self.connection)
         return d
 
