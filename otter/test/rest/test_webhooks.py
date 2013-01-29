@@ -72,8 +72,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         # return two webhook objects
         self.mock_group.list_webhooks.return_value = defer.succeed({
-            "3": {'metadata': {}, 'capabilityHash': 'xxx'},
-            "4": {'metadata': {}, 'capabilityHash': 'yyy'}
+            "3": {'name': 'three', 'metadata': {}, 'capabilityHash': 'xxx'},
+            "4": {'name': 'four', 'metadata': {}, 'capabilityHash': 'yyy'}
         })
         body = self.assert_status_code(200)
         self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
@@ -84,6 +84,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             "webhooks": [
                 {
                     'id': '3',
+                    'name': 'three',
                     'metadata': {},
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
@@ -95,6 +96,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                 },
                 {
                     'id': '4',
+                    'name': 'four',
                     'metadata': {},
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
@@ -114,9 +116,10 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         error = DummyException('what')
         self.mock_group.create_webhooks.return_value = defer.fail(error)
-        self.assert_status_code(500, None, 'POST', '[{}]')
+        self.assert_status_code(500, None, 'POST', json.dumps(
+                                [{'name': 'one'}]))
         self.mock_group.create_webhooks.assert_called_once_with(
-            self.policy_id, [{}])
+            self.policy_id, [{'name': 'one'}])
         self.flushLoggedErrors(DummyException)
 
     def test_create_webhooks_for_unknown_policy_is_404(self):
@@ -127,9 +130,10 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         error = NoSuchPolicyError(
             self.tenant_id, self.group_id, self.policy_id)
         self.mock_group.create_webhooks.return_value = defer.fail(error)
-        self.assert_status_code(404, None, 'POST', '[{}]')
+        self.assert_status_code(404, None, 'POST', json.dumps(
+                                [{'name': 'one'}]))
         self.mock_group.create_webhooks.assert_called_once_with(
-            self.policy_id, [{}])
+            self.policy_id, [{'name': 'one'}])
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_create_webhooks_bad_input_400(self):
@@ -159,17 +163,18 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         Tries to create a set of webhooks.
         """
+        creation = [{'name': 'three'}, {'name': 'four'}]
         self.mock_group.create_webhooks.return_value = defer.succeed({
-            "3": {'metadata': {}, 'capabilityHash': 'xxx'},
-            "4": {'metadata': {}, 'capabilityHash': 'yyy'}
+            "3": {'name': 'three', 'metadata': {}, 'capabilityHash': 'xxx'},
+            "4": {'name': 'four', 'metadata': {}, 'capabilityHash': 'yyy'}
         })
         response_body = self.assert_status_code(
-            201, None, 'POST', '[{}, {}]',
+            201, None, 'POST', json.dumps(creation),
             # location header points to the webhooks list
             '/v1.0/11111/groups/1/policies/2/webhooks')
 
         self.mock_group.create_webhooks.assert_called_once_with(
-            self.policy_id, [{}, {}])
+            self.policy_id, creation)
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_webhooks_response)
@@ -178,6 +183,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             "webhooks": [
                 {
                     'id': '3',
+                    'name': 'three',
                     'metadata': {},
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
@@ -189,6 +195,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                 },
                 {
                     'id': '4',
+                    'name': 'four',
                     'metadata': {},
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',

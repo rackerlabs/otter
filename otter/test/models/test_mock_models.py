@@ -492,13 +492,23 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.policies = {'2': {}}
         # have a fake webhook already
         self.group.webhooks = {
-            '2': {'fake': {'capabilityURL': 'fake', 'metadata': {}}}}
+            '2': {
+                'fake': {
+                    'capabilityURL': 'fake',
+                    'name': 'meh',
+                    'metadata': {}
+                }
+            }
+        }
 
         # create two webhooks, both empty
-        creation = self.validate_create_webhooks_return_value('2', [{}, {}])
+        creation = self.validate_create_webhooks_return_value(
+            '2', [{'name': 'one'}, {'name': 'two'}])
         self.assertEqual(len(creation), 2)
-        for webhook in creation.values():
-            self.assertEqual(webhook, {'metadata': {}, 'capabilityURL': 'temp'})
+        for name in ('one', 'two'):
+            self.assertIn(
+                {'name': name, 'metadata': {}, 'capabilityURL': 'temp'},
+                creation.values())
 
         # listing should return 3
         listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))

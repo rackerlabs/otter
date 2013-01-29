@@ -260,3 +260,22 @@ policy = {
         }
     }
 }
+
+
+webhook = {
+    "type": "object",
+    "description": "A webhook to execute a scaling policy",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": (
+                "A name for this scaling policy. This name does have to be "
+                "unique for all scaling policies."),
+            "required": True,
+            "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
+        },
+        "metadata": metadata
+    },
+    "additionalProperties": False
+}
