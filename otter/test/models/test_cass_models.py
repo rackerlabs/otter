@@ -66,10 +66,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'otter.models.cass.generate_key_str')
         self.mock_key = self.hashkey_patch.start()
         self.mock_key.return_value = '12345678'
-
-    def tearDown(self):
-        """ Stop patching the generate_random_str """
-        self.hashkey_patch.stop()
+        self.addCleanup(self.hashkey_patch.stop)
 
     def test_view_config(self):
         """
@@ -84,8 +81,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_config()
         r = self.assert_deferred_succeeded(d)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -104,8 +101,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -118,8 +115,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -133,8 +130,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -148,8 +145,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_config()
         self.assert_deferred_failed(d, CassBadDataError)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -168,8 +165,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.view_launch_config()
         r = self.assert_deferred_succeeded(d)
-        expectedCql = "SELECT data FROM launch_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM launch_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -189,15 +186,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, groupId, data) VALUES "
-        expectedCql += "(:tenantId, :groupId, :scaling) APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, groupId, data) VALUES "
+                       "(:tenantId, :groupId, :scaling) APPLY BATCH;")
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
-    def test_view_pol(self):
+    def test_view_policy(self):
         """
         Test that you can call view and receive a valid parsed response
         """
@@ -210,31 +207,31 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock]
         d = self.group.get_policy("3444")
         r = self.assert_deferred_succeeded(d)
-        expectedCql = "SELECT data FROM scaling_policies WHERE tenantId = :tenantId "
-        expectedCql += "AND groupId = :groupId AND polId = :polId AND deleted = False;"
-        expectedData = {"tenantId": "11111", "groupId": "12345678", "polId": "3444"}
+        expectedCql = ("SELECT data FROM scaling_policies WHERE tenantId = :tenantId "
+                       "AND groupId = :groupId AND policyId = :policyId AND deleted = False;")
+        expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
         self.assertEqual(r, {})
 
-    def test_list_pol(self):
+    def test_list_policy(self):
         """
         Test that you can list a bunch of scaling policies.
         """
         mock = [
-            {'cols': [{'timestamp': None, 'name': 'polid',
+            {'cols': [{'timestamp': None, 'name': 'policyId',
                        'value': 'group1', 'ttl': None},
                       {'timestamp': None, 'name': 'data',
                        'value': '{}', 'ttl': None}], 'key': ''},
-            {'cols': [{'timestamp': None, 'name': 'polid',
+            {'cols': [{'timestamp': None, 'name': 'policyId',
                        'value': 'group3', 'ttl': None},
                       {'timestamp': None, 'name': 'data',
                        'value': '{}', 'ttl': None}], 'key': ''}]
         self.returns = [mock]
         expectedData = {"groupId": '12345678',
                         "tenantId": '11111'}
-        expectedCql = "SELECT polId, data FROM scaling_policies WHERE tenantId = :tenantId "
-        expectedCql += "AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT policyId, data FROM scaling_policies WHERE tenantId = :tenantId "
+                       "AND groupId = :groupId AND deleted = False;")
         d = self.group.list_policies()
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 2)
@@ -242,7 +239,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
-    def test_add_scaling_pol(self):
+    def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy
         """
@@ -256,8 +253,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.create_policies([{"b": "lah"}])
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, polId, data, "
-        expectedCql += "deleted) VALUES (:tenantId, :groupId, :policy0key, :policy0, False) APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, policyId, "
+                       "data, deleted) VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "APPLY BATCH;")
         expectedData = {"policy0": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "policy0key": '12345678',
@@ -265,7 +263,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
-    def test_delete_pol(self):
+    def test_delete_policy(self):
         """
         Tests that you can't just create a scaling group by sending
         an update to a nonexistant group
@@ -273,13 +271,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [[], None]
         d = self.group.delete_policy('3222')
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND :polId=polId APPLY BATCH;"
-        expectedData = {"tenantId": "11111", "groupId": "12345678", "polId": "3222"}
+        expectedCql = ("BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND :policyId=policyId APPLY BATCH;")
+        expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3222"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData, ConsistencyLevel.ONE)
 
-    def test_update_scaling_pol(self):
+    def test_update_scaling_policy(self):
         """
         Test that you can update a config
         """
@@ -293,8 +291,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, polId, data) VALUES "
-        expectedCql += "(:tenantId, :groupId, :policykey, :policy) APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, policyId, data) "
+                       "VALUES (:tenantId, :groupId, :policykey, :policy) APPLY BATCH;")
         expectedData = {"policy": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "policykey": '12345678',
@@ -302,17 +300,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
-    def test_update_scaling_pol_bad(self):
+    def test_update_scaling_policy_bad(self):
         """
         Test that you can update a config
         """
         self.returns = [[], None]
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
-        expectedCql = "SELECT data FROM scaling_policies WHERE tenantId = :tenantId "
-        expectedCql += "AND groupId = :groupId AND polId = :polId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_policies WHERE tenantId = :tenantId "
+                       "AND groupId = :groupId AND policyId = :policyId AND deleted = False;")
         expectedData = {"groupId": '12345678',
-                        "polId": '12345678',
+                        "policyId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -325,8 +323,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [[], None]
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
-        expectedCql = "SELECT data FROM scaling_config WHERE "
-        expectedCql += "tenantId = :tenantId AND groupId = :groupId AND deleted = False;"
+        expectedCql = ("SELECT data FROM scaling_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
@@ -345,8 +343,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [mock, None]
         d = self.group.update_launch_config({"b": "lah"})
         self.assert_deferred_succeeded(d)
-        expectedCql = "BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
-        expectedCql += "(:tenantId, :groupId, :launch) APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
+                       "(:tenantId, :groupId, :launch) APPLY BATCH;")
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
                         "tenantId": '11111'}
@@ -376,10 +374,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.hashkey_patch = mock.patch(
             'otter.models.cass.generate_key_str')
         self.mock_key = self.hashkey_patch.start()
-
-    def tearDown(self):
-        """ Stop patching the generate_random_str """
-        self.hashkey_patch.stop()
+        self.addCleanup(self.hashkey_patch.stop)
 
     def test_create(self):
         """
@@ -390,11 +385,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch': '{"_ver": 1}',
             'groupId': '12345678',
             'tenantId': '123'}
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, "
-        expectedCql += ":scaling, False) INSERT INTO launch_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
-        expectedCql += "APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, "
+                       ":scaling, False) INSERT INTO launch_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
+                       "APPLY BATCH;")
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {})
         self.assert_deferred_succeeded(d)
@@ -402,7 +397,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.ONE)
 
-    def test_create_pol(self):
+    def test_create_policy(self):
         """
         Test that you can create a group
         """
@@ -413,13 +408,13 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'tenantId': '123',
             ':policy0key': '12345678',
             ':policy0': '{"_ver": 1}'}
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, "
-        expectedCql += ":scaling, False) INSERT INTO launch_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
-        expectedCql += "INSERT INTO scaling_policies(tenantId, groupId, polId, data, deleted) "
-        expectedCql += "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
-        expectedCql += "APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, "
+                       ":scaling, False) INSERT INTO launch_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
+                       "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
+                       "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "APPLY BATCH;")
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {}, [{}])
         self.assert_deferred_succeeded(d)
@@ -427,7 +422,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.ONE)
 
-    def test_create_pol_multiple(self):
+    def test_create_policy_multiple(self):
         """
         Test that you can create a group
         """
@@ -440,15 +435,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             ':policy0': '{"_ver": 1}',
             ':policy1key': '12345678',
             ':policy1': '{"_ver": 1}'}
-        expectedCql = "BEGIN BATCH INSERT INTO scaling_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, "
-        expectedCql += ":scaling, False) INSERT INTO launch_config(tenantId, "
-        expectedCql += "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
-        expectedCql += "INSERT INTO scaling_policies(tenantId, groupId, polId, data, deleted) "
-        expectedCql += "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
-        expectedCql += "INSERT INTO scaling_policies(tenantId, groupId, polId, data, deleted) "
-        expectedCql += "VALUES (:tenantId, :groupId, :policy1key, :policy1, False) "
-        expectedCql += "APPLY BATCH;"
+        expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, "
+                       ":scaling, False) INSERT INTO launch_config(tenantId, "
+                       "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
+                       "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
+                       "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
+                       "VALUES (:tenantId, :groupId, :policy1key, :policy1, False) "
+                       "APPLY BATCH;")
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {}, [{}, {}])
         self.assert_deferred_succeeded(d)
@@ -467,8 +462,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
-        expectedCql += "AND deleted = False;"
+        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+                       "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)
@@ -487,8 +482,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mockdata = []
 
         expectedData = {'tenantId': '123'}
-        expectedCql = "SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
-        expectedCql += "AND deleted = False;"
+        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+                       "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)

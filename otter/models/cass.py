@@ -26,24 +26,24 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-_cql_view += "groupId = :groupId AND deleted = False;"
-_cql_view_pol = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-_cql_view_pol += "groupId = :groupId AND polId = :polId AND deleted = False;"
-_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
-_cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
-_cql_insert_pol = "INSERT INTO {cf}(tenantId, groupId, polId, data, deleted) "
-_cql_insert_pol += "VALUES (:tenantId, :groupId, {name}key, {name}, False)"
-_cql_update = "INSERT INTO {cf}(tenantId, groupId, data) "
-_cql_update += "VALUES (:tenantId, :groupId, {name})"
-_cql_update_pol = "INSERT INTO {cf}(tenantId, groupId, polId, data) "
-_cql_update_pol += "VALUES (:tenantId, :groupId, {name}key, {name})"
+_cql_view = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+             "groupId = :groupId AND deleted = False;")
+_cql_view_policy = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+                    "groupId = :groupId AND policyId = :policyId AND deleted = False;")
+_cql_insert = ("INSERT INTO {cf}(tenantId, groupId, data, deleted) "
+               "VALUES (:tenantId, :groupId, {name}, False)")
+_cql_insert_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data, deleted) "
+                      "VALUES (:tenantId, :groupId, {name}key, {name}, False)")
+_cql_update = ("INSERT INTO {cf}(tenantId, groupId, data) "
+               "VALUES (:tenantId, :groupId, {name})")
+_cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
+                      "VALUES (:tenantId, :groupId, {name}key, {name})")
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
-_cql_delete_pol = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
-_cql_delete_pol += "AND :polId=polId"
+_cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
+                      "AND :policyId=policyId")
 _cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
-_cql_list_pol = "SELECT polId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
-_cql_list_pol += "AND deleted = False;"
+_cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
+                    "AND deleted = False;")
 
 
 class CassScalingGroup(object):
@@ -213,29 +213,32 @@ class CassScalingGroup(object):
         """
         def _grab_pol_list(rawResponse):
             if rawResponse is None:
-                err = CassBadDataError("None")
-                return defer.fail(err)
+                raise CassBadDataError("received unexpected None response")
             if len(rawResponse) == 0:
                 return defer.succeed([])
             data = {}
             for row in rawResponse:
                 if 'cols' not in row:
-                    err = CassBadDataError("No cols")
-                    return defer.fail(err)
+                    raise CassBadDataError("Received malformed response with no cols")
                 rec = None
                 groupid = None
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'polid':
+                    if rawRec['name'] is 'policyId':
                         groupid = rawRec['value']
                     if rawRec['name'] is 'data':
                         rec = rawRec['value']
                 if rec is None:
-                    err = CassBadDataError("No data")
-                    return defer.fail(err)
-                data[groupid] = rec
+                    raise CassBadDataError("Received malformed response without the "
+                                           "required fields")
+                try:
+                    data[groupid] = json.loads(rec)
+                    if "_ver" in data[groupid]:
+                        del data[groupid]["_ver"]
+                except ValueError:
+                    raise CassBadDataError("Bad data in database")
             return defer.succeed(data)
 
-        query = _cql_list_pol.format(cf=self.policies_table)
+        query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
@@ -249,11 +252,11 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        query = _cql_view_pol.format(cf=self.policies_table)
+        query = _cql_view_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
-                                     "polId": policy_id})
+                                     "policyId": policy_id})
         d.addCallback(self._grab_json_data)
         return d
 
@@ -285,8 +288,8 @@ class CassScalingGroup(object):
             for i in range(len(data)):
                 polname = "policy{}".format(i)
                 polkey = generate_key_str('policy')
-                queries.append(_cql_insert_pol.format(cf=self.policies_table,
-                                                      name=":" + polname))
+                queries.append(_cql_insert_policy.format(cf=self.policies_table,
+                                                         name=":" + polname))
                 cqldata[polname] = _serial_json_data(data[i], 1)
                 cqldata[polname + "key"] = polkey
 
@@ -319,7 +322,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_update_pol.format(cf=self.policies_table, name=":policy")]
+            queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -328,7 +331,7 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d
 
-        d = self._ensure_pol_there(policy_id)
+        d = self.get_policy(policy_id)
         d.addCallback(_do_update_launch)
         return d
 
@@ -344,11 +347,11 @@ class CassScalingGroup(object):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         queries = [
-            _cql_delete_pol.format(cf=self.policies_table)]
+            _cql_delete_policy.format(cf=self.policies_table)]
         b = Batch(
             queries, {"tenantId": self.tenant_id,
                       "groupId": self.uuid,
-                      "polId": policy_id})
+                      "policyId": policy_id})
         return b.execute(self.connection)
 
     def _ensure_there(self):
@@ -356,15 +359,6 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid})
-        d.addCallback(self._grab_json_data)
-        return d
-
-    def _ensure_pol_there(self, policy_id):
-        query = _cql_view_pol.format(cf=self.policies_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid,
-                                     "polId": policy_id})
         d.addCallback(self._grab_json_data)
         return d
 
@@ -410,7 +404,7 @@ class CassScalingGroupCollection:
     Scaling Policies (doesn't mirror config):
     CF = policies
     RK = tenantId
-    CK = groupID:polID
+    CK = groupID:policyId
     """
     zope.interface.implements(IScalingGroupCollection)
 
@@ -470,8 +464,8 @@ class CassScalingGroupCollection:
             for i in range(len(policies)):
                 polname = ":policy{}".format(i)
                 polkey = generate_key_str('policy')
-                queries.append(_cql_insert_pol.format(cf=self.policies_table,
-                                                      name=polname))
+                queries.append(_cql_insert_policy.format(cf=self.policies_table,
+                                                         name=polname))
                 data[polname] = _serial_json_data(launch, 1)
                 data[polname + "key"] = polkey
 

@@ -18,7 +18,7 @@ USE @@KEYSPACE@@;
 CREATE TABLE scaling_policies (
     tenantId ascii,
     groupId ascii, 
-    polId ascii, 
+    policyId ascii, 
     data ascii,
     deleted boolean,
     PRIMARY KEY(tenantId, groupId, polId)
