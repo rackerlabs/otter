@@ -73,13 +73,13 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.config = {
-            'name': '',
+            'name': 'aname',
             'cooldown': 0,
             'minEntities': 0
         }
         # this is the config with all the default vals
         self.output_config = {
-            'name': '',
+            'name': 'aname',
             'cooldown': 0,
             'minEntities': 0,
             'maxEntities': None,

@@ -143,7 +143,8 @@ config = {
             "description": ("Name of the scaling group (this name does not "
                             "have to be unique)."),
             "maxLength": 256,
-            "required": True
+            "required": True,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "cooldown": {
             "type": "integer",
@@ -217,6 +218,7 @@ policy = {
                 "unique for all scaling policies."),
             "required": True,
             "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "change": {
             "type": "integer",
