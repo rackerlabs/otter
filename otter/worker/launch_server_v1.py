@@ -1,3 +1,13 @@
+"""
+Initial implementation of a version one launch_server_v1 config.
+
+Ultimately this launch config will be responsible for:
+1) Starting a server
+2) Executing a user defined deployment script (TODO)
+3) Adding the server to a load balancer.
+4) Configuring MaaS? (TODO)
+"""
+
 from itertools import chain
 import time
 import json
@@ -8,6 +18,7 @@ from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet.task import LoopingCall
 
 import treq
+
 
 class APIError(Exception):
     """
@@ -66,7 +77,6 @@ def append_segments(uri, *segments):
             yield quote(s)
 
     uri = '/'.join(chain([uri.rstrip('/')], _segments(segments)))
-    print uri
     return uri
 
 
@@ -180,12 +190,10 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
 
     d = treq.post(path,
                   auth_headers=auth_headers(auth_token),
-                  data=json.dumps({
-                    "nodes": [
-                        {"address": ip_address,
-                         "port": port,
-                         "condition": "ENABLED",
-                         "type": "PRIMARY"}]}))
+                  data=json.dumps({"nodes": [{"address": ip_address,
+                                              "port": port,
+                                              "condition": "ENABLED",
+                                              "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
     return d.addCallback(treq.json_content)
 
@@ -260,8 +268,15 @@ def launch_server(region, service_catalog, auth_token, launch_config):
         service_catalog, service_name='cloudServersOpenStack', region=region))[0]['publicURL']
 
     d = create_server(server_endpoint, auth_token, None, server_config)
-    d.addCallback(lambda server: wait_for_status(server_endpoint, auth_token,
-                                            server['server']['id'], 'ACTIVE'))
+
+    def _wait_for_server(server):
+        return wait_for_status(
+            server_endpoint,
+            auth_token,
+            server['server']['id'], 'ACTIVE')
+
+    d.addCallback(_wait_for_server)
+
     def _add_lb(server):
         ip_address = filter(
             lambda x: x['version'] == 4,
@@ -279,15 +294,16 @@ if __name__ == '__main__':
     from twisted.internet.defer import inlineCallbacks
     from twisted.internet.task import react
 
-
     @inlineCallbacks
     def main(reactor, *argv):
         service_catalog = [
             {'name': 'cloudLoadBalancers', 'endpoints': [
-                {'region': 'ORD', 'publicURL': 'https://ord.loadbalancers.api.rackspacecloud.com/v1.0/416511'}
+                {'region': 'ORD',
+                 'publicURL': 'https://ord.loadbalancers.api.rackspacecloud.com/v1.0/416511'}
             ]},
             {'name': 'cloudServersOpenStack', 'endpoints': [
-                {'region': 'ORD', 'publicURL': 'https://ord.servers.api.rackspacecloud.com/v2/416511'}
+                {'region': 'ORD',
+                 'publicURL': 'https://ord.servers.api.rackspacecloud.com/v2/416511'}
             ]}
         ]
 
@@ -314,7 +330,6 @@ if __name__ == '__main__':
                  'port': 8080}
             ]
         }
-
 
         def print_duration(r, name, start):
             print name, 'duration:', time.time() - start
