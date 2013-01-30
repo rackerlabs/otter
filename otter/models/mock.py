@@ -1,6 +1,7 @@
 """
  Mock interface for the front-end scaling groups engine
 """
+from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid4
 
@@ -11,7 +12,7 @@ from twisted.internet import defer
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError,
                                     NoSuchPolicyError)
-from otter.util.hashkey import generate_capability_url
+from otter.util.hashkey import generate_capability_hash
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -368,7 +369,7 @@ class MockScalingGroup:
 
         if policy_id in self.policies:
             # return a copy so this store doesn't get mutated
-            return defer.succeed(self.webhooks.get(policy_id, {}).copy())
+            return defer.succeed(deepcopy(self.webhooks.get(policy_id, {})))
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
@@ -396,10 +397,11 @@ class MockScalingGroup:
             for webhook_input in data:
                 webhook_real = {'metadata': {}}
                 webhook_real.update(webhook_input)
-                webhook_real['capabilityURL'] = generate_capability_url()
+                webhook_real['capabilityHash'] = generate_capability_hash()
                 uuid = str(uuid4())
-                created[uuid] = webhook_real
                 self.webhooks[policy_id][uuid] = webhook_real
+                # return a copy so this store doesn't get mutated
+                created[uuid] = webhook_real.copy()
 
             return defer.succeed(created)
         else:

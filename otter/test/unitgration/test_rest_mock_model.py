@@ -280,12 +280,13 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # this iterates over the response policies, checks to see that each have
         # 'id' and 'links' keys, and then checks to see that the rest of the
-        # responce policy is in the original set of policies to be created
+        # response policy is in the original set of policies to be created
         for pol in response["policies"]:
             original_pol = pol.copy()
             for key in ('id', 'links'):
                 self.assertIn(key, pol)
                 del original_pol[key]
+            self.assertIn(original_pol, request_body)
 
         headers = wrapper.response.headers.getRawHeaders('Location')
         self.assertTrue(headers is not None)
@@ -357,7 +358,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assert_number_of_scaling_policies(0)
         first_policies = self.create_and_view_scaling_policies()
 
-        # create more scaling groups, to check the creation response
+        # create more scaling policies, to check the creation response
         self.assert_number_of_scaling_policies(len(first_policies))
         second_policies = self.create_and_view_scaling_policies()
         len_total_policies = len(first_policies) + len(second_policies)
@@ -371,3 +372,111 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         # delete a scaling policy - there should be one fewer scaling policy
         self.delete_and_view_scaling_policy(second_policies[0])
         self.assert_number_of_scaling_policies(len_total_policies - 1)
+
+
+class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
+    """
+    Test case for testing the REST API for the webhook specific endpoints
+    against the mock model.
+
+    As above, this could be made a base case instead... yadda yadda.
+    """
+    tenant_id = '11111'
+
+    def setUp(self):
+        """
+        Replace the store every time with a clean one.
+        """
+        store = MockScalingGroupCollection()
+        self.group_id = self.assert_deferred_succeeded(
+            store.create_scaling_group(self.tenant_id, config()[0],
+                                       launch_server_config()[0]))
+        group = store.get_scaling_group(self.tenant_id, self.group_id)
+        self.policy_id = self.assert_deferred_succeeded(
+            group.create_policies([{
+                "name": 'set number of servers to 10',
+                "steadyState": 10,
+                "cooldown": 3
+            }])).keys()[0]
+        set_store(store)
+
+        self.webhooks_url = (
+            '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks'.format(
+                tenant=self.tenant_id, group=self.group_id,
+                policy=self.policy_id))
+
+    def assert_number_of_webhooks(self, number):
+        """
+        Asserts that there are ``number`` number of scaling policies
+        """
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'GET', self.webhooks_url))
+        self.assertEqual(200, wrapper.response.code)
+
+        response = json.loads(wrapper.content)
+        self.assertEqual(len(response["webhooks"]), number)
+
+    def create_and_view_webhooks(self):
+        """
+        Creating valid webhooks returns with a 200 OK, a Location header
+        pointing to the list of all webhooks, and a response containing a list
+        of the newly created webhook resources only.
+
+        :return: a list self links to the new webhooks (not guaranteed
+            to be in any consistent order)
+        """
+        request_body = [
+            {'name': 'first', 'metadata': {'notes': 'first webhook'}},
+            {'name': 'second', 'metadata': {'notes': 'second webhook'}}
+        ]
+        wrapper = self.assert_deferred_succeeded(request(
+            root, 'POST', self.webhooks_url, body=json.dumps(request_body)))
+
+        self.assertEqual(wrapper.response.code, 201,
+                         "Create failed: {0}".format(wrapper.content))
+        response = json.loads(wrapper.content)
+
+        self.assertEqual(len(request_body), len(response["webhooks"]))
+
+        # this iterates over the webhooks, checks to see that each have
+        # 'id' and 'links' keys, makes sure that there is an extra link
+        # containing the capability URL, and then checks to see that the
+        # rest of the responce is in the original set of webhooks to be created
+        for webhook in response["webhooks"]:
+            keys = webhook.keys()
+            keys.sort()
+            self.assertEqual(['id', 'links', 'metadata', 'name'], keys)
+            self.assertIn(
+                {'metadata': webhook['metadata'], 'name': webhook['name']},
+                request_body)
+            self.assertIn('capability',
+                          [link_obj['rel'] for link_obj in webhook['links']])
+
+        headers = wrapper.response.headers.getRawHeaders('Location')
+        self.assertTrue(headers is not None)
+        self.assertEqual(1, len(headers))
+
+        # now make sure the Location header points to the list webhooks header
+        self.assertEqual(_strip_base_url(headers[0]), self.webhooks_url)
+
+        links = [_strip_base_url(link["href"])
+                 for link in webhook["links"] if link["rel"] == "self"
+                 for webhook in response["webhooks"]]
+        return links
+
+    def test_crud_webhooks(self):
+        """
+        Start with no policies.  Create some, make sure they're listed,
+        create some more because we want to verify that creation response
+        contains only the ones that were created.  Then update one of them,
+        check changes. Then delete one of them and make sure it's no longer
+        listed.
+        """
+        # start with no webhooks
+        self.assert_number_of_webhooks(0)
+        self.create_and_view_webhooks()
+
+        # create more webhooks, to check the creation response
+        self.assert_number_of_webhooks(2)
+        self.create_and_view_webhooks()
+        self.assert_number_of_webhooks(4)

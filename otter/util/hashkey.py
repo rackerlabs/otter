@@ -11,8 +11,8 @@ def generate_key_str(keytype):
     return uuid.uuid4()
 
 
-def generate_capability_url(*args, **kwargs):
+def generate_capability_hash(*args, **kwargs):
     """
-    Generates an unguessable capability URL
+    Generates an unguessable capability hash
     """
-    raise NotImplementedError()
+    return uuid.uuid4().hex
