@@ -16,12 +16,12 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 CREATE TABLE scaling_policies (
-    tenantId ascii,
-    groupId ascii, 
-    policyId ascii, 
+    "tenantId" ascii,
+    "groupId" ascii, 
+    "policyId" ascii, 
     data ascii,
     deleted boolean,
-    PRIMARY KEY(tenantId, groupId, polId)
+    PRIMARY KEY("tenantId", "groupId", "policyId")
     );
     
 CREATE INDEX deleted_scaling_policies ON scaling_policies (deleted);

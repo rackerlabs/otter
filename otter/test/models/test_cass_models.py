@@ -254,11 +254,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.create_policies([{"b": "lah"}])
         self.assert_deferred_succeeded(d)
         expectedCql = ("BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, policyId, "
-                       "data, deleted) VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) "
                        "APPLY BATCH;")
         expectedData = {"policy0": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
-                        "policy0key": '12345678',
+                        "policy0Id": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
@@ -292,10 +292,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.assert_deferred_succeeded(d)
         expectedCql = ("BEGIN BATCH INSERT INTO scaling_policies(tenantId, groupId, policyId, data) "
-                       "VALUES (:tenantId, :groupId, :policykey, :policy) APPLY BATCH;")
+                       "VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;")
         expectedData = {"policy": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678',
-                        "policykey": '12345678',
+                        "policyId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
@@ -406,14 +406,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch': '{"_ver": 1}',
             'groupId': '12345678',
             'tenantId': '123',
-            ':policy0key': '12345678',
-            ':policy0': '{"_ver": 1}'}
+            'policy0Id': '12345678',
+            'policy0': '{"_ver": 1}'}
         expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, "
                        "groupId, data, deleted) VALUES (:tenantId, :groupId, "
                        ":scaling, False) INSERT INTO launch_config(tenantId, "
                        "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
                        "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
-                       "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) "
                        "APPLY BATCH;")
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {}, [{}])
@@ -431,18 +431,18 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch': '{"_ver": 1}',
             'groupId': '12345678',
             'tenantId': '123',
-            ':policy0key': '12345678',
-            ':policy0': '{"_ver": 1}',
-            ':policy1key': '12345678',
-            ':policy1': '{"_ver": 1}'}
+            'policy0Id': '12345678',
+            'policy0': '{"_ver": 1}',
+            'policy1Id': '12345678',
+            'policy1': '{"_ver": 1}'}
         expectedCql = ("BEGIN BATCH INSERT INTO scaling_config(tenantId, "
                        "groupId, data, deleted) VALUES (:tenantId, :groupId, "
                        ":scaling, False) INSERT INTO launch_config(tenantId, "
                        "groupId, data, deleted) VALUES (:tenantId, :groupId, :launch, False) "
                        "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
-                       "VALUES (:tenantId, :groupId, :policy0key, :policy0, False) "
+                       "VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) "
                        "INSERT INTO scaling_policies(tenantId, groupId, policyId, data, deleted) "
-                       "VALUES (:tenantId, :groupId, :policy1key, :policy1, False) "
+                       "VALUES (:tenantId, :groupId, :policy1Id, :policy1, False) "
                        "APPLY BATCH;")
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group('123', {}, {}, [{}, {}])
@@ -456,9 +456,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that you can list a bunch of configs.
         """
         mockdata = [
-            {'cols': [{'timestamp': None, 'name': 'groupid',
+            {'cols': [{'timestamp': None, 'name': 'groupId',
                        'value': 'group1', 'ttl': None}], 'key': ''},
-            {'cols': [{'timestamp': None, 'name': 'groupid',
+            {'cols': [{'timestamp': None, 'name': 'groupId',
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'tenantId': '123'}

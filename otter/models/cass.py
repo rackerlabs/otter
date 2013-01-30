@@ -33,17 +33,28 @@ _cql_view_policy = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
 _cql_insert = ("INSERT INTO {cf}(tenantId, groupId, data, deleted) "
                "VALUES (:tenantId, :groupId, {name}, False)")
 _cql_insert_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data, deleted) "
-                      "VALUES (:tenantId, :groupId, {name}key, {name}, False)")
+                      "VALUES (:tenantId, :groupId, {name}Id, {name}, False)")
 _cql_update = ("INSERT INTO {cf}(tenantId, groupId, data) "
                "VALUES (:tenantId, :groupId, {name})")
 _cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
-                      "VALUES (:tenantId, :groupId, {name}key, {name})")
+                      "VALUES (:tenantId, :groupId, {name}Id, {name})")
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
 _cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
                       "AND :policyId=policyId")
 _cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 _cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
                     "AND deleted = False;")
+
+
+def _build_policies(policies, policies_table, queries, data):
+    if policies is not None:
+        for i in range(len(policies)):
+            polname = "policy{}".format(i)
+            polId = generate_key_str('policy')
+            queries.append(_cql_insert_policy.format(cf=policies_table,
+                                                     name=':' + polname))
+            data[polname] = _serial_json_data(policies[i], 1)
+            data[polname + "Id"] = polId
 
 
 class CassScalingGroup(object):
@@ -221,19 +232,19 @@ class CassScalingGroup(object):
                 if 'cols' not in row:
                     raise CassBadDataError("Received malformed response with no cols")
                 rec = None
-                groupid = None
+                groupId = None
                 for rawRec in row['cols']:
                     if rawRec['name'] is 'policyId':
-                        groupid = rawRec['value']
+                        groupId = rawRec['value']
                     if rawRec['name'] is 'data':
                         rec = rawRec['value']
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 try:
-                    data[groupid] = json.loads(rec)
-                    if "_ver" in data[groupid]:
-                        del data[groupid]["_ver"]
+                    data[groupId] = json.loads(rec)
+                    if "_ver" in data[groupId]:
+                        del data[groupId]["_ver"]
                 except ValueError:
                     raise CassBadDataError("Bad data in database")
             return defer.succeed(data)
@@ -285,13 +296,7 @@ class CassScalingGroup(object):
             cqldata = {"tenantId": self.tenant_id,
                        "groupId": self.uuid}
 
-            for i in range(len(data)):
-                polname = "policy{}".format(i)
-                polkey = generate_key_str('policy')
-                queries.append(_cql_insert_policy.format(cf=self.policies_table,
-                                                         name=":" + polname))
-                cqldata[polname] = _serial_json_data(data[i], 1)
-                cqldata[polname + "key"] = polkey
+            _build_policies(data, self.policies_table, queries, cqldata)
 
             b = Batch(queries, cqldata)
             d = b.execute(self.connection)
@@ -326,7 +331,7 @@ class CassScalingGroup(object):
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "policykey": policy_id,
+                                "policyId": policy_id,
                                 "policy": _serial_json_data(data, 1)})
             d = b.execute(self.connection)
             return d
@@ -460,14 +465,7 @@ class CassScalingGroupCollection:
                 "launch": _serial_json_data(launch, 1),
                 }
 
-        if policies is not None:
-            for i in range(len(policies)):
-                polname = ":policy{}".format(i)
-                polkey = generate_key_str('policy')
-                queries.append(_cql_insert_policy.format(cf=self.policies_table,
-                                                         name=polname))
-                data[polname] = _serial_json_data(launch, 1)
-                data[polname + "key"] = polkey
+        _build_policies(policies, self.policies_table, queries, data)
 
         b = Batch(queries, data)
         d = b.execute(self.connection)
@@ -522,7 +520,7 @@ class CassScalingGroupCollection:
                     return defer.fail(err)
                 rec = None
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'groupid':
+                    if rawRec['name'] is 'groupId':
                         rec = rawRec['value']
                 if rec is None:
                     err = CassBadDataError("No data")
