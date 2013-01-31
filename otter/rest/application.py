@@ -49,7 +49,8 @@ def set_store(store):
 
 
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
-                        webhook_id=None, capability_hash=None, format="json",
+                        webhook_id=None, capability_hash=None,
+                        capability_version="1", format="json",
                         api_version="1.0"):
     """
     Generates links into the autoscale system, based on the ids given.  If
@@ -72,9 +73,21 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
     :type tenant_id: ``str``
 
     :param group_id: the scaling group UUID - if not provided then the link(s)
-        provided will be just the link to listing all scaling groups for the
-        tenant ID/creating an autoscale group.
+        will be just the link to listing all scaling groups for the tenant
+        ID/creating an autoscale group.
     :type group_id: ``str`` or ``None``
+
+    :param policy_id: the scaling policy UUID - if not provided (and `group_id`
+        is provided)then the link(s) will be just the link to the scaling group,
+        and if blank then the link(s) will to listings of all the policies
+        for the scaling group.
+    :type policy_id: ``str`` or ``None``
+
+    :param webhook_id: the webhook UUID - if not provided (and `group_id` and
+        `policy_id` are provided) then the link(s) will be just the link to the
+        scaling policy, and if blank then the link(s) will to listings of all
+        the webhooks for the scaling policy
+    :type webhook_id: ``str`` or ``None``
 
     :param format: whether to return a bunch of links in JSON format
     :type format: ``str`` that should be 'json' if the JSON format is desired
@@ -82,6 +95,13 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
     :param api_version: Which API version to provide links to - generally
         should not be overriden
     :type api_version: ``str``
+
+    :param capability_hash: a unique value for the capability url
+    :type capability_hash: ``str``
+
+    :param capability_version: capability hash generation version - defaults to
+        1
+    :type capability_version: ``str``
 
     :return: JSON blob if `format="json"` is given, a ``str`` containing a link
         else
@@ -105,7 +125,9 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
 
         if capability_hash is not None:
             capability_url = "/".join(
-                [get_url_root(), api, "execute", capability_hash]).rstrip('/')
+                [get_url_root(), api, "execute", capability_version,
+                 capability_hash])
+            capability_url = capability_url.rstrip('/')
 
             links.append({"href": capability_url, "rel": "capability"})
 

@@ -193,11 +193,11 @@ class LinkGenerationTestCase(TestCase):
                                 webhook_id="3"),
             self._expected_json(expected_url))
 
-    def test_capability_hash(self):
+    def test_capability_url_included_with_capability_hash(self):
         """
-        If a capability hash is passed in, an extra link is added to the JSON
-        blob containing a capability URL.  But in the non-formatted URL,
-        nothing changes.
+        If a capability_hash parameter is passed in, an extra link is added to
+        the JSON blob containing a capability URL.  But in the non-formatted
+        URL, nothing changes.
         """
         pairs = [("group_id", "1"), ("policy_id", "2"), ("webhook_id", "3")]
         expected = [
@@ -216,5 +216,23 @@ class LinkGenerationTestCase(TestCase):
                 '11111', capability_hash='xxx', **dict(pairs[:(i + 1)]))
 
             self.assertEqual(len(json_blob), 3)
-            self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/xxx'},
+            self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx'},
                           json_blob)
+
+    def test_capability_version(self):
+        """
+        There is a default capability version of 1, but whatever capability
+        version is passed is the one used
+        """
+        # default version
+        json_blob = get_autoscale_links(
+            '11111', group_id='1', policy_id='2', webhook_id='3',
+            capability_hash='xxx')
+        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx'},
+                      json_blob)
+
+        json_blob = get_autoscale_links(
+            '11111', group_id='1', policy_id='2', webhook_id='3',
+            capability_hash='xxx', capability_version="8")
+        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/8/xxx'},
+                      json_blob)
