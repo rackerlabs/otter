@@ -21,6 +21,7 @@ class Options(usage.Options):
     TODO: Debugging.
     TODO: Environments.
     TODO: Admin HTTP interface.
+    TODO: Specify store
     """
 
     optParameters = [
