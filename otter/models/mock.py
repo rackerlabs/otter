@@ -12,7 +12,7 @@ from twisted.internet import defer
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError,
                                     NoSuchPolicyError)
-from otter.util.hashkey import generate_capability_hash
+from otter.util.hashkey import generate_capability
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -397,7 +397,11 @@ class MockScalingGroup:
             for webhook_input in data:
                 webhook_real = {'metadata': {}}
                 webhook_real.update(webhook_input)
-                webhook_real['capabilityHash'] = generate_capability_hash()
+                webhook_real['capability'] = {}
+
+                (ignore, webhook_real['capability']['hash'],
+                 webhook_real['capability']['version']) = generate_capability()
+
                 uuid = str(uuid4())
                 self.webhooks[policy_id][uuid] = webhook_real
                 # return a copy so this store doesn't get mutated

@@ -24,8 +24,10 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
     webhook_model['id'] = webhook_id
     webhook_model['links'] = get_autoscale_links(
         tenant_id, group_id=group_id, policy_id=policy_id,
-        webhook_id=webhook_id, capability_hash=webhook_model['capabilityHash'])
-    del webhook_model['capabilityHash']
+        webhook_id=webhook_id,
+        capability_hash=webhook_model['capability']['hash'],
+        capability_version=webhook_model['capability']['version'])
+    del webhook_model['capability']
     return webhook_model
 
 

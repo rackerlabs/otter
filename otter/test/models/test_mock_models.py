@@ -482,8 +482,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         deferred = self.group.create_webhooks("otter-stacking", [{}])
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
-    @mock.patch('otter.models.mock.generate_capability_hash',
-                return_value="temp")
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
     def test_create_webhooks_succeed(self, fake_random):
         """
         Adding new webhooks to the scaling policy returns a dictionary of
@@ -494,7 +494,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.webhooks = {
             '2': {
                 'fake': {
-                    'capabilityHash': 'fake',
+                    'capability': {
+                        'hash': 'fake',
+                        'ver': '1'
+                    },
                     'name': 'meh',
                     'metadata': {}
                 }
@@ -506,9 +509,14 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             '2', [{'name': 'one'}, {'name': 'two'}])
         self.assertEqual(len(creation), 2)
         for name in ('one', 'two'):
-            self.assertIn(
-                {'name': name, 'metadata': {}, 'capabilityHash': 'temp'},
-                creation.values())
+            self.assertIn({
+                'name': name,
+                'metadata': {},
+                'capability': {
+                    'hash': 'hash',
+                    'version': 'ver'
+                },
+            }, creation.values())
 
         # listing should return 3
         listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))
@@ -646,8 +654,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
-    @mock.patch('otter.models.mock.generate_capability_hash',
-                return_value="temp")
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
     def _call_all_methods_on_group(self, group_id, mock_generation):
         """
         Gets a group, asserts that it's a MockScalingGroup, and runs all of its

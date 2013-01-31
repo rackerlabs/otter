@@ -72,8 +72,10 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         # return two webhook objects
         self.mock_group.list_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {}, 'capabilityHash': 'xxx'},
-            "4": {'name': 'four', 'metadata': {}, 'capabilityHash': 'yyy'}
+            "3": {'name': 'three', 'metadata': {},
+                  'capability': {'hash': 'xxx', 'version': '1'}},
+            "4": {'name': 'four', 'metadata': {},
+                  'capability': {'hash': 'yyy', 'version': '1'}}
         })
         body = self.assert_status_code(200)
         self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
@@ -91,7 +93,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                          "rel": "self"},
                         {"href": '/11111/groups/1/policies/2/webhooks/3',
                          "rel": "bookmark"},
-                        {"href": '/v1.0/execute/xxx', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
                 },
                 {
@@ -103,7 +105,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                          "rel": "self"},
                         {"href": '/11111/groups/1/policies/2/webhooks/4',
                          "rel": "bookmark"},
-                        {"href": '/v1.0/execute/yyy', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
                 }
             ],
@@ -165,8 +167,10 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         creation = [{'name': 'three'}, {'name': 'four'}]
         self.mock_group.create_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {}, 'capabilityHash': 'xxx'},
-            "4": {'name': 'four', 'metadata': {}, 'capabilityHash': 'yyy'}
+            "3": {'name': 'three', 'metadata': {},
+                  'capability': {'hash': 'xxx', 'version': '1'}},
+            "4": {'name': 'four', 'metadata': {},
+                  'capability': {'hash': 'yyy', 'version': '1'}}
         })
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(creation),
@@ -190,7 +194,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                          "rel": "self"},
                         {"href": '/11111/groups/1/policies/2/webhooks/3',
                          "rel": "bookmark"},
-                        {"href": '/v1.0/execute/xxx', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
                 },
                 {
@@ -202,7 +206,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                          "rel": "self"},
                         {"href": '/11111/groups/1/policies/2/webhooks/4',
                          "rel": "bookmark"},
-                        {"href": '/v1.0/execute/yyy', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
                 }
             ]

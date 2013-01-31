@@ -143,14 +143,28 @@ policy_list = {
 
 webhook = deepcopy(group_schemas.webhook)
 webhook['properties']['metadata']['required'] = True
-webhook['properties']['capabilityHash'] = {
-    "type": "string",
-    "description": ("A random unguessable string to be HMAC-ed for the "
-                    "capability URL"),
-    "required": True,
-    "length": 64
+webhook['properties']['capability'] = {
+    "type": "object",
+    "properties": {
+        "hash": {
+            "type": "string",
+            "description": 'The "unguessable" part of the capability URL',
+            "required": True,
+            "minLength": 64
+        },
+        "version": {
+            "type": "string",
+            "description": ("The version of capability generation used to make "
+                            "the capabilityHash"),
+            "required": True,
+            "pattern": "\S+"
+        }
+    },
+    "additionalProperties": False,
+    "required": True
 }
 webhook['required'] = True
+
 
 webhook_list = {
     "type": "object",
