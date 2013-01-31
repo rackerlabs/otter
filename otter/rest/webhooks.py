@@ -48,6 +48,7 @@ def list_webhooks(request, tenantId, groupId, policyId):
             "webhooks": [
                 {
                     "id":"{webhookId1}",
+                    "name": "alice",
                     "metadata": {
                         "notes": "this is for Alice"
                     },
@@ -61,13 +62,14 @@ def list_webhooks(request, tenantId, groupId, policyId):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
                     ]
                 },
                 {
                     "id":"{webhookId2}",
+                    "name": "alice",
                     "metadata": {
                         "notes": "this is for Bob"
                     },
@@ -81,7 +83,7 @@ def list_webhooks(request, tenantId, groupId, policyId):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2},
                             "rel": "capability"
                         }
                     ]
@@ -118,7 +120,9 @@ def list_webhooks(request, tenantId, groupId, policyId):
 def create_webhooks(request, tenantId, groupId, policyId, data):
     """
     Create one or many new webhooks associated with a particular scaling policy.
-    Webhooks may (but do not need to) include some arbitrary medata.
+    Webhooks may (but do not need to) include some arbitrary medata, and must
+    include a name.
+
     The response header will point to the list webhooks endpoint.
     An array of webhooks is provided in the request body in JSON format.
 
@@ -126,11 +130,14 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
 
         [
             {
+                "name": "alice",
                 "metadata": {
                     "notes": "this is for Alice"
                 }
             },
-            {}
+            {
+                "name": "bob"
+            }
         ]
 
 
@@ -140,6 +147,7 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
             "webhooks": [
                 {
                     "id":"{webhookId1}",
+                    "alice",
                     "metadata": {
                         "notes": "this is for Alice"
                     },
@@ -153,13 +161,14 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
                     ]
                 },
                 {
                     "id":"{webhookId2}",
+                    "name": "bob",
                     "metadata": {},
                     "links": [
                         {
@@ -171,7 +180,7 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2},
                             "rel": "capability"
                         }
                     ]
