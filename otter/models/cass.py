@@ -225,26 +225,24 @@ class CassScalingGroup(object):
         def _grab_pol_list(rawResponse):
             if rawResponse is None:
                 raise CassBadDataError("received unexpected None response")
-            if len(rawResponse) == 0:
-                return defer.succeed([])
             data = {}
             for row in rawResponse:
                 if 'cols' not in row:
                     raise CassBadDataError("Received malformed response with no cols")
                 rec = None
-                groupId = None
+                policyId = None
                 for rawRec in row['cols']:
                     if rawRec['name'] is 'policyId':
-                        groupId = rawRec['value']
+                        policyId = rawRec['value']
                     if rawRec['name'] is 'data':
                         rec = rawRec['value']
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 try:
-                    data[groupId] = json.loads(rec)
-                    if "_ver" in data[groupId]:
-                        del data[groupId]["_ver"]
+                    data[policyId] = json.loads(rec)
+                    if "_ver" in data[policyId]:
+                        del data[policyId]["_ver"]
                 except ValueError:
                     raise CassBadDataError("Bad data in database")
             return defer.succeed(data)
@@ -379,7 +377,8 @@ class CassScalingGroup(object):
             if rawRec['name'] is 'data':
                 rec = rawRec['value']
         if rec is None:
-            raise CassBadDataError("Received malformed response without the ")
+            raise CassBadDataError("Received malformed response without the "
+                                   "required fields")
         data = None
         try:
             data = json.loads(rec)
@@ -509,22 +508,20 @@ class CassScalingGroupCollection:
 
         def _grab_list(rawResponse):
             if rawResponse is None:
-                err = CassBadDataError("None")
-                return defer.fail(err)
+                raise CassBadDataError("received unexpected None response")
             if len(rawResponse) == 0:
                 return defer.succeed([])
             data = []
             for row in rawResponse:
                 if 'cols' not in row:
-                    err = CassBadDataError("No cols")
-                    return defer.fail(err)
+                    raise CassBadDataError("Received malformed response with no cols")
                 rec = None
                 for rawRec in row['cols']:
                     if rawRec['name'] is 'groupId':
                         rec = rawRec['value']
                 if rec is None:
-                    err = CassBadDataError("No data")
-                    return defer.fail(err)
+                    raise CassBadDataError("Received malformed response without the "
+                                           "required fields")
                 data.append(CassScalingGroup(tenant_id, rec,
                                              self.connection))
             return defer.succeed(data)

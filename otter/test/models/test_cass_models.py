@@ -265,8 +265,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_delete_policy(self):
         """
-        Tests that you can't just create a scaling group by sending
-        an update to a nonexistant group
+        Tests that you can delete a scaling policy
         """
         self.returns = [[], None]
         d = self.group.delete_policy('3222')
@@ -279,7 +278,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_update_scaling_policy(self):
         """
-        Test that you can update a config
+        Test that you can update a scaling policy
         """
         mock = [
             {'cols': [{'timestamp': None,
@@ -302,7 +301,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_update_scaling_policy_bad(self):
         """
-        Test that you can update a config
+        Tests that if you try to update a scaling policy that doesn't exist, the right thing happens
         """
         self.returns = [[], None]
         d = self.group.update_policy('12345678', {"b": "lah"})
