@@ -46,7 +46,7 @@ _cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId 
                     "AND deleted = False;")
 
 
-def _build_policies(policies, policies_table, queries, data):
+def _build_policies(policies, policies_table, queries, data, outpolicies):
     if policies is not None:
         for i in range(len(policies)):
             polname = "policy{}".format(i)
@@ -55,6 +55,7 @@ def _build_policies(policies, policies_table, queries, data):
                                                      name=':' + polname))
             data[polname] = _serial_json_data(policies[i], 1)
             data[polname + "Id"] = polId
+            outpolicies[polId] = policies[i]
 
 
 class CassScalingGroup(object):
@@ -293,12 +294,13 @@ class CassScalingGroup(object):
             queries = []
             cqldata = {"tenantId": self.tenant_id,
                        "groupId": self.uuid}
+            outpolicies = {}
 
-            _build_policies(data, self.policies_table, queries, cqldata)
+            _build_policies(data, self.policies_table, queries, cqldata, outpolicies)
 
             b = Batch(queries, cqldata)
             d = b.execute(self.connection)
-            return d
+            return d.addCallback(lambda _: outpolicies)
 
         d = self._ensure_there()
         d.addCallback(_do_create_pol)
@@ -497,7 +499,8 @@ class CassScalingGroupCollection:
                 "launch": _serial_json_data(launch, 1),
                 }
 
-        _build_policies(policies, self.policies_table, queries, data)
+        outpolicies = {}
+        _build_policies(policies, self.policies_table, queries, data, outpolicies)
 
         b = Batch(queries, data)
         d = b.execute(self.connection)
