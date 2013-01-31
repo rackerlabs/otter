@@ -1,5 +1,21 @@
-""" Hash key related library code """
+"""
+Hash key related library code
+"""
+
+from hashlib import sha256
+import hmac
 import uuid
+
+
+# TODO: do this for real
+def _get_hmac_secret(version="1"):
+    """
+    Given a version number, return cryptographically secure key to be used to
+    hash a possibly pseudorandom number as its message
+
+    :return: secret key
+    """
+    return "sekrit!!!!"
 
 
 def generate_key_str(keytype):
@@ -11,8 +27,19 @@ def generate_key_str(keytype):
     return uuid.uuid4()
 
 
-def generate_capability_hash(*args, **kwargs):
+# TODO: versioning
+def generate_capability(number=None, version="1"):
     """
-    Generates an unguessable capability hash
+    Generates a random number and HMAC it with a secure key to produce
+    the an unguessable (due to the super secret key) capability hash.
+
+    :return: a tuple of the the random number, the capability hash (which is
+        the number concatenated with the HMAC of the number), and the version
+        number of this capability generation scheme.
+    :rtype: ``tuple``
     """
-    return uuid.uuid4().hex
+    number = number or uuid.uuid4().hex
+    version = "1"  # force version to be one
+    hashed_number = hmac.new(_get_hmac_secret(version), number, sha256)
+    message = "".join((number, hashed_number.hexdigest()))
+    return (number, message, version)
