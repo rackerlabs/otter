@@ -5,7 +5,8 @@ JSON schemas for the rest responses from autoscale
 from copy import deepcopy
 from itertools import cycle
 
-from otter.json_schema.group_schemas import policy, config, launch_config
+from otter.json_schema.group_schemas import (
+    policy, config, launch_config, webhook)
 from otter.json_schema.group_examples import (
     launch_server_config as launch_server_config_examples,
     config as config_examples,
@@ -159,6 +160,7 @@ group_state = _openstackify_schema("group", {
 }, include_id=True)
 
 
+# ----- schemas for viewing policies
 view_policy = deepcopy(policy)
 view_policy["properties"].update(_link_objects["properties"])
 for type_blob in view_policy["type"]:
@@ -251,3 +253,28 @@ view_manifest_response = _openstackify_schema("group", {
     },
     "additionalProperties": False
 }, include_id=True)
+
+
+# ----- schemas for viewing webhooks
+_view_webhook = deepcopy(webhook)
+_view_webhook['properties']['metadata']['required'] = True
+
+view_webhook_response = _openstackify_schema("webhook", _view_webhook,
+                                             include_id=True)
+_list_of_webhooks = {
+    "type": "array",
+    "items": view_webhook_response["properties"]["webhook"],
+    "uniqueItems": True
+}
+
+list_webhooks_response = _openstackify_schema(
+    "webhooks", _list_of_webhooks, paginated=True)
+
+create_webhooks_request = {
+    "type": "array",
+    "description": "Schema of the JSON used to create webhooks",
+    "items": webhook,
+    "minItems": 1
+}
+
+create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)

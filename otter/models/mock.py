@@ -1,15 +1,18 @@
 """
  Mock interface for the front-end scaling groups engine
 """
+from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid4
+
+import zope.interface
+
+from twisted.internet import defer
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchEntityError,
                                     NoSuchPolicyError)
-import zope.interface
-
-from twisted.internet import defer
+from otter.util.hashkey import generate_capability
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -101,11 +104,13 @@ class MockScalingGroup:
             self.policies = {}
             if creation['policies']:
                 self.create_policies(creation['policies'])
+            self.webhooks = defaultdict(dict)
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
             self.launch = None
             self.policies = None
+            self.webhooks = None
 
     def view_manifest(self):
         """
@@ -126,7 +131,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.config)
+        return defer.succeed(self.config.copy())
 
     def view_launch_config(self):
         """
@@ -134,7 +139,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.launch)
+        return defer.succeed(self.launch.copy())
 
     def view_state(self):
         """
@@ -263,7 +268,8 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         if policy_id in self.policies:
-            return defer.succeed(self.policies[policy_id])
+            # return a coyp so this store doesn't get corrupted
+            return defer.succeed(self.policies[policy_id].copy())
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
@@ -321,7 +327,8 @@ class MockScalingGroup:
 
     def delete_policy(self, policy_id):
         """
-        Delete the scaling policy
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
 
         :param policy_id: the ID of the policy to be deleted
         :type policy_id: ``str``
@@ -335,7 +342,72 @@ class MockScalingGroup:
 
         if policy_id in self.policies:
             del self.policies[policy_id]
+
+            if policy_id in self.webhooks:
+                del self.webhooks[policy_id]
+
             return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def list_webhooks(self, policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            # return a copy so this store doesn't get mutated
+            return defer.succeed(deepcopy(self.webhooks.get(policy_id, {})))
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def create_webhooks(self, policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: the details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            created = {}
+            for webhook_input in data:
+                webhook_real = {'metadata': {}}
+                webhook_real.update(webhook_input)
+                webhook_real['capability'] = {}
+
+                (ignore, webhook_real['capability']['hash'],
+                 webhook_real['capability']['version']) = generate_capability()
+
+                uuid = str(uuid4())
+                self.webhooks[policy_id][uuid] = webhook_real
+                # return a copy so this store doesn't get mutated
+                created[uuid] = webhook_real.copy()
+
+            return defer.succeed(created)
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
@@ -407,3 +479,19 @@ class MockScalingGroupCollection:
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(tenant, uuid, None)
+
+    def execute_webhook(self, capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
+        """
+        raise NotImplementedError()

@@ -340,7 +340,8 @@ class CassScalingGroup(object):
 
     def delete_policy(self, policy_id):
         """
-        Delete the scaling policy
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
 
         :param policy_id: the ID of the policy to be deleted
         :type policy_id: ``str``
@@ -356,6 +357,38 @@ class CassScalingGroup(object):
                       "groupId": self.uuid,
                       "policyId": policy_id})
         return b.execute(self.connection)
+
+    def list_webhooks(self, policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        raise NotImplementedError()
+
+    def create_webhooks(self, policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: a list of details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        raise NotImplementedError()
 
     def _ensure_there(self):
         query = _cql_view.format(cf=self.config_table)
@@ -549,3 +582,19 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(tenant_id, scaling_group_id,
                                 self.connection)
+
+    def execute_webhook(self, capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
+        """
+        raise NotImplementedError()

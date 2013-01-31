@@ -24,6 +24,20 @@ scaling group configuration, and policies.
 # Launch Schemas
 #
 
+metadata = {
+    "type": "object",
+    "description": ("User-provided key-value metadata.  Both keys and "
+                    "values should be strings not exceeding 256 "
+                    "characters in length."),
+    "patternProperties": {
+        "^.{0,256}$": {
+            "type": "string",
+            "maxLength": 256
+        }
+    },
+    "additionalProperties": False
+}
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -129,7 +143,8 @@ config = {
             "description": ("Name of the scaling group (this name does not "
                             "have to be unique)."),
             "maxLength": 256,
-            "required": True
+            "required": True,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "cooldown": {
             "type": "integer",
@@ -154,19 +169,7 @@ config = {
             "minimum": 0,
             "default": None
         },
-        "metadata": {
-            "type": "object",
-            "description": ("User-provided key-value metadata.  Both keys and "
-                            "values should be strings not exceeding 256 "
-                            "characters in length."),
-            "patternProperties": {
-                "^.{0,256}$": {
-                    "type": "string",
-                    "maxLength": 256
-                }
-            },
-            "additionalProperties": False
-        }
+        "metadata": metadata
     },
     "additionalProperties": False,
     "required": True
@@ -215,6 +218,7 @@ policy = {
                 "unique for all scaling policies."),
             "required": True,
             "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "change": {
             "type": "integer",
@@ -255,4 +259,23 @@ policy = {
             "required": True
         }
     }
+}
+
+
+webhook = {
+    "type": "object",
+    "description": "A webhook to execute a scaling policy",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": (
+                "A name for this scaling policy. This name does have to be "
+                "unique for all scaling policies."),
+            "required": True,
+            "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
+        },
+        "metadata": metadata
+    },
+    "additionalProperties": False
 }
