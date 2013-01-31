@@ -6,8 +6,8 @@ from jsonschema import validate
 from zope.interface.verify import verifyObject
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.json_schema.scaling_group import create_group, launch_config
-from otter.test.models import interface_schema
+from otter.json_schema.group_schemas import launch_config
+from otter.json_schema import model_schemas
 from otter.test.utils import DeferredTestMixin
 
 
@@ -35,7 +35,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         result = self.assert_deferred_succeeded(
             self.group.view_manifest(*args, **kwargs))
-        validate(result, create_group)
+        validate(result, model_schemas.view_manifest)
         return result
 
     def validate_view_config_return_value(self, *args, **kwargs):
@@ -48,7 +48,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         result = self.assert_deferred_succeeded(
             self.group.view_config(*args, **kwargs))
-        validate(result, interface_schema.group_config)
+        validate(result, model_schemas.group_config)
         return result
 
     def validate_view_launch_config_return_value(self, *args, **kwargs):
@@ -73,7 +73,55 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         result = self.assert_deferred_succeeded(
             self.group.view_state(*args, **kwargs))
-        validate(result, interface_schema.group_state)
+        validate(result, model_schemas.group_state)
+        return result
+
+    def validate_list_policies_return_value(self, *args, **kwargs):
+        """
+        Calls ``list_policies``, and validates that it returns a policy
+        dictionary containing the policies mapped to their IDs
+
+        :return: the return value of ``list_policies()``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.list_policies(*args, **kwargs))
+        validate(result, model_schemas.policy_list)
+        return result
+
+    def validate_create_policies_return_value(self, *args, **kwargs):
+        """
+        Calls ``list_policies``, and validates that it returns a policy
+        dictionary containing the policies mapped to their IDs
+
+        :return: the return value of ``list_policies()``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.create_policies(*args, **kwargs))
+        validate(result, model_schemas.policy_list)
+        return result
+
+    def validate_list_webhooks_return_value(self, *args, **kwargs):
+        """
+        Calls ``list_webhooks(policy_id)`` and validates that it returns a
+        dictionary uuids mapped to webhook JSON blobs.
+
+        :return: the return value of ``list_webhooks(policy_id)``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.list_webhooks(*args, **kwargs))
+        validate(result, model_schemas.webhook_list)
+        return result
+
+    def validate_create_webhooks_return_value(self, *args, **kwargs):
+        """
+        Calls ``create_webhooks(policy_id, data)`` and validates that it returns
+        a dictionary uuids mapped to webhook JSON blobs.
+
+        :return: the return value of ``create_webhooks(policy_id, data)``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.create_webhooks(*args, **kwargs))
+        validate(result, model_schemas.webhook_list)
         return result
 
 

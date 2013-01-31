@@ -7,7 +7,7 @@ or launch configuration for a scaling group.
 
 import json
 
-from otter.json_schema import scaling_group as sg_schema
+from otter.json_schema import group_schemas
 from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store
@@ -30,19 +30,21 @@ def view_config_for_scaling_group(request, tenantId, groupId):
     Example response::
 
         {
-            "name": "workers",
-            "cooldown": 60,
-            "minEntities": 5,
-            "maxEntities": 100,
-            "metadata": {
-                "firstkey": "this is a string",
-                "secondkey": "1",
+            "groupConfiguration": {
+                "name": "workers",
+                "cooldown": 60,
+                "minEntities": 5,
+                "maxEntities": 100,
+                "metadata": {
+                    "firstkey": "this is a string",
+                    "secondkey": "1",
+                }
             }
         }
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.view_config()
-    deferred.addCallback(json.dumps)
+    deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
     return deferred
 
 
@@ -53,7 +55,7 @@ def view_config_for_scaling_group(request, tenantId, groupId):
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.config)
+@validate_body(group_schemas.config)
 def edit_config_for_scaling_group(request, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
@@ -96,40 +98,42 @@ def view_launch_config(request, tenantId, groupId):
     Example response::
 
         {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": 3,
-                    "name": "webhead",
-                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                    "OS-DCF:diskConfig": "AUTO",
-                    "metadata": {
-                        "mykey": "myvalue"
+            "launchConfiguration": {
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 3,
+                        "name": "webhead",
+                        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                        "OS-DCF:diskConfig": "AUTO",
+                        "metadata": {
+                            "mykey": "myvalue"
+                        },
+                        "personality": [
+                            {
+                                "path": '/root/.ssh/authorized_keys',
+                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                            }
+                        ],
+                        "networks": [
+                            {
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }
+                        ],
                     },
-                    "personality": [
+                    "loadBalancers": [
                         {
-                            "path": '/root/.ssh/authorized_keys',
-                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                            "loadBalancerId": 2200,
+                            "port": 8081
                         }
-                    ],
-                    "networks": [
-                        {
-                            "uuid": "11111111-1111-1111-1111-111111111111"
-                        }
-                    ],
-                },
-                "loadBalancers": [
-                    {
-                        "loadBalancerId": 2200,
-                        "port": 8081
-                    }
-                ]
+                    ]
+                }
             }
         }
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.view_launch_config()
-    deferred.addCallback(json.dumps)
+    deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
     return deferred
 
 
@@ -137,7 +141,7 @@ def view_launch_config(request, tenantId, groupId):
            methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(sg_schema.launch_config)
+@validate_body(group_schemas.launch_config)
 def edit_launch_config(request, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the

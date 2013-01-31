@@ -5,6 +5,16 @@ Interface to be used by the scaling groups engine
 from zope.interface import Interface, Attribute
 
 
+class UnrecognizedCapabilityError(Exception):
+    """
+    Error to be raised when a capability hash is not recognized, or does not
+    exist, or has been deleted.
+    """
+    def __init__(self, capability_hash):
+        super(UnrecognizedCapabilityError, self).__init__(
+            "Unrecognized capability hash {hash}".format(hash=capability_hash))
+
+
 class NoSuchScalingGroupError(Exception):
     """
     Error to be raised when attempting operations on a scaling group that
@@ -24,6 +34,14 @@ class NoSuchEntityError(Exception):
     pass
 
 
+class NoSuchPolicyError(Exception):
+    """
+    Error to be raised when attempting operations on an policy that does not
+    exist.
+    """
+    pass
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -35,29 +53,36 @@ class IScalingGroup(Interface):
         The manifest contains everything required to configure this scaling:
         the config, the launch config, and all the scaling policies.
 
-        :return: a dictionary with 3 keys: ``groupConfiguration`` containing
-            the group configuration dictionary, ``launchConfiguration``
-            containing the launch configuration dictionary, and
-            ``scalingPolicies`` containing a list of all the scaling policies
+        :return: a dictionary corresponding to the JSON schema at
+            :data:``otter.json_schema.model_schemas.view_manifest``
         :rtype: ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
     def view_config():
         """
         :return: a view of the config, as specified by
-            :data:`otter.json_schema.scaling_group.config`
+            :data:`otter.json_schema.group_schemas.config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
     def view_launch_config():
         """
         :return: a view of the launch config, as specified by
-            :data:`otter.json_schema.scaling_group.launch_config`
+            :data:`otter.json_schema.group_schemas.launch_config`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
@@ -71,49 +96,14 @@ class IScalingGroup(Interface):
 
         The entity links are in JSON link format.
 
-        :return: a view of the state of the scaling group in the form::
-
-        {
-          "active": {
-            "{instanceId1}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                "rel": "bookmark"
-              }
-            ],
-            "{instanceId2}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
-                "rel": "bookmark"
-              }
-            ]
-          },
-          "pending": {
-            "{instanceId3}": [
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
-                "rel": "self"
-              },
-              {
-                "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
-                "rel": "bookmark"
-              }
-            ]
-          },
-          "steadyState": 3,
-          "paused": false
-        }
+        :return: a view of the state of the scaling group corresponding to the
+            JSON schema at :data:``otter.json_schema.model_schemas.group_state``
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
@@ -128,6 +118,9 @@ class IScalingGroup(Interface):
         :type config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
@@ -142,6 +135,9 @@ class IScalingGroup(Interface):
         :type launch_config: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
@@ -161,6 +157,9 @@ class IScalingGroup(Interface):
         :type steady_state: ``int``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         pass
 
@@ -174,8 +173,127 @@ class IScalingGroup(Interface):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         :raises: NoSuchEntityError if the entity is not a member of the scaling
             group
+        """
+        pass
+
+    def create_policies(data):
+        """
+        Create a set of new scaling policies.
+
+        :param data: a list of one or more scaling policies in JSON format,
+            each of which is defined by
+            :data:`otter.json_schema.group_schemas.policy`
+        :type data: ``list`` of ``dict``
+
+        :return: dictionary of UUIDs to their matching newly created scaling
+            policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``dict`` of ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        """
+        pass
+
+    def update_policy(policy_id, data):
+        """
+        Updates an existing policy with the data given.
+
+        :param policy_id: the uuid of the entity to update
+        :type policy_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+    def list_policies():
+        """
+        Gets all the policies associated with particular scaling group.
+
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        """
+        pass
+
+    def get_policy(policy_id):
+        """
+        Gets the specified policy on this particular scaling group.
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+    def delete_policy(policy_id):
+        """
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+    def list_webhooks(policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        pass
+
+    def create_webhooks(policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: a list of details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         pass
 
@@ -266,5 +384,21 @@ class IScalingGroupCollection(Interface):
         :return: scaling group model object
         :rtype: :class:`IScalingGroup` provider (no
             :class:`twisted.internet.defer.Deferred`)
+        """
+        pass
+
+    def execute_webhook(capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
         """
         pass

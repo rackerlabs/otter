@@ -1,6 +1,6 @@
 """
-JSON Schemas for the scaling group - the launch config and the general scaling
-group configuration.  There are also example configs and launch configs.
+JSON Schemas that define the scaling group - the launch config, the general
+scaling group configuration, and policies.
 """
 
 # This is built using union types which may not be available in Draft 4
@@ -19,6 +19,24 @@ group configuration.  There are also example configs and launch configs.
 # config has problems.  Perhaps a no-op validation endpoint that lists all the
 # problems with their launch configuration, or perhaps accept the launch
 # configuration and return a warning list of all possible problems.
+
+#
+# Launch Schemas
+#
+
+metadata = {
+    "type": "object",
+    "description": ("User-provided key-value metadata.  Both keys and "
+                    "values should be strings not exceeding 256 "
+                    "characters in length."),
+    "patternProperties": {
+        "^.{0,256}$": {
+            "type": "string",
+            "maxLength": 256
+        }
+    },
+    "additionalProperties": False
+}
 
 launch_server = {
     "type": "object",
@@ -115,74 +133,6 @@ launch_config = {
 }
 
 
-# Valid launch config examples - used for testing the schema and for
-# documentation purposes
-launch_server_config_examples = [
-    {
-        "type": "launch_server",
-        "args": {
-            "server": {
-                "flavorRef": 3,
-                "name": "webhead",
-                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                "OS-DCF:diskConfig": "AUTO",
-                "metadata": {
-                    "mykey": "myvalue"
-                },
-                "personality": [
-                    {
-                        "path": '/root/.ssh/authorized_keys',
-                        "contents": (
-                            "ICAgICAgDQoiQSBjbG91ZCBkb2VzIG5vdCBrbm93IHdoeSBp")
-                    }
-                ],
-                "networks": [
-                    {
-                        "uuid": "11111111-1111-1111-1111-111111111111"
-                    }
-                ],
-            },
-            "loadBalancers": [
-                {
-                    "loadBalancerId": 2200,
-                    "port": 8081
-                }
-            ]
-        }
-    },
-    {
-        "type": "launch_server",
-        "args": {
-            "server": {
-                "flavorRef": 2,
-                "name": "worker",
-                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
-            },
-            "loadBalancers": [
-                {
-                    "loadBalancerId": 441,
-                    "port": 80
-                },
-                {
-                    "loadBalancerId": 2200,
-                    "port": 8081
-                }
-            ]
-        }
-    },
-    {
-        "type": "launch_server",
-        "args": {
-            "server": {
-                "flavorRef": 2,
-                "name": "worker",
-                "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
-            }
-        }
-    }
-]
-
-
 config = {
     "type": "object",
     "description": ("Configuration options for the scaling group, "
@@ -193,7 +143,8 @@ config = {
             "description": ("Name of the scaling group (this name does not "
                             "have to be unique)."),
             "maxLength": 256,
-            "required": True
+            "required": True,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "cooldown": {
             "type": "integer",
@@ -218,43 +169,11 @@ config = {
             "minimum": 0,
             "default": None
         },
-        "metadata": {
-            "type": "object",
-            "description": ("User-provided key-value metadata.  Both keys and "
-                            "values should be strings not exceeding 256 "
-                            "characters in length."),
-            "patternProperties": {
-                "^.{0,256}$": {
-                    "type": "string",
-                    "maxLength": 256
-                }
-            },
-            "additionalProperties": False
-        }
+        "metadata": metadata
     },
     "additionalProperties": False,
     "required": True
 }
-
-
-# Valid config examples
-config_examples = [
-    {
-        "name": "webheads",
-        "cooldown": 30,
-        "minEntities": 1
-    },
-    {
-        "name": "workers",
-        "cooldown": 60,
-        "minEntities": 5,
-        "maxEntities": 100,
-        "metadata": {
-            "firstkey": "this is a string",
-            "secondkey": "1"
-        }
-    }
-]
 
 
 policy = {
@@ -299,6 +218,7 @@ policy = {
                 "unique for all scaling policies."),
             "required": True,
             "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "change": {
             "type": "integer",
@@ -342,54 +262,20 @@ policy = {
 }
 
 
-policy_examples = [
-    {
-        "name": "scale up by 10",
-        "change": 10,
-        "cooldown": 5
-    },
-    {
-        "name": 'scale down a 5.5 percent because of a tweet',
-        "changePercent": -5.5,
-        "cooldown": 6
-    },
-    {
-        "name": 'set number of servers to 10',
-        "steadyState": 10,
-        "cooldown": 3
-    }
-]
-
-
-create_group = {
+webhook = {
     "type": "object",
-    "description": "Schema of the JSON used to create a scaling group.",
+    "description": "A webhook to execute a scaling policy",
     "properties": {
-        'groupConfiguration': config,
-        'launchConfiguration': launch_config,
-        'scalingPolicies': {
-            'type': 'array',
-            'items': policy,
-            'uniqueItems': True
-        }
+        "name": {
+            "type": "string",
+            "description": (
+                "A name for this scaling policy. This name does have to be "
+                "unique for all scaling policies."),
+            "required": True,
+            "maxLength": 256,
+            "pattern": "\S+"  # must contain non-whitespace
+        },
+        "metadata": metadata
     },
     "additionalProperties": False
 }
-
-
-create_group_examples = [
-    {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0]
-    },
-    {
-        "groupConfiguration": config_examples[0],
-        "launchConfiguration": launch_server_config_examples[0],
-        "scalingPolicies": []
-    },
-    {
-        "groupConfiguration": config_examples[1],
-        "launchConfiguration": launch_server_config_examples[1],
-        "scalingPolicies": policy_examples
-    }
-]

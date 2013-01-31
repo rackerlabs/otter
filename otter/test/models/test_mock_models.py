@@ -7,7 +7,8 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import NoSuchScalingGroupError, NoSuchEntityError
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
+                                    NoSuchPolicyError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -72,13 +73,13 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.config = {
-            'name': '',
+            'name': 'aname',
             'cooldown': 0,
             'minEntities': 0
         }
         # this is the config with all the default vals
         self.output_config = {
-            'name': '',
+            'name': 'aname',
             'cooldown': 0,
             'minEntities': 0,
             'maxEntities': None,
@@ -88,7 +89,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = []
+        self.policies = [{
+            "name": "set number of servers to 10",
+            "steadyState": 10,
+            "cooldown": 3
+        }]
         self.group = MockScalingGroup(
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
@@ -100,11 +105,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         schema
         """
         result = self.validate_view_manifest_return_value()
-        self.assertEqual(result, {
-            'groupConfiguration': self.output_config,
-            'launchConfiguration': self.launch_config,
-            'scalingPolicies': []
-        })
+        self.assertEqual(result['groupConfiguration'], self.output_config)
+        self.assertEqual(result['launchConfiguration'], self.launch_config)
+        self.assertEqual(result['scalingPolicies'].values(), self.policies)
 
     def test_default_view_config_has_all_info(self):
         """
@@ -321,6 +324,204 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.assert_deferred_succeeded(self.group.view_config()),
             self.output_config)
 
+    def test_create_new_scaling_policies(self):
+        """
+        Adding new policies to the scaling group returns a dictionary of
+        scaling policies mapped to their ids
+        """
+        create_response = self.validate_create_policies_return_value([
+            {
+                "name": "set number of servers to 3000",
+                "steadyState": 3000,
+                "cooldown": 300
+            },
+            {
+                "name": 'scale down 10 percent',
+                "changePercent": -10,
+                "cooldown": 200
+            }
+        ])
+        list_result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertGreater(len(list_result), len(create_response))
+        for key, value in create_response.iteritems():
+            self.assertEqual(list_result[key], value)
+
+    def test_list_empty_policies(self):
+        """
+        If there are no policies, list policies conforms to the schema and
+        also is an empty dictionary
+        """
+        self.group = MockScalingGroup(
+            self.tenant_id, 1,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': None})
+        self.assertEqual(self.validate_list_policies_return_value(), {})
+
+    def test_list_all_policies(self):
+        """
+        List existing policies returns a dictionary of the policy mapped to the
+        ID
+        """
+        policies_dict = self.validate_list_policies_return_value()
+        self.assertEqual(len(policies_dict), len(self.policies))
+        policies = policies_dict.values()
+        for a_policy in self.policies:
+            self.assertIn(a_policy, policies)
+
+    def test_get_policy_succeeds(self):
+        """
+        Try to get a policy by looking up all available UUIDs, and getting one.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        value = policy_list.values()[0]
+        result = self.assert_deferred_succeeded(self.group.get_policy(uuid))
+        self.assertEqual(value, result)
+
+    def test_get_nonexistent_policy_fails(self):
+        """
+        Get a policy that doesn't exist returns :class:`NoSuchPolicyError`
+        """
+        uuid = "Otters are so cute!"
+        deferred = self.group.get_policy(uuid)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_policy_succeeds(self):
+        """
+        Delete a policy, check that it is actually deleted.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        self.assert_deferred_succeeded(self.group.delete_policy(uuid))
+        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertNotIn(uuid, result)
+        self.assertEqual({}, result)
+
+    def test_delete_nonexistent_policy_fails(self):
+        """
+        Delete a policy that doesn't exist. Should return with NoSuchPolicyError
+        """
+        deferred = self.group.delete_policy("puppies")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_policy_removes_webhooks(self):
+        """
+        Deleting an existing policy removes its associated webhooks too
+        """
+        self.group.policies = {"2": {}}
+        self.group.webhooks = {"2": {}}
+        self.assert_deferred_succeeded(self.group.delete_policy("2"))
+        self.assertNotIn("2", self.group.webhooks)
+
+    def test_update_policy_succeeds(self):
+        """
+        Get a UUID and attempt to update the policy.
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        update_data = {
+            "name": "Otters are not good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
+        result = self.assert_deferred_succeeded(
+            self.group.get_policy(uuid))
+        self.assertEqual(update_data, result)
+
+    def test_update_nonexistent_policy_fails(self):
+        """
+        Attempt to update a nonexistant policy.
+        """
+        update_data = {
+            "name": "puppies are good pets",
+            "steadyState": 1234,
+            "cooldown": 555
+        }
+        deferred = self.group.update_policy("puppies", update_data)
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_list_webhooks_nonexistant_policy_fails(self):
+        """
+        Listing webhooks on a policy that doesn't exist fails with a
+        :class:`NoSuchPolicyError`
+        """
+        deferred = self.group.list_webhooks("otter-stacking")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_list_empty_webhooks(self):
+        """
+        If there are no webhooks, an empty dictionary is returned when
+        ``list_webhooks`` is called
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        result = self.validate_list_webhooks_return_value(uuid)
+        self.assertEqual(result, {})
+
+    def test_list_webhooks_succeeds(self):
+        """
+        If there are webhooks for a particular policy, listing webhooks returns
+        a dictionary for all of them
+        """
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        uuid = policy_list.keys()[0]
+        webhooks = {
+            '10': {'capabilityHash': 'hook', 'metadata': {}},
+            '11': {'capabilityHash': 'anotherhook', 'metadata': {}}
+        }
+        self.group.webhooks = {uuid: webhooks}
+        result = self.validate_list_webhooks_return_value(uuid)
+        self.assertEqual(result, webhooks)
+
+    def test_create_webhooks_nonexistant_policy_fails(self):
+        """
+        Creating webhooks on a policy that doesn't exist fails with a
+        :class:`NoSuchPolicyError`
+        """
+        deferred = self.group.create_webhooks("otter-stacking", [{}])
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
+    def test_create_webhooks_succeed(self, fake_random):
+        """
+        Adding new webhooks to the scaling policy returns a dictionary of
+        scaling webhooks mapped to their ids
+        """
+        self.group.policies = {'2': {}}
+        # have a fake webhook already
+        self.group.webhooks = {
+            '2': {
+                'fake': {
+                    'capability': {
+                        'hash': 'fake',
+                        'ver': '1'
+                    },
+                    'name': 'meh',
+                    'metadata': {}
+                }
+            }
+        }
+
+        # create two webhooks, both empty
+        creation = self.validate_create_webhooks_return_value(
+            '2', [{'name': 'one'}, {'name': 'two'}])
+        self.assertEqual(len(creation), 2)
+        for name in ('one', 'two'):
+            self.assertIn({
+                'name': name,
+                'metadata': {},
+                'capability': {
+                    'hash': 'hash',
+                    'version': 'ver'
+                },
+            }, creation.values())
+
+        # listing should return 3
+        listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))
+        self.assertGreater(len(listing), len(creation))
+
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -362,7 +563,23 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         scaling group with the specified configuration.
         """
         launch = {"launch": "config"}
-        policies = [1, 2, 3]
+        policies = {
+            "f236a93f-a46d-455c-9403-f26838011522": {
+                "name": "scale up by 10",
+                "change": 10,
+                "cooldown": 5
+            },
+            "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
+                "name": "scale down a 5.5 percent because of a tweet",
+                "changePercent": -5.5,
+                "cooldown": 6
+            },
+            "228dbf91-7b15-4d21-8de2-fa584f01a440": {
+                "name": "set number of servers to 10",
+                "steadyState": 10,
+                "cooldown": 3
+            }
+        }
         self.assertEqual(self.validate_list_return_value(self.tenant_id), [],
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
@@ -437,6 +654,52 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
+    def _call_all_methods_on_group(self, group_id, mock_generation):
+        """
+        Gets a group, asserts that it's a MockScalingGroup, and runs all of its
+        calls and returns their deferreds as a list
+        """
+        group = self.validate_get_return_value(self.tenant_id, group_id)
+        self.assertTrue(isinstance(group, MockScalingGroup),
+                        "group is {0!r}".format(group))
+
+        group.active_entities = ["1"]
+        group.policies = {'1': {}, '2': {}}
+
+        return [
+            group.view_config(),
+            group.view_launch_config(),
+            group.view_state(),
+            group.update_config({
+                'name': '1',
+                'minEntities': 0,
+                'cooldown': 0,
+                'maxEntities': None,
+                'metadata': {}
+            }),
+            group.update_launch_config({
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 2,
+                        "name": "worker",
+                        "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                    }
+                }
+            }),
+            group.set_steady_state(1),
+            group.bounce_entity("1"),
+            group.list_policies(),
+            group.create_policies([]),
+            group.get_policy('2'),
+            group.update_policy('2', {}),
+            group.delete_policy('1'),
+            group.list_webhooks('2'),
+            group.create_webhooks('2', [{}, {}])
+        ]
+
     def test_get_scaling_group_returns_mock_scaling_group(self):
         """
         Getting valid scaling group returns a MockScalingGroup whose methods
@@ -445,46 +708,17 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.tenant_id, self.config, {}))  # empty launch for testing
-        group = self.validate_get_return_value(self.tenant_id, uuid)
 
-        self.assertTrue(isinstance(group, MockScalingGroup),
-                        "group is {0!r}".format(group))
-
-        for method in ('view_config', 'view_launch_config', 'view_state'):
-            self.assert_deferred_succeeded(getattr(group, method)())
-
-        self.assert_deferred_succeeded(group.update_config({
-            'name': '1', 'minEntities': 0, 'cooldown': 0, 'maxEntities': None,
-            'metadata': {}
-        }))
-        self.assert_deferred_succeeded(group.set_steady_state(1))
-
-        group.active_entities = ["1"]
-        self.assert_deferred_succeeded(group.bounce_entity("1"))
+        succeeded_deferreds = self._call_all_methods_on_group(uuid)
+        for deferred in succeeded_deferreds:
+            self.assert_deferred_succeeded(deferred)
 
     def test_get_scaling_group_works_but_methods_do_not(self):
         """
         Getting a scaling group that doesn't exist returns a MockScalingGropu
         whose methods will raise :class:`NoSuchScalingGroupError` exceptions.
         """
-        group = self.validate_get_return_value(self.tenant_id, 1)
-        self.assertTrue(isinstance(group, MockScalingGroup),
-                        "group is {0!r}".format(group))
+        failed_deferreds = self._call_all_methods_on_group("1")
 
-        for method in ('view_config', 'view_launch_config', 'view_state'):
-            self.assert_deferred_failed(getattr(group, method)(),
-                                        NoSuchScalingGroupError)
-
-        self.assert_deferred_failed(group.update_config(
-            {
-                'name': '1',
-                'minEntities': 0,
-                'cooldown': 0,
-                'maxEntities': None,
-                'metadata': {}
-            }), NoSuchScalingGroupError)
-
-        self.assert_deferred_failed(group.set_steady_state(1),
-                                    NoSuchScalingGroupError)
-        self.assert_deferred_failed(group.bounce_entity("1"),
-                                    NoSuchScalingGroupError)
+        for deferred in failed_deferreds:
+            self.assert_deferred_failed(deferred, NoSuchScalingGroupError)

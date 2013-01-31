@@ -1,14 +1,18 @@
 """
  Mock interface for the front-end scaling groups engine
 """
+from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid4
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError)
 import zope.interface
 
 from twisted.internet import defer
+
+from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
+                                    NoSuchScalingGroupError, NoSuchEntityError,
+                                    NoSuchPolicyError)
+from otter.util.hashkey import generate_capability
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -48,7 +52,7 @@ class MockScalingGroup:
 
     :ivar policies: scaling policies of the group, each of which is specified
         by :data:`otter.json_schema.scaling_group.scaling_policy`
-    :type config: ``list``
+    :type config: ``dict``
 
     :ivar steady: the desired steady state number of entities -
         defaults to the minimum if not given.  This how many entities the
@@ -97,12 +101,16 @@ class MockScalingGroup:
             }
             self.update_config(creation['config'], partial_update=True)
             self.launch = creation['launch']
-            self.policies = creation.get('policies', None) or []
+            self.policies = {}
+            if creation['policies']:
+                self.create_policies(creation['policies'])
+            self.webhooks = defaultdict(dict)
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
             self.config = None
             self.launch = None
             self.policies = None
+            self.webhooks = None
 
     def view_manifest(self):
         """
@@ -123,7 +131,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.config)
+        return defer.succeed(self.config.copy())
 
     def view_launch_config(self):
         """
@@ -131,7 +139,7 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed(self.launch)
+        return defer.succeed(self.launch.copy())
 
     def view_state(self):
         """
@@ -151,6 +159,10 @@ class MockScalingGroup:
         Update the scaling group configuration paramaters based on the
         attributes in ``data``.  Has the option to partially update the config,
         since when creating the model there could be default variables.
+
+        Every time this is updated, the steady state and the number of entities
+        should be checked/modified to ensure compliance with the minimum and
+        maximum number of entities.
 
         :return: :class:`Deferred` that fires with None
         """
@@ -216,7 +228,6 @@ class MockScalingGroup:
                 self.uuid, entity_id)))
 
     # ---- not interface methods
-
     def add_entities(self, pending=None, active=None):
         """
         Takes a list of pending entity ids and active entity ids, and adds
@@ -233,6 +244,173 @@ class MockScalingGroup:
                    (active or [], self.active_entities))
         for entity_ids, dictionary in mapping:
             dictionary.update(generate_entity_links(self.tenant_id, entity_ids))
+
+    def list_policies(self):
+        """
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.scaling_group.policy_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        return defer.succeed(self.policies)
+
+    def get_policy(self, policy_id):
+        """
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            # return a coyp so this store doesn't get corrupted
+            return defer.succeed(self.policies[policy_id].copy())
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def create_policies(self, data):
+        """
+        Create a set of new scaling policies.
+
+        :param data: a list of one or more scaling policies in JSON format,
+            each of which is defined by
+            :data:`otter.json_schema.group_schemas.policy`
+        :type data: ``list`` of ``dict``
+
+        :return: dictionary of UUIDs to their matching newly created scaling
+            policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``dict`` of ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        return_data = {}
+
+        for policy in data:
+            policy_id = str(uuid4())
+            self.policies[policy_id] = policy
+            return_data[policy_id] = policy
+
+        return defer.succeed(return_data)
+
+    def update_policy(self, policy_id, data):
+        """
+        Updates an existing policy with the data given.
+
+        :param policy_id: the uuid of the entity to update
+        :type policy_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a policy, as specified by
+            :data:`otter.json_schema.scaling_group.policy`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            self.policies[policy_id] = data
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def delete_policy(self, policy_id):
+        """
+        Delete the specified policy on this particular scaling group, and all
+        of its associated webhooks as well.
+
+        :param policy_id: the ID of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            del self.policies[policy_id]
+
+            if policy_id in self.webhooks:
+                del self.webhooks[policy_id]
+
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def list_webhooks(self, policy_id):
+        """
+        Gets all the capability URLs created for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :return: a dict of the webhooks, as specified by
+            :data:`otter.json_schema.group_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            # return a copy so this store doesn't get mutated
+            return defer.succeed(deepcopy(self.webhooks.get(policy_id, {})))
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
+
+    def create_webhooks(self, policy_id, data):
+        """
+        Creates a new capability URL for one particular scaling policy
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
+        :param data: the details of the webhook in JSON format, as specified
+            by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if policy_id in self.policies:
+            created = {}
+            for webhook_input in data:
+                webhook_real = {'metadata': {}}
+                webhook_real.update(webhook_input)
+                webhook_real['capability'] = {}
+
+                (ignore, webhook_real['capability']['hash'],
+                 webhook_real['capability']['version']) = generate_capability()
+
+                uuid = str(uuid4())
+                self.webhooks[policy_id][uuid] = webhook_real
+                # return a copy so this store doesn't get mutated
+                created[uuid] = webhook_real.copy()
+
+            return defer.succeed(created)
+        else:
+            return defer.fail(NoSuchPolicyError(self.tenant_id,
+                                                self.uuid, policy_id))
 
 
 class MockScalingGroupCollection:
@@ -301,3 +479,19 @@ class MockScalingGroupCollection:
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(tenant, uuid, None)
+
+    def execute_webhook(self, capability_hash):
+        """
+        Identify the scaling policy (and tenant ID, group ID, etc.) associated
+        with this particular capability URL hash and execute said policy.
+
+        :param capability_hash: the capability hash associated with a particular
+            scaling policy
+        :type capability_hash: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
+            does not match any non-deleted policy
+        """
+        raise NotImplementedError()
