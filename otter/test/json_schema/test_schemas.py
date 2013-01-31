@@ -52,12 +52,26 @@ class ScalingGroupConfigTestCase(TestCase):
         The name must be less than or equal to 256 characters.
         """
         invalid = {
-            'name': ' ' * 257,
+            'name': 'a' * 257,
             'cooldown': 60,
             'minEntities': 1,
         }
         self.assertRaisesRegexp(ValidationError, "is too long",
                                 validate, invalid, group_schemas.config)
+
+    def test_invalid_name_does_not_validate(self):
+        """
+        The name must contain something other than whitespace.
+        """
+        invalid = {
+            'name': ' ',
+            'cooldown': 60,
+            'minEntities': 1,
+        }
+        for invalid_name in ('', ' ', '    '):
+            invalid['name'] = invalid_name
+            self.assertRaisesRegexp(ValidationError, "does not match",
+                                    validate, invalid, group_schemas.config)
 
     def test_invalid_metadata_does_not_validate(self):
         """
@@ -264,7 +278,7 @@ class ScalingPolicyTestCase(TestCase):
         Cannot set the steady state to a negative number
         """
         invalid = {
-            "name": "",
+            "name": "aname",
             "steadyState": -1,
             "cooldown": 5
         }
@@ -279,7 +293,7 @@ class ScalingPolicyTestCase(TestCase):
         results in an error.
         """
         invalid = {
-            "name": "",
+            "name": "aname",
             "change": 5,
             "cooldown": 5,
             "poofy": False
@@ -287,6 +301,21 @@ class ScalingPolicyTestCase(TestCase):
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
             validate, invalid, group_schemas.policy)
+
+    def test_invalid_name_does_not_validate(self):
+        """
+        The name must contain something other than whitespace.
+        """
+        invalid = {
+            "name": "",
+            "change": 10,
+            "cooldown": 5
+        }
+        for invalid_name in ('', ' ', '    '):
+            invalid['name'] = invalid_name
+            self.assertRaisesRegexp(
+                ValidationError, 'does not match', validate, invalid,
+                group_schemas.policy)
 
 
 class CreateScalingGroupTestCase(TestCase):
