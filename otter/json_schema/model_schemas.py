@@ -3,7 +3,7 @@ JSON schema to be used to verify the return values from implementations of the
 model interface.
 """
 from copy import deepcopy
-from otter.json_schema.group_schemas import config, launch_config, policy
+from otter.json_schema import group_schemas
 
 entity_schema = {
     'type': 'object',
@@ -81,7 +81,7 @@ group_state = {
 
 # unlike updating or inputing a group config, the returned config must actually
 # have all the properties
-group_config = deepcopy(config)
+group_config = deepcopy(group_schemas.config)
 for property_name in group_config['properties']:
     group_config['properties'][property_name]['required'] = True
 
@@ -91,15 +91,15 @@ view_manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
-        "groupConfiguration": config,
-        "launchConfiguration": launch_config,
+        "groupConfiguration": group_schemas.config,
+        "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": {
             "type": "object",
             "patternProperties": {
                 "^\S+$": {
                     "type": "object",
                     "required": True,
-                    "items": [policy]
+                    "items": [group_schemas.policy]
                 }
             },
             "required": True,
@@ -134,9 +134,47 @@ policy_list = {
         "^\S+$": {
             "type": "object",
             "required": True,
-            "items": [policy]
+            "items": [group_schemas.policy]
         }
     },
     "required": False,
+    "additionalProperties": False
+}
+
+webhook = deepcopy(group_schemas.webhook)
+webhook['properties']['metadata']['required'] = True
+webhook['properties']['capability'] = {
+    "type": "object",
+    "properties": {
+        "hash": {
+            "type": "string",
+            "description": 'The "unguessable" part of the capability URL',
+            "required": True,
+            "minLength": 64
+        },
+        "version": {
+            "type": "string",
+            "description": ("The version of capability generation used to make "
+                            "the capabilityHash"),
+            "required": True,
+            "pattern": "\S+"
+        }
+    },
+    "additionalProperties": False,
+    "required": True
+}
+webhook['required'] = True
+
+
+webhook_list = {
+    "type": "object",
+    "description": "Schema returned by the interface for viewing all webhooks",
+    "patternProperties": {
+        "^\S+$": {
+            "type": "object",
+            "required": True,
+            "items": [webhook]
+        }
+    },
     "additionalProperties": False
 }
