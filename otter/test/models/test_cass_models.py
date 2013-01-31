@@ -235,6 +235,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.list_policies()
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 2)
+        self.assertEqual(r, {'group1': {}, 'group3': {}})
 
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
