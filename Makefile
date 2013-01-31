@@ -16,7 +16,7 @@ CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 test: unit integration
 
 run:
-	twistd -n web --resource-script=${CODEDIR}/server.rpy
+	twistd -n otter-api
 
 env:
 	./scripts/bootstrap-virtualenv.sh
