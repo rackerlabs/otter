@@ -26,14 +26,36 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = "SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-_cql_view += "groupId = :groupId AND deleted = False;"
-_cql_insert = "INSERT INTO {cf}(tenantId, groupId, data, deleted) "
-_cql_insert += "VALUES (:tenantId, :groupId, {name}, False)"
-_cql_update = "INSERT INTO {cf}(tenantId, groupId, data) "
-_cql_update += "VALUES (:tenantId, :groupId, {name})"
+_cql_view = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+             "groupId = :groupId AND deleted = False;")
+_cql_view_policy = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
+                    "groupId = :groupId AND policyId = :policyId AND deleted = False;")
+_cql_insert = ("INSERT INTO {cf}(tenantId, groupId, data, deleted) "
+               "VALUES (:tenantId, :groupId, {name}, False)")
+_cql_insert_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data, deleted) "
+                      "VALUES (:tenantId, :groupId, {name}Id, {name}, False)")
+_cql_update = ("INSERT INTO {cf}(tenantId, groupId, data) "
+               "VALUES (:tenantId, :groupId, {name})")
+_cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
+                      "VALUES (:tenantId, :groupId, {name}Id, {name})")
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
+_cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
+                      "AND :policyId=policyId")
 _cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
+_cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
+                    "AND deleted = False;")
+
+
+def _build_policies(policies, policies_table, queries, data, outpolicies):
+    if policies is not None:
+        for i in range(len(policies)):
+            polname = "policy{}".format(i)
+            polId = generate_key_str('policy')
+            queries.append(_cql_insert_policy.format(cf=policies_table,
+                                                     name=':' + polname))
+            data[polname] = _serial_json_data(policies[i], 1)
+            data[polname + "Id"] = polId
+            outpolicies[polId] = policies[i]
 
 
 class CassScalingGroup(object):
@@ -201,7 +223,37 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        def _grab_pol_list(rawResponse):
+            if rawResponse is None:
+                raise CassBadDataError("received unexpected None response")
+            data = {}
+            for row in rawResponse:
+                if 'cols' not in row:
+                    raise CassBadDataError("Received malformed response with no cols")
+                rec = None
+                policyId = None
+                for rawRec in row['cols']:
+                    if rawRec['name'] is 'policyId':
+                        policyId = rawRec['value']
+                    if rawRec['name'] is 'data':
+                        rec = rawRec['value']
+                if rec is None:
+                    raise CassBadDataError("Received malformed response without the "
+                                           "required fields")
+                try:
+                    data[policyId] = json.loads(rec)
+                    if "_ver" in data[policyId]:
+                        del data[policyId]["_ver"]
+                except ValueError:
+                    raise CassBadDataError("Bad data in database")
+            return defer.succeed(data)
+
+        query = _cql_list_policy.format(cf=self.policies_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid})
+        d.addCallback(_grab_pol_list)
+        return d
 
     def get_policy(self, policy_id):
         """
@@ -210,7 +262,13 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        query = _cql_view_policy.format(cf=self.policies_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "policyId": policy_id})
+        d.addCallback(self._grab_json_data)
+        return d
 
     def create_policies(self, data):
         """
@@ -226,7 +284,27 @@ class CassScalingGroup(object):
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: ``dict`` of ``dict``
         """
-        raise NotImplementedError()
+        def _do_create_pol(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+
+            queries = []
+            cqldata = {"tenantId": self.tenant_id,
+                       "groupId": self.uuid}
+            outpolicies = {}
+
+            _build_policies(data, self.policies_table, queries, cqldata, outpolicies)
+
+            b = Batch(queries, cqldata)
+            d = b.execute(self.connection)
+            return d.addCallback(lambda _: outpolicies)
+
+        d = self._ensure_there()
+        d.addCallback(_do_create_pol)
+        return d
 
     def update_policy(self, policy_id, data):
         """
@@ -243,7 +321,25 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
         """
-        raise NotImplementedError()
+        def _do_update_launch(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
+
+            b = Batch(queries, {"tenantId": self.tenant_id,
+                                "groupId": self.uuid,
+                                "policyId": policy_id,
+                                "policy": _serial_json_data(data, 1)})
+            d = b.execute(self.connection)
+            return d
+
+        d = self.get_policy(policy_id)
+        d.addCallback(_do_update_launch)
+        d.addCallback(lambda _: data)
+        return d
 
     def delete_policy(self, policy_id):
         """
@@ -257,7 +353,13 @@ class CassScalingGroup(object):
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        raise NotImplementedError()
+        queries = [
+            _cql_delete_policy.format(cf=self.policies_table)]
+        b = Batch(
+            queries, {"tenantId": self.tenant_id,
+                      "groupId": self.uuid,
+                      "policyId": policy_id})
+        return b.execute(self.connection)
 
     def list_webhooks(self, policy_id):
         """
@@ -311,7 +413,8 @@ class CassScalingGroup(object):
             if rawRec['name'] is 'data':
                 rec = rawRec['value']
         if rec is None:
-            raise CassBadDataError("Received malformed response without the ")
+            raise CassBadDataError("Received malformed response without the "
+                                   "required fields")
         data = None
         try:
             data = json.loads(rec)
@@ -341,7 +444,7 @@ class CassScalingGroupCollection:
     Scaling Policies (doesn't mirror config):
     CF = policies
     RK = tenantId
-    CK = groupID:polID
+    CK = groupID:policyId
     """
     zope.interface.implements(IScalingGroupCollection)
 
@@ -390,12 +493,19 @@ class CassScalingGroupCollection:
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),
             _cql_insert.format(cf=self.launch_table, name=":launch")]
-        b = Batch(queries, {"tenantId": tenant_id,
-                            "groupId": scaling_group_id,
-                            "scaling": _serial_json_data(config, 1),
-                            "launch": _serial_json_data(launch, 1),
-                            })
+
+        data = {"tenantId": tenant_id,
+                "groupId": scaling_group_id,
+                "scaling": _serial_json_data(config, 1),
+                "launch": _serial_json_data(launch, 1),
+                }
+
+        outpolicies = {}
+        _build_policies(policies, self.policies_table, queries, data, outpolicies)
+
+        b = Batch(queries, data)
         d = b.execute(self.connection)
+        d.addCallback(lambda _: scaling_group_id)
         return d
 
     def delete_scaling_group(self, tenant_id, scaling_group_id):
@@ -436,22 +546,20 @@ class CassScalingGroupCollection:
 
         def _grab_list(rawResponse):
             if rawResponse is None:
-                err = CassBadDataError("None")
-                return defer.fail(err)
+                raise CassBadDataError("received unexpected None response")
             if len(rawResponse) == 0:
                 return defer.succeed([])
             data = []
             for row in rawResponse:
                 if 'cols' not in row:
-                    err = CassBadDataError("No cols")
-                    return defer.fail(err)
+                    raise CassBadDataError("Received malformed response with no cols")
                 rec = None
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'groupid':
+                    if rawRec['name'] is 'groupId':
                         rec = rawRec['value']
                 if rec is None:
-                    err = CassBadDataError("No data")
-                    return defer.fail(err)
+                    raise CassBadDataError("Received malformed response without the "
+                                           "required fields")
                 data.append(CassScalingGroup(tenant_id, rec,
                                              self.connection))
             return defer.succeed(data)
