@@ -9,6 +9,7 @@ policy.
 
 import json
 
+from otter.json_schema.group_schemas import webhook
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import fails_with, succeeds_with, validate_body
 from otter.rest.errors import exception_codes
@@ -206,4 +207,31 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
     deferred = rec.create_webhooks(policyId, data)
     deferred.addCallback(format_webhooks_and_send_redirect)
     deferred.addCallback(json.dumps)
+    return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(webhook)
+def update_webhook(request, tenantId, groupId, policyId, webhookId, data):
+    """
+    Update a particular webhook.
+    A webhook may (but do not need to) include some arbitrary medata, and must
+    include a name.
+    If successful, no response body will be returned.
+
+    Example request::
+
+        {
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            }
+        }
+    """
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.update_webhook(policyId, webhookId, data)
     return deferred
