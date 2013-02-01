@@ -16,11 +16,11 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 CREATE COLUMNFAMILY launch_config (
-    tenantId ascii,
-    groupId ascii, 
+    "tenantId" ascii,
+    "groupId" ascii, 
     data ascii, 
     deleted boolean,
-    PRIMARY KEY(tenantId, groupId)
+    PRIMARY KEY("tenantId", "groupId")
     );
     
 CREATE INDEX deleted_launch_config ON launch_config (deleted);
