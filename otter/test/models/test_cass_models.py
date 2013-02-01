@@ -399,7 +399,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_create_policy(self):
         """
-        Test that you can create a group
+        Test that you can create a scaling group with a single policy
         """
         expectedData = {
             'scaling': '{"_ver": 1}',
@@ -424,7 +424,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_create_policy_multiple(self):
         """
-        Test that you can create a group
+        Test that you can create a scaling group with multiple policies
         """
         expectedData = {
             'scaling': '{"_ver": 1}',
