@@ -338,6 +338,7 @@ class CassScalingGroup(object):
 
         d = self.get_policy(policy_id)
         d.addCallback(_do_update_launch)
+        d.addCallback(lambda _: data)
         return d
 
     def delete_policy(self, policy_id):
@@ -504,6 +505,7 @@ class CassScalingGroupCollection:
 
         b = Batch(queries, data)
         d = b.execute(self.connection)
+        d.addCallback(lambda _: scaling_group_id)
         return d
 
     def delete_scaling_group(self, tenant_id, scaling_group_id):
