@@ -9,9 +9,9 @@ import zope.interface
 
 from twisted.internet import defer
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError,
-                                    NoSuchPolicyError)
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
+    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError)
 from otter.util.hashkey import generate_capability
 
 
@@ -527,7 +527,20 @@ class MockScalingGroup:
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
-        raise NotImplementedError()
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if webhook_id in self.webhooks[policy_id]:
+            defaulted_data = {'metadata': {}}
+            defaulted_data.update(data)
+            self.webhooks[policy_id][webhook_id].update(defaulted_data)
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
 
     def delete_webhook(self, policy_id, webhook_id):
         """
