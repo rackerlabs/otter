@@ -234,6 +234,84 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
 
     invalid_methods = ("POST")
 
+    def test_get_webhook_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.get_webhook.return_value = defer.fail(error)
+        self.assert_status_code(500)
+        self.mock_group.get_webhook.assert_called_once_with(self.policy_id,
+                                                            self.webhook_id)
+        self.flushLoggedErrors(DummyException)
+
+    def test_get_webhook_for_unknowns_is_404(self):
+        """
+        When getting a webhook, endpoint returns a 404 if:
+        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
+        - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
+        """
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id),
+            NoSuchWebhookError(self.tenant_id, self.group_id, self.policy_id,
+                               self.webhook_id)]
+        for error in errors:
+            self.mock_group.get_webhook.return_value = defer.fail(error)
+            self.assert_status_code(404)
+            self.mock_group.get_webhook.assert_called_once_with(self.policy_id,
+                                                                self.webhook_id)
+            self.flushLoggedErrors(type(error))
+            self.mock_group.get_webhook.reset_mock()
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_get_webhook(self, mock_url):
+        """
+        Checks that get webhook returns a 200 with a body with the right schema
+        if successful
+        """
+        self.mock_group.get_webhook.return_value = defer.succeed({
+            'name': 'the_name',
+            'capability': {
+                'hash': 'xxx',
+                'version': 'ver'
+            },
+            'metadata': {
+                'key': 'value'
+            }
+        })
+        response_body = self.assert_status_code(200)
+        response = json.loads(response_body)
+        validate(response, rest_schemas.view_webhook_response)
+        self.assertEqual(response, {
+            'webhook': {
+                'name': 'the_name',
+                'metadata': {
+                    'key': 'value'
+                },
+                'id': self.webhook_id,
+                'links': [
+                    {
+                        'rel': 'self',
+                        'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                                 .format(t=self.tenant_id, g=self.group_id,
+                                         p=self.policy_id, w=self.webhook_id))
+                    },
+                    {
+                        'rel': 'bookmark',
+                        'href': ('/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                                 .format(t=self.tenant_id, g=self.group_id,
+                                         p=self.policy_id, w=self.webhook_id))
+                    },
+                    {
+                        'rel': 'capability',
+                        'href': '/v1.0/execute/ver/xxx'
+                    }
+                ]
+            }
+        })
+
     def test_update_webhook_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.

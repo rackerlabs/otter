@@ -212,6 +212,52 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
 
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def get_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Get a webhook which has a name, some arbitrary metdata, and a capability
+    URL.  This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "webhook": {
+                "id":"{webhookId}",
+                "name": "webhook name",
+                "metadata": {},
+                "links": [
+                    {
+                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}",
+                        "rel": "self"
+                    },
+                    {
+                        "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId}",
+                        "rel": "bookmark"
+                    },
+                    {
+                        "href": ".../execute/1/{capability_hash2},
+                        "rel": "capability"
+                    }
+                ]
+            }
+        }
+    """
+    def format_one_webhook(webhook_model):
+        result = _format_webhook(webhookId, webhook_model,
+                                 tenantId, groupId, policyId)
+        return {'webhook': result}
+
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.get_webhook(policyId, webhookId)
+    deferred.addCallback(format_one_webhook)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
     methods=['PUT'])
 @fails_with(exception_codes)
 @succeeds_with(204)
