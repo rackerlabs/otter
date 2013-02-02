@@ -522,6 +522,38 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))
         self.assertGreater(len(listing), len(creation))
 
+    def test_get_webhook_nonexistent_policy_fails(self):
+        """
+        Attempt to update a webhook of a nonexistant policy.
+        """
+        deferred = self.group.get_webhook("puppies", "1")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_get_nonexistant_webhook_fails(self):
+        """
+        Attempt to get a non-existant webhook of an existing policy.
+        """
+        self.group.policies = {'2': {}}
+        self.group.webhooks = {'2': {}}
+        deferred = self.group.get_webhook("2", "1")
+        self.assert_deferred_failed(deferred, NoSuchWebhookError)
+
+    def test_get_webhook_updates_existing_dictionary(self):
+        """
+        Get webhook updates the data that's already there but doesn't
+        delete the capability url.
+        """
+        expected_webhook = {
+            'name': 'original',
+            'capability': {'hash': 'xxx', 'version': '3'},
+            'metadata': {'key': 'value'}
+        }
+        self.group.policies = {'2': {}}
+        self.group.webhooks = {'2': {'3': expected_webhook}}
+        deferred = self.group.get_webhook("2", "3")
+        self.assertEqual(self.assert_deferred_succeeded(deferred),
+                         expected_webhook)
+
     def test_update_webhook_nonexistent_policy_fails(self):
         """
         Attempt to update a webhook of a nonexistant policy.
@@ -771,6 +803,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.delete_policy('1'),
             group.list_webhooks('2'),
             group.create_webhooks('2', [{}, {}]),
+            group.get_webhook('3', '3x'),
             group.update_webhook('3', '3x', {'name': 'hat'})
         ]
 

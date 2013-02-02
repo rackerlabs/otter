@@ -504,7 +504,17 @@ class MockScalingGroup:
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
-        raise NotImplementedError()
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if webhook_id in self.webhooks[policy_id]:
+            return defer.succeed(self.webhooks[policy_id][webhook_id].copy())
+        else:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
 
     def update_webhook(self, policy_id, webhook_id, data):
         """
