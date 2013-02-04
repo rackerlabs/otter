@@ -31,7 +31,6 @@ class NoSuchEntityError(Exception):
     Error to be raised when attempting operations on an entity that does not
     exist.
     """
-    pass
 
 
 class NoSuchPolicyError(Exception):
@@ -39,7 +38,6 @@ class NoSuchPolicyError(Exception):
     Error to be raised when attempting operations on an policy that does not
     exist.
     """
-    pass
 
 
 class IScalingGroup(Interface):
@@ -60,7 +58,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def view_config():
         """
@@ -72,7 +69,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def view_launch_config():
         """
@@ -84,7 +80,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def view_state():
         """
@@ -105,7 +100,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def update_config(config):
         """
@@ -126,7 +120,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def update_launch_config(launch_config):
         """
@@ -143,7 +136,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def set_steady_state(steady_state):
         """
@@ -165,7 +157,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def bounce_entity(entity_id):
         """
@@ -182,7 +173,6 @@ class IScalingGroup(Interface):
         :raises: NoSuchEntityError if the entity is not a member of the scaling
             group
         """
-        pass
 
     def create_policies(data):
         """
@@ -201,7 +191,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def update_policy(policy_id, data):
         """
@@ -219,7 +208,6 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
 
     def list_policies():
         """
@@ -233,7 +221,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
 
     def get_policy(policy_id):
         """
@@ -251,7 +238,6 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
 
     def delete_policy(policy_id):
         """
@@ -267,7 +253,6 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
 
     def list_webhooks(policy_id):
         """
@@ -282,7 +267,6 @@ class IScalingGroup(Interface):
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
 
     def create_webhooks(policy_id, data):
         """
@@ -299,7 +283,6 @@ class IScalingGroup(Interface):
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        pass
 
 
 class IScalingGroupCollection(Interface):
@@ -342,7 +325,6 @@ class IScalingGroupCollection(Interface):
         :return: uuid of the newly created scaling group
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
         """
-        pass
 
     def delete_scaling_group(tenant_id, scaling_group_id):
         """
@@ -359,7 +341,6 @@ class IScalingGroupCollection(Interface):
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
         """
-        pass
 
     def list_scaling_groups(tenant_id):
         """
@@ -372,7 +353,6 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a
             ``list`` of :class:`IScalingGroup` providers
         """
-        pass
 
     def get_scaling_group(tenant_id, scaling_group_id):
         """
@@ -389,7 +369,6 @@ class IScalingGroupCollection(Interface):
         :rtype: :class:`IScalingGroup` provider (no
             :class:`twisted.internet.defer.Deferred`)
         """
-        pass
 
     def execute_webhook(capability_hash):
         """
@@ -405,4 +384,3 @@ class IScalingGroupCollection(Interface):
         :raises: :class:`UnrecognizedCapabilityError` if the capability hash
             does not match any non-deleted policy
         """
-        pass
