@@ -524,14 +524,16 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_get_webhook_nonexistent_policy_fails(self):
         """
-        Attempt to update a webhook of a nonexistant policy.
+        Updating a webhook of a nonexistant policy fails with a
+        :class:`NoSuchPolicyError`.
         """
         deferred = self.group.get_webhook("puppies", "1")
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     def test_get_nonexistant_webhook_fails(self):
         """
-        Attempt to get a non-existant webhook of an existing policy.
+        Getting a non-existant webhook of an existing policy fails with a
+        :class:`NoSuchWebhookError`.
         """
         self.group.policies = {'2': {}}
         self.group.webhooks = {'2': {}}
@@ -556,14 +558,16 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_update_webhook_nonexistent_policy_fails(self):
         """
-        Attempt to update a webhook of a nonexistant policy.
+        Updating a webhook of a nonexistant policy fails with a
+        :class:`NoSuchPolicyError`.
         """
         deferred = self.group.update_webhook("puppies", "1", {'name': 'fake'})
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     def test_update_nonexistant_webhook_fails(self):
         """
-        Attempt to update a non-existant webhook of an existing policy.
+        Updating a non-existant webhook of an existing policy fails with a
+        :class:`NoSuchWebhookError`.
         """
         self.group.policies = {'2': {}}
         deferred = self.group.update_webhook("2", "1", {'name': 'fake'})
@@ -625,6 +629,41 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 }
             }
         })
+
+    def test_delete_webhook_nonexistent_policy_fails(self):
+        """
+        Deleting a webhook of a nonexistant policy fails with a
+        :class:`NoSuchPolicyError`.
+        """
+        deferred = self.group.delete_webhook("puppies", "1")
+        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+
+    def test_delete_nonexistant_webhook_fails(self):
+        """
+        Deleting a non-existant webhook of an existing policy fails with a
+        :class:`NoSuchWebhookError`.
+        """
+        self.group.policies = {'2': {}}
+        deferred = self.group.delete_webhook("2", "1")
+        self.assert_deferred_failed(deferred, NoSuchWebhookError)
+
+    def test_delete_webhook_succeeds(self):
+        """
+        If deleting a webhook succeeds, webhook is removed from store.
+        """
+        self.group.policies = {'2': {}}
+        self.group.webhooks = {
+            '2': {
+                '3': {
+                    'name': 'original',
+                    'capability': {'hash': 'xxx', 'version': '3'},
+                    'metadata': {'key': 'value'}
+                }
+            }
+        }
+        deferred = self.group.delete_webhook("2", "3")
+        self.assertIsNone(self.assert_deferred_succeeded(deferred))
+        self.assertEqual(self.group.webhooks, {'2': {}})
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -804,7 +843,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.list_webhooks('2'),
             group.create_webhooks('2', [{}, {}]),
             group.get_webhook('3', '3x'),
-            group.update_webhook('3', '3x', {'name': 'hat'})
+            group.update_webhook('3', '3x', {'name': 'hat'}),
+            group.delete_webhook('3', '3x')
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):

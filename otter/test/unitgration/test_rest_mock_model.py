@@ -16,7 +16,8 @@ from urlparse import urlsplit
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.group_examples import config, launch_server_config, policy
-from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.models.interface import (
+    NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
@@ -497,6 +498,23 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
 
         self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {}})
 
+    def delete_and_view_webhook(self, path):
+        """
+        Deleting a webhook returns with a 204 no content.  The next attempt to
+        view the webhook should return a 404 not found.
+        """
+        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Delete failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 404)
+
+        # flush any logged errors
+        self.flushLoggedErrors(NoSuchWebhookError)
+
     def test_crud_webhooks(self):
         """
         Start with no policies.  Create some, make sure they're listed,
@@ -518,3 +536,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         # webhook after the update
         self.update_and_view_webhook(first_webhooks[0])
         self.assert_number_of_webhooks(4)
+
+        # delete webhook - there should be one fewer webhook
+        self.delete_and_view_webhook(first_webhooks[0])
+        self.assert_number_of_webhooks(3)
