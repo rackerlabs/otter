@@ -268,8 +268,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_get_webhook(self, mock_url):
         """
-        Checks that get webhook returns a 200 with a body with the right schema
-        if successful
+        Get webhook returns a 200 with a body with the right schema if
+        successful
         """
         self.mock_group.get_webhook.return_value = defer.succeed({
             'name': 'the_name',
@@ -347,8 +347,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
 
     def test_update_webhook_bad_input_400(self):
         """
-        Checks that the serialization checks and rejects unserializable
-        data
+        Invalid JSON data is rejected
         """
         self.mock_group.update_webhook.return_value = defer.succeed(None)
         self.assert_status_code(400, None, 'PUT', '{')
@@ -356,7 +355,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
 
     def test_update_webhook_invalid_schema_400(self):
         """
-        Checks that the webhook schema is obeyed - an empty schema is bad.
+        Webhook schema is obeyed - an empty schema is bad.
         """
         self.mock_group.update_webhook.return_value = defer.succeed(None)
         response_body = self.assert_status_code(400, None, 'PUT', '[]')
@@ -367,9 +366,49 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
 
     def test_update_valid_webhook(self):
         """
-        Checks that the update webhook returns an empty 204 if successful
+        Update webhook returns an empty 204 if successful
         """
         self.mock_group.update_webhook.return_value = defer.succeed(None)
         response_body = self.assert_status_code(
             204, None, 'PUT', json.dumps({'name': 'a name'}))
+        self.assertEqual(response_body, "")
+
+    def test_delete_webhook_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.delete_webhook.return_value = defer.fail(error)
+        self.assert_status_code(500, None, 'DELETE')
+        self.mock_group.delete_webhook.assert_called_once_with(
+            self.policy_id, self.webhook_id)
+        self.flushLoggedErrors(DummyException)
+
+    def test_delete_webhook_for_unknowns_is_404(self):
+        """
+        When deleting a webhook, endpoint returns a 404 if:
+        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
+        - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
+        """
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id),
+            NoSuchWebhookError(self.tenant_id, self.group_id, self.policy_id,
+                               self.webhook_id)]
+        for error in errors:
+            self.mock_group.delete_webhook.return_value = defer.fail(error)
+            self.assert_status_code(404, None, 'DELETE')
+            self.mock_group.delete_webhook.assert_called_once_with(
+                self.policy_id, self.webhook_id)
+            self.flushLoggedErrors(type(error))
+            self.mock_group.delete_webhook.reset_mock()
+
+    def test_delete_valid_webhook(self):
+        """
+        Delete webhook returns an empty 204 if successful
+        """
+        self.mock_group.delete_webhook.return_value = defer.succeed(None)
+        response_body = self.assert_status_code(
+            204, None, 'DELETE')
         self.assertEqual(response_body, "")

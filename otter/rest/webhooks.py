@@ -281,3 +281,18 @@ def update_webhook(request, tenantId, groupId, policyId, webhookId, data):
     rec = get_store().get_scaling_group(tenantId, groupId)
     deferred = rec.update_webhook(policyId, webhookId, data)
     return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['DELETE'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+def delete_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Deletes a particular webhook.
+    If successful, no response body will be returned.
+    """
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.delete_webhook(policyId, webhookId)
+    return deferred
