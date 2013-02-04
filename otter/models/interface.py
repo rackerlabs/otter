@@ -113,6 +113,10 @@ class IScalingGroup(Interface):
         attributes in ``config``.  This can update the already-existing values,
         or just overwrite them - it is up to the implementation.
 
+        Every time this is updated, the steady state and the number of entities
+        should be checked/modified to ensure compliance with the minimum and
+        maximum number of entities.
+
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.scaling_group.config`
         :type config: ``dict``
