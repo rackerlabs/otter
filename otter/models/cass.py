@@ -125,7 +125,7 @@ class CassScalingGroup(object):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        pass
+        raise NotImplementedError()
 
     def view_config(self):
         """
@@ -182,6 +182,8 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
+    # TODO: There is no state yet, and updating the config should update the
+    # state
     def update_config(self, data):
         """
         Update the scaling group configuration paramaters based on the
@@ -312,11 +314,11 @@ class CassScalingGroup(object):
                 rec = None
                 policyId = None
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'policyId':
-                        policyId = rawRec['value']
-                    if rawRec['name'] is 'data':
-                        rec = rawRec['value']
-                if rec is None:
+                    if rawRec.get('name', None) is 'policyId':
+                        policyId = rawRec.get('value')
+                    if rawRec.get('name', None) is 'data':
+                        rec = rawRec.get('value')
+                if rec is None or policyId is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 try:

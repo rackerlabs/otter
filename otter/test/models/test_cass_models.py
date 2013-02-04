@@ -240,6 +240,39 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
+    def test_list_policy_errors(self):
+        """
+        Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
+        """
+        bads = (
+            None,
+            [{}],
+            # no results
+            [{'cols': [{}]}],
+            # no value
+            [{'cols': [{'timestamp': None, 'name': 'policyId', 'ttl': None},
+                       {'timestamp': None, 'name': 'data', 'ttl': None}],
+              'key': ''}],
+            # missing one column
+            [{'cols': [{'timestamp': None, 'name': 'policyId',
+                        'value': 'group1', 'ttl': None}],
+              'key': ''}],
+            [{'cols': [{'timestamp': None, 'name': 'data',
+                        'value': '{}', 'ttl': None}],
+              'key': ''}],
+            # non json
+            [{'cols': [{'timestamp': None, 'name': 'policyId',
+                        'value': 'group1', 'ttl': None},
+                       {'timestamp': None, 'name': 'data',
+                        'value': 'hi', 'ttl': None}],
+              'key': ''}]
+        )
+        for bad in bads:
+            self.returns = [bad]
+            self.assert_deferred_failed(self.group.list_policies(),
+                                        CassBadDataError)
+            self.flushLoggedErrors(CassBadDataError)
+
     def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy
