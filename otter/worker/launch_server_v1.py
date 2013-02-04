@@ -105,7 +105,7 @@ def server_details(server_endpoint, auth_token, server_id):
     :return: A dict of the server details.
     """
     d = treq.get(append_segments(server_endpoint, 'servers', server_id),
-                 auth_headers=auth_headers(auth_token))
+                 headers=auth_headers(auth_token))
     d.addCallback(check_success, [200, 203])
     return d.addCallback(treq.json_content)
 
@@ -114,7 +114,8 @@ def wait_for_status(server_endpoint,
                     auth_token,
                     server_id,
                     expected_status,
-                    interval=5):
+                    interval=5,
+                    clock=None):
     """
     Wait until the server specified by server_id's status is expected_status.
 
@@ -144,6 +145,9 @@ def wait_for_status(server_endpoint,
 
     lc = LoopingCall(poll)
 
+    if clock is not None:  # pragma: no cover
+        lc.clock = clock
+
     def _stop(r):
         lc.stop()
         return r
@@ -164,8 +168,13 @@ def create_server(server_endpoint, auth_token, scaling_group, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
+
+    # XXX: Is this where we should generate the name and insert metadata?
+    #   Or should that already be in the server_config by the time we
+    #   get here?  Perhaps an explicit prepare step that launch_server invokes?
+    #   If that is the case scaling_group doesn't need to be passed in here.2
     d = treq.post(append_segments(server_endpoint, 'servers'),
-                  auth_headers=auth_headers(auth_token),
+                  headers=auth_headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
     return d.addCallback(treq.json_content)
@@ -189,7 +198,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
 
     d = treq.post(path,
-                  auth_headers=auth_headers(auth_token),
+                  headers=auth_headers(auth_token),
                   data=json.dumps({"nodes": [{"address": ip_address,
                                               "port": port,
                                               "condition": "ENABLED",
@@ -242,6 +251,17 @@ def endpoints(service_catalog, service_name=None, service_type=None, region=None
             yield endpoint
 
 
+def private_ip_addresses(server):
+    """
+    Get all private IPv4 addresses from the addresses section of a server.
+
+    :param dict server: A server body.
+    :return: List of IP addresses as strings.
+    """
+    return [addr['addr'] for addr in server['server']['addresses']['private']
+            if addr['version'] == 4]
+
+
 def launch_server(region, service_catalog, auth_token, launch_config):
     """
     Launch a new server given the launch config auth tokens and service catalog.
@@ -278,10 +298,7 @@ def launch_server(region, service_catalog, auth_token, launch_config):
     d.addCallback(_wait_for_server)
 
     def _add_lb(server):
-        ip_address = filter(
-            lambda x: x['version'] == 4,
-            server['server']['addresses']['private'])[0]['addr']
-
+        ip_address = private_ip_addresses(server['server']['addresses'])[0]
         return add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
 
     d.addCallback(_add_lb)
@@ -307,7 +324,7 @@ if __name__ == '__main__':
             ]}
         ]
 
-        auth_token = 'ad55f47f-ccf1-407a-8558-5d3a678106ac'
+        auth_token = '15fcff14-2e45-4cdb-b1e5-4fded8b4539c'
 
         manual_launch_config = {
             'server': {'name': 'test-server-manual',
