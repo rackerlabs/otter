@@ -146,6 +146,22 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
+    def test_view_config_no_version(self):
+        """
+        When viewing the config, any version information is removed from the
+        final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
+        self.returns = [mock]
+        d = self.group.view_config()
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {})
+
     def test_view_launch(self):
         """
         Test that you can call view and receive a valid parsed response
@@ -178,6 +194,22 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData))
+
+    def test_view_launch_no_version(self):
+        """
+        When viewing the launch config, any version information is removed from
+        the final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
+        self.returns = [mock]
+        d = self.group.view_launch_config()
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {})
 
     def test_update_config(self):
         """
@@ -276,6 +308,22 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData))
 
+    def test_view_policy_no_version(self):
+        """
+        When viewing the policy, any version information is removed from the
+        final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
+        self.returns = [mock]
+        d = self.group.get_policy("3444")
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {})
+
     def test_list_policy(self):
         """
         Test that you can list a bunch of scaling policies.
@@ -334,6 +382,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.assert_deferred_failed(self.group.list_policies(),
                                         CassBadDataError)
             self.flushLoggedErrors(CassBadDataError)
+
+    def test_list_policy_no_version(self):
+        """
+        When listing the policies, any version information is removed from the
+        final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None, 'name': 'policyId',
+                       'value': 'group1', 'ttl': None},
+                      {'timestamp': None, 'name': 'data',
+                       'value': '{"_ver": 5}', 'ttl': None}], 'key': ''},
+            {'cols': [{'timestamp': None, 'name': 'policyId',
+                       'value': 'group3', 'ttl': None},
+                      {'timestamp': None, 'name': 'data',
+                       'value': '{"_ver": 2}', 'ttl': None}], 'key': ''}]
+        self.returns = [mock]
+        d = self.group.list_policies()
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {'group1': {}, 'group3': {}})
 
     def test_add_scaling_policy(self):
         """
