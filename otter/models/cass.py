@@ -41,7 +41,7 @@ _cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
 _cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
                       "AND :policyId=policyId")
-_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
+_cql_list = "SELECT groupId FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 _cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
                     "AND deleted = False;")
 

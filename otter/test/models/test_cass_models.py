@@ -629,7 +629,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+        expectedCql = ("SELECT groupId FROM scaling_config WHERE tenantId = :tenantId "
                        "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
@@ -649,7 +649,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mockdata = []
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+        expectedCql = ("SELECT groupId FROM scaling_config WHERE tenantId = :tenantId "
                        "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
@@ -681,9 +681,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                         CassBadDataError)
             self.flushLoggedErrors(CassBadDataError)
 
-    def test_get(self):
+    def test_get_scaling_group(self):
         """
-        Tests that you can get a config
+        Tests that you can get a scaling group
         (note that it doesn't request the database)
         """
         g = self.collection.get_scaling_group('123', '12345678')
