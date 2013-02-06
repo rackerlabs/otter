@@ -41,7 +41,7 @@ _cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
 _cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
 _cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
                       "AND :policyId=policyId")
-_cql_list = "SELECT groupid FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
+_cql_list = "SELECT groupId FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
 _cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
                     "AND deleted = False;")
 
@@ -115,13 +115,27 @@ class CassScalingGroup(object):
 
     def view_manifest(self):
         """
-        :return: :class:`Deferred` that fires with a view of the config
+        The manifest contains everything required to configure this scaling:
+        the config, the launch config, and all the scaling policies.
+
+        :return: a dictionary corresponding to the JSON schema at
+            :data:``otter.json_schema.model_schemas.view_manifest``
+        :rtype: ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
-        pass
+        raise NotImplementedError()
 
     def view_config(self):
         """
-        :return: :class:`Deferred` that fires with a view of the config
+        :return: a view of the config, as specified by
+            :data:`otter.json_schema.group_schemas.config`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
@@ -132,7 +146,13 @@ class CassScalingGroup(object):
 
     def view_launch_config(self):
         """
-        :return: :class:`Deferred` that fires with a view of the launch config
+        :return: a view of the launch config, as specified by
+            :data:`otter.json_schema.group_schemas.launch_config`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         query = _cql_view.format(cf=self.launch_table)
         d = self.connection.execute(query,
@@ -143,16 +163,45 @@ class CassScalingGroup(object):
 
     def view_state(self):
         """
-        :return: :class:`Deferred` that fires with a view of the state
+        The state of the scaling group consists of a mapping of entity id's to
+        entity links for the current entities in the scaling group, a mapping
+        of entity id's to entity links for the pending entities in the scaling
+        group, the desired steady state number of entities, and a boolean
+        specifying whether scaling is currently paused.
+
+        The entity links are in JSON link format.
+
+        :return: a view of the state of the scaling group corresponding to the
+            JSON schema at :data:``otter.json_schema.model_schemas.group_state``
+
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         raise NotImplementedError()
 
+    # TODO: There is no state yet, and updating the config should update the
+    # state
     def update_config(self, data):
         """
         Update the scaling group configuration paramaters based on the
-        attributes in ``data``.
+        attributes in ``config``.  This can update the already-existing values,
+        or just overwrite them - it is up to the implementation.
 
-        :return: :class:`Deferred` that fires with None
+        Every time this is updated, the steady state and the number of entities
+        should be checked/modified to ensure compliance with the minimum and
+        maximum number of entities.
+
+        :param config: Configuration data in JSON format, as specified by
+            :data:`otter.json_schema.scaling_group.config`
+        :type config: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         def _do_update_config(lastRev):
             # IMPORTANT REMINDER: lastRev contains the previous
@@ -167,16 +216,24 @@ class CassScalingGroup(object):
                                 "scaling": _serial_json_data(data, 1)})
             return b.execute(self.connection)
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_update_config)
         return d
 
     def update_launch_config(self, data):
         """
-        Update the launch config parameters based on the attributes in
-        ``data``.  Overwrites the existing launch config.  Note - no error
-        checking here happens, so it's possible to get the launch config into
-        an improper state.
+        Update the scaling group launch configuration parameters based on the
+        attributes in ``launch_config``.  This can update the already-existing
+        values, or just overwrite them - it is up to the implementation.
+
+        :param launch_config: launch config data in JSON format, as specified
+            by :data:`otter.json_schema.scaling_group.launch_config`
+        :type launch_config: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         def _do_update_launch(lastRev):
             # IMPORTANT REMINDER: lastRev contains the previous
@@ -192,36 +249,60 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_update_launch)
         return d
 
     def set_steady_state(self, steady_state):
         """
-        Sets the steady state value
+        The steady state represents the number of entities - defaults to the
+        minimum. This number represents how many entities _should_ be
+        currently in the system to handle the current load. Its value is
+        constrained to be between ``min_entities`` and ``max_entities``,
+        inclusive.
 
-        :param steady_state: value to set the steady state to, but will not set
-            to anything below the minimum or above the maximum
+        :param steady_state: The new value for the desired number of entities
+            in steady state.  If this value is greater than ``max_entities``,
+            the value will be set to ``max_entities``.  Similarly, if this
+            value is less than ``min_entities``, the value will be set to
+            ``min_entities``.
         :type steady_state: ``int``
 
-        :return: :class:`Deferred` that fires with None
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         raise NotImplementedError()
 
     def bounce_entity(self, entity_id):
         """
-        Rebuilds a entity given by the server ID
+        Rebuilds an entity given by the entity ID.  This essentially deletes
+        the given entity and a new one will be rebuilt in its place.
 
-        :return: :class:`Deferred` that fires with None
+        :param entity_id: the uuid of the entity to delete
+        :type entity_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: NoSuchEntityError if the entity is not a member of the scaling
+            group
         """
         raise NotImplementedError()
 
     def list_policies(self):
         """
+        Gets all the policies associated with particular scaling group.
+
         :return: a dict of the policies, as specified by
-            :data:`otter.json_schema.scaling_group.policy_list`
+            :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         def _grab_pol_list(rawResponse):
             if rawResponse is None:
@@ -233,11 +314,11 @@ class CassScalingGroup(object):
                 rec = None
                 policyId = None
                 for rawRec in row['cols']:
-                    if rawRec['name'] is 'policyId':
-                        policyId = rawRec['value']
-                    if rawRec['name'] is 'data':
-                        rec = rawRec['value']
-                if rec is None:
+                    if rawRec.get('name', None) is 'policyId':
+                        policyId = rawRec.get('value')
+                    if rawRec.get('name', None) is 'data':
+                        rec = rawRec.get('value')
+                if rec is None or policyId is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 try:
@@ -257,10 +338,19 @@ class CassScalingGroup(object):
 
     def get_policy(self, policy_id):
         """
+        Gets the specified policy on this particular scaling group.
+
+        :param policy_id: the uuid of the policy to be deleted
+        :type policy_id: ``str``
+
         :return: a policy, as specified by
             :data:`otter.json_schema.scaling_group.policy`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         query = _cql_view_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
@@ -283,6 +373,9 @@ class CassScalingGroup(object):
             policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: ``dict`` of ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
         def _do_create_pol(lastRev):
             # IMPORTANT REMINDER: lastRev contains the previous
@@ -302,7 +395,7 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d.addCallback(lambda _: outpolicies)
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_create_pol)
         return d
 
@@ -316,10 +409,11 @@ class CassScalingGroup(object):
         :param data: the details of the scaling policy in JSON format
         :type data: ``dict``
 
-        :return: a policy, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         def _do_update_launch(lastRev):
             # IMPORTANT REMINDER: lastRev contains the previous
@@ -346,11 +440,13 @@ class CassScalingGroup(object):
         Delete the specified policy on this particular scaling group, and all
         of its associated webhooks as well.
 
-        :param policy_id: the ID of the policy to be deleted
+        :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
         queries = [
@@ -393,14 +489,6 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _ensure_there(self):
-        query = _cql_view.format(cf=self.config_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
-        d.addCallback(self._grab_json_data)
-        return d
-
     def _grab_json_data(self, rawResponse):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
@@ -409,9 +497,9 @@ class CassScalingGroup(object):
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
-        for rawRec in rawResponse[0]['cols']:
-            if rawRec['name'] is 'data':
-                rec = rawRec['value']
+        for rawRec in rawResponse[0].get('cols', []):
+            if rawRec.get('name', None) is 'data':
+                rec = rawRec.get('value', None)
         if rec is None:
             raise CassBadDataError("Received malformed response without the "
                                    "required fields")
@@ -554,15 +642,15 @@ class CassScalingGroupCollection:
                 if 'cols' not in row:
                     raise CassBadDataError("Received malformed response with no cols")
                 rec = None
-                for rawRec in row['cols']:
-                    if rawRec['name'] is 'groupId':
-                        rec = rawRec['value']
+                for rawRec in row.get('cols', []):
+                    if rawRec.get('name', None) is 'groupId':
+                        rec = rawRec.get('value', None)
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 data.append(CassScalingGroup(tenant_id, rec,
                                              self.connection))
-            return defer.succeed(data)
+            return data
 
         query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
