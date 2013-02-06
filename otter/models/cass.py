@@ -216,7 +216,7 @@ class CassScalingGroup(object):
                                 "scaling": _serial_json_data(data, 1)})
             return b.execute(self.connection)
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_update_config)
         return d
 
@@ -249,7 +249,7 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_update_launch)
         return d
 
@@ -395,7 +395,7 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d.addCallback(lambda _: outpolicies)
 
-        d = self._ensure_there()
+        d = self.view_config()
         d.addCallback(_do_create_pol)
         return d
 
@@ -489,14 +489,6 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _ensure_there(self):
-        query = _cql_view.format(cf=self.config_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
-        d.addCallback(self._grab_json_data)
-        return d
-
     def _grab_json_data(self, rawResponse):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
@@ -505,9 +497,9 @@ class CassScalingGroup(object):
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
-        for rawRec in rawResponse[0]['cols']:
-            if rawRec['name'] is 'data':
-                rec = rawRec['value']
+        for rawRec in rawResponse[0].get('cols', []):
+            if rawRec.get('name', None) is 'data':
+                rec = rawRec.get('value', None)
         if rec is None:
             raise CassBadDataError("Received malformed response without the "
                                    "required fields")
