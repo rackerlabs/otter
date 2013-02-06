@@ -359,6 +359,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
+    def test_add_first_checks_view_config(self):
+        """
+        Before a policy is added, `view_config` is first called to determine
+        that there is such a scaling group
+        """
+        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
+        self.returns = [None]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.assert_deferred_succeeded(d)
+        self.group.view_config.assert_called_once_with()
+
     def test_delete_policy(self):
         """
         Tests that you can delete a scaling policy
