@@ -317,14 +317,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
               'key': ''}],
             # missing one column
             [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'group1', 'ttl': None}],
+                        'value': 'policy1', 'ttl': None}],
               'key': ''}],
             [{'cols': [{'timestamp': None, 'name': 'data',
                         'value': '{}', 'ttl': None}],
               'key': ''}],
             # non json
             [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'group1', 'ttl': None},
+                        'value': 'policy1', 'ttl': None},
                        {'timestamp': None, 'name': 'data',
                         'value': 'hi', 'ttl': None}],
               'key': ''}]
@@ -590,6 +590,29 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(len(r), 0)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
+
+    def test_list_errors(self):
+        """
+        Errors from cassandra in listing groups cause :class:`CassBadDataErrors`
+        """
+        bads = (
+            None,
+            [{}],
+            # no results
+            [{'cols': [{}]}],
+            # no value
+            [{'cols': [{'timestamp': None, 'name': 'groupId', 'ttl': None}],
+              'key': ''}],
+            # wrong column
+            [{'cols': [{'timestamp': None, 'name': 'data',
+                        'value': '{}', 'ttl': None}],
+              'key': ''}]
+        )
+        for bad in bads:
+            self.connection.execute.return_value = defer.succeed(bad)
+            self.assert_deferred_failed(self.collection.list_scaling_groups('123'),
+                                        CassBadDataError)
+            self.flushLoggedErrors(CassBadDataError)
 
     def test_get(self):
         """

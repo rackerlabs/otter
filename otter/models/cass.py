@@ -642,15 +642,15 @@ class CassScalingGroupCollection:
                 if 'cols' not in row:
                     raise CassBadDataError("Received malformed response with no cols")
                 rec = None
-                for rawRec in row['cols']:
-                    if rawRec['name'] is 'groupId':
-                        rec = rawRec['value']
+                for rawRec in row.get('cols', []):
+                    if rawRec.get('name', None) is 'groupId':
+                        rec = rawRec.get('value', None)
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
                 data.append(CassScalingGroup(tenant_id, rec,
                                              self.connection))
-            return defer.succeed(data)
+            return data
 
         query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
