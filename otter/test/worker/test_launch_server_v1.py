@@ -16,12 +16,28 @@ from otter.worker.launch_server_v1 import (
     append_segments,
     auth_headers,
     private_ip_addresses,
+    endpoints,
     add_to_load_balancer,
     add_to_load_balancers,
     server_details,
     wait_for_status,
     create_server
 )
+
+
+fake_service_catalog = [
+    {'type': 'compute',
+     'name': 'openStackCompute',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+         {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}
+     ]},
+    {'type': 'database',
+     'name': 'CaasaaS',
+     'endpoints': [
+         {'region': 'DFW', 'publicURL': 'http://dfw.cass/'},
+     ]}
+]
 
 
 class UtilityTests(TestCase):
@@ -157,6 +173,74 @@ class UtilityTests(TestCase):
 
         result = private_ip_addresses({'server': {'addresses': addresses}})
         self.assertEqual(result, ['10.0.0.1', '10.0.0.2'])
+
+    def test_endpoints(self):
+        """
+        endpoints will return all endpoints with no arguments.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog)),
+            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+                    {'region': 'ORD', 'publicURL': 'http://ord.openstack/'},
+                    {'region': 'DFW', 'publicURL': 'http://dfw.cass/'}]))
+
+    def test_endpoints_limit_region(self):
+        """
+        endpoints will return all endpoints that have the specified region.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog, region='DFW')),
+            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+                    {'region': 'DFW', 'publicURL': 'http://dfw.cass/'}]))
+
+    def test_endpoints_limit_type(self):
+        """
+        endpoints will return all endpoints that have the specified type.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog, service_type='database')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.cass/'}])
+
+    def test_endpoints_limit_name(self):
+        """
+        endpoints will return only the named endpoints.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog, service_name='CaasaaS')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.cass/'}])
+
+    def test_endpoints_region_and_name(self):
+        """
+        endpoints will return only the named endpoint in a specific region.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog,
+                             service_name='openStackCompute',
+                             region='DFW')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
+
+    def test_endpoints_region_and_type(self):
+        """
+        endpoints will return only the endpoints of the specified type,
+        in the specified region.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog,
+                             service_type='compute',
+                             region='ORD')),
+            [{'region': 'ORD', 'publicURL': 'http://ord.openstack/'}])
+
+    def test_endpoints_name_and_type(self):
+        """
+        endpoints will return only the endpoints of the specified name
+        and type.
+        """
+        self.assertEqual(
+            sorted(endpoints(fake_service_catalog,
+                             service_type='compute',
+                             service_name='openStackCompute')),
+            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
+                    {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}]))
 
 
 expected_headers = {
