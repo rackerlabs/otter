@@ -530,6 +530,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def setUp(self):
         """ Setup the mocks """
         self.connection = mock.MagicMock()
+
         self.connection.execute.return_value = defer.succeed(None)
         self.collection = CassScalingGroupCollection(self.connection)
         self.tenant_id = 'goo1234'
@@ -691,3 +692,60 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         g = self.collection.get_scaling_group('123', '12345678')
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
+
+    def test_delete_non_existant_scaling_group_fails(self):
+        """
+        If the scaling group doesn't exist, :class:`NoSuchScalingGroup` is
+        raised
+        """
+        execute_results = [[], None]  # view returns an empty list
+
+        def execute_respond(*args, **kwargs):
+            return defer.succeed(execute_results.pop(0))
+
+        self.connection.execute.side_effect = execute_respond
+
+        self.assert_deferred_failed(
+            self.collection.delete_scaling_group('123', 'group1'),
+            NoSuchScalingGroupError)
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+        # only called once to view
+        self.assertEqual(len(self.connection.execute.mock_calls), 1)
+
+    def test_delete_existing_scaling_group(self):
+        """
+        If the scaling group exists, deletes scaling group
+        """
+        view_config = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{}',
+                       'ttl': None}],
+             'key': ''}]
+
+        execute_results = [view_config, None]  # executing update returns None
+
+        def execute_respond(*args, **kwargs):
+            return defer.succeed(execute_results.pop(0))
+
+        self.connection.execute.side_effect = execute_respond
+
+        result = self.assert_deferred_succeeded(
+            self.collection.delete_scaling_group('123', 'group1'))
+        self.assertIsNone(result)
+        # called twice - once to view and once to delete
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)
+
+        expected_data = {'tenantId': '123', 'groupId': 'group1'}
+        expected_cql = (
+            'BEGIN BATCH '
+            'UPDATE scaling_config SET deleted=True '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'UPDATE launch_config SET deleted=True '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'UPDATE scaling_policies SET deleted=True '
+            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'APPLY BATCH;')
+
+        self.connection.execute.assert_called_with(expected_cql, expected_data,
+                                                   ConsistencyLevel.ONE)

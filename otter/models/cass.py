@@ -611,14 +611,23 @@ class CassScalingGroupCollection:
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
         """
+        def _delete_it(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                _cql_delete.format(cf=self.config_table),
+                _cql_delete.format(cf=self.launch_table),
+                _cql_delete.format(cf=self.policies_table)]
+            b = Batch(
+                queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
+            return b.execute(self.connection)
 
-        queries = [
-            _cql_delete.format(cf=self.config_table),
-            _cql_delete.format(cf=self.launch_table),
-            _cql_delete.format(cf=self.policies_table)]
-        b = Batch(
-            queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
-        b.execute(self.connection)
+        group = self.get_scaling_group(tenant_id, scaling_group_id)
+        d = group.view_config()  # ensure that it's actually there
+        return d.addCallback(_delete_it)  # only delete if it exists
 
     def list_scaling_groups(self, tenant_id):
         """
