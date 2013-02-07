@@ -68,6 +68,38 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.mock_key.return_value = '12345678'
         self.addCleanup(self.hashkey_patch.stop)
 
+    def _test_view_things_errors(self, callback_to_test, *args, **kwargs):
+        """
+        Errors from cassandra in viewing one thing (not listing) or updating
+        one thing (because it must first be viewed) cause
+        :class:`CassBadDataErrors`
+        """
+        bads = (
+            # no data
+            None,
+            # this should probably not happen
+            [{}],
+            # no results
+            [{'cols': [{}]}],
+            # no value
+            [{'cols': [{'timestamp': None, 'name': 'data', 'ttl': None}],
+              'key': ''}],
+            # non json
+            [{'cols': [{'timestamp': None, 'name': 'data',
+                        'value': 'hi', 'ttl': None}],
+              'key': ''}],
+            [{'cols': [{'timestamp': None, 'name': 'data', 'value': '{ff}',
+                       'ttl': None}],
+             'key': ''}]
+
+        )
+
+        for bad in bads:
+            self.returns = [bad]
+            self.assert_deferred_failed(callback_to_test(*args, **kwargs),
+                                        CassBadDataError)
+            self.flushLoggedErrors(CassBadDataError)
+
     def test_view_config(self):
         """
         Test that you can call view and receive a valid parsed response
@@ -88,24 +120,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                                         expectedData)
         self.assertEqual(r, {})
 
-    def test_view_config_corrupt(self):
+    def test_view_config_bad_db_data(self):
         """
-        Test what happens if you retrieve a corrupt JSON record (e.g. database corruption)
+        Test what happens if you retrieve bad db config data, including None, rows
+        without keys, or bad JSON data (e.g. database corruption)
         """
-        mock = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{ff}',
-                       'ttl': None}],
-             'key': ''}]
-        self.returns = [mock]
-        d = self.group.view_config()
-        self.assert_deferred_failed(d, CassBadDataError)
+        self._test_view_things_errors(self.group.view_config)
         expectedCql = ("SELECT data FROM scaling_config WHERE "
                        "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+        for call in self.connection.execute.call_args_list:
+            self.assertEqual(call, mock.call(expectedCql, expectedData))
 
     def test_view_config_empty(self):
         """
@@ -121,35 +146,21 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
-    def test_view_config_bad(self):
+    def test_view_config_no_version(self):
         """
-        This should probably never happen, but just in case, make sure
-        that it does the right thing
+        When viewing the config, any version information is removed from the
+        final output
         """
-        mock = [{}]
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
         self.returns = [mock]
         d = self.group.view_config()
-        self.assert_deferred_failed(d, CassBadDataError)
-        expectedCql = ("SELECT data FROM scaling_config WHERE "
-                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
-        expectedData = {"tenantId": "11111", "groupId": "12345678"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
-
-    def test_view_config_none(self):
-        """
-        This should probably never happen, but just in case, make sure
-        that it does the right thing
-        """
-        mock = None
-        self.returns = [mock]
-        d = self.group.view_config()
-        self.assert_deferred_failed(d, CassBadDataError)
-        expectedCql = ("SELECT data FROM scaling_config WHERE "
-                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
-        expectedData = {"tenantId": "11111", "groupId": "12345678"}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {})
 
     def test_view_launch(self):
         """
@@ -170,6 +181,34 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
+        self.assertEqual(r, {})
+
+    def test_view_launch_bad_db_data(self):
+        """
+        Test what happens if you retrieve bad db launch data, including None, rows
+        without keys, or bad JSON data (e.g. database corruption)
+        """
+        self._test_view_things_errors(self.group.view_launch_config)
+        expectedCql = ("SELECT data FROM launch_config WHERE "
+                       "tenantId = :tenantId AND groupId = :groupId AND deleted = False;")
+        expectedData = {"tenantId": "11111", "groupId": "12345678"}
+        for call in self.connection.execute.call_args_list:
+            self.assertEqual(call, mock.call(expectedCql, expectedData))
+
+    def test_view_launch_no_version(self):
+        """
+        When viewing the launch config, any version information is removed from
+        the final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
+        self.returns = [mock]
+        d = self.group.view_launch_config()
+        r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {})
 
     def test_update_config(self):
@@ -194,6 +233,49 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
 
+    def test_update_launch(self):
+        """
+        Test that you can update a launch config
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{}',
+                       'ttl': None}],
+             'key': ''}]
+
+        self.returns = [mock, None]
+        d = self.group.update_launch_config({"b": "lah"})
+        self.assert_deferred_succeeded(d)
+        expectedCql = ("BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
+                       "(:tenantId, :groupId, :launch) APPLY BATCH;")
+        expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
+                        "groupId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.ONE)
+
+    def test_update_configs_call_view_first(self):
+        """
+        When updating a config or launch config, `view_config` is called first
+        and if it fails, the rest of the update does not continue
+        """
+        updates = [
+            lambda: self.group.update_config({'b': 'lah'}),
+            lambda: self.group.update_launch_config({'b': 'lah'})
+        ]
+
+        for callback in updates:
+            self.group.view_config = mock.MagicMock(
+                return_value=defer.fail(CassBadDataError("Cassandra failure")))
+            self.assert_deferred_failed(callback(), CassBadDataError)
+
+            # view is called
+            self.group.view_config.assert_called_once_with()
+            # but extra executes, to update, are not called
+            self.assertFalse(self.connection.execute.called)
+            self.flushLoggedErrors(CassBadDataError)
+
     def test_view_policy(self):
         """
         Test that you can call view and receive a valid parsed response
@@ -212,6 +294,34 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
+        self.assertEqual(r, {})
+
+    def test_view_policy_bad_db_data(self):
+        """
+        Test what happens if you retrieve bad db policy data, including None, rows
+        without keys, or bad JSON data (e.g. database corruption)
+        """
+        self._test_view_things_errors(self.group.get_policy, "3444")
+        expectedCql = ("SELECT data FROM scaling_policies WHERE tenantId = :tenantId "
+                       "AND groupId = :groupId AND policyId = :policyId AND deleted = False;")
+        expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
+        for call in self.connection.execute.call_args_list:
+            self.assertEqual(call, mock.call(expectedCql, expectedData))
+
+    def test_view_policy_no_version(self):
+        """
+        When viewing the policy, any version information is removed from the
+        final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{"_ver": 5}',
+                       'ttl': None}],
+             'key': ''}]
+        self.returns = [mock]
+        d = self.group.get_policy("3444")
+        r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {})
 
     def test_list_policy(self):
@@ -240,6 +350,58 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
+    def test_list_policy_errors(self):
+        """
+        Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
+        """
+        bads = (
+            None,
+            [{}],
+            # no results
+            [{'cols': [{}]}],
+            # no value
+            [{'cols': [{'timestamp': None, 'name': 'policyId', 'ttl': None},
+                       {'timestamp': None, 'name': 'data', 'ttl': None}],
+              'key': ''}],
+            # missing one column
+            [{'cols': [{'timestamp': None, 'name': 'policyId',
+                        'value': 'policy1', 'ttl': None}],
+              'key': ''}],
+            [{'cols': [{'timestamp': None, 'name': 'data',
+                        'value': '{}', 'ttl': None}],
+              'key': ''}],
+            # non json
+            [{'cols': [{'timestamp': None, 'name': 'policyId',
+                        'value': 'policy1', 'ttl': None},
+                       {'timestamp': None, 'name': 'data',
+                        'value': 'hi', 'ttl': None}],
+              'key': ''}]
+        )
+        for bad in bads:
+            self.returns = [bad]
+            self.assert_deferred_failed(self.group.list_policies(),
+                                        CassBadDataError)
+            self.flushLoggedErrors(CassBadDataError)
+
+    def test_list_policy_no_version(self):
+        """
+        When listing the policies, any version information is removed from the
+        final output
+        """
+        mock = [
+            {'cols': [{'timestamp': None, 'name': 'policyId',
+                       'value': 'group1', 'ttl': None},
+                      {'timestamp': None, 'name': 'data',
+                       'value': '{"_ver": 5}', 'ttl': None}], 'key': ''},
+            {'cols': [{'timestamp': None, 'name': 'policyId',
+                       'value': 'group3', 'ttl': None},
+                      {'timestamp': None, 'name': 'data',
+                       'value': '{"_ver": 2}', 'ttl': None}], 'key': ''}]
+        self.returns = [mock]
+        d = self.group.list_policies()
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {'group1': {}, 'group3': {}})
+
     def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy
@@ -263,6 +425,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.ONE)
+
+    def test_add_first_checks_view_config(self):
+        """
+        Before a policy is added, `view_config` is first called to determine
+        that there is such a scaling group
+        """
+        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
+        self.returns = [None]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.assert_deferred_succeeded(d)
+        self.group.view_config.assert_called_once_with()
 
     def test_delete_policy(self):
         """
@@ -329,27 +502,21 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
-    def test_update_launch(self):
+    def test_update_policy_calls_view_first(self):
         """
-        Test that you can update a launch config
+        When updating a policy, a `get_policy` is called first and if it fails,
+        the rest of the update does not continue
         """
-        mock = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
+        self.group.get_policy = mock.MagicMock(
+            return_value=defer.fail(CassBadDataError("Cassandra failure")))
+        self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
+                                    CassBadDataError)
 
-        self.returns = [mock, None]
-        d = self.group.update_launch_config({"b": "lah"})
-        self.assert_deferred_succeeded(d)
-        expectedCql = ("BEGIN BATCH INSERT INTO launch_config(tenantId, groupId, data) VALUES "
-                       "(:tenantId, :groupId, :launch) APPLY BATCH;")
-        expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
-                        "groupId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+        # view is called
+        self.group.get_policy.assert_called_once_with('1')
+        # but extra executes, to update, are not called
+        self.assertFalse(self.connection.execute.called)
+        self.flushLoggedErrors(CassBadDataError)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -462,7 +629,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'value': 'group3', 'ttl': None}], 'key': ''}]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+        expectedCql = ("SELECT groupId FROM scaling_config WHERE tenantId = :tenantId "
                        "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
@@ -482,7 +649,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mockdata = []
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ("SELECT groupid FROM scaling_config WHERE tenantId = :tenantId "
+        expectedCql = ("SELECT groupId FROM scaling_config WHERE tenantId = :tenantId "
                        "AND deleted = False;")
         self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
@@ -491,9 +658,32 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
-    def test_get(self):
+    def test_list_errors(self):
         """
-        Tests that you can get a config
+        Errors from cassandra in listing groups cause :class:`CassBadDataErrors`
+        """
+        bads = (
+            None,
+            [{}],
+            # no results
+            [{'cols': [{}]}],
+            # no value
+            [{'cols': [{'timestamp': None, 'name': 'groupId', 'ttl': None}],
+              'key': ''}],
+            # wrong column
+            [{'cols': [{'timestamp': None, 'name': 'data',
+                        'value': '{}', 'ttl': None}],
+              'key': ''}]
+        )
+        for bad in bads:
+            self.connection.execute.return_value = defer.succeed(bad)
+            self.assert_deferred_failed(self.collection.list_scaling_groups('123'),
+                                        CassBadDataError)
+            self.flushLoggedErrors(CassBadDataError)
+
+    def test_get_scaling_group(self):
+        """
+        Tests that you can get a scaling group
         (note that it doesn't request the database)
         """
         g = self.collection.get_scaling_group('123', '12345678')
