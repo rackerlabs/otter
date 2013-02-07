@@ -26,24 +26,24 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-             "groupId = :groupId AND deleted = False;")
-_cql_view_policy = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-                    "groupId = :groupId AND policyId = :policyId AND deleted = False;")
-_cql_insert = ("INSERT INTO {cf}(tenantId, groupId, data, deleted) "
-               "VALUES (:tenantId, :groupId, {name}, False)")
-_cql_insert_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data, deleted) "
-                      "VALUES (:tenantId, :groupId, {name}Id, {name}, False)")
-_cql_update = ("INSERT INTO {cf}(tenantId, groupId, data) "
-               "VALUES (:tenantId, :groupId, {name})")
-_cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
-                      "VALUES (:tenantId, :groupId, {name}Id, {name})")
-_cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
-_cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
-                      "AND :policyId=policyId")
-_cql_list = "SELECT groupId FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
-_cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
-                    "AND deleted = False;")
+_cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+             '"groupId" = :groupId AND deleted = False;')
+_cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                    '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+_cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
+               'VALUES (:tenantId, :groupId, {name}, False)')
+_cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
+                      'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+_cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
+               'VALUES (:tenantId, :groupId, {name})')
+_cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
+                      'VALUES (:tenantId, :groupId, {name}Id, {name})')
+_cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
+_cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
+                      'AND "groupId" = :groupId AND "policyId" = :policyId')
+_cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
+_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                    '"groupId" = :groupId AND deleted = False;')
 
 
 def _build_policies(policies, policies_table, queries, data, outpolicies):
