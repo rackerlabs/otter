@@ -570,14 +570,6 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _ensure_there(self):
-        query = _cql_view.format(cf=self.config_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
-        d.addCallback(self._grab_json_data)
-        return d
-
     def _grab_json_data(self, rawResponse, policy_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
