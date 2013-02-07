@@ -234,9 +234,10 @@ class IScalingGroup(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist - this error is optional - a
+            :class:`NoSuchPolicyError` can be raised instead
         """
 
     def delete_policy(policy_id):
