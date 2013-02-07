@@ -2,7 +2,7 @@
  Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError)
+                                    NoSuchScalingGroupError, NoSuchPolicyError)
 import zope.interface
 
 from twisted.internet import defer
@@ -361,7 +361,7 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
                                      "policyId": policy_id})
-        d.addCallback(self._grab_json_data)
+        d.addCallback(self._grab_json_data, policy_id)
         return d
 
     def create_policies(self, data):
@@ -436,7 +436,6 @@ class CassScalingGroup(object):
 
         d = self.get_policy(policy_id)
         d.addCallback(_do_update_launch)
-        d.addCallback(lambda _: data)
         return d
 
     def delete_policy(self, policy_id):
@@ -453,13 +452,25 @@ class CassScalingGroup(object):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        queries = [
-            _cql_delete_policy.format(cf=self.policies_table)]
-        b = Batch(
-            queries, {"tenantId": self.tenant_id,
-                      "groupId": self.uuid,
-                      "policyId": policy_id})
-        return b.execute(self.connection)
+        def _do_delete_policy(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                _cql_delete_policy.format(cf=self.policies_table)]
+            b = Batch(
+                queries, {"tenantId": self.tenant_id,
+                          "groupId": self.uuid,
+                          "policyId": policy_id})
+
+            return b.execute(self.connection)
+
+        d = self.get_policy(policy_id)
+        d.addCallback(_do_delete_policy)
+        d.addCallback(lambda _: None)
+        return d
 
     def list_webhooks(self, policy_id):
         """
@@ -493,11 +504,14 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _grab_json_data(self, rawResponse):
+    def _grab_json_data(self, rawResponse, policy_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            if not policy_id:
+                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            else:
+                raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
