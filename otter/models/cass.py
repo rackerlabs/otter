@@ -2,7 +2,7 @@
  Mock interface for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError)
+                                    NoSuchScalingGroupError, NoSuchPolicyError)
 import zope.interface
 
 from twisted.internet import defer
@@ -26,24 +26,24 @@ def _serial_json_data(data, ver):
     return json.dumps(dataOut)
 
 
-_cql_view = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-             "groupId = :groupId AND deleted = False;")
-_cql_view_policy = ("SELECT data FROM {cf} WHERE tenantId = :tenantId AND "
-                    "groupId = :groupId AND policyId = :policyId AND deleted = False;")
-_cql_insert = ("INSERT INTO {cf}(tenantId, groupId, data, deleted) "
-               "VALUES (:tenantId, :groupId, {name}, False)")
-_cql_insert_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data, deleted) "
-                      "VALUES (:tenantId, :groupId, {name}Id, {name}, False)")
-_cql_update = ("INSERT INTO {cf}(tenantId, groupId, data) "
-               "VALUES (:tenantId, :groupId, {name})")
-_cql_update_policy = ("INSERT INTO {cf}(tenantId, groupId, policyId, data) "
-                      "VALUES (:tenantId, :groupId, {name}Id, {name})")
-_cql_delete = "UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId"
-_cql_delete_policy = ("UPDATE {cf} SET deleted=True WHERE tenantId = :tenantId AND groupId = :groupId "
-                      "AND :policyId=policyId")
-_cql_list = "SELECT groupId FROM {cf} WHERE tenantId = :tenantId AND deleted = False;"
-_cql_list_policy = ("SELECT policyId, data FROM {cf} WHERE tenantId = :tenantId AND groupId = :groupId "
-                    "AND deleted = False;")
+_cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+             '"groupId" = :groupId AND deleted = False;')
+_cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                    '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+_cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
+               'VALUES (:tenantId, :groupId, {name}, False)')
+_cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
+                      'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+_cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
+               'VALUES (:tenantId, :groupId, {name})')
+_cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
+                      'VALUES (:tenantId, :groupId, {name}Id, {name})')
+_cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
+_cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
+                      'AND "groupId" = :groupId AND "policyId" = :policyId')
+_cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
+_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                    '"groupId" = :groupId AND deleted = False;')
 
 
 def _build_policies(policies, policies_table, queries, data, outpolicies):
@@ -327,6 +327,11 @@ class CassScalingGroup(object):
                         del data[policyId]["_ver"]
                 except ValueError:
                     raise CassBadDataError("Bad data in database")
+
+            if len(data) == 0:
+                # If there is no data - make sure it's not because the group
+                # doesn't exist
+                return self.view_config().addCallback(lambda _: data)
             return defer.succeed(data)
 
         query = _cql_list_policy.format(cf=self.policies_table)
@@ -348,16 +353,15 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist for
+            whatever reason
         """
         query = _cql_view_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
                                      "policyId": policy_id})
-        d.addCallback(self._grab_json_data)
+        d.addCallback(self._grab_json_data, policy_id)
         return d
 
     def create_policies(self, data):
@@ -432,7 +436,6 @@ class CassScalingGroup(object):
 
         d = self.get_policy(policy_id)
         d.addCallback(_do_update_launch)
-        d.addCallback(lambda _: data)
         return d
 
     def delete_policy(self, policy_id):
@@ -449,13 +452,25 @@ class CassScalingGroup(object):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
-        queries = [
-            _cql_delete_policy.format(cf=self.policies_table)]
-        b = Batch(
-            queries, {"tenantId": self.tenant_id,
-                      "groupId": self.uuid,
-                      "policyId": policy_id})
-        return b.execute(self.connection)
+        def _do_delete_policy(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                _cql_delete_policy.format(cf=self.policies_table)]
+            b = Batch(
+                queries, {"tenantId": self.tenant_id,
+                          "groupId": self.uuid,
+                          "policyId": policy_id})
+
+            return b.execute(self.connection)
+
+        d = self.get_policy(policy_id)
+        d.addCallback(_do_delete_policy)
+        d.addCallback(lambda _: None)
+        return d
 
     def list_webhooks(self, policy_id):
         """
@@ -489,11 +504,14 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _grab_json_data(self, rawResponse):
+    def _grab_json_data(self, rawResponse, policy_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            if not policy_id:
+                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            else:
+                raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
@@ -611,14 +629,23 @@ class CassScalingGroupCollection:
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
         """
+        def _delete_it(lastRev):
+            # IMPORTANT REMINDER: lastRev contains the previous
+            # state.... but you can't be guaranteed that the
+            # previous state hasn't changed between when you
+            # got it back from Cassandra and when you are
+            # sending your new insert request.
+            queries = [
+                _cql_delete.format(cf=self.config_table),
+                _cql_delete.format(cf=self.launch_table),
+                _cql_delete.format(cf=self.policies_table)]
+            b = Batch(
+                queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
+            return b.execute(self.connection)
 
-        queries = [
-            _cql_delete.format(cf=self.config_table),
-            _cql_delete.format(cf=self.launch_table),
-            _cql_delete.format(cf=self.policies_table)]
-        b = Batch(
-            queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
-        b.execute(self.connection)
+        group = self.get_scaling_group(tenant_id, scaling_group_id)
+        d = group.view_config()  # ensure that it's actually there
+        return d.addCallback(_delete_it)  # only delete if it exists
 
     def list_scaling_groups(self, tenant_id):
         """
