@@ -322,7 +322,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
-        pass
 
     def update_webhook(policy_id, webhook_id, data):
         """
@@ -345,7 +344,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
-        pass
 
     def delete_webhook(policy_id, webhook_id):
         """
@@ -365,7 +363,6 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
-        pass
 
 
 class IScalingGroupCollection(Interface):
