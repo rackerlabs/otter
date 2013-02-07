@@ -348,9 +348,8 @@ class CassScalingGroup(object):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist for
+            whatever reason
         """
         query = _cql_view_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
