@@ -327,6 +327,11 @@ class CassScalingGroup(object):
                         del data[policyId]["_ver"]
                 except ValueError:
                     raise CassBadDataError("Bad data in database")
+
+            if len(data) == 0:
+                # If there is no data - make sure it's not because the group
+                # doesn't exist
+                return self.view_config().addCallback(lambda _: data)
             return defer.succeed(data)
 
         query = _cql_list_policy.format(cf=self.policies_table)

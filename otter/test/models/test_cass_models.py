@@ -350,6 +350,42 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData)
 
+    def test_list_policy_empty_list(self):
+        """
+        If the group exists but there are no policies, `list_policies` returns
+        an empty list
+        """
+        def execute_respond(cql, cqlargs, *other_args, **kwargs):
+            if 'scaling_config' in cql:  # view config - seeing if it's there
+                return defer.succeed([
+                    {'cols': [{'timestamp': None,
+                               'name': 'data',
+                               'value': '{"_ver": 5}',
+                               'ttl': None}],
+                     'key': ''}])
+            else:
+                return defer.succeed([])
+        self.connection.execute.side_effect = execute_respond
+
+        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assertEqual(result, {})
+
+    def test_list_policy_invalid_group(self):
+        """
+        If the group does not exist, `list_policies` raises a
+        :class:`NoSuchScalingGroupError`
+        """
+        def execute_respond(cql, cqlargs, *other_args, **kwargs):
+            if 'scaling_config' in cql:  # view config - seeing if it's there
+                return defer.succeed([])  # no config - no such group
+            else:
+                return defer.succeed([])
+        self.connection.execute.side_effect = execute_respond
+
+        self.assert_deferred_failed(self.group.list_policies(),
+                                    NoSuchScalingGroupError)
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
     def test_list_policy_errors(self):
         """
         Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
