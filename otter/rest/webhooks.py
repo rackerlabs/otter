@@ -9,6 +9,7 @@ policy.
 
 import json
 
+from otter.json_schema.group_schemas import webhook
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import fails_with, succeeds_with, validate_body
 from otter.rest.errors import exception_codes
@@ -48,6 +49,7 @@ def list_webhooks(request, tenantId, groupId, policyId):
             "webhooks": [
                 {
                     "id":"{webhookId1}",
+                    "name": "alice",
                     "metadata": {
                         "notes": "this is for Alice"
                     },
@@ -61,13 +63,14 @@ def list_webhooks(request, tenantId, groupId, policyId):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
                     ]
                 },
                 {
                     "id":"{webhookId2}",
+                    "name": "alice",
                     "metadata": {
                         "notes": "this is for Bob"
                     },
@@ -81,7 +84,7 @@ def list_webhooks(request, tenantId, groupId, policyId):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2},
                             "rel": "capability"
                         }
                     ]
@@ -118,7 +121,9 @@ def list_webhooks(request, tenantId, groupId, policyId):
 def create_webhooks(request, tenantId, groupId, policyId, data):
     """
     Create one or many new webhooks associated with a particular scaling policy.
-    Webhooks may (but do not need to) include some arbitrary medata.
+    Webhooks may (but do not need to) include some arbitrary medata, and must
+    include a name.
+
     The response header will point to the list webhooks endpoint.
     An array of webhooks is provided in the request body in JSON format.
 
@@ -126,11 +131,14 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
 
         [
             {
+                "name": "alice",
                 "metadata": {
                     "notes": "this is for Alice"
                 }
             },
-            {}
+            {
+                "name": "bob"
+            }
         ]
 
 
@@ -140,6 +148,7 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
             "webhooks": [
                 {
                     "id":"{webhookId1}",
+                    "alice",
                     "metadata": {
                         "notes": "this is for Alice"
                     },
@@ -153,13 +162,14 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
                     ]
                 },
                 {
                     "id":"{webhookId2}",
+                    "name": "bob",
                     "metadata": {},
                     "links": [
                         {
@@ -171,7 +181,7 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
                             "rel": "bookmark"
                         },
                         {
-                            "href": ".../execute/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2},
                             "rel": "capability"
                         }
                     ]
@@ -197,4 +207,92 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
     deferred = rec.create_webhooks(policyId, data)
     deferred.addCallback(format_webhooks_and_send_redirect)
     deferred.addCallback(json.dumps)
+    return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['GET'])
+@fails_with(exception_codes)
+@succeeds_with(200)
+def get_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Get a webhook which has a name, some arbitrary metdata, and a capability
+    URL.  This data is returned in the body of the response in JSON format.
+
+    Example response::
+
+        {
+            "webhook": {
+                "id":"{webhookId}",
+                "name": "webhook name",
+                "metadata": {},
+                "links": [
+                    {
+                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}",
+                        "rel": "self"
+                    },
+                    {
+                        "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId}",
+                        "rel": "bookmark"
+                    },
+                    {
+                        "href": ".../execute/1/{capability_hash2},
+                        "rel": "capability"
+                    }
+                ]
+            }
+        }
+    """
+    def format_one_webhook(webhook_model):
+        result = _format_webhook(webhookId, webhook_model,
+                                 tenantId, groupId, policyId)
+        return {'webhook': result}
+
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.get_webhook(policyId, webhookId)
+    deferred.addCallback(format_one_webhook)
+    deferred.addCallback(json.dumps)
+    return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['PUT'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+@validate_body(webhook)
+def update_webhook(request, tenantId, groupId, policyId, webhookId, data):
+    """
+    Update a particular webhook.
+    A webhook may (but do not need to) include some arbitrary medata, and must
+    include a name.
+    If successful, no response body will be returned.
+
+    Example request::
+
+        {
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            }
+        }
+    """
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.update_webhook(policyId, webhookId, data)
+    return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    methods=['DELETE'])
+@fails_with(exception_codes)
+@succeeds_with(204)
+def delete_webhook(request, tenantId, groupId, policyId, webhookId):
+    """
+    Deletes a particular webhook.
+    If successful, no response body will be returned.
+    """
+    rec = get_store().get_scaling_group(tenantId, groupId)
+    deferred = rec.delete_webhook(policyId, webhookId)
     return deferred

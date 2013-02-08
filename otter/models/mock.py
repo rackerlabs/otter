@@ -9,9 +9,9 @@ import zope.interface
 
 from twisted.internet import defer
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchEntityError,
-                                    NoSuchPolicyError)
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
+    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError)
 from otter.util.hashkey import generate_capability
 
 
@@ -482,6 +482,106 @@ class MockScalingGroup:
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
+
+    def get_webhook(self, policy_id, webhook_id):
+        """
+        Gets the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a webhook, as specified by
+            :data:`otter.json_schema.model_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if webhook_id in self.webhooks[policy_id]:
+            return defer.succeed(self.webhooks[policy_id][webhook_id].copy())
+        else:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
+
+    def update_webhook(self, policy_id, webhook_id, data):
+        """
+        Update the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if webhook_id in self.webhooks[policy_id]:
+            defaulted_data = {'metadata': {}}
+            defaulted_data.update(data)
+            self.webhooks[policy_id][webhook_id].update(defaulted_data)
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
+
+    def delete_webhook(self, policy_id, webhook_id):
+        """
+        Delete the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if webhook_id in self.webhooks[policy_id]:
+            del self.webhooks[policy_id][webhook_id]
+            return defer.succeed(None)
+        else:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
 
     # ---- not interface methods
     def add_entities(self, pending=None, active=None):

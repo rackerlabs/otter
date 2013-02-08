@@ -182,7 +182,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         (self.mock_group.
             get_policy.
-            return_value) = defer.fail(NoSuchPolicyError('11111', '111', '1'))
+            return_value) = defer.fail(NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404, method="GET")
         resp = json.loads(response_body)
@@ -210,7 +210,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         (self.mock_group.
             update_policy.
-            return_value) = defer.fail(NoSuchPolicyError('11111', '1'))
+            return_value) = defer.fail(NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(
             404, method="PUT", body=json.dumps(policy_examples()[0]))
@@ -275,7 +275,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         (self.mock_group.
             delete_policy.
-            return_value) = defer.fail(NoSuchPolicyError('11111', '1'))
+            return_value) = defer.fail(NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404, method="DELETE")
         resp = json.loads(response_body)

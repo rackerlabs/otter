@@ -268,9 +268,7 @@ webhook = {
     "properties": {
         "name": {
             "type": "string",
-            "description": (
-                "A name for this scaling policy. This name does have to be "
-                "unique for all scaling policies."),
+            "description": "A name for this webhook for logging purposes",
             "required": True,
             "maxLength": 256,
             "pattern": "\S+"  # must contain non-whitespace
