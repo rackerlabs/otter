@@ -504,6 +504,72 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
+    def get_webhook(self, policy_id, webhook_id):
+        """
+        Gets the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a webhook, as specified by
+            :data:`otter.json_schema.model_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        raise NotImplementedError()
+
+    def update_webhook(self, policy_id, webhook_id, data):
+        """
+        Update the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        raise NotImplementedError()
+
+    def delete_webhook(self, policy_id, webhook_id):
+        """
+        Delete the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+        raise NotImplementedError()
+
     def _grab_json_data(self, rawResponse, policy_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
