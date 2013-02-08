@@ -7,3 +7,4 @@ iso8601>=0.1.4
 lxml>=3.0.1
 treq>=0.1.0
 silverberg>=0.0.3
+pyOpenSSL>=0.13
