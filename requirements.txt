@@ -1,4 +1,4 @@
-git+http://github.com/twisted/klein.git
+klein>=0.1.0
 twisted>=12.3
 tryfer>=0.2.2
 jsonschema>=0.7
