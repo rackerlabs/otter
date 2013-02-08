@@ -2,10 +2,18 @@
 Initial implementation of a version one launch_server_v1 config.
 
 Ultimately this launch config will be responsible for:
+0) Generating server name and injecting our AS metadata (TODO)
 1) Starting a server
 2) Executing a user defined deployment script (TODO)
 3) Adding the server to a load balancer.
 4) Configuring MaaS? (TODO)
+
+The shape of this is nowhere near solidified, probably most of these
+functions are actually private and many of the utilities will get
+moved out of here.
+
+Also no attempt is currently being made to define the public API for
+initiating a launch_server job.
 """
 
 from itertools import chain
@@ -157,13 +165,12 @@ def wait_for_status(server_endpoint,
     return lc.start(interval).addCallback(lambda _: d)
 
 
-def create_server(server_endpoint, auth_token, scaling_group, server_config):
+def create_server(server_endpoint, auth_token, server_config):
     """
     Create a new server.
 
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth Token.
-    :param str scaling_group: Scaling group ID.
     :param dict server_config: Nova server config.
 
     :return: Deferred that fires with the CreateServer response as a dict.
@@ -275,19 +282,25 @@ def launch_server(region, service_catalog, auth_token, launch_config):
 
     :return: Deferred that fires when the server is "launched" based on the
         given configuration.
+
+    TODO: Figure out if the return value is significant other than for
+        communicating failure.
     """
+    lb_endpoint = list(endpoints(
+        service_catalog,
+        service_name='cloudLoadBalancers',
+        region=region))[0]['publicURL']
+
+    server_endpoint = list(endpoints(
+        service_catalog,
+        service_name='cloudServersOpenStack',
+        region=region))[0]['publicURL']
 
     lb_config = launch_config.get('loadBalancers', [])
 
     server_config = launch_config['server']
 
-    lb_endpoint = list(endpoints(
-        service_catalog, service_name='cloudLoadBalancers', region=region))[0]['publicURL']
-
-    server_endpoint = list(endpoints(
-        service_catalog, service_name='cloudServersOpenStack', region=region))[0]['publicURL']
-
-    d = create_server(server_endpoint, auth_token, None, server_config)
+    d = create_server(server_endpoint, auth_token, server_config)
 
     def _wait_for_server(server):
         return wait_for_status(
@@ -298,70 +311,10 @@ def launch_server(region, service_catalog, auth_token, launch_config):
     d.addCallback(_wait_for_server)
 
     def _add_lb(server):
-        ip_address = private_ip_addresses(server['server']['addresses'])[0]
-        return add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        ip_address = private_ip_addresses(server)[0]
+        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        lbd.addCallback(lambda _: server)
+        return lbd
 
     d.addCallback(_add_lb)
     return d
-
-
-if __name__ == '__main__':
-    import sys
-
-    from twisted.internet.defer import inlineCallbacks
-    from twisted.internet.task import react
-
-    @inlineCallbacks
-    def main(reactor, *argv):
-        service_catalog = [
-            {'name': 'cloudLoadBalancers', 'endpoints': [
-                {'region': 'ORD',
-                 'publicURL': 'https://ord.loadbalancers.api.rackspacecloud.com/v1.0/416511'}
-            ]},
-            {'name': 'cloudServersOpenStack', 'endpoints': [
-                {'region': 'ORD',
-                 'publicURL': 'https://ord.servers.api.rackspacecloud.com/v2/416511'}
-            ]}
-        ]
-
-        auth_token = '15fcff14-2e45-4cdb-b1e5-4fded8b4539c'
-
-        manual_launch_config = {
-            'server': {'name': 'test-server-manual',
-                       'imageRef': '3afe97b2-26dc-49c5-a2cc-a2fc8d80c001',
-                       'flavorRef': '3',
-                       'OS-DCF:diskConfig': 'MANUAL'},
-            'loadBalancers': [
-                {'loadBalancerId': 96815,
-                 'port': 8080}
-            ]
-        }
-
-        auto_launch_config = {
-            'server': {'name': 'test-server-auto',
-                       'imageRef': '3afe97b2-26dc-49c5-a2cc-a2fc8d80c001',
-                       'flavorRef': '3',
-                       'OS-DCF:diskConfig': 'AUTO'},
-            'loadBalancers': [
-                {'loadBalancerId': 96815,
-                 'port': 8080}
-            ]
-        }
-
-        def print_duration(r, name, start):
-            print name, 'duration:', time.time() - start
-            return r
-
-        start = time.time()
-        d = launch_server('ORD', service_catalog, auth_token, manual_launch_config)
-        d.addCallback(print_duration, 'manual', start)
-
-        start = time.time()
-        d2 = launch_server('ORD', service_catalog, auth_token, auto_launch_config)
-        d2.addCallback(print_duration, 'auto', start)
-        try:
-            yield gatherResults([d, d2], consumeErrors=True)
-        except Exception as e:
-            print e.subFailure
-
-    react(main, sys.argv[1:])

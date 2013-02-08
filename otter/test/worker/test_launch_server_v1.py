@@ -6,7 +6,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed
+from twisted.internet.defer import succeed, fail
 from twisted.internet.task import Clock
 from twisted.web.http_headers import Headers
 
@@ -21,21 +21,22 @@ from otter.worker.launch_server_v1 import (
     add_to_load_balancers,
     server_details,
     wait_for_status,
-    create_server
+    create_server,
+    launch_server
 )
 
 
 fake_service_catalog = [
     {'type': 'compute',
-     'name': 'openStackCompute',
+     'name': 'cloudServersOpenStack',
      'endpoints': [
          {'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
          {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}
      ]},
-    {'type': 'database',
-     'name': 'CaasaaS',
+    {'type': 'lb',
+     'name': 'cloudLoadBalancers',
      'endpoints': [
-         {'region': 'DFW', 'publicURL': 'http://dfw.cass/'},
+         {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'},
      ]}
 ]
 
@@ -182,7 +183,7 @@ class UtilityTests(TestCase):
             sorted(endpoints(fake_service_catalog)),
             sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
                     {'region': 'ORD', 'publicURL': 'http://ord.openstack/'},
-                    {'region': 'DFW', 'publicURL': 'http://dfw.cass/'}]))
+                    {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}]))
 
     def test_endpoints_limit_region(self):
         """
@@ -191,23 +192,23 @@ class UtilityTests(TestCase):
         self.assertEqual(
             sorted(endpoints(fake_service_catalog, region='DFW')),
             sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
-                    {'region': 'DFW', 'publicURL': 'http://dfw.cass/'}]))
+                    {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}]))
 
     def test_endpoints_limit_type(self):
         """
         endpoints will return all endpoints that have the specified type.
         """
         self.assertEqual(
-            sorted(endpoints(fake_service_catalog, service_type='database')),
-            [{'region': 'DFW', 'publicURL': 'http://dfw.cass/'}])
+            sorted(endpoints(fake_service_catalog, service_type='lb')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}])
 
     def test_endpoints_limit_name(self):
         """
         endpoints will return only the named endpoints.
         """
         self.assertEqual(
-            sorted(endpoints(fake_service_catalog, service_name='CaasaaS')),
-            [{'region': 'DFW', 'publicURL': 'http://dfw.cass/'}])
+            sorted(endpoints(fake_service_catalog, service_name='cloudLoadBalancers')),
+            [{'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}])
 
     def test_endpoints_region_and_name(self):
         """
@@ -215,7 +216,7 @@ class UtilityTests(TestCase):
         """
         self.assertEqual(
             sorted(endpoints(fake_service_catalog,
-                             service_name='openStackCompute',
+                             service_name='cloudServersOpenStack',
                              region='DFW')),
             [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
 
@@ -238,7 +239,7 @@ class UtilityTests(TestCase):
         self.assertEqual(
             sorted(endpoints(fake_service_catalog,
                              service_type='compute',
-                             service_name='openStackCompute')),
+                             service_name='cloudServersOpenStack')),
             sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
                     {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}]))
 
@@ -405,7 +406,7 @@ class ServerTests(TestCase):
             'flavorRef': '3'
         }
 
-        d = create_server('http://url/', 'my-auth-token', 'scalingGroup', server_config)
+        d = create_server('http://url/', 'my-auth-token', server_config)
 
         result = self.successResultOf(d)
 
@@ -421,7 +422,7 @@ class ServerTests(TestCase):
         self.treq.post.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = create_server('http://url/', 'my-auth-token', 'scalingGroup', {})
+        d = create_server('http://url/', 'my-auth-token', {})
 
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
@@ -459,3 +460,104 @@ class ServerTests(TestCase):
         result = self.successResultOf(d)
 
         self.assertEqual(result['server']['status'], server_status[0])
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    def test_launch_server(self, wait_for_status, create_server, add_to_load_balancers):
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        create_server.return_value = succeed(server_details)
+
+        wait_for_status.return_value = succeed(server_details)
+
+        add_to_load_balancers.return_value = succeed([])
+
+        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+        self.successResultOf(d) # TODO: Currently the return value is not significant.
+
+        create_server.assert_called_once_with('http://dfw.openstack/',
+                                              'my-auth-token',
+                                              launch_config['server'])
+
+        wait_for_status.assert_called_once_with('http://dfw.openstack/',
+                                                'my-auth-token',
+                                                '1',
+                                                'ACTIVE')
+
+        add_to_load_balancers.assert_called_once_with(
+            'http://dfw.lbaas/', 'my-auth-token', [], '10.0.0.1')
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    def test_launch_server_propogates_create_server_errors(
+            self, wait_for_status, create_server, add_to_load_balancers):
+        create_server.return_value = fail(APIError(500, "Oh noes"))
+
+        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', {'server': {}})
+
+        failure = self.failureResultOf(d)
+        failure.trap(APIError)
+
+        self.assertEqual(failure.value.code, 500)
+        self.assertEqual(failure.value.body, "Oh noes")
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    def test_launch_server_propogates_wait_for_status_errors(
+            self, wait_for_status, create_server, add_to_load_balancers):
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        create_server.return_value = succeed(server_details)
+
+        wait_for_status.return_value = fail(APIError(500, "Oh noes"))
+
+        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+
+        failure = self.failureResultOf(d)
+        failure.trap(APIError)
+
+        self.assertEqual(failure.value.code, 500)
+        self.assertEqual(failure.value.body, "Oh noes")
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    def test_launch_server_propogates_add_to_load_balancers_errors(
+            self, wait_for_status, create_server, add_to_load_balancers):
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        create_server.return_value = succeed(server_details)
+
+        wait_for_status.return_value = succeed(server_details)
+
+        add_to_load_balancers.return_value = fail(APIError(500, "Oh noes"))
+
+        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+
+        failure = self.failureResultOf(d)
+        failure.trap(APIError)
+
+        self.assertEqual(failure.value.code, 500)
+        self.assertEqual(failure.value.body, "Oh noes")
+
