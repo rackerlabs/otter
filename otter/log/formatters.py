@@ -5,6 +5,7 @@ import socket
 from twiggy.levels import name2level
 from twiggy.lib import iso8601time, thread_name
 import os
+import time
 
 class ReprFallbackEncoder(json.JSONEncoder):
     """
@@ -68,7 +69,7 @@ class JSONFormat(object):
             'host': socket.gethostname(),
             'short_message': record.text,
             'full_message': self.add_extra_fields({},record.fields),
-            'timestamp': iso8601time(record.fields["time"]),
+            'timestamp': time.mktime(record.fields["time"]),
             'level': self.convert_level_to_syslog(record.fields["level"]),
             'facility': self.facility,
             '_pid': os.getpid(),
