@@ -23,14 +23,10 @@ class ReprFallbackEncoder(json.JSONEncoder):
 
 class JSONFormat(object):
     """This is a fork of GrayPy formatter. http://pypi.python.org/pypi/graypy """
-
     def __init__(self, facility = 'twisted', suffix = '\n\n'):
         self.suffix = suffix
         self.facility = facility
     
-    def __copy__(self):
-        return self.__class__(self.separator, self.traceback_prefix, self.conversion.copy())
-
     def __call__(self, msg):
         message_dict = self.make_message_dict(msg)
         return json.dumps(message_dict, cls=ReprFallbackEncoder) + self.suffix
@@ -44,26 +40,12 @@ class JSONFormat(object):
             name2level("DEBUG"): 7,
         }.get(level, level)
 
-    def get_full_message(self, exc_info):
-        """
-        Generates the value to be placed into the C{full_message} field - if
-        exc_info is provided, will be the traceback.  If not, will be the empty
-        string.
-
-        @param exc_info: for example, the output of sys.exc_info()
-        @type exc_info: C{tuple} of the exception type, exception value, and
-            the traceback object.  Or C{None}
-
-        @return: formatted traceback of the C{exc_info} it is provided, or the
-            empty string if it is not
-        @rtype: C{str}
-        """
-        if exc_info:
-            return "\n".join(traceback.format_exception(*exc_info))
-        return ''
-
     def make_message_dict(self, record):
         tbstr = record.traceback
+        facility = self.facility
+        if "name" in record.fields:
+            facility = record.fields["name"]
+        
         outrec = {
             'version': "1.0",
             'host': socket.gethostname(),
@@ -71,7 +53,7 @@ class JSONFormat(object):
             'full_message': self.add_extra_fields({},record.fields),
             'timestamp': time.mktime(record.fields["time"]),
             'level': self.convert_level_to_syslog(record.fields["level"]),
-            'facility': self.facility,
+            'facility': facility,
             '_pid': os.getpid(),
             '_thread_name': thread_name()
             }
@@ -94,22 +76,8 @@ class JSONFormat(object):
         return data
 
     def add_extra_fields(self, message_dict, record):
-        # record.processName was added in Python 2.6.2
-        pn = getattr(record, 'processName', None)
-        if pn is not None:
-            message_dict['_process_name'] = pn
-
         # skip_list is used to filter additional fields in a log message.
-        # It contains all attributes listed in
-        # http://docs.python.org/library/logging.html#logrecord-attributes
-        # plus exc_text, which is only found in the logging module source,
-        # and id, which is prohibited by the GELF format.
-        skip_list = (
-            'level', 'time', '_time',
-            'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
-            'funcName', 'id', 'levelname', 'levelno', 'lineno', 'module',
-            'msecs', 'msecs', 'message', 'msg', 'name', 'pathname', 'process',
-            'processName', 'relativeCreated', 'request', 'thread', 'threadName')
+        skip_list = ('level', 'time', 'name')
 
         for key, value in record.items():
             # data can be full of locals and exception objects and craziness. Not all of it can be json.dump()ed
