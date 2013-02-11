@@ -50,7 +50,6 @@ class JSONFormat(object):
             'version': "1.0",
             'host': socket.gethostname(),
             'short_message': record.text,
-            'full_message': self.add_extra_fields({},record.fields),
             'timestamp': time.mktime(record.fields["time"]),
             'level': self.convert_level_to_syslog(record.fields["level"]),
             'facility': facility,
@@ -59,9 +58,9 @@ class JSONFormat(object):
             }
         if tbstr is not None:
             outrec['_traceback'] = traceback
-            outrec['exception'] = record.text
+            outrec['full_message'] = record.text
             outrec['short_message'] = 'Exception'
-        return outrec
+        return self.add_extra_fields(outrec,record.fields)
 
     def fix_data(self, data):
         if not data:
@@ -77,7 +76,7 @@ class JSONFormat(object):
 
     def add_extra_fields(self, message_dict, record):
         # skip_list is used to filter additional fields in a log message.
-        skip_list = ('level', 'time', 'name')
+        skip_list = ('level', 'time', 'name', 'id')
 
         for key, value in record.items():
             # data can be full of locals and exception objects and craziness. Not all of it can be json.dump()ed
