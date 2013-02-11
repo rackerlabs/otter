@@ -1,6 +1,5 @@
 """JSON Formatters for GELF with Twiggy """
 import json
-import traceback
 import socket
 from twiggy.levels import name2level
 from twiggy.lib import thread_name
@@ -23,9 +22,9 @@ class ReprFallbackEncoder(json.JSONEncoder):
         return repr(obj)
 
 
-class JSONFormat(object):
+class GELFFormat(object):
     """This is a fork of GrayPy formatter. http://pypi.python.org/pypi/graypy """
-    def __init__(self, facility='twisted', suffix='\n\n'):
+    def __init__(self, facility='twisted', suffix='\n'):
         self.suffix = suffix
         self.facility = facility
 
@@ -46,38 +45,19 @@ class JSONFormat(object):
 
     def _make_message_dict(self, record):
         """ Make a JSON serializable dict out of a record """
-        tbstr = record.traceback
-        facility = self.facility
-        if "name" in record.fields:
-            facility = record.fields["name"]
-
         outrec = {
             'version': "1.0",
             'host': socket.gethostname(),
             'short_message': record.text,
             'timestamp': time.mktime(record.fields["time"]),
             'level': self._convert_level_to_syslog(record.fields["level"]),
-            'facility': facility,
+            'facility': record.fields.get('name', self.facility),
+            'full_message': record.traceback or '',
             '_pid': os.getpid(),
             '_thread_name': thread_name()
         }
-        if tbstr is not None:
-            outrec['_traceback'] = traceback
-            outrec['full_message'] = record.text
-            outrec['short_message'] = 'Exception'
+
         return self._add_extra_fields(outrec, record.fields)
-
-    def _fix_data(self, data):
-        if not data:
-            return data
-
-        for k, v in data.iteritems():
-            try:
-                json.dumps(v)
-            except Exception:
-                data[k] = str(v)
-
-        return data
 
     def _add_extra_fields(self, message_dict, record):
         """
@@ -90,13 +70,10 @@ class JSONFormat(object):
         skip_list = ('level', 'time', 'name', 'id')
 
         for key, value in record.items():
-            # data can be full of locals and exception objects and craziness.
-            # Not all of it can be json.dump()ed
-            if key == "data":
-                value = self._fix_data(value)
             if key not in skip_list:
                 message_dict['_%s' % key] = value
 
         return message_dict
 
-json_format = JSONFormat()
+
+json_format = GELFFormat()
