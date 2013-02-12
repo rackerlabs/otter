@@ -225,6 +225,33 @@ Metrics
    trace id, a span id, and a parent span id.  Can use the `tryfer python client library
    <https://github.com/racker/tryfer>`_
 
+=======
+Logging
+=======
+
+#. Use the `twiggy <https://twiggy.wearpants.org/>`_ logging API.
+#. Use the bound logger at ``otter.log.log``.
+#. For large subsystems create a new bound logger with the name of the subsystem::
+
+    from otter.log import log
+
+    log = log.name('otter.worker')
+
+#. Log failure objects with the ``failure`` feature::
+
+    def _errback(failure):
+        log.failure(failure).error('error doing something')
+
+    d = do_something()
+    d.addErrback(_errback)
+
+#. Log exceptions with ``trace``::
+
+    try:
+        1 / 0
+    except:
+        log.trace().error("Uh oh maths.")
+
 =============
 Build process
 =============
