@@ -465,6 +465,10 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
     def test_launch_server(self, wait_for_status, create_server, add_to_load_balancers):
+        """
+        launch_server creates a server, waits until the server is active then
+        adds the server's first private IPv4 address to any load balancers.
+        """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
 
@@ -480,7 +484,7 @@ class ServerTests(TestCase):
         add_to_load_balancers.return_value = succeed([])
 
         d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
-        self.successResultOf(d) # TODO: Currently the return value is not significant.
+        self.successResultOf(d)  # TODO: Currently the return value is not significant.
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
@@ -499,6 +503,9 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
     def test_launch_server_propogates_create_server_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
+        """
+        launch_server will propogate any errors from create_server.
+        """
         create_server.return_value = fail(APIError(500, "Oh noes"))
 
         d = launch_server('DFW', fake_service_catalog, 'my-auth-token', {'server': {}})
@@ -514,6 +521,9 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
     def test_launch_server_propogates_wait_for_status_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
+        """
+        launch_server will propogate any errors from wait_for_status.
+        """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
 
@@ -539,6 +549,9 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
     def test_launch_server_propogates_add_to_load_balancers_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
+        """
+        launch_server will propogate any errors from add_to_load_balancers.
+        """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
 
@@ -560,4 +573,3 @@ class ServerTests(TestCase):
 
         self.assertEqual(failure.value.code, 500)
         self.assertEqual(failure.value.body, "Oh noes")
-

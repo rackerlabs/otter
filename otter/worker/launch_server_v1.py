@@ -17,7 +17,6 @@ initiating a launch_server job.
 """
 
 from itertools import chain
-import time
 import json
 
 from urllib import quote
