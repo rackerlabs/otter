@@ -18,23 +18,32 @@ class ReprFallbackEncoder(json.JSONEncoder):
     logging system because of a formatting error.
     """
     def default(self, obj):
-        """ Provide a default serializer """
+        """
+        Serialize obj as repr(obj).
+        """
         return repr(obj)
 
 
 class GELFFormat(object):
-    """This is a fork of GrayPy formatter. http://pypi.python.org/pypi/graypy """
-    def __init__(self, facility='twisted', suffix='\n'):
+    """
+    A Twiggy log Format that produces https://github.com/Graylog2/graylog2-docs/wiki/GELF
+    format messages.
+    """
+    def __init__(self, facility, suffix='\n'):
         self.suffix = suffix
         self.facility = facility
 
     def __call__(self, msg):
-        """ Twiggy uses callable to format messages """
+        """
+        Twiggy uses callable to format messages.
+        """
         message_dict = self._make_message_dict(msg)
         return json.dumps(message_dict, cls=ReprFallbackEncoder) + self.suffix
 
     def _convert_level_to_syslog(self, level):
-        """ Convert the level from Twiggy into a syslog appropriate level """
+        """
+        Convert the level from Twiggy into a syslog appropriate level.
+        """
         return {
             name2level("CRITICAL"): 2,
             name2level("ERROR"): 3,
@@ -44,7 +53,9 @@ class GELFFormat(object):
         }.get(level, level)
 
     def _make_message_dict(self, record):
-        """ Make a JSON serializable dict out of a record """
+        """
+        Make a JSON serializable dict out of a record.
+        """
         outrec = {
             'version': "1.0",
             'host': socket.gethostname(),
@@ -66,7 +77,6 @@ class GELFFormat(object):
         are being sent elsewhere (e.g. level, time, name) and also
         making sure that the data is serializable.
         """
-        # skip_list is used to filter additional fields in a log message.
         skip_list = ('level', 'time', 'name', 'id')
 
         for key, value in record.items():
@@ -74,6 +84,3 @@ class GELFFormat(object):
                 message_dict['_%s' % key] = value
 
         return message_dict
-
-
-json_format = GELFFormat()
