@@ -10,11 +10,13 @@ import mock
 
 from twisted.trial.unittest import TestCase
 from twisted.python import log as tplog
+from twisted.python.failure import Failure
 
 import twiggy
 from twiggy import log
 from twixxy import TwiggyLoggingObserver
 
+from otter.log import log as olog
 from otter.log.formatters import GELFFormat
 
 
@@ -261,5 +263,30 @@ class TwiggyLoggingTests(TestCase):
 
         m = self.last_logged_json()
         self.assertEqual(m['short_message'], 'Unhandled Error')
+        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
+                      m['full_message'])
+
+    def test_base_logger(self):
+        """
+        The base logger is bound to the 'otter' name.
+        """
+        olog.info('foo')
+
+        m = self.last_logged_json()
+        self.assertEqual(m['short_message'], 'foo')
+        self.assertEqual(m['facility'], 'otter')
+
+    def test_base_logger_failure_feature(self):
+        """
+        The base logger supports the failure feature.
+        """
+
+        try:
+            1 / 0
+        except:
+            olog.failure(Failure()).error('uh oh')
+
+        m = self.last_logged_json()
+        self.assertEqual(m['short_message'], 'uh oh')
         self.assertIn('ZeroDivisionError: integer division or modulo by zero',
                       m['full_message'])
