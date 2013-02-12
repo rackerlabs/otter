@@ -16,6 +16,8 @@ NAME="otter-deploy"
 TARGET=${TARGET:="$NAME"}
 DIST_DIR=${DIST_DIR:="."}
 
+INSTALL_TARGET=${INSTALL_TARGET:="/opt/otter/current"}
+
 TERRARIUM=$(which terrarium)
 GIT_REV=$(git rev-parse HEAD)
 
@@ -82,6 +84,11 @@ if [[ "$1" == "--dev" ]]; then
 
     unset IFS
 fi
+
+echo "Rewrite virtualenv PATH..."
+sed -i \
+    -e "s|VIRTUAL_ENV=\".*\"|VIRTUAL_ENV=\"${INSTALL_TARGET}\"|" \
+    "${TARGET}/bin/activate";
 
 echo "Generating distribution tarball..."
 tar -zcvf ${DIST} -C ${TARGET} \

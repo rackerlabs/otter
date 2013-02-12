@@ -10,9 +10,10 @@ class UnrecognizedCapabilityError(Exception):
     Error to be raised when a capability hash is not recognized, or does not
     exist, or has been deleted.
     """
-    def __init__(self, capability_hash):
+    def __init__(self, capability_hash, capability_version):
         super(UnrecognizedCapabilityError, self).__init__(
-            "Unrecognized capability hash {hash}".format(hash=capability_hash))
+            "Unrecognized (version {version}) capability hash {hash}".format(
+                hash=capability_hash, version=capability_version))
 
 
 class NoSuchScalingGroupError(Exception):
@@ -22,8 +23,8 @@ class NoSuchScalingGroupError(Exception):
     """
     def __init__(self, tenant_id, group_id):
         super(NoSuchScalingGroupError, self).__init__(
-            "No such scaling group {uuid!s} for tenant {tenant!s}".format(
-                tenant=tenant_id, uuid=group_id))
+            "No such scaling group {g} for tenant {t}".format(
+                t=tenant_id, g=group_id))
 
 
 class NoSuchEntityError(Exception):
@@ -38,6 +39,21 @@ class NoSuchPolicyError(Exception):
     Error to be raised when attempting operations on an policy that does not
     exist.
     """
+    def __init__(self, tenant_id, group_id, policy_id):
+        super(NoSuchPolicyError, self).__init__(
+            "No such scaling policy {p} for group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, p=policy_id))
+
+
+class NoSuchWebhookError(Exception):
+    """
+    Error to be raised when attempting operations on an webhook that does not
+    exist.
+    """
+    def __init__(self, tenant_id, group_id, policy_id, webhook_id):
+        super(NoSuchWebhookError, self).__init__(
+            "No such webhook {w} for policy {p} in group {g} for tenant {t}"
+            .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
 class IScalingGroup(Interface):
@@ -226,17 +242,18 @@ class IScalingGroup(Interface):
         """
         Gets the specified policy on this particular scaling group.
 
-        :param policy_id: the uuid of the policy to be deleted
+        :param policy_id: the uuid of the policy
         :type policy_id: ``str``
 
         :return: a policy, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
+            :data:`otter.json_schema.group_schemas.policy`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist - this error is optional - a
+            :class:`NoSuchPolicyError` can be raised instead
         """
 
     def delete_policy(policy_id):
@@ -262,7 +279,7 @@ class IScalingGroup(Interface):
         :type policy_id: ``str``
 
         :return: a dict of the webhooks, as specified by
-            :data:`otter.json_schema.group_schemas.webhook`
+            :data:`otter.json_schema.model_schemas.webhook_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
@@ -276,12 +293,75 @@ class IScalingGroup(Interface):
         :type policy_id: ``str``
 
         :param data: a list of details of the webhook in JSON format, as specified
-            by :data:`otter.json_schema.group_schemas.webhook`
+            by :data:`otter.json_schema.model_schemas.webhook_list`
         :type data: ``dict``
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+
+    def get_webhook(policy_id, webhook_id):
+        """
+        Gets the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a webhook, as specified by
+            :data:`otter.json_schema.model_schemas.webhook`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+
+    def update_webhook(policy_id, webhook_id, data):
+        """
+        Update the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :param data: the details of the scaling policy in JSON format
+        :type data: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+
+    def delete_webhook(policy_id, webhook_id):
+        """
+        Delete the specified webhook for the specified policy on this particular
+        scaling group.
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :param webhook_id: the uuid of the webhook
+        :type webhook_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
 
 

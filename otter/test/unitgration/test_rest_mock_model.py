@@ -16,7 +16,8 @@ from urlparse import urlsplit
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema.group_examples import config, launch_server_config, policy
-from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.models.interface import (
+    NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
@@ -464,6 +465,56 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
                  for webhook in response["webhooks"]]
         return links
 
+    def update_and_view_webhook(self, path):
+        """
+        Updating a webhook returns with a 204 no content.  When viewing
+        the webhook again, it should contain the updated version.
+        """
+        request_body = {'name': 'updated_webhook'}
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'PUT', path, body=json.dumps(request_body)))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Update failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 200)
+
+        response = json.loads(wrapper.content)
+        updated = response['webhook']
+
+        self.assertIn('id', updated)
+        self.assertIn('links', updated)
+        for link in updated["links"]:
+            if link['rel'] in ('self', 'bookmark'):
+                self.assertIn(_strip_base_url(link["href"]), path)
+            else:
+                self.assertEqual(link['rel'], 'capability')
+                self.assertIn('/v1.0/execute/1/', link["href"])
+
+        del updated['id']
+        del updated['links']
+
+        self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {}})
+
+    def delete_and_view_webhook(self, path):
+        """
+        Deleting a webhook returns with a 204 no content.  The next attempt to
+        view the webhook should return a 404 not found.
+        """
+        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        self.assertEqual(wrapper.response.code, 204,
+                         "Delete failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "")
+
+        # now try to view
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        self.assertEqual(wrapper.response.code, 404)
+
+        # flush any logged errors
+        self.flushLoggedErrors(NoSuchWebhookError)
+
     def test_crud_webhooks(self):
         """
         Start with no policies.  Create some, make sure they're listed,
@@ -474,9 +525,18 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         # start with no webhooks
         self.assert_number_of_webhooks(0)
-        self.create_and_view_webhooks()
+        first_webhooks = self.create_and_view_webhooks()
 
         # create more webhooks, to check the creation response
         self.assert_number_of_webhooks(2)
         self.create_and_view_webhooks()
         self.assert_number_of_webhooks(4)
+
+        # update webhook, and there should still be the same number of
+        # webhook after the update
+        self.update_and_view_webhook(first_webhooks[0])
+        self.assert_number_of_webhooks(4)
+
+        # delete webhook - there should be one fewer webhook
+        self.delete_and_view_webhook(first_webhooks[0])
+        self.assert_number_of_webhooks(3)

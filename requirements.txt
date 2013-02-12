@@ -1,4 +1,4 @@
-git+http://github.com/twisted/klein.git
+klein>=0.1.0
 twisted>=12.3
 tryfer>=0.2.2
 jsonschema>=0.7
@@ -8,3 +8,5 @@ lxml>=3.0.1
 treq>=0.1.0
 silverberg>=0.0.3
 pyOpenSSL>=0.13
+twiggy>=0.4.0
+twixxy>=0.1.1

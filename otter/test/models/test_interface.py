@@ -124,6 +124,18 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         validate(result, model_schemas.webhook_list)
         return result
 
+    def validate_get_webhook_return_value(self, *args, **kwargs):
+        """
+        Calls ``get_webhook(policy_id, webhook_id)`` and validates that it
+        returns a dictionary uuids mapped to webhook JSON blobs.
+
+        :return: the return value of ``get_webhook(policy_id, webhook_id)``
+        """
+        result = self.assert_deferred_succeeded(
+            self.group.get_webhook(*args, **kwargs))
+        validate(result, model_schemas.webhook)
+        return result
+
 
 class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
     """

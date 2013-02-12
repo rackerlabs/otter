@@ -12,7 +12,8 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.json_schema import rest_schemas
-from otter.models.interface import NoSuchPolicyError
+from otter.models.interface import (
+    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError)
 from otter.rest.decorators import InvalidJsonError
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
@@ -39,17 +40,21 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
         self.flushLoggedErrors(DummyException)
 
-    def test_list_unknown_policy_is_404(self):
+    def test_list_webhooks_for_unknowns_is_404(self):
         """
-        When listing webhooks for a policy, if the policy doesn't exist and
-        :class:`NoSuchPolicyError` is raised, endpoint returns 404.
+        When listing webhooks, endpoint returns 404 if:
+        - the group doesn't exist, :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist, :class:`NoSuchPolicyError` is raised
         """
-        error = NoSuchPolicyError(
-            self.tenant_id, self.group_id, self.policy_id)
-        self.mock_group.list_webhooks.return_value = defer.fail(error)
-        self.assert_status_code(404)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
-        self.flushLoggedErrors(NoSuchPolicyError)
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id)]
+        for error in errors:
+            self.mock_group.list_webhooks.return_value = defer.fail(error)
+            self.assert_status_code(404)
+            self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+            self.flushLoggedErrors(type(error))
+            self.mock_group.list_webhooks.reset_mock()
 
     def test_no_webhooks_returns_empty_list(self):
         """
@@ -124,19 +129,23 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             self.policy_id, [{'name': 'one'}])
         self.flushLoggedErrors(DummyException)
 
-    def test_create_webhooks_for_unknown_policy_is_404(self):
+    def test_create_webhooks_for_unknowns_is_404(self):
         """
-        When create webhooks for a policy, if the policy doesn't exist and
-        :class:`NoSuchPolicyError` is raised, endpoint returns 404.
+        When listing webhooks, endpoint returns 404 if:
+        - the group doesn't exist, :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist, :class:`NoSuchPolicyError` is raised
         """
-        error = NoSuchPolicyError(
-            self.tenant_id, self.group_id, self.policy_id)
-        self.mock_group.create_webhooks.return_value = defer.fail(error)
-        self.assert_status_code(404, None, 'POST', json.dumps(
-                                [{'name': 'one'}]))
-        self.mock_group.create_webhooks.assert_called_once_with(
-            self.policy_id, [{'name': 'one'}])
-        self.flushLoggedErrors(NoSuchPolicyError)
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id)]
+        for error in errors:
+            self.mock_group.list_webhooks.return_value = defer.fail(error)
+            self.assert_status_code(404, None, 'POST', json.dumps(
+                                    [{'name': 'one'}]))
+            self.mock_group.create_webhooks.assert_called_once_with(
+                self.policy_id, [{'name': 'one'}])
+            self.flushLoggedErrors(type(error))
+            self.mock_group.create_webhooks.reset_mock()
 
     def test_create_webhooks_bad_input_400(self):
         """
@@ -147,12 +156,10 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
 
-    def test_group_create_invalid_schema_400(self):
+    def test_create_webhooks_invalid_schema_400(self):
         """
-        Checks that the scaling groups schema is obeyed --
-        an empty schema is bad.
+        Checks that the webhooks is obeyed - an empty schema is bad.
         """
-
         self.mock_group.create_webhooks.return_value = defer.succeed({})
         response_body = self.assert_status_code(400, None, 'POST', '[]')
         self.flushLoggedErrors(ValidationError)
@@ -211,3 +218,197 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                 }
             ]
         })
+
+
+class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for
+    ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}``
+    endpoints (get, update, delete)
+    """
+    tenant_id = '11111'
+    group_id = '1'
+    policy_id = '2'
+    webhook_id = '3'
+    endpoint = "/v1.0/11111/groups/1/policies/2/webhooks/3"
+
+    invalid_methods = ("POST")
+
+    def test_get_webhook_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.get_webhook.return_value = defer.fail(error)
+        self.assert_status_code(500)
+        self.mock_group.get_webhook.assert_called_once_with(self.policy_id,
+                                                            self.webhook_id)
+        self.flushLoggedErrors(DummyException)
+
+    def test_get_webhook_for_unknowns_is_404(self):
+        """
+        When getting a webhook, endpoint returns a 404 if:
+        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
+        - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
+        """
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id),
+            NoSuchWebhookError(self.tenant_id, self.group_id, self.policy_id,
+                               self.webhook_id)]
+        for error in errors:
+            self.mock_group.get_webhook.return_value = defer.fail(error)
+            self.assert_status_code(404)
+            self.mock_group.get_webhook.assert_called_once_with(self.policy_id,
+                                                                self.webhook_id)
+            self.flushLoggedErrors(type(error))
+            self.mock_group.get_webhook.reset_mock()
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    def test_get_webhook(self, mock_url):
+        """
+        Get webhook returns a 200 with a body with the right schema if
+        successful
+        """
+        self.mock_group.get_webhook.return_value = defer.succeed({
+            'name': 'the_name',
+            'capability': {
+                'hash': 'xxx',
+                'version': 'ver'
+            },
+            'metadata': {
+                'key': 'value'
+            }
+        })
+        response_body = self.assert_status_code(200)
+        response = json.loads(response_body)
+        validate(response, rest_schemas.view_webhook_response)
+        self.assertEqual(response, {
+            'webhook': {
+                'name': 'the_name',
+                'metadata': {
+                    'key': 'value'
+                },
+                'id': self.webhook_id,
+                'links': [
+                    {
+                        'rel': 'self',
+                        'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                                 .format(t=self.tenant_id, g=self.group_id,
+                                         p=self.policy_id, w=self.webhook_id))
+                    },
+                    {
+                        'rel': 'bookmark',
+                        'href': ('/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                                 .format(t=self.tenant_id, g=self.group_id,
+                                         p=self.policy_id, w=self.webhook_id))
+                    },
+                    {
+                        'rel': 'capability',
+                        'href': '/v1.0/execute/ver/xxx'
+                    }
+                ]
+            }
+        })
+
+    def test_update_webhook_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.update_webhook.return_value = defer.fail(error)
+        self.assert_status_code(500, None, 'PUT', json.dumps(
+                                {'name': 'one'}))
+        self.mock_group.update_webhook.assert_called_once_with(
+            self.policy_id, self.webhook_id, {'name': 'one'})
+        self.flushLoggedErrors(DummyException)
+
+    def test_update_webhook_for_unknowns_is_404(self):
+        """
+        When updating a webhook, endpoint returns a 404 if:
+        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
+        - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
+        """
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id),
+            NoSuchWebhookError(self.tenant_id, self.group_id, self.policy_id,
+                               self.webhook_id)]
+        for error in errors:
+            self.mock_group.update_webhook.return_value = defer.fail(error)
+            self.assert_status_code(404, None, 'PUT', json.dumps(
+                                    {'name': 'one'}))
+            self.mock_group.update_webhook.assert_called_once_with(
+                self.policy_id, self.webhook_id, {'name': 'one'})
+            self.flushLoggedErrors(type(error))
+            self.mock_group.update_webhook.reset_mock()
+
+    def test_update_webhook_bad_input_400(self):
+        """
+        Invalid JSON data is rejected
+        """
+        self.mock_group.update_webhook.return_value = defer.succeed(None)
+        self.assert_status_code(400, None, 'PUT', '{')
+        self.flushLoggedErrors(InvalidJsonError)
+
+    def test_update_webhook_invalid_schema_400(self):
+        """
+        Webhook schema is obeyed - an empty schema is bad.
+        """
+        self.mock_group.update_webhook.return_value = defer.succeed(None)
+        response_body = self.assert_status_code(400, None, 'PUT', '[]')
+        self.flushLoggedErrors(ValidationError)
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'ValidationError')
+
+    def test_update_valid_webhook(self):
+        """
+        Update webhook returns an empty 204 if successful
+        """
+        self.mock_group.update_webhook.return_value = defer.succeed(None)
+        response_body = self.assert_status_code(
+            204, None, 'PUT', json.dumps({'name': 'a name'}))
+        self.assertEqual(response_body, "")
+
+    def test_delete_webhook_unknown_error_is_500(self):
+        """
+        If an unexpected exception is raised, endpoint returns a 500.
+        """
+        error = DummyException('what')
+        self.mock_group.delete_webhook.return_value = defer.fail(error)
+        self.assert_status_code(500, None, 'DELETE')
+        self.mock_group.delete_webhook.assert_called_once_with(
+            self.policy_id, self.webhook_id)
+        self.flushLoggedErrors(DummyException)
+
+    def test_delete_webhook_for_unknowns_is_404(self):
+        """
+        When deleting a webhook, endpoint returns a 404 if:
+        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
+        - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
+        """
+        errors = [
+            NoSuchScalingGroupError(self.tenant_id, self.group_id),
+            NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id),
+            NoSuchWebhookError(self.tenant_id, self.group_id, self.policy_id,
+                               self.webhook_id)]
+        for error in errors:
+            self.mock_group.delete_webhook.return_value = defer.fail(error)
+            self.assert_status_code(404, None, 'DELETE')
+            self.mock_group.delete_webhook.assert_called_once_with(
+                self.policy_id, self.webhook_id)
+            self.flushLoggedErrors(type(error))
+            self.mock_group.delete_webhook.reset_mock()
+
+    def test_delete_valid_webhook(self):
+        """
+        Delete webhook returns an empty 204 if successful
+        """
+        self.mock_group.delete_webhook.return_value = defer.succeed(None)
+        response_body = self.assert_status_code(
+            204, None, 'DELETE')
+        self.assertEqual(response_body, "")
