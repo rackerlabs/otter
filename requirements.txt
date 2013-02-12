@@ -6,3 +6,5 @@ yunomi>=0.2.1
 iso8601>=0.1.4
 lxml>=3.0.1
 silverberg>=0.0.3
+twiggy>=0.4.0
+twixxy>=0.1.1
