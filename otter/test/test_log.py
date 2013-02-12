@@ -228,12 +228,18 @@ class TwiggyLoggingTests(TestCase):
         self.assertEqual(m['_foo'], repr(o))
 
     def test_twisted_log_msg(self):
+        """
+        Log messages from twisted's logging API should be correctly formatted.
+        """
         tplog.msg('hello')
 
         m = self.last_logged_json()
         self.assertEqual(m['short_message'], 'hello')
 
     def test_twisted_log_err_with_reason(self):
+        """
+        Errors logged with an explicit reason should be correctly formatted.
+        """
         try:
             1 / 0
         except:
@@ -245,12 +251,15 @@ class TwiggyLoggingTests(TestCase):
                       m['full_message'])
 
     def test_twisted_log_err_without_reason(self):
+        """
+        Errors logged without a reason should be logged as Unhandled Error.
+        """
         try:
             1 / 0
         except:
             tplog.err()
 
         m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'an error occurred')
+        self.assertEqual(m['short_message'], 'Unhandled Error')
         self.assertIn('ZeroDivisionError: integer division or modulo by zero',
                       m['full_message'])
