@@ -10,7 +10,7 @@ import time
 class ReprFallbackEncoder(json.JSONEncoder):
     """
     A JSONEncoder that will use the repr(obj) as the default serialization
-    for objects taht the base JSONEncoder does not know about.
+    for objects that the base JSONEncoder does not know about.
 
     This will ensure that even log messages that include unserializable objects
     (like from 3rd party libraries) will still have reasonable representations
