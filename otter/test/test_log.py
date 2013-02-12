@@ -9,9 +9,11 @@ from StringIO import StringIO
 import mock
 
 from twisted.trial.unittest import TestCase
+from twisted.python import log as tplog
 
 import twiggy
 from twiggy import log
+from twixxy import TwiggyLoggingObserver
 
 from otter.log.formatters import GELFFormat
 
@@ -62,6 +64,16 @@ class TwiggyLoggingTests(TestCase):
                                              stream=self.destination)
 
         twiggy.addEmitters(('*', twiggy.levels.DEBUG, None, output))
+
+        observer = TwiggyLoggingObserver()
+        _observers = tplog.theLogPublisher.observers
+        tplog.theLogPublisher.observers = []
+        tplog.addObserver(observer.emit)
+
+        def _restore_observers():
+            tplog.theLogPublisher.observers = _observers
+
+        self.addCleanup(_restore_observers)
 
     def last_logged_json(self):
         """
@@ -214,3 +226,31 @@ class TwiggyLoggingTests(TestCase):
 
         m = self.last_logged_json()
         self.assertEqual(m['_foo'], repr(o))
+
+    def test_twisted_log_msg(self):
+        tplog.msg('hello')
+
+        m = self.last_logged_json()
+        self.assertEqual(m['short_message'], 'hello')
+
+    def test_twisted_log_err_with_reason(self):
+        try:
+            1 / 0
+        except:
+            tplog.err(_why='an error occurred')
+
+        m = self.last_logged_json()
+        self.assertEqual(m['short_message'], 'an error occurred')
+        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
+                      m['full_message'])
+
+    def test_twisted_log_err_without_reason(self):
+        try:
+            1 / 0
+        except:
+            tplog.err()
+
+        m = self.last_logged_json()
+        self.assertEqual(m['short_message'], 'an error occurred')
+        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
+                      m['full_message'])
