@@ -18,24 +18,14 @@ def _get_hmac_secret(version="1"):
     return "sekrit!!!!"
 
 
-txnPrefix = uuid.uuid4()
-txnCount = 0
-
-
 def generate_txnid():
     """
     Generates a transaction ID.
 
-    Transaction IDs are of the format <run uuid>.<txn #>.<txn uuid>
-    where the run uuid is the same for each process,
-    the txn # is increasing with each txn_id generated
-    and the txn uuid is generated once for each req
+    Generally returns a UUID, but we can always change it later
     """
 
-    global txnCount
-    i = txnCount
-    txnCount += 1
-    return "{}.{}.{}".format(txnPrefix, i, uuid.uuid4())
+    return uuid.uuid4()
 
 
 def generate_key_str(keytype):
