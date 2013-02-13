@@ -9,6 +9,8 @@ from twisted.internet import defer
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_key_str
 
+from silverberg.client import ConsistencyLevel
+
 import json
 
 
@@ -140,7 +142,8 @@ class CassScalingGroup(object):
         query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
+                                     "groupId": self.uuid},
+                                    ConsistencyLevel.ONE)
         d.addCallback(self._grab_json_data)
         return d
 
@@ -157,7 +160,8 @@ class CassScalingGroup(object):
         query = _cql_view.format(cf=self.launch_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
+                                     "groupId": self.uuid},
+                                    ConsistencyLevel.ONE)
         d.addCallback(self._grab_json_data)
         return d
 
@@ -337,7 +341,8 @@ class CassScalingGroup(object):
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid})
+                                     "groupId": self.uuid},
+                                    ConsistencyLevel.ONE)
         d.addCallback(_grab_pol_list)
         return d
 
@@ -360,7 +365,8 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
-                                     "policyId": policy_id})
+                                     "policyId": policy_id},
+                                    ConsistencyLevel.ONE)
         d.addCallback(self._grab_json_data, policy_id)
         return d
 
@@ -747,7 +753,8 @@ class CassScalingGroupCollection:
 
         query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
-                                    {"tenantId": tenant_id})
+                                    {"tenantId": tenant_id},
+                                    ConsistencyLevel.ONE)
         d.addCallback(_grab_list)
         return d
 

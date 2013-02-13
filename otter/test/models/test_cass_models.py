@@ -117,7 +117,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.assertEqual(r, {})
 
     def test_view_config_bad_db_data(self):
@@ -130,7 +131,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData))
+            self.assertEqual(call, mock.call(expectedCql, expectedData,
+                                             ConsistencyLevel.ONE))
 
     def test_view_config_no_such_group(self):
         """
@@ -144,7 +146,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_config_no_version(self):
@@ -181,7 +184,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.assertEqual(r, {})
 
     def test_view_launch_bad_db_data(self):
@@ -194,7 +198,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData))
+            self.assertEqual(call, mock.call(expectedCql, expectedData,
+                                             ConsistencyLevel.ONE))
 
     def test_view_launch_no_such_group(self):
         """
@@ -208,7 +213,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_launch_no_version(self):
@@ -311,7 +317,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.assertEqual(r, {})
 
     def test_view_policy_bad_db_data(self):
@@ -324,7 +331,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData))
+            self.assertEqual(call, mock.call(expectedCql, expectedData,
+                                             ConsistencyLevel.ONE))
 
     def test_view_policy_no_such_policy(self):
         """
@@ -338,7 +346,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_policy_no_version(self):
@@ -381,7 +390,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(r, {'group1': {}, 'group3': {}})
 
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
 
     def test_list_policy_empty_list(self):
         """
@@ -531,7 +541,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
         self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData, ConsistencyLevel.ONE)
+                                                   expectedData,
+                                                   ConsistencyLevel.ONE)
 
     def test_delete_non_existant_policy(self):
         """
@@ -582,7 +593,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "policyId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_bad(self):
@@ -597,7 +609,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
 
     def test_update_policy_calls_view_first(self):
         """
@@ -744,7 +757,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(r[0].uuid, 'group1')
         self.assertEqual(r[1].uuid, 'group3')
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
 
     def test_list_empty(self):
         """
@@ -760,7 +774,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 0)
         self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData)
+                                                        expectedData,
+                                                        ConsistencyLevel.ONE)
 
     def test_list_errors(self):
         """
