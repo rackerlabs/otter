@@ -6,15 +6,18 @@ Autoscale REST endpoints having to do with a group or collection of groups
 import json
 
 from otter.json_schema.rest_schemas import create_group_request
-from otter.rest.decorators import validate_body, fails_with, succeeds_with
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   has_request_txnid, has_txnid_bound_log)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
 
 
 @app.route('/<string:tenantId>/groups',  methods=['GET'])
+@has_request_txnid()
+@has_txnid_bound_log()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def list_all_scaling_groups(request, tenantId):
+def list_all_scaling_groups(request, bound_log, tenantId):
     """
     Lists all the autoscaling groups per for a given tenant ID.
 
@@ -82,9 +85,11 @@ def list_all_scaling_groups(request, tenantId):
 # probably also return their ids and links, just like the manifest.
 @app.route('/<string:tenantId>/groups', methods=['POST'])
 @fails_with(exception_codes)
+@has_request_txnid()
+@has_txnid_bound_log()
 @succeeds_with(201)
 @validate_body(create_group_request)
-def create_new_scaling_group(request, tenantId, data):
+def create_new_scaling_group(request, bound_log, tenantId, data):
     """
     Create a new scaling group, given the general scaling group configuration,
     launch configuration, and optional scaling policies.  This data provided
@@ -253,9 +258,11 @@ def create_new_scaling_group(request, tenantId, data):
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>', methods=['GET'])
+@has_request_txnid()
+@has_txnid_bound_log()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_manifest_config_for_scaling_group(request, tenantId, groupId):
+def view_manifest_config_for_scaling_group(request, bound_log, tenantId, groupId):
     """
     View manifested view of the scaling group configuration, including the
     launch configuration, and the scaling policies.  This data is returned in
@@ -395,9 +402,11 @@ def view_manifest_config_for_scaling_group(request, tenantId, groupId):
 #       deletes the scaling group.
 # D
 @app.route('/<string:tenantId>/groups/<string:groupId>', methods=['DELETE'])
+@has_request_txnid()
+@has_txnid_bound_log()
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_scaling_group(request, tenantId, groupId):
+def delete_scaling_group(request, bound_log, tenantId, groupId):
     """
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
@@ -407,9 +416,11 @@ def delete_scaling_group(request, tenantId, groupId):
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
+@has_request_txnid()
+@has_txnid_bound_log()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_scaling_group_state(request, tenantId, groupId):
+def get_scaling_group_state(request, bound_log, tenantId, groupId):
     """
     Get the current state of the scaling group, including the current set of
     active entities, the current set of pending entities, the desired number

@@ -8,7 +8,8 @@ import json
 import jsonschema
 
 from twisted.internet import defer
-from twisted.python import log
+from otter.util.hashkey import generate_txnid
+from otter.log import log
 
 
 def _get_real_failure(possible_first_error):
@@ -61,7 +62,7 @@ def fails_with(mapping):
                         'details': ''
                     }
                 request.setResponseCode(code)
-                log.err(failure)
+                log.failure(failure).error('fails_with internal error')
                 return json.dumps(errorObj)
 
             d = defer.maybeDeferred(f, request, *args, **kwargs)
@@ -100,6 +101,33 @@ def succeeds_with(success_code):
             d = defer.maybeDeferred(f, request, *args, **kwargs)
             d.addCallback(_succeed, request)
             return d
+        return _
+    return decorator
+
+
+def has_request_txnid():
+    """
+    Generates a request txnid
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(request, *args, **kwargs):
+            txnId = generate_txnid()
+            request.setHeader('X-Response-Id', txnId)
+            return f(request, txnId, *args, **kwargs)
+        return _
+    return decorator
+
+
+def has_txnid_bound_log():
+    """
+    Generates a bound log containing the txnid
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(request, txnId, *args, **kwargs):
+            bound_log = log.fields(txnId=txnId)
+            return f(request, bound_log, *args, **kwargs)
         return _
     return decorator
 
