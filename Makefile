@@ -16,7 +16,7 @@ CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 test: unit integration
 
 run:
-	twistd -n --logger=otter.log.observer_factory otter-api
+	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
 env:
 	./scripts/bootstrap-virtualenv.sh
