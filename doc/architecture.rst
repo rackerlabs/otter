@@ -70,6 +70,11 @@ Scaling Worker
 * Triggering customer workflow via webhook
 * Triggering eventual workflow systems
 
+.. toctree::
+    :maxdepth: 2
+
+    scaling_workers
+
 User-extensibility
 ------------------
 
