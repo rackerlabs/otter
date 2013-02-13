@@ -15,7 +15,7 @@ else
     virtualenv ${VE_DIR}
 fi
 
-source .ve/bin/activate
+source ${VE_DIR}/bin/activate
 
 pip install -r dev_requirements.txt
 pip install -r requirements.txt
