@@ -22,6 +22,7 @@ def observer_factory():
     observer = TwiggyLoggingObserver()
     return observer.emit
 
+
 def observer_factory_debug():
     """
     Setup twiggy and return a twisted log observer.
