@@ -105,7 +105,7 @@ def succeeds_with(success_code):
     return decorator
 
 
-def has_request_txnid():
+def with_transaction_id():
     """
     Generates a request txnid
     """
@@ -114,18 +114,6 @@ def has_request_txnid():
         def _(request, *args, **kwargs):
             txnId = generate_txnid()
             request.setHeader('X-Response-Id', txnId)
-            return f(request, txnId, *args, **kwargs)
-        return _
-    return decorator
-
-
-def has_txnid_bound_log():
-    """
-    Generates a bound log containing the txnid
-    """
-    def decorator(f):
-        @wraps(f)
-        def _(request, txnId, *args, **kwargs):
             bound_log = log.fields(txnId=txnId)
             return f(request, bound_log, *args, **kwargs)
         return _

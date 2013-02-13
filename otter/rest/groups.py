@@ -7,14 +7,13 @@ import json
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   has_request_txnid, has_txnid_bound_log)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
 
 
 @app.route('/<string:tenantId>/groups',  methods=['GET'])
-@has_request_txnid()
-@has_txnid_bound_log()
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
 def list_all_scaling_groups(request, bound_log, tenantId):
@@ -84,9 +83,8 @@ def list_all_scaling_groups(request, bound_log, tenantId):
 # attached.  If we are going to create the scaling policies here too, we should
 # probably also return their ids and links, just like the manifest.
 @app.route('/<string:tenantId>/groups', methods=['POST'])
+@with_transaction_id()
 @fails_with(exception_codes)
-@has_request_txnid()
-@has_txnid_bound_log()
 @succeeds_with(201)
 @validate_body(create_group_request)
 def create_new_scaling_group(request, bound_log, tenantId, data):
@@ -258,8 +256,7 @@ def create_new_scaling_group(request, bound_log, tenantId, data):
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>', methods=['GET'])
-@has_request_txnid()
-@has_txnid_bound_log()
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
 def view_manifest_config_for_scaling_group(request, bound_log, tenantId, groupId):
@@ -402,8 +399,7 @@ def view_manifest_config_for_scaling_group(request, bound_log, tenantId, groupId
 #       deletes the scaling group.
 # D
 @app.route('/<string:tenantId>/groups/<string:groupId>', methods=['DELETE'])
-@has_request_txnid()
-@has_txnid_bound_log()
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 def delete_scaling_group(request, bound_log, tenantId, groupId):
@@ -416,8 +412,7 @@ def delete_scaling_group(request, bound_log, tenantId, groupId):
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',
            methods=['GET'])
-@has_request_txnid()
-@has_txnid_bound_log()
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
 def get_scaling_group_state(request, bound_log, tenantId, groupId):
