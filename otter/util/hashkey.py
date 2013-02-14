@@ -24,7 +24,7 @@ def generate_key_str(keytype):
 
     Generally returns a UUID, but we're accepting a type paramater
     """
-    return uuid.uuid4()
+    return str(uuid.uuid4())
 
 
 # TODO: versioning
