@@ -35,8 +35,7 @@ def _strip_base_url(url):
 
 
 generator = keyspaces.CQLGenerator(keyspaces.schema_dir + '/setup')
-cluster = keyspaces.RunningCassandraCluster(
-    'ubuntu', setup_cql=generator.generate_cql)
+cluster = keyspaces.RunningCassandraCluster(setup_cql=generator.generate_cql)
 cluster.setup_keyspace('cassresttest')
 
 
@@ -69,7 +68,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         Set up a silverberg client
         """
         self.client = client.CQLClient(
-            endpoints.clientFromString(reactor, "tcp:ubuntu:9160"),
+            endpoints.clientFromString(reactor, "tcp:localhost:9160"),
             "cassresttest")
         store = CassScalingGroupCollection(self.client)
         set_store(store)
@@ -91,7 +90,8 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         """
         request_body = {
             "groupConfiguration": config()[1],
-            "launchConfiguration": launch_server_config()[0]
+            "launchConfiguration": launch_server_config()[0],
+            "scalingPolicies": policy()
         }
 
         def _check_create_body(wrapper):
@@ -115,9 +115,9 @@ class CassStoreRestScalingGroupTestCase(TestCase):
 
             response = json.loads(wrapper.content)
             self.assertEqual(response["group"]['groupConfiguration'],
-                             config()[1])
+                             request_body['groupConfiguration'])
             self.assertEqual(response["group"]['launchConfiguration'],
-                             launch_server_config()[0])
+                             request_body['launchConfiguration'])
 
         def _check_state_body(wrapper):
             self.assertEqual(wrapper.response.code, 200)
@@ -125,21 +125,30 @@ class CassStoreRestScalingGroupTestCase(TestCase):
             response = json.loads(wrapper.content)
             self.assertTrue(not response["group"]['paused'])
             self.assertTrue(len(response["group"]['pending']),
-                            config()[1]['minEntities'])
+                            request_body['groupConfiguration']['minEntities'])
+
+        def _check_policies_created(wrapper):
+            self.assertEqual(200, wrapper.response.code)
+            response = json.loads(wrapper.content)
+            self.assertEqual(len(response["policies"]),
+                             len(request_body['scalingPolicies']))
 
         def _check_creation_worked(path):
             d = defer.gatherResults([
-                request(root, 'GET', path).addCallback(_check_manifest_body),
-                request(root, 'GET', path + '/state').addCallback(
-                    _check_state_body)])
+                # request(root, 'GET', path).addCallback(_check_manifest_body),
+                # request(root, 'GET', path + '/state').addCallback(
+                #     _check_state_body),
+                request(root, 'GET', path + '/policies').addCallback(
+                    _check_policies_created)
+            ])
 
             # no matter what, just return the path
             return d.addCallback(lambda _: path)
 
         deferred = request(
             root, 'POST', '/v1.0/11111/groups', body=json.dumps(request_body))
-        # deferred.addCallback(_check_create_body)
-        # deferred.addCallback(_check_creation_worked)
+        deferred.addCallback(_check_create_body)
+        deferred.addCallback(_check_creation_worked)
         return deferred
 
     @defer.inlineCallbacks
@@ -153,14 +162,19 @@ class CassStoreRestScalingGroupTestCase(TestCase):
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
-        # now try to view
+        # now try to view state, manifest, and policies
         # wrapper = yield request(root, 'GET', path)
         # self.assertEqual(wrapper.response.code, 404)
         # wrapper = yield request(root, 'GET', path + '/state')
         # self.assertEqual(wrapper.response.code, 404)
+        wrapper = yield request(root, 'GET', path + '/policies')
+        self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    # @defer.inlineCallbacks
+    # def update_and_view_scaling_config(self, path):
 
     @defer.inlineCallbacks
     def assert_number_of_scaling_groups(self, number):
@@ -180,15 +194,16 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         """
         # start with no scaling groups
         yield self.assert_number_of_scaling_groups(0)
-        yield self.create_and_view_scaling_group()
+        path = yield self.create_and_view_scaling_group()
 
         # there should still be one scaling group
         yield self.assert_number_of_scaling_groups(1)
-        # yield self.delete_and_view_scaling_group(path)
+        yield self.delete_and_view_scaling_group(path)
 
-        # # there should be no scaling groups now
-        # self.assert_number_of_scaling_groups(0)
+        # there should be no scaling groups now
+        yield self.assert_number_of_scaling_groups(0)
 
+    @defer.inlineCallbacks
     def test_ru_scaling_config(self):
         """
         Editing the config of a scaling group with a valid config returns with
