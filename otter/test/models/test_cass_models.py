@@ -68,6 +68,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.mock_key.return_value = '12345678'
         self.addCleanup(self.hashkey_patch.stop)
 
+        self.consistency_level_patch = mock.patch(
+            'otter.models.cass.get_consistency_level',
+            return_value=ConsistencyLevel.TWO)
+        self.consistency_level_patch.start()
+        self.addCleanup(self.consistency_level_patch.stop)
+
     def _test_view_things_errors(self, callback_to_test, *args, **kwargs):
         """
         Errors from cassandra in viewing one thing (not listing) or updating
@@ -118,7 +124,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.assertEqual(r, {})
 
     def test_view_config_bad_db_data(self):
@@ -132,7 +138,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.ONE))
+                                             ConsistencyLevel.TWO))
 
     def test_view_config_no_such_group(self):
         """
@@ -147,7 +153,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_config_no_version(self):
@@ -185,7 +191,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.assertEqual(r, {})
 
     def test_view_launch_bad_db_data(self):
@@ -199,7 +205,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.ONE))
+                                             ConsistencyLevel.TWO))
 
     def test_view_launch_no_such_group(self):
         """
@@ -214,7 +220,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_view_launch_no_version(self):
@@ -254,7 +260,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "groupId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_update_launch(self):
         """
@@ -277,7 +283,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "groupId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_update_configs_call_view_first(self):
         """
@@ -318,7 +324,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.assertEqual(r, {})
 
     def test_view_policy_bad_db_data(self):
@@ -332,7 +338,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.ONE))
+                                             ConsistencyLevel.TWO))
 
     def test_view_policy_no_such_policy(self):
         """
@@ -347,7 +353,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_policy_no_version(self):
@@ -391,7 +397,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_list_policy_empty_list(self):
         """
@@ -504,7 +510,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "policy0Id": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
         self.assertEqual(result, {self.mock_key.return_value: {'b': 'lah'}})
 
@@ -542,7 +548,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
         self.connection.execute.assert_called_with(expectedCql,
                                                    expectedData,
-                                                   ConsistencyLevel.ONE)
+                                                   ConsistencyLevel.TWO)
 
     def test_delete_non_existant_policy(self):
         """
@@ -578,7 +584,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "policyId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.ONE)
+            expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_update_scaling_policy_bad(self):
         """
@@ -594,7 +600,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "tenantId": '11111'}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_bad(self):
@@ -610,7 +616,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_update_policy_calls_view_first(self):
         """
@@ -654,6 +660,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_key = self.hashkey_patch.start()
         self.addCleanup(self.hashkey_patch.stop)
 
+        self.consistency_level_patch = mock.patch(
+            'otter.models.cass.get_consistency_level',
+            return_value=ConsistencyLevel.TWO)
+        self.consistency_level_patch.start()
+        self.addCleanup(self.consistency_level_patch.stop)
+
     def test_create(self):
         """
         Test that you can create a group, and if successful the group ID is
@@ -675,7 +687,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_create_policy(self):
         """
@@ -702,7 +714,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_create_policy_multiple(self):
         """
@@ -733,7 +745,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_list(self):
         """
@@ -758,7 +770,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(r[1].uuid, 'group3')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_list_empty(self):
         """
@@ -775,7 +787,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(len(r), 0)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.ONE)
+                                                        ConsistencyLevel.TWO)
 
     def test_list_errors(self):
         """
@@ -865,4 +877,4 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_with(expected_cql, expected_data,
-                                                   ConsistencyLevel.ONE)
+                                                   ConsistencyLevel.TWO)

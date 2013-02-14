@@ -48,6 +48,26 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenan
                     '"groupId" = :groupId AND deleted = False;')
 
 
+def get_consistency_level(operation, resource):
+    """
+    Get the consistency level for a particular operation.
+
+    :param operation: one of (create, list, view, update, or delete)
+    :type operation: ``str``
+
+    :param resource: one of (group, partial, policy, webhook) -
+        "partial" covers group views such as the config, the launch
+        config, or the state
+    :type resource: ``str``
+
+    :return: the consistency level
+    :rtype: one of the consistency levels in :class:`ConsistencyLevel`
+    """
+    # TODO: configurable consistency level, possibly different for read
+    # and write operations
+    return ConsistencyLevel.ONE
+
+
 def _build_policies(policies, policies_table, queries, data, outpolicies):
     if policies is not None:
         for i in range(len(policies)):
@@ -143,7 +163,7 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
-                                    ConsistencyLevel.ONE)
+                                    get_consistency_level('view', 'partial'))
         d.addCallback(self._grab_json_data)
         return d
 
@@ -161,7 +181,7 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
-                                    ConsistencyLevel.ONE)
+                                    get_consistency_level('view', 'partial'))
         d.addCallback(self._grab_json_data)
         return d
 
@@ -204,7 +224,7 @@ class CassScalingGroup(object):
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+        :raises: :class:`NoSuchScalingGrou(pError` if this scaling group (one
             with this uuid) does not exist
         """
         def _do_update_config(lastRev):
@@ -217,7 +237,8 @@ class CassScalingGroup(object):
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "scaling": _serial_json_data(data, 1)})
+                                "scaling": _serial_json_data(data, 1)},
+                      consistency=get_consistency_level('update', 'partial'))
             return b.execute(self.connection)
 
         d = self.view_config()
@@ -249,7 +270,8 @@ class CassScalingGroup(object):
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "launch": _serial_json_data(data, 1)})
+                                "launch": _serial_json_data(data, 1)},
+                      consistency=get_consistency_level('update', 'partial'))
             d = b.execute(self.connection)
             return d
 
@@ -342,7 +364,7 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
-                                    ConsistencyLevel.ONE)
+                                    get_consistency_level('list', 'policy'))
         d.addCallback(_grab_pol_list)
         return d
 
@@ -366,7 +388,7 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
                                      "policyId": policy_id},
-                                    ConsistencyLevel.ONE)
+                                    get_consistency_level('view', 'policy'))
         d.addCallback(self._grab_json_data, policy_id)
         return d
 
@@ -401,7 +423,8 @@ class CassScalingGroup(object):
 
             _build_policies(data, self.policies_table, queries, cqldata, outpolicies)
 
-            b = Batch(queries, cqldata)
+            b = Batch(queries, cqldata,
+                      consistency=get_consistency_level('create', 'policy'))
             d = b.execute(self.connection)
             return d.addCallback(lambda _: outpolicies)
 
@@ -436,7 +459,8 @@ class CassScalingGroup(object):
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id,
-                                "policy": _serial_json_data(data, 1)})
+                                "policy": _serial_json_data(data, 1)},
+                      consistency=get_consistency_level('update', 'policy'))
             d = b.execute(self.connection)
             return d
 
@@ -469,7 +493,8 @@ class CassScalingGroup(object):
             b = Batch(
                 queries, {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
-                          "policyId": policy_id})
+                          "policyId": policy_id},
+                consistency=get_consistency_level('delete', 'policy'))
 
             return b.execute(self.connection)
 
@@ -681,7 +706,8 @@ class CassScalingGroupCollection:
         outpolicies = {}
         _build_policies(policies, self.policies_table, queries, data, outpolicies)
 
-        b = Batch(queries, data)
+        b = Batch(queries, data,
+                  consistency=get_consistency_level('create', 'group'))
         d = b.execute(self.connection)
         d.addCallback(lambda _: scaling_group_id)
         return d
@@ -712,7 +738,8 @@ class CassScalingGroupCollection:
                 _cql_delete.format(cf=self.launch_table),
                 _cql_delete.format(cf=self.policies_table)]
             b = Batch(
-                queries, {"tenantId": tenant_id, "groupId": scaling_group_id})
+                queries, {"tenantId": tenant_id, "groupId": scaling_group_id},
+                consistency=get_consistency_level('delete', 'group'))
             return b.execute(self.connection)
 
         group = self.get_scaling_group(tenant_id, scaling_group_id)
@@ -754,7 +781,7 @@ class CassScalingGroupCollection:
         query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": tenant_id},
-                                    ConsistencyLevel.ONE)
+                                    get_consistency_level('list', 'group'))
         d.addCallback(_grab_list)
         return d
 
