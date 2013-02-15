@@ -14,7 +14,7 @@ import json
 import mock
 from urlparse import urlsplit
 
-from twisted.trial.unittest import TestCase
+from twisted.trial.unittest import TestCase, SkipTest
 from twisted.internet import defer, endpoints, reactor
 
 from otter.json_schema.group_examples import (
@@ -33,7 +33,6 @@ from silverberg import client
 def _strip_base_url(url):
     return urlsplit(url)[2].rstrip('/')
 
-
 keyspace_name = "cassandra_rest_unitgration"
 
 generator = keyspaces.CQLGenerator(keyspaces.schema_dir + '/setup')
@@ -41,13 +40,12 @@ try:
     cluster = keyspaces.RunningCassandraCluster(setup_cql=generator.generate_cql)
     cluster.setup_keyspace(keyspace_name)
 except Exception as e:
-    skip = "Cassandra unavailable: {0}".format(e)
+    raise SkipTest("Cassandra unavailable: {0}".format(e))
 else:
     silver_client = client.CQLClient(
         endpoints.clientFromString(reactor, "tcp:localhost:9160"),
         keyspace_name)
     store = CassScalingGroupCollection(silver_client)
-    set_store(store)
 
 
 class CassStoreRestScalingGroupTestCase(TestCase):
@@ -60,12 +58,18 @@ class CassStoreRestScalingGroupTestCase(TestCase):
     _launch_server_config = launch_server_config()[0]
     _policies = policy()
 
+    def setUp(self):
+        """
+        Make sure the store is the Cassandra store
+        """
+        set_store(store)
+
     def tearDown(self):
         """
         Disconnect the client - it will reconnect as needed.  Better if this
         could be disconnected only once this particular module were done.
         """
-        silver_client.disconnect()
+        return silver_client.disconnect()
 
     def create_scaling_group(self):
         """
@@ -180,7 +184,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         return d.addCallback(_check_number)
 
     @defer.inlineCallbacks
-    def test_crud_scaling_group(self):
+    def test_crd_scaling_group(self):
         """
         Start with no scaling groups.  Create one, make sure it's listed, then
         delete it and make sure it's no longer listed.
@@ -276,6 +280,8 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         """
         Set up a silverberg client
         """
+        set_store(store)  # ensure it's the cassandra store
+
         if self.group_id is None:
             # only do this once
             self._config = config()[0]
@@ -298,7 +304,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         Disconnect the client - it will reconnect as needed.  Better if this
         could be disconnected only once this particular module were done.
         """
-        silver_client.disconnect()
+        return silver_client.disconnect()
 
     def assert_number_of_scaling_policies(self, number):
         """
