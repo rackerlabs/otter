@@ -10,6 +10,3 @@ repoze.sphinx.autointerface>=0.7.1
 terrarium>=1.0.0rc2
 python-subunit>=0.0.8
 junitxml>=0.7
-twiggy>=0.4.4
-twixxy>=0.1.1
-treq>=0.1.0
