@@ -1,5 +1,5 @@
 """
-Integration-y tests for the REST interface interacting with the mock model.
+Integration-y tests for the REST interface interacting with the Cassandra model.
 
 This is perhaps not the place for these tests to go.  Also, perhaps this should
 instead be tested by spinning up an actually HTTP server (thus this test can
@@ -7,10 +7,11 @@ happen using the mock tap file).
 
 But until a decision has been made for integration test infrastructure and
 frameworks, this will do for now, as it is needed to verify that the rest unit
-tests and mock model unit tests do not lie.
+tests and Cassandra model unit tests do not lie.
 """
 
 import json
+import mock
 from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
@@ -33,10 +34,12 @@ def _strip_base_url(url):
     return urlsplit(url)[2].rstrip('/')
 
 
+keyspace_name = "cassandra_rest_unitgration"
+
 generator = keyspaces.CQLGenerator(keyspaces.schema_dir + '/setup')
 try:
     cluster = keyspaces.RunningCassandraCluster(setup_cql=generator.generate_cql)
-    cluster.setup_keyspace('cassresttest')
+    cluster.setup_keyspace(keyspace_name)
 except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 
@@ -61,7 +64,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
             # only do this once
             self.client = client.CQLClient(
                 endpoints.clientFromString(reactor, "tcp:localhost:9160"),
-                "cassresttest")
+                keyspace_name)
             store = CassScalingGroupCollection(self.client)
             set_store(store)
 
@@ -69,7 +72,8 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         """
         Tear down a silverberg client
         """
-        return self.client._client.disconnect()
+        if self.client is not None:
+            return self.client._client.disconnect()
 
     def create_scaling_group(self):
         """
@@ -171,15 +175,17 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         # flush any logged errors
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @defer.inlineCallbacks
     def assert_number_of_scaling_groups(self, number):
         """
         Asserts that there are ``number`` number of scaling groups
         """
-        wrapper = yield request(root, 'GET', '/v1.0/11111/groups')
-        self.assertEqual(200, wrapper.response.code)
-        response = json.loads(wrapper.content)
-        self.assertEqual(len(response["groups"]), number)
+        def _check_number(wrapper):
+            self.assertEqual(200, wrapper.response.code)
+            response = json.loads(wrapper.content)
+            self.assertEqual(len(response["groups"]), number)
+
+        d = request(root, 'GET', '/v1.0/11111/groups')
+        return d.addCallback(_check_number)
 
     @defer.inlineCallbacks
     def test_crud_scaling_group(self):
@@ -276,13 +282,13 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
 
     def setUp(self):
         """
-        Replace the store every time with a clean one.
+        Set up a silverberg client
         """
-        if self.client is not None:
+        if self.client is None:
             # only do this once
             self.client = client.CQLClient(
-                endpoints.clientFromString(reactor, "tcp:ubuntu:9160"),
-                "cassresttest")
+                endpoints.clientFromString(reactor, "tcp:localhost:9160"),
+                keyspace_name)
             store = CassScalingGroupCollection(self.client)
             set_store(store)
 
@@ -295,21 +301,30 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
                     '/v1.0/{tenant}/groups/{group}/policies'.format(
                         tenant=self.tenant_id, group=self.group_id))
 
-            d = store.create_scaling_group(self.tenant_id, self._config,
-                                           self.launch)
+            mock_log = mock.MagicMock()
+            d = store.create_scaling_group(mock_log, self.tenant_id,
+                                           self._config, self._launch)
             d.addCallback(_set_group_id)
             return d
+
+    def tearDown(self):
+        """
+        Tear down a silverberg client
+        """
+        if self.client is not None:
+            return self.client._client.disconnect()
 
     def assert_number_of_scaling_policies(self, number):
         """
         Asserts that there are ``number`` number of scaling policies
         """
-        wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', self.policies_url))
-        self.assertEqual(200, wrapper.response.code)
+        def _check_number(wrapper):
+            self.assertEqual(200, wrapper.response.code)
+            response = json.loads(wrapper.content)
+            self.assertEqual(len(response["policies"]), number)
 
-        response = json.loads(wrapper.content)
-        self.assertEqual(len(response["policies"]), number)
+        d = request(root, 'GET', self.policies_url)
+        return d.addCallback(_check_number)
 
     def create_and_view_scaling_policies(self):
         """
@@ -321,36 +336,41 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
             to be in any consistent order)
         """
         request_body = policy()[:-1]  # however many of them there are minus one
-        wrapper = self.assert_deferred_succeeded(request(
-            root, 'POST', self.policies_url, body=json.dumps(request_body)))
 
-        self.assertEqual(wrapper.response.code, 201,
-                         "Create failed: {0}".format(wrapper.content))
-        response = json.loads(wrapper.content)
+        def _verify_create_response(wrapper):
+            self.assertEqual(wrapper.response.code, 201,
+                             "Create failed: {0}".format(wrapper.content))
+            response = json.loads(wrapper.content)
 
-        self.assertEqual(len(request_body), len(response["policies"]))
+            self.assertEqual(len(request_body), len(response["policies"]))
 
-        # this iterates over the response policies, checks to see that each have
-        # 'id' and 'links' keys, and then checks to see that the rest of the
-        # response policy is in the original set of policies to be created
-        for pol in response["policies"]:
-            original_pol = pol.copy()
-            for key in ('id', 'links'):
-                self.assertIn(key, pol)
-                del original_pol[key]
-            self.assertIn(original_pol, request_body)
+            # this iterates over the response policies, checks to see that each
+            # have 'id' and 'links' keys, and then checks to see that the rest
+            # of the response policy is in the original set of policies to be
+            #created
+            for pol in response["policies"]:
+                original_pol = pol.copy()
+                for key in ('id', 'links'):
+                    self.assertIn(key, pol)
+                    del original_pol[key]
+                self.assertIn(original_pol, request_body)
 
-        headers = wrapper.response.headers.getRawHeaders('Location')
-        self.assertTrue(headers is not None)
-        self.assertEqual(1, len(headers))
+            headers = wrapper.response.headers.getRawHeaders('Location')
+            self.assertTrue(headers is not None)
+            self.assertEqual(1, len(headers))
 
-        # now make sure the Location header points to the list policies header
-        self.assertEqual(_strip_base_url(headers[0]), self.policies_url)
+            # now make sure the Location header points to the list policies
+            #header
+            self.assertEqual(_strip_base_url(headers[0]), self.policies_url)
 
-        links = [_strip_base_url(link["href"])
-                 for link in pol["links"] if link["rel"] == "self"
-                 for pol in response["policies"]]
-        return links
+            links = [_strip_base_url(link["href"])
+                     for link in pol["links"] if link["rel"] == "self"
+                     for pol in response["policies"]]
+            return links
+
+        d = request(root, 'POST', self.policies_url,
+                    body=json.dumps(request_body))
+        return d.addCallback(_verify_create_response)
 
     def update_and_view_scaling_policy(self, path):
         """
@@ -398,6 +418,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         # flush any logged errors
         self.flushLoggedErrors(NoSuchPolicyError)
 
+    @defer.inlineCallbacks
     def test_crud_scaling_policies(self):
         """
         Start with no policies.  Create some, make sure they're listed,
@@ -407,22 +428,20 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         listed.
         """
         # start with no scaling groups
-        self.assert_number_of_scaling_policies(0)
-        first_policies = self.create_and_view_scaling_policies()
+        yield self.assert_number_of_scaling_policies(0)
+        first_policies = yield self.create_and_view_scaling_policies()
 
         # create more scaling policies, to check the creation response
-        self.assert_number_of_scaling_policies(len(first_policies))
-        second_policies = self.create_and_view_scaling_policies()
+        yield self.assert_number_of_scaling_policies(len(first_policies))
+        second_policies = yield self.create_and_view_scaling_policies()
         len_total_policies = len(first_policies) + len(second_policies)
-        self.assert_number_of_scaling_policies(len_total_policies)
+        yield self.assert_number_of_scaling_policies(len_total_policies)
 
-        # update scaling policy, and there should still be the same number of
-        # policies after the update
-        self.update_and_view_scaling_policy(first_policies[0])
-        self.assert_number_of_scaling_policies(len_total_policies)
+        # # update scaling policy, and there should still be the same number of
+        # # policies after the update
+        # self.update_and_view_scaling_policy(first_policies[0])
+        # self.assert_number_of_scaling_policies(len_total_policies)
 
-        # delete a scaling policy - there should be one fewer scaling policy
-        self.delete_and_view_scaling_policy(second_policies[0])
-        self.assert_number_of_scaling_policies(len_total_policies - 1)
-
-    test_crud_scaling_policies.skip = True
+        # # delete a scaling policy - there should be one fewer scaling policy
+        # self.delete_and_view_scaling_policy(second_policies[0])
+        # self.assert_number_of_scaling_policies(len_total_policies - 1)
