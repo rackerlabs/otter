@@ -16,7 +16,7 @@ from otter.rest.application import app, get_autoscale_links, get_store
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def list_all_scaling_groups(request, bound_log, tenantId):
+def list_all_scaling_groups(request, log, tenantId):
     """
     Lists all the autoscaling groups per for a given tenant ID.
 
@@ -87,7 +87,7 @@ def list_all_scaling_groups(request, bound_log, tenantId):
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(create_group_request)
-def create_new_scaling_group(request, bound_log, tenantId, data):
+def create_new_scaling_group(request, log, tenantId, data):
     """
     Create a new scaling group, given the general scaling group configuration,
     launch configuration, and optional scaling policies.  This data provided
@@ -259,7 +259,7 @@ def create_new_scaling_group(request, bound_log, tenantId, data):
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_manifest_config_for_scaling_group(request, bound_log, tenantId, groupId):
+def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
     """
     View manifested view of the scaling group configuration, including the
     launch configuration, and the scaling policies.  This data is returned in
@@ -402,7 +402,7 @@ def view_manifest_config_for_scaling_group(request, bound_log, tenantId, groupId
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_scaling_group(request, bound_log, tenantId, groupId):
+def delete_scaling_group(request, log, tenantId, groupId):
     """
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
@@ -415,7 +415,7 @@ def delete_scaling_group(request, bound_log, tenantId, groupId):
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_scaling_group_state(request, bound_log, tenantId, groupId):
+def get_scaling_group_state(request, log, tenantId, groupId):
     """
     Get the current state of the scaling group, including the current set of
     active entities, the current set of pending entities, the desired number

@@ -18,7 +18,7 @@ def _get_hmac_secret(version="1"):
     return "sekrit!!!!"
 
 
-def generate_txnid():
+def generate_transaction_id():
     """
     Generates a transaction ID.
 

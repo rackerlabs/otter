@@ -8,7 +8,7 @@ import json
 import jsonschema
 
 from twisted.internet import defer
-from otter.util.hashkey import generate_txnid
+from otter.util.hashkey import generate_transaction_id
 from otter.log import log
 
 
@@ -112,9 +112,9 @@ def with_transaction_id():
     def decorator(f):
         @wraps(f)
         def _(request, *args, **kwargs):
-            txnId = generate_txnid()
-            request.setHeader('X-Response-Id', txnId)
-            bound_log = log.fields(txnId=txnId)
+            transaction_id = generate_transaction_id()
+            request.setHeader('X-Response-Id', transaction_id)
+            bound_log = log.fields(transaction_id=transaction_id)
             return f(request, bound_log, *args, **kwargs)
         return _
     return decorator
