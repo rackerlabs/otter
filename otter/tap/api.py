@@ -1,6 +1,7 @@
 """
 Twisted Application plugin for otter API nodes.
 """
+import jsonfig
 
 from twisted.python import usage
 
@@ -27,7 +28,12 @@ class Options(usage.Options):
     optParameters = [
         ["port", "p", "tcp:9000",
          "strports description of the port for API connections."],
+        ["config", "c", "config.json",
+         "path to JSON configuration file."]
     ]
+
+    def postOptions(self):
+        self.update(jsonfig.from_path(self['config']))
 
 
 def makeService(config):
