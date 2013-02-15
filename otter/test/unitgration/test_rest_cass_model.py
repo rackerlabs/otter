@@ -42,6 +42,12 @@ try:
     cluster.setup_keyspace(keyspace_name)
 except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
+else:
+    silver_client = client.CQLClient(
+        endpoints.clientFromString(reactor, "tcp:localhost:9160"),
+        keyspace_name)
+    store = CassScalingGroupCollection(silver_client)
+    set_store(store)
 
 
 class CassStoreRestScalingGroupTestCase(TestCase):
@@ -54,26 +60,12 @@ class CassStoreRestScalingGroupTestCase(TestCase):
     _launch_server_config = launch_server_config()[0]
     _policies = policy()
 
-    client = None
-
-    def setUp(self):
-        """
-        Set up a silverberg client
-        """
-        if self.client is None:
-            # only do this once
-            self.client = client.CQLClient(
-                endpoints.clientFromString(reactor, "tcp:localhost:9160"),
-                keyspace_name)
-            store = CassScalingGroupCollection(self.client)
-            set_store(store)
-
     def tearDown(self):
         """
-        Tear down a silverberg client
+        Disconnect the client - it will reconnect as needed.  Better if this
+        could be disconnected only once this particular module were done.
         """
-        if self.client is not None:
-            return self.client._client.disconnect()
+        silver_client.disconnect()
 
     def create_scaling_group(self):
         """
@@ -278,20 +270,14 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
     As above, this could be made a base case instead... yadda yadda.
     """
     tenant_id = '11111'
-    client = None
+    group_id = None
 
     def setUp(self):
         """
         Set up a silverberg client
         """
-        if self.client is None:
+        if self.group_id is None:
             # only do this once
-            self.client = client.CQLClient(
-                endpoints.clientFromString(reactor, "tcp:localhost:9160"),
-                keyspace_name)
-            store = CassScalingGroupCollection(self.client)
-            set_store(store)
-
             self._config = config()[0]
             self._launch = launch_server_config()[0]
 
@@ -309,10 +295,10 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
 
     def tearDown(self):
         """
-        Tear down a silverberg client
+        Disconnect the client - it will reconnect as needed.  Better if this
+        could be disconnected only once this particular module were done.
         """
-        if self.client is not None:
-            return self.client._client.disconnect()
+        silver_client.disconnect()
 
     def assert_number_of_scaling_policies(self, number):
         """
