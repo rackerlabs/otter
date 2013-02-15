@@ -372,20 +372,21 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
                     body=json.dumps(request_body))
         return d.addCallback(_verify_create_response)
 
+    @defer.inlineCallbacks
     def update_and_view_scaling_policy(self, path):
         """
         Updating a scaling policy returns with a 204 no content.  When viewing
         the policy again, it should contain the updated version.
         """
         request_body = policy()[-1]  # the one that was not created
-        wrapper = self.assert_deferred_succeeded(
-            request(root, 'PUT', path, body=json.dumps(request_body)))
+        wrapper = yield request(root, 'PUT', path,
+                                body=json.dumps(request_body))
         self.assertEqual(wrapper.response.code, 204,
                          "Update failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = yield request(root, 'GET', path)
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -401,18 +402,19 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
 
         self.assertEqual(updated, request_body)
 
+    @defer.inlineCallbacks
     def delete_and_view_scaling_policy(self, path):
         """
         Deleting a scaling policy returns with a 204 no content.  The next
         attempt to view the scaling policy should return a 404 not found.
         """
-        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        wrapper = yield request(root, 'DELETE', path)
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = yield request(root, 'GET', path)
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -437,11 +439,11 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         len_total_policies = len(first_policies) + len(second_policies)
         yield self.assert_number_of_scaling_policies(len_total_policies)
 
-        # # update scaling policy, and there should still be the same number of
-        # # policies after the update
-        # self.update_and_view_scaling_policy(first_policies[0])
-        # self.assert_number_of_scaling_policies(len_total_policies)
+        # update scaling policy, and there should still be the same number of
+        # policies after the update
+        yield self.update_and_view_scaling_policy(first_policies[0])
+        yield self.assert_number_of_scaling_policies(len_total_policies)
 
-        # # delete a scaling policy - there should be one fewer scaling policy
-        # self.delete_and_view_scaling_policy(second_policies[0])
-        # self.assert_number_of_scaling_policies(len_total_policies - 1)
+        # delete a scaling policy - there should be one fewer scaling policy
+        yield self.delete_and_view_scaling_policy(second_policies[0])
+        yield self.assert_number_of_scaling_policies(len_total_policies - 1)
