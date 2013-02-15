@@ -13,6 +13,10 @@ import os.path
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
 
+from silverberg import client
+
+from twisted.internet import endpoints, reactor
+
 
 def simple_create_keyspace(keyspace_name, replication_dict=None):
     """
@@ -184,3 +188,57 @@ class CQLGenerator(object):
         if outfile:
             outfile.write(output)
         return output
+
+
+class PausableSilverbergClient(client.CQLClient):
+    """
+    A Silverberg client that can be paused and resumed and that makes sure it
+    is disconnected before the reactor shuts down.
+    """
+    def __init__(self, *args, **kwargs):
+        """
+        Add a reactor hook to disconnect before shutting down
+        """
+        super(PausableSilverbergClient, self).__init__(*args, **kwargs)
+        reactor.addSystemEventTrigger("before", "shutdown", self.cleanup)
+
+    def pause(self):
+        if self._client._transport:
+            self._client._transport.stopReading()
+            self._client._transport.stopWriting()
+
+    def resume(self):
+        if self._client._transport:
+            self._client._transport.startReading()
+            self._client._transport.startWriting()
+
+    def cleanup(self):
+        try:
+            return self.disconnect()
+        except:
+            pass
+
+
+class OtterKeymaster(object):
+    """
+    Object that keeps track of created keyspaces, PauseableSilverbergClients,
+    and is a factory for PausableSilverbergClients
+    """
+    def __init__(self, host="localhost", port=9160, setup_generator=None):
+        self.host = host
+        self.port = port
+        self.setup_generator = (
+            setup_generator or CQLGenerator(schema_dir + '/setup'))
+
+        self._keys = {}
+        self.cluster = RunningCassandraCluster(
+            host=host, port=port, setup_cql=self.setup_generator.generate_cql)
+
+    def get_client(self, keyspace_name):
+        if keyspace_name not in self._keys:
+            self.cluster.setup_keyspace(keyspace_name)
+            self._keys[keyspace_name] = PausableSilverbergClient(
+                endpoints.clientFromString(reactor,
+                    "tcp:{0}:{1}".format(self.host, self.port)),
+                keyspace_name)
+        return self._keys[keyspace_name]
