@@ -33,6 +33,8 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         self.mockRequest = mock.MagicMock()
         self.mockRequest.code = None
 
+        self.mockLog = mock.MagicMock()
+
         def mockResponseCode(code):
             self.mockRequest.code = code
         self.mockRequest.setResponseCode.side_effect = mockResponseCode
@@ -44,11 +46,11 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             """ Test Work """
             return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.assertEqual('hello', r)
@@ -60,11 +62,11 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @succeeds_with(204)
         @fails_with({})
-        def doWork(request):
+        def doWork(request, log):
             """ Test Work """
             return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.assertEqual('hello', r)
@@ -76,10 +78,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({BlahError: 404})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -99,10 +101,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({DetailsError: 404})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -122,10 +124,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @succeeds_with(204)
         @fails_with({DetailsError: 404})
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -157,10 +159,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
 
         @fails_with(select_dict([BlahError], mapping))
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
@@ -182,10 +184,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
 
         @fails_with(select_dict([KeyError], mapping))
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 

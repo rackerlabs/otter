@@ -41,7 +41,7 @@ def fails_with(mapping):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(request, bound_log, *args, **kwargs):
 
             def _fail(failure, request):
                 failure = _get_real_failure(failure)
@@ -62,10 +62,10 @@ def fails_with(mapping):
                         'details': ''
                     }
                 request.setResponseCode(code)
-                log.failure(failure).error('fails_with internal error')
+                bound_log.failure(failure).error('fails_with internal error')
                 return json.dumps(errorObj)
 
-            d = defer.maybeDeferred(f, request, *args, **kwargs)
+            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
             d.addErrback(_fail, request)
             return d
         return _

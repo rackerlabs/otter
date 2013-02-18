@@ -11,7 +11,8 @@ import json
 
 from otter.json_schema.group_schemas import webhook
 from otter.json_schema import rest_schemas
-from otter.rest.decorators import fails_with, succeeds_with, validate_body
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 
@@ -35,9 +36,10 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks',
     methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def list_webhooks(request, tenantId, groupId, policyId):
+def list_webhooks(request, log, tenantId, groupId, policyId):
     """
     Get a list of all webhooks (capability URL) associated with a particular
     scaling policy. This data is returned in the body of the response in JSON
@@ -115,10 +117,11 @@ def list_webhooks(request, tenantId, groupId, policyId):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks',
     methods=['POST'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(rest_schemas.create_webhooks_request)
-def create_webhooks(request, tenantId, groupId, policyId, data):
+def create_webhooks(request, log, tenantId, groupId, policyId, data):
     """
     Create one or many new webhooks associated with a particular scaling policy.
     Webhooks may (but do not need to) include some arbitrary medata, and must
@@ -213,9 +216,10 @@ def create_webhooks(request, tenantId, groupId, policyId, data):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
     methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_webhook(request, tenantId, groupId, policyId, webhookId):
+def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
     """
     Get a webhook which has a name, some arbitrary metdata, and a capability
     URL.  This data is returned in the body of the response in JSON format.
@@ -259,10 +263,11 @@ def get_webhook(request, tenantId, groupId, policyId, webhookId):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
     methods=['PUT'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(webhook)
-def update_webhook(request, tenantId, groupId, policyId, webhookId, data):
+def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
     """
     Update a particular webhook.
     A webhook may (but do not need to) include some arbitrary medata, and must
@@ -286,9 +291,10 @@ def update_webhook(request, tenantId, groupId, policyId, webhookId, data):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
     methods=['DELETE'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_webhook(request, tenantId, groupId, policyId, webhookId):
+def delete_webhook(request, log, tenantId, groupId, policyId, webhookId):
     """
     Deletes a particular webhook.
     If successful, no response body will be returned.
