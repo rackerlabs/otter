@@ -58,7 +58,7 @@ def fails_with(mapping):
                                      code=code,
                                      message=failure.value.message,
                                      details=getattr(failure.value, 'details', '')
-                                     ).info('Error')
+                                     ).info(failure.value.message)
                 else:
                     errorObj = {
                         'type': 'InternalError',
@@ -66,7 +66,7 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
-                    bound_log.failure(failure).error('Caught Internal Error')
+                    bound_log.failure(failure).error('Unhandled Error')
                 request.setResponseCode(code)
                 return json.dumps(errorObj)
 
