@@ -32,6 +32,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """ Basic Setup and patch the log """
         self.mockRequest = mock.MagicMock()
         self.mockRequest.code = None
+        self.mockRequest.uri = '/'
 
         self.mockLog = mock.MagicMock()
 
@@ -53,6 +54,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
+
+        self.mockLog.fields.assert_called_once_with(code=204, uri='/')
+        self.mockLog.fields().info.assert_called_once_with('OK')
+
         self.assertEqual('hello', r)
 
     def test_success_ordering(self):
@@ -69,6 +74,9 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
+        self.mockLog.fields.assert_called_once_with(code=204, uri='/')
+        self.mockLog.fields().info.assert_called_once_with('OK')
+
         self.assertEqual('hello', r)
 
     def test_simple_failure(self):
@@ -84,6 +92,11 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
+
+        self.mockLog.fields.assert_called_once_with(code=404, uri='/',
+                                                    details='', message='fail',
+                                                    type='BlahError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -108,6 +121,12 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
+        self.mockLog.fields.assert_called_once_with(code=404, uri='/',
+                                                    details='this is a detail',
+                                                    message='fail',
+                                                    type='DetailsError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
+
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
             "message": "fail",
@@ -130,6 +149,9 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
+
+        # Not testing the logging here; if you do it out of order, it still
+        # works but the logging is a bit spammy
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -166,6 +188,11 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
+        self.mockLog.fields.assert_called_once_with(code=400, uri='/',
+                                                    details='', message='fail',
+                                                    type='BlahError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
+
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
             "message": "fail",
@@ -190,6 +217,12 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
+
+        # Can't compare Failures
+        self.assertEqual(self.mockLog.failure.called, True)
+
+        self.mockLog.failure().fields.assert_called_once_with(code=500, uri='/')
+        self.mockLog.failure().fields().error.assert_called_once_with('Unhandled Error')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
