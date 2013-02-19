@@ -128,8 +128,8 @@ def with_transaction_id():
                 method=request.method,
                 uri=request.uri,
                 clientproto=request.clientproto,
-                referer=(request.getHeader("referer") or "-"),
-                useragent=(request.getHeader("user-agent") or "-")
+                referer=request.getHeader("referer"),
+                useragent=request.getHeader("user-agent")
             )
             return f(request, bound_log, *args, **kwargs)
         return _
