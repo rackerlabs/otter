@@ -10,3 +10,4 @@ silverberg>=0.0.3
 pyOpenSSL>=0.13
 twiggy>=0.4.0
 twixxy>=0.1.1
+jsonfig>=0.1.1
