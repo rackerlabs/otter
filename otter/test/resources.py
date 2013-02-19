@@ -9,6 +9,9 @@ from cStringIO import StringIO
 from glob import glob
 import json
 import os.path
+import os
+import re
+import uuid
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
@@ -44,6 +47,10 @@ def simple_drop_keyspace(keyspace_name):
     :type keyspace_name: ``str``
     """
     return "DROP KEYSPACE {name}".format(name=keyspace_name)
+
+
+_table_regex = re.compile('create\s+(?:table|columnfamily)\s+(?P<table>\S+)\s*\(',
+                          re.I)
 
 
 class RunningCassandraCluster(object):
@@ -96,11 +103,7 @@ class RunningCassandraCluster(object):
         self._connection = connect(self.host, self.port,
                                    cql_version=self.cql_version)
 
-    def _exec_cql(self, cql):
-        """
-        Execute some CQL, which can be a giant blob of commands with a `;`
-        after each command.
-        """
+    def _get_cursor(self):
         try:
             cursor = self._connection.cursor()
         except ProgrammingError:
@@ -108,12 +111,26 @@ class RunningCassandraCluster(object):
                                        cql_version=self.cql_version)
             # if this doesn't take, blow up
             cursor = self._connection.cursor()
+        return cursor
 
+    def _exec_cql(self, cql):
+        """
+        Execute some CQL, which can be a giant blob of commands with a `;`
+        after each command.
+        """
+        cursor = self._get_cursor()
         statements = [x for x in cql.split(';') if x.strip()]
         params = [{}] * len(statements)
         result = cursor.executemany(statements, params)
         cursor.close()
         return result
+
+    def _get_tables(self):
+        """
+        Take the creation CQL and identify which tables and column families
+        were created.
+        """
+        return _table_regex.findall(self.setup_cql(''))
 
     def setup_keyspace(self, keyspace_name):
         """
@@ -153,14 +170,53 @@ class RunningCassandraCluster(object):
             if "Cannot drop non existing keyspace" not in pe.message:
                 raise pe
 
+    def truncate_keyspace(self, keyspace_name):
+        """
+        Truncates a keyspace (removes all data from all tables in the keyspace)
+
+        :param keyspace_name: what the name of the keyspace is to drop
+        :type keyspace_name: ``str``
+        """
+        tables = self._get_tables()
+        if tables:
+            cql = "USE {0}; {1};".format(
+                keyspace_name,
+                "; ".join(["TRUNCATE {0}".format(table) for table in tables]))
+            self._exec_cql(cql)
+
+    def dump_data(self, keyspace_name, dirpath):
+        """
+        Dumps all the data from every table in a keyspace to the specified
+        directory path.  Data from each table will be in its own file.
+
+        :param keyspace_name: what the name of the keyspace is to drop
+        :type keyspace_name: ``str``
+
+        :param dirpath: The directory to put the dumped data
+        :type dirpath: ``str``
+        """
+        tables = self._get_tables()
+
+        if tables:
+            os.makedirs(dirpath)
+
+        for table in tables:
+            cursor = self._get_cursor()
+            cursor.execute('USE {0}'.format(keyspace_name))
+            cursor.execute('SELECT * FROM {0};'.format(table))
+            with open(os.path.join(dirpath, table), 'wb') as dump:
+                json.dump(cursor.description, dump)
+                dump.write('\n\n')
+                for row in cursor:
+                    json.dump(row, dump)
+                    dump.write('\n')
+            cursor.close()
+
     def cleanup(self):
         """
         Cleanup connections
         """
         self._connection.close()
-
-
-schema_dir = os.path.abspath(os.path.join(__file__, '../../../schema'))
 
 
 class CQLGenerator(object):
@@ -190,33 +246,92 @@ class CQLGenerator(object):
         return output
 
 
-class PausableSilverbergClient(client.CQLClient):
+class KeyspaceWithClient(object):
     """
-    A Silverberg client that can be paused and resumed and that makes sure it
-    is disconnected before the reactor shuts down.
+    Resource that represents a keyspace, and a Silverberg client for said
+    keyspace, that can be dirtied.  When dirtied and then reset, the data
+    can be optionally dumped, and then the data is truncated.
+
+    This resource also cleans its connections (and keyspace) up when the
+    reactor shuts down.
+
+    :ivar client: the Silverberg client for this keyspace
+    :type client: :class:``silverberg.client.CQLClient``
     """
-    def __init__(self, *args, **kwargs):
-        """
-        Add a reactor hook to disconnect before shutting down
-        """
-        super(PausableSilverbergClient, self).__init__(*args, **kwargs)
+    def __init__(self, cluster, keyspace_name):
+        self._cluster = cluster
+        self._keyspace_name = keyspace_name
+
         reactor.addSystemEventTrigger("before", "shutdown", self.cleanup)
 
+        self._cluster.setup_keyspace(self._keyspace_name)
+        self.client = client.CQLClient(
+            endpoints.clientFromString(
+                reactor,
+                "tcp:{0}:{1}".format(self._cluster.host, self._cluster.port)),
+            self._keyspace_name)
+
+        self._dirtied = False
+
     def pause(self):
-        if self._client._transport:
-            self._client._transport.stopReading()
-            self._client._transport.stopWriting()
+        """
+        Pause this resource, for use at the end of tests.  It removes the
+        client's connection from the reactor.  If not paused, there will be a
+        dirty reactor warning.
+        """
+        # pause the silverberg client's transport
+        if self.client._client._transport:
+            self.client._client._transport.stopReading()
+            self.client._client._transport.stopWriting()
 
     def resume(self):
-        if self._client._transport:
-            self._client._transport.startReading()
-            self._client._transport.startWriting()
+        """
+        Resumes this resource, for use at the start of tests.  It puts the
+        client's connection back in the reactor, if not there.
+        """
+        # resume the silverberg client's transport
+        if self.client._client._transport:
+            self.client._client._transport.startReading()
+            self.client._client._transport.startWriting()
+
+    def dirtied(self):
+        """
+        Specify that this resource has been dirtied, so when reset is called
+        the data gets truncated.
+        """
+        self._dirtied = True
+
+    def reset(self, dumpdir=None):
+        """
+        If this resource is dirty, truncate the data (dump the data to
+        ``dumpdir`` first, if specified).  Each table will be written to
+        a different file (named for the table) in the dump directory.
+
+        If the resource has not been dirtied, do nothing (not even dump data)
+
+        :param dumpdir: the path to the directory to dump the data in
+        :type dumpdir: ``str``
+        """
+        if not self._dirtied:
+            return
+
+        if dumpdir:
+            self._cluster.dump_data(self._keyspace_name, dumpdir)
+        self._cluster.truncate_keyspace(self._keyspace_name)
 
     def cleanup(self):
+        """
+        Clean up this resource by dropping the keyspace from the database
+        and by closing the client's connection to the database.
+        """
+        self._cluster.teardown_keyspace(self._keyspace_name)
         try:
-            return self.disconnect()
+            return self.client._client.disconnect()
         except:
             pass
+
+
+schema_dir = os.path.abspath(os.path.join(__file__, '../../../schema'))
 
 
 class OtterKeymaster(object):
@@ -232,13 +347,19 @@ class OtterKeymaster(object):
 
         self._keys = {}
         self.cluster = RunningCassandraCluster(
-            host=host, port=port, setup_cql=self.setup_generator.generate_cql)
+            host=host, port=port,
+            setup_cql=(setup_generator or
+                       CQLGenerator(schema_dir + '/setup').generate_cql))
 
-    def get_client(self, keyspace_name):
-        if keyspace_name not in self._keys:
-            self.cluster.setup_keyspace(keyspace_name)
-            self._keys[keyspace_name] = PausableSilverbergClient(
-                endpoints.clientFromString(reactor,
-                    "tcp:{0}:{1}".format(self.host, self.port)),
-                keyspace_name)
+    def get_keyspace(self, keyspace_name=None):
+        """
+        Get a keyspace resource named ``keyspace_name``.  If no name is
+        specified, one will randomly be chosen.
+        """
+        # keyspaces must start with a letter, not a number
+        keyspace_name = keyspace_name or ('a' + uuid.uuid4().hex)
+
+        if not keyspace_name in self._keys:
+            self._keys[keyspace_name] = KeyspaceWithClient(
+                self.cluster, keyspace_name)
         return self._keys[keyspace_name]

@@ -36,8 +36,8 @@ try:
 except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 else:
-    silver_client = keymaster.get_client("cassandra_rest_unitgration")
-    store = CassScalingGroupCollection(silver_client)
+    keyspace = keymaster.get_keyspace()
+    store = CassScalingGroupCollection(keyspace.client)
 
 
 class CassStoreRestScalingGroupTestCase(TestCase):
@@ -54,7 +54,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         """
         Make sure the store is the Cassandra store
         """
-        silver_client.resume()
+        keyspace.resume()
         set_store(store)
 
     def tearDown(self):
@@ -62,7 +62,9 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         Disconnect the client - it will reconnect as needed.  Better if this
         could be disconnected only once this particular module were done.
         """
-        return silver_client.pause()
+        keyspace.dirtied()
+        keyspace.pause()
+        keyspace.reset(self.mktemp())
 
     def create_scaling_group(self):
         """
@@ -273,7 +275,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         """
         Set up a silverberg client
         """
-        silver_client.resume()
+        keyspace.resume()
         set_store(store)  # ensure it's the cassandra store
 
         if self.group_id is None:
@@ -298,7 +300,9 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         Disconnect the client - it will reconnect as needed.  Better if this
         could be disconnected only once this particular module were done.
         """
-        return silver_client.pause()
+        keyspace.dirtied()
+        keyspace.pause()
+        keyspace.reset(self.mktemp())
 
     def assert_number_of_scaling_policies(self, number):
         """
