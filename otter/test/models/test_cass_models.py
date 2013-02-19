@@ -132,12 +132,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Test that you can call view and receive a valid parsed response
         """
-        mock = json.loads(json.dumps([
+        mock = [
             {'cols': [{'timestamp': None,
                        'name': 'data',
                        'value': '{}',
                        'ttl': None}],
-             'key': ''}]))
+             'key': ''}]
         self.returns = [mock]
         d = self.group.view_config()
         r = self.assert_deferred_succeeded(d)
