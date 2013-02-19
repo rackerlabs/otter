@@ -54,6 +54,11 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
+                    bound_log.fields(type=failure.type.__name__,
+                                     code=code,
+                                     message=failure.value.message,
+                                     details=getattr(failure.value, 'details', '')
+                                     ).info('Error')
                 else:
                     errorObj = {
                         'type': 'InternalError',
@@ -61,8 +66,8 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
+                    bound_log.failure(failure).error('Caught Internal Error')
                 request.setResponseCode(code)
-                bound_log.failure(failure).error('fails_with internal error')
                 return json.dumps(errorObj)
 
             d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
@@ -92,13 +97,17 @@ def succeeds_with(success_code):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(request, bound_log, *args, **kwargs):
             def _succeed(result, request):
                 if request.code is None:
                     request.setResponseCode(success_code)
+                bound_log.fields(
+                    uri=request.uri,
+                    code=request.code
+                ).info('OK')
                 return result
 
-            d = defer.maybeDeferred(f, request, *args, **kwargs)
+            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
             d.addCallback(_succeed, request)
             return d
         return _
@@ -115,6 +124,13 @@ def with_transaction_id():
             transaction_id = generate_transaction_id()
             request.setHeader('X-Response-Id', transaction_id)
             bound_log = log.fields(transaction_id=transaction_id)
+            bound_log.struct(
+                method=request.method,
+                uri=request.uri,
+                clientproto=request.clientproto,
+                referer=(request.getHeader("referer") or "-"),
+                useragent=(request.getHeader("user-agent") or "-")
+            )
             return f(request, bound_log, *args, **kwargs)
         return _
     return decorator
