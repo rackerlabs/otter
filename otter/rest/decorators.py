@@ -54,12 +54,8 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
-                    bound_log.fields(type=failure.type.__name__,
-                                     code=code,
-                                     uri=request.uri,
-                                     message=failure.value.message,
-                                     details=getattr(failure.value, 'details', '')
-                                     ).info(failure.value.message)
+                    bound_log.fields(uri=request.uri,
+                                     **errorObj).info(failure.value.message)
                 else:
                     errorObj = {
                         'type': 'InternalError',
