@@ -34,7 +34,7 @@ class APIOptionsTests(TestCase):
 
         self.jsonfig.from_path.return_value = test_config
 
-    def test_options(self):
+    def test_port_options(self):
         """
         The port long option should end up in the 'port' key.
         """
@@ -42,13 +42,31 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['--port=tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
-    def test_short_options(self):
+    def test_short_port_options(self):
         """
         The p short option should end up in the 'port' key.
         """
         config = Options()
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
+
+    def test_store_options(self):
+        """
+        The mock long flag option should end up in the 'mock' key
+        """
+        config = Options()
+        self.assertFalse(config['mock'])
+        config.parseOptions(['--mock'])
+        self.assertTrue(config['mock'])
+
+    def test_short_store_options(self):
+        """
+        The m shor toption should end up in the 'mock' key
+        """
+        config = Options()
+        self.assertFalse(config['mock'])
+        config.parseOptions(['-m'])
+        self.assertTrue(config['mock'])
 
 
 class APIMakeServiceTests(TestCase):
@@ -140,3 +158,19 @@ class APIMakeServiceTests(TestCase):
         makeService(test_config)
         self.set_store.assert_called_once_with(
             self.CassScalingGroupCollection.return_value)
+
+    def test_mock_store(self):
+        """
+        makeService does not configure the CassScalingGroupCollection as an
+        api store
+        """
+        mock_config = test_config.copy()
+        mock_config['mock'] = True
+        makeService(mock_config)
+
+        for mocked in (self.RoundRobinCassandraCluster,
+                       self.CassScalingGroupCollection,
+                       self.set_store, self.clientFromString):
+            mock_calls = getattr(mocked, 'mock_calls')
+            self.assertEqual(len(mock_calls), 0,
+                             "{0} called with {1}".format(mocked, mock_calls))
