@@ -106,36 +106,15 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         :return: the path to the new scaling group resource
         """
 
-        def _check_manifest_body(wrapper):
-            self.assertEqual(wrapper.response.code, 200)
-
-            response = json.loads(wrapper.content)
-            self.assertEqual(response["group"]['groupConfiguration'],
-                             self._config)
-            self.assertEqual(response["group"]['launchConfiguration'],
-                             self._launch_server_config)
-
-        def _check_state_body(wrapper):
-            self.assertEqual(wrapper.response.code, 200)
-
-            response = json.loads(wrapper.content)
-            self.assertTrue(not response["group"]['paused'])
-            self.assertTrue(len(response["group"]['pending']),
-                            self._config['minEntities'])
-
         def _check_policies_created(wrapper):
             self.assertEqual(200, wrapper.response.code)
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["policies"]), len(self._policies))
 
         def _check_creation_worked(path):
-            d = defer.gatherResults([
-                # request(root, 'GET', path).addCallback(_check_manifest_body),
-                # request(root, 'GET', path + '/state').addCallback(
-                #     _check_state_body),
-                request(root, 'GET', path + '/policies').addCallback(
-                    _check_policies_created)
-            ])
+            # TODO: check manifest and state as well
+            d = request(root, 'GET', path + '/policies').addCallback(
+                _check_policies_created)
 
             # no matter what, just return the path
             return d.addCallback(lambda _: path)
@@ -155,11 +134,8 @@ class CassStoreRestScalingGroupTestCase(TestCase):
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
-        # now try to view state, manifest, and policies
-        # wrapper = yield request(root, 'GET', path)
-        # self.assertEqual(wrapper.response.code, 404)
-        # wrapper = yield request(root, 'GET', path + '/state')
-        # self.assertEqual(wrapper.response.code, 404)
+        # now try to view policies
+        # TODO: view state and manifest too, once they have been implemented
         wrapper = yield request(root, 'GET', path + '/policies')
         self.assertEqual(wrapper.response.code, 404)
 
@@ -227,15 +203,8 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         self.assertEqual(json.loads(wrapper.content),
                          {'groupConfiguration': edited_config})
 
-        # make sure the created group has updated pending entities, and is
-        # still not paused
-        # wrapper = yield request(root, 'GET', path + '/state')
-        # self.assertEqual(wrapper.response.code, 200)
-
-        # response = json.loads(wrapper.content)
-        # self.assertTrue(not response['group']['paused'])
-        # self.assertTrue(len(response['group']['pending']),
-        #                 config()[1]['minEntities'] + 5)
+        # TODO: make sure the created group has updated pending entities, and
+        # is still not paused
 
     @defer.inlineCallbacks
     def test_update_launch_config(self):
