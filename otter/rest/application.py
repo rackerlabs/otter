@@ -2,14 +2,17 @@
 Contains the actual Klein app, backing store, and utilities used by the route
 handlers for the REST service.
 """
+import os.path
 
 from twisted.web.resource import Resource
+from twisted.web.static import File
 
 from klein import Klein
 
 
 _store = None
 _urlRoot = 'http://127.0.0.1'
+_otter = File(os.path.join(os.path.dirname(__file__), 'otter_ascii.txt'))
 
 
 def get_store():
@@ -138,3 +141,4 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
 app = Klein()
 root = Resource()
 root.putChild('v1.0', app.resource())
+root.putChild('', _otter)
