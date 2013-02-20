@@ -150,6 +150,12 @@ class RestAPITestMixin(DeferredTestMixin):
         response_wrapper = self.assert_deferred_succeeded(
             request(root, method, endpoint or self.endpoint, body=body))
 
+        # If we're expecting a 405, it never hits the decorator;
+        # otherwise it needs to have sent a transaction ID.
+
+        if expected_status != 405:
+            self.assertNotEqual(response_wrapper.response.headers.getRawHeaders('X-Response-ID'), None)
+
         self.assertEqual(response_wrapper.response.code, expected_status)
         if location is not None:
             self.assertEqual(

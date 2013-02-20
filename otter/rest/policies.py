@@ -8,16 +8,18 @@ the scaling policies associated with a particular scaling group.
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
-from otter.rest.decorators import validate_body, fails_with, succeeds_with
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def list_policies(request, tenantId, groupId):
+def list_policies(request, log, tenantId, groupId):
     """
     Get a list of scaling policies in the group. Each policy describes an id,
     name, type, adjustment, cooldown, and links. This data is returned in the
@@ -124,10 +126,11 @@ def list_policies(request, tenantId, groupId):
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/policies',
            methods=['POST'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(rest_schemas.create_policies_request)
-def create_policies(request, tenantId, groupId, data):
+def create_policies(request, log, tenantId, groupId, data):
     """
     Create one or many new scaling policies.
     Scaling policies must include a name, type, adjustment, and cooldown.
@@ -214,9 +217,10 @@ def create_policies(request, tenantId, groupId, data):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_policy(request, tenantId, groupId, policyId):
+def get_policy(request, log, tenantId, groupId, policyId):
     """
     Get a scaling policy which describes an id, name, type, adjustment, and
     cooldown, and links.  This data is returned in the body of the response in
@@ -258,10 +262,11 @@ def get_policy(request, tenantId, groupId, policyId):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['PUT'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.policy)
-def update_policy(request, tenantId, groupId, policyId, data):
+def update_policy(request, log, tenantId, groupId, policyId, data):
     """
     Updates a scaling policy. Scaling policies must include a name, type,
     adjustment, and cooldown.
@@ -285,9 +290,10 @@ def update_policy(request, tenantId, groupId, policyId, data):
 @app.route(
     '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
     methods=['DELETE'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_policy(request, tenantId, groupId, policyId):
+def delete_policy(request, log, tenantId, groupId, policyId):
     """
     Delete a scaling policy. If successful, no response body will be returned.
     """

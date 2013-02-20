@@ -18,6 +18,16 @@ def _get_hmac_secret(version="1"):
     return "sekrit!!!!"
 
 
+def generate_transaction_id():
+    """
+    Generates a transaction ID.
+
+    Generally returns a UUID, but we can always change it later
+    """
+
+    return uuid.uuid4()
+
+
 def generate_key_str(keytype):
     """
     Generates an opaque unique identifier

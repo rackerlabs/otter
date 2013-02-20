@@ -12,7 +12,8 @@ from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 
 from otter.rest.decorators import (
-    fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError)
+    fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
+    with_transaction_id)
 from otter.test.utils import DeferredTestMixin
 
 
@@ -26,12 +27,71 @@ class DetailsError(Exception):
     details = 'this is a detail'
 
 
+class TransactionIdTestCase(DeferredTestMixin, TestCase):
+    """Test case for the transaction ID"""
+    def setUp(self):
+        """ Basic Setup and patch the log """
+        self.mockRequest = mock.MagicMock()
+        self.mockRequest.code = None
+        self.mockRequest.uri = '/'
+        self.mockRequest.clientproto = 'HTTP/1.1'
+        self.mockRequest.method = 'PROPFIND'
+        values = {'referer': 'referrer(sic)',
+                  'user-agent': 'Mosaic/1.0'}
+
+        def header_side_effect(arg):
+            return values[arg]
+
+        self.mockRequest.getHeader.side_effect = header_side_effect
+
+        self.mockLog = mock.MagicMock()
+
+        def mockResponseCode(code):
+            self.mockRequest.code = code
+        self.mockRequest.setResponseCode.side_effect = mockResponseCode
+
+        self.log_patch = mock.patch(
+            'otter.rest.decorators.log')
+        self.mock_log_patch = self.log_patch.start()
+        self.addCleanup(self.log_patch.stop)
+
+        self.hashkey_patch = mock.patch(
+            'otter.rest.decorators.generate_transaction_id')
+        self.mock_key = self.hashkey_patch.start()
+        self.mock_key.return_value = '12345678'
+        self.addCleanup(self.hashkey_patch.stop)
+
+    def test_success(self):
+        """
+        Test to make sure it works in the success case
+        :return nothing
+        """
+        @with_transaction_id()
+        def doWork(request, log):
+            """ Test Work """
+            return defer.succeed('hello')
+
+        d = doWork(self.mockRequest)
+        r = self.assert_deferred_succeeded(d)
+
+        self.mock_log_patch.fields.assert_called_once_with(transaction_id='12345678')
+        self.mock_log_patch.fields().struct.assert_called_once_with(useragent='Mosaic/1.0',
+                                                                    clientproto='HTTP/1.1',
+                                                                    referer='referrer(sic)',
+                                                                    uri='/',
+                                                                    method='PROPFIND')
+        self.assertEqual('hello', r)
+
+
 class FaultTestCase(DeferredTestMixin, TestCase):
     """Test case for the fault system"""
     def setUp(self):
         """ Basic Setup and patch the log """
         self.mockRequest = mock.MagicMock()
         self.mockRequest.code = None
+        self.mockRequest.uri = '/'
+
+        self.mockLog = mock.MagicMock()
 
         def mockResponseCode(code):
             self.mockRequest.code = code
@@ -44,13 +104,17 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             """ Test Work """
             return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
+
+        self.mockLog.fields.assert_called_once_with(code=204, uri='/')
+        self.mockLog.fields().info.assert_called_once_with('OK')
+
         self.assertEqual('hello', r)
 
     def test_success_ordering(self):
@@ -60,13 +124,16 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @succeeds_with(204)
         @fails_with({})
-        def doWork(request):
+        def doWork(request, log):
             """ Test Work """
             return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
+        self.mockLog.fields.assert_called_once_with(code=204, uri='/')
+        self.mockLog.fields().info.assert_called_once_with('OK')
+
         self.assertEqual('hello', r)
 
     def test_simple_failure(self):
@@ -76,12 +143,17 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({BlahError: 404})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
+
+        self.mockLog.fields.assert_called_once_with(code=404, uri='/',
+                                                    details='', message='fail',
+                                                    type='BlahError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -99,12 +171,18 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @fails_with({DetailsError: 404})
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
+
+        self.mockLog.fields.assert_called_once_with(code=404, uri='/',
+                                                    details='this is a detail',
+                                                    message='fail',
+                                                    type='DetailsError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -122,12 +200,15 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         """
         @succeeds_with(204)
         @fails_with({DetailsError: 404})
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
+
+        # Not testing the logging here; if you do it out of order, it still
+        # works but the logging is a bit spammy
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -157,12 +238,17 @@ class FaultTestCase(DeferredTestMixin, TestCase):
 
         @fails_with(select_dict([BlahError], mapping))
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
+
+        self.mockLog.fields.assert_called_once_with(code=400, uri='/',
+                                                    details='', message='fail',
+                                                    type='BlahError')
+        self.mockLog.fields().info.assert_called_once_with('fail')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -182,12 +268,18 @@ class FaultTestCase(DeferredTestMixin, TestCase):
 
         @fails_with(select_dict([KeyError], mapping))
         @succeeds_with(204)
-        def doWork(request):
+        def doWork(request, log):
             return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest)
+        d = doWork(self.mockRequest, self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
+
+        # Can't compare Failures
+        self.assertEqual(self.mockLog.failure.called, True)
+
+        self.mockLog.failure().fields.assert_called_once_with(code=500, uri='/')
+        self.mockLog.failure().fields().error.assert_called_once_with('Unhandled Error')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -215,12 +307,7 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         self.validate_patch = mock.patch(
             'otter.rest.decorators.jsonschema.validate')
         self.mock_validate = self.validate_patch.start()
-
-    def tearDown(self):
-        """
-        Unpatch jsonschema
-        """
-        self.validate_patch.stop()
+        self.addCleanup(self.validate_patch.stop)
 
     def test_success_case(self):
         """

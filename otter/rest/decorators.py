@@ -8,7 +8,8 @@ import json
 import jsonschema
 
 from twisted.internet import defer
-from twisted.python import log
+from otter.util.hashkey import generate_transaction_id
+from otter.log import log
 
 
 def _get_real_failure(possible_first_error):
@@ -40,7 +41,7 @@ def fails_with(mapping):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(request, bound_log, *args, **kwargs):
 
             def _fail(failure, request):
                 failure = _get_real_failure(failure)
@@ -53,6 +54,8 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
+                    bound_log.fields(uri=request.uri,
+                                     **errorObj).info(failure.value.message)
                 else:
                     errorObj = {
                         'type': 'InternalError',
@@ -60,11 +63,13 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
+                    errlog = bound_log.failure(failure)
+                    errlog.fields(uri=request.uri,
+                                  code=code).error('Unhandled Error')
                 request.setResponseCode(code)
-                log.err(failure)
                 return json.dumps(errorObj)
 
-            d = defer.maybeDeferred(f, request, *args, **kwargs)
+            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
             d.addErrback(_fail, request)
             return d
         return _
@@ -91,15 +96,41 @@ def succeeds_with(success_code):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(request, bound_log, *args, **kwargs):
             def _succeed(result, request):
                 if request.code is None:
                     request.setResponseCode(success_code)
+                bound_log.fields(
+                    uri=request.uri,
+                    code=request.code
+                ).info('OK')
                 return result
 
-            d = defer.maybeDeferred(f, request, *args, **kwargs)
+            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
             d.addCallback(_succeed, request)
             return d
+        return _
+    return decorator
+
+
+def with_transaction_id():
+    """
+    Generates a request txnid
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(request, *args, **kwargs):
+            transaction_id = generate_transaction_id()
+            request.setHeader('X-Response-Id', transaction_id)
+            bound_log = log.fields(transaction_id=transaction_id)
+            bound_log.struct(
+                method=request.method,
+                uri=request.uri,
+                clientproto=request.clientproto,
+                referer=request.getHeader("referer"),
+                useragent=request.getHeader("user-agent")
+            )
+            return f(request, bound_log, *args, **kwargs)
         return _
     return decorator
 
