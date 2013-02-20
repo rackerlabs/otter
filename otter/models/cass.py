@@ -328,7 +328,7 @@ class CassScalingGroup(object):
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
         """
-        # If there is no policies - make sure it's not because the group
+        # If there are no policies - make sure it's not because the group
         # doesn't exist
         def _check_if_empty(policies_dict):
             if len(policies_dict) == 0:
