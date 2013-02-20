@@ -8,7 +8,8 @@ or launch configuration for a scaling group.
 import json
 
 from otter.json_schema import group_schemas
-from otter.rest.decorators import validate_body, fails_with, succeeds_with
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store
 
@@ -18,9 +19,10 @@ from otter.rest.application import app, get_store
 #       corresponding tests also changed
 @app.route('/<string:tenantId>/groups/<string:groupId>/config',
            methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, tenantId, groupId):
+def view_config_for_scaling_group(request, log, tenantId, groupId):
     """
     Get the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -53,10 +55,11 @@ def view_config_for_scaling_group(request, tenantId, groupId):
 #       corresponding tests also changed
 @app.route('/<string:tenantId>/groups/<string:groupId>/config',
            methods=['PUT'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.config)
-def edit_config_for_scaling_group(request, tenantId, groupId, data):
+def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -86,9 +89,10 @@ def edit_config_for_scaling_group(request, tenantId, groupId, data):
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/launch',
            methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_launch_config(request, tenantId, groupId):
+def view_launch_config(request, log, tenantId, groupId):
     """
     Get the launch configuration for a scaling group, which includes the
     details of how to create a server, from what image, which load balancers to
@@ -139,10 +143,11 @@ def view_launch_config(request, tenantId, groupId):
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/launch',
            methods=['PUT'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.launch_config)
-def edit_launch_config(request, tenantId, groupId, data):
+def edit_launch_config(request, log, tenantId, groupId, data):
     """
     Edit the launch configuration for a scaling group, which includes the
     details of how to create a server, from what image, which load balancers to
