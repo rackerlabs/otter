@@ -340,9 +340,9 @@ class CassScalingGroup(object):
                 rec = None
                 policyId = None
                 for rawRec in row['cols']:
-                    if rawRec.get('name', None) is 'policyId':
+                    if rawRec.get('name', None) == 'policyId':
                         policyId = rawRec.get('value')
-                    if rawRec.get('name', None) is 'data':
+                    if rawRec.get('name', None) == 'data':
                         rec = rawRec.get('value')
                 if rec is None or policyId is None:
                     raise CassBadDataError("Received malformed response without the "
@@ -613,7 +613,7 @@ class CassScalingGroup(object):
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
         for rawRec in rawResponse[0].get('cols', []):
-            if rawRec.get('name', None) is 'data':
+            if rawRec.get('name', None) == 'data':
                 rec = rawRec.get('value', None)
         if rec is None:
             raise CassBadDataError("Received malformed response without the "
@@ -769,7 +769,7 @@ class CassScalingGroupCollection:
                     raise CassBadDataError("Received malformed response with no cols")
                 rec = None
                 for rawRec in row.get('cols', []):
-                    if rawRec.get('name', None) is 'groupId':
+                    if rawRec.get('name', None) == 'groupId':
                         rec = rawRec.get('value', None)
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "

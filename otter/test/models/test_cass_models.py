@@ -1,6 +1,7 @@
 """
 Tests for :mod:`otter.models.mock`
 """
+import json
 import mock
 
 from twisted.trial.unittest import TestCase
@@ -20,6 +21,27 @@ from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 
 
+def _de_identify(json_obj):
+    """
+    >>> 'ab' == 'ab'
+    True
+    >>> 'ab' is 'ab'
+    True
+
+    >>> 'ab' == ' '.join(['a', 'b'])
+    True
+    >>> 'ab' is ' '.join(['a', 'b'])
+    False
+
+    Data coming out of cassandra will not be identical to strings that are just
+    created, so this function is a way to a mock JSON object not identical to
+    a re-creation the same object, or its keys/values not identical to an
+    expected string.
+    """
+    if json_obj is not None:
+        return json.loads(json.dumps(json_obj))
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -34,7 +56,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [None]
 
         def _responses(*args):
-            result = self.returns.pop(0)
+            result = _de_identify(self.returns.pop(0))
             if isinstance(result, Exception):
                 return defer.fail(result)
             return defer.succeed(result)
@@ -42,23 +64,23 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.side_effect = _responses
 
         self.tenant_id = '11111'
-        self.config = {
+        self.config = _de_identify({
             'name': '',
             'cooldown': 0,
             'minEntities': 0
-        }
+        })
         # this is the config with all the default vals
-        self.output_config = {
+        self.output_config = _de_identify({
             'name': '',
             'cooldown': 0,
             'minEntities': 0,
             'maxEntities': None,
             'metadata': {}
-        }
-        self.launch_config = {
+        })
+        self.launch_config = _de_identify({
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
-        }
+        })
         self.policies = []
         self.group = CassScalingGroup(self.tenant_id, '12345678',
                                       self.connection)
@@ -406,14 +428,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         def execute_respond(cql, cqlargs, *other_args, **kwargs):
             if 'scaling_config' in cql:  # view config - seeing if it's there
-                return defer.succeed([
+                return defer.succeed(_de_identify([
                     {'cols': [{'timestamp': None,
                                'name': 'data',
                                'value': '{"_ver": 5}',
                                'ttl': None}],
-                     'key': ''}])
+                     'key': ''}]))
             else:
-                return defer.succeed([])
+                return defer.succeed(_de_identify([]))
         self.connection.execute.side_effect = execute_respond
 
         result = self.assert_deferred_succeeded(self.group.list_policies())
@@ -424,13 +446,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingGroupError`
         """
-        def execute_respond(cql, cqlargs, *other_args, **kwargs):
-            if 'scaling_config' in cql:  # view config - seeing if it's there
-                return defer.succeed([])  # no config - no such group
-            else:
-                return defer.succeed([])
-        self.connection.execute.side_effect = execute_respond
-
+        # no scaling policies, and view config is empty too
+        self.returns = [[], []]
         self.assert_deferred_failed(self.group.list_policies(),
                                     NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -645,16 +662,25 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """ Setup the mocks """
         self.connection = mock.MagicMock()
 
-        self.connection.execute.return_value = defer.succeed(None)
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
+
         self.collection = CassScalingGroupCollection(self.connection)
         self.tenant_id = 'goo1234'
-        self.config = {
+        self.config = _de_identify({
             'name': 'blah',
             'cooldown': 600,
             'minEntities': 0,
             'maxEntities': 10,
             'metadata': {}
-        }
+        })
         self.hashkey_patch = mock.patch(
             'otter.models.cass.generate_key_str')
         self.mock_key = self.hashkey_patch.start()
@@ -751,16 +777,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         Test that you can list a bunch of configs.
         """
-        mockdata = [
+        self.returns = [[
             {'cols': [{'timestamp': None, 'name': 'groupId',
                        'value': 'group1', 'ttl': None}], 'key': ''},
             {'cols': [{'timestamp': None, 'name': 'groupId',
-                       'value': 'group3', 'ttl': None}], 'key': ''}]
+                       'value': 'group3', 'ttl': None}], 'key': ''}]]
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 2)
@@ -776,12 +801,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         Test that you can list a bunch of configs.
         """
-        mockdata = []
+        self.returns = [[]]
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        self.connection.execute.return_value = defer.succeed(mockdata)
         d = self.collection.list_scaling_groups('123')
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 0)
@@ -807,7 +831,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
               'key': ''}]
         )
         for bad in bads:
-            self.connection.execute.return_value = defer.succeed(bad)
+            self.returns = [bad]
             self.assert_deferred_failed(self.collection.list_scaling_groups('123'),
                                         CassBadDataError)
             self.flushLoggedErrors(CassBadDataError)
@@ -827,12 +851,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         If the scaling group doesn't exist, :class:`NoSuchScalingGroup` is
         raised
         """
-        execute_results = [[], None]  # view returns an empty list
-
-        def execute_respond(*args, **kwargs):
-            return defer.succeed(execute_results.pop(0))
-
-        self.connection.execute.side_effect = execute_respond
+        self.returns = [[], None]  # view returns an empty list
 
         self.assert_deferred_failed(
             self.collection.delete_scaling_group('123', 'group1'),
@@ -845,19 +864,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         If the scaling group exists, deletes scaling group
         """
-        view_config = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
-        execute_results = [view_config, None]  # executing update returns None
-
-        def execute_respond(*args, **kwargs):
-            return defer.succeed(execute_results.pop(0))
-
-        self.connection.execute.side_effect = execute_respond
+        self.returns = [
+            [
+                {'cols': [{'timestamp': None,
+                           'name': 'data',
+                           'value': '{}',
+                           'ttl': None}],
+                 'key': ''}],
+            None]  # executing update returns None
 
         result = self.assert_deferred_succeeded(
             self.collection.delete_scaling_group('123', 'group1'))
