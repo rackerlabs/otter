@@ -18,6 +18,9 @@ test: unit integration
 run:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
+mockrun:
+	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
+
 env:
 	./scripts/bootstrap-virtualenv.sh
 

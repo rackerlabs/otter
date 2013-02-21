@@ -38,6 +38,10 @@ class Options(usage.Options):
          "path to JSON configuration file."]
     ]
 
+    optFlags = [
+        ["mock", "m", "whether to use a mock back end instead of cassandra"]
+    ]
+
     def postOptions(self):
         """
         Merge our commandline arguments with our config file.
@@ -49,15 +53,16 @@ def makeService(config):
     """
     Set up the otter-api service.
     """
-    seed_endpoints = [
-        clientFromString(reactor, host)
-        for host in config['cassandra']['seed_hosts']]
+    if not config.get('mock', False):
+        seed_endpoints = [
+            clientFromString(reactor, host)
+            for host in config['cassandra']['seed_hosts']]
 
-    cassandra_cluster = RoundRobinCassandraCluster(
-        seed_endpoints,
-        config['cassandra']['keyspace'])
+        cassandra_cluster = RoundRobinCassandraCluster(
+            seed_endpoints,
+            config['cassandra']['keyspace'])
 
-    set_store(CassScalingGroupCollection(cassandra_cluster))
+        set_store(CassScalingGroupCollection(cassandra_cluster))
 
     s = MultiService()
 
