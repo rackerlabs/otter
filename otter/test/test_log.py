@@ -290,4 +290,3 @@ class TwiggyLoggingTests(TestCase):
         self.assertEqual(m['short_message'], 'uh oh')
         self.assertIn('ZeroDivisionError: integer division or modulo by zero',
                       m['full_message'])
-
