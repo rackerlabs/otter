@@ -9,6 +9,8 @@ from twisted.web.static import File
 
 from klein import Klein
 
+from otter.util.http import append_segments
+
 
 _store = None
 _urlRoot = 'http://127.0.0.1'
@@ -110,15 +112,15 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         else
     """
     api = "v{0}".format(api_version)
-    path_parts = [get_url_root(), api, tenant_id, "groups"]
+    segments = [get_url_root(), api, tenant_id, "groups"]
     if group_id is not None:
-        path_parts.append(group_id)
+        segments.append(group_id)
         if policy_id is not None:
-            path_parts.extend(("policies", policy_id))
+            segments.extend(("policies", policy_id))
             if webhook_id is not None:
-                path_parts.extend(("webhooks", webhook_id))
+                segments.extend(("webhooks", webhook_id))
 
-    url = "/".join(path_parts).rstrip('/')
+    url = append_segments(*segments).rstrip('/')
 
     if format == "json":
         links = [

@@ -1,3 +1,5 @@
+# encoding: utf-8
+
 """
 Tests for :mod:`otter.rest.application`
 """
@@ -236,3 +238,15 @@ class LinkGenerationTestCase(TestCase):
             capability_hash='xxx', capability_version="8")
         self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/8/xxx'},
                       json_blob)
+
+    def test_capability_urls_unicode_escaped(self):
+        """
+        Even if unicode path bits are provided, only bytes urls are returned
+        """
+        self.assertTrue(isinstance(
+            get_autoscale_links(u'11111', group_id=u'1', policy_id=u'2',
+                                format=None),
+            str))
+        snowman = get_autoscale_links('☃', group_id='☃', format=None)
+        self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83')
+        self.assertTrue(isinstance(snowman, str))

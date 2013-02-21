@@ -61,6 +61,15 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     mock_request.code = None
     mock_request.setHeader = mock.MagicMock(spec=())
 
+    # if setHeader has been called a with unicode value, twisted will raise a
+    # TypeError after the request has been closed and it is attemptig to write
+    # to the network.  So just fail here for testing purposes
+    def _twisted_compat(name, value):
+        if not isinstance(name, str) or not isinstance(value, str):
+            raise TypeError("Can only pass-through bytes on Python 2")
+
+    mock_request.setHeader.side_effect = _twisted_compat
+
     def build_response(_):
         # build a response that offers some useful attributes of an IResponse
         status_code = 200
