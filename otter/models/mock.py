@@ -1,5 +1,6 @@
 """
- Mock interface for the front-end scaling groups engine
+Mock (in memory) implementation of the store for the front-end scaling groups
+engine
 """
 from copy import deepcopy
 from collections import defaultdict
@@ -33,7 +34,7 @@ def generate_entity_links(tenant_id, entity_ids,
 
 class MockScalingGroup:
     """
-    Mock scaling group record
+    .. autointerface:: otter.models.interface.IScalingGroup
 
     :ivar tenant_id: the tenant ID of the scaling group - once set, should not
         be updated
@@ -393,7 +394,7 @@ class MockScalingGroup:
 
 class MockScalingGroupCollection:
     """
-    Mock scaling group collections
+    .. autointerface:: otter.models.interface.IScalingGroupCollection
     """
     zope.interface.implements(IScalingGroupCollection)
 

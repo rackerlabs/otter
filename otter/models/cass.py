@@ -1,5 +1,5 @@
 """
- Mock interface for the front-end scaling groups engine
+Cassandra implementation of the store for the front-end scaling groups engine
 """
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchPolicyError)
@@ -82,7 +82,7 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
 
 class CassScalingGroup(object):
     """
-    Scaling group record
+    .. autointerface:: otter.models.interface.IScalingGroup
 
     :ivar tenant_id: the tenant ID of the scaling group - once set, should not
         be updated
@@ -392,24 +392,24 @@ class CassScalingGroup(object):
 
 class CassScalingGroupCollection:
     """
-    Scaling group collections
+    .. autointerface:: otter.models.interface.IScalingGroupCollection
 
-    The structure..
+    The Cassandra schema structure::
 
-    Configs:
-    CF = scaling_config
-    RK = tenantId
-    CK = groupID
+        Configs:
+        CF = scaling_config
+        RK = tenantId
+        CK = groupID
 
-    Launch Configs (mirrors config):
-    CF = launch_config
-    RK = tenantId
-    CK = groupID
+        Launch Configs (mirrors config):
+        CF = launch_config
+        RK = tenantId
+        CK = groupID
 
-    Scaling Policies (doesn't mirror config):
-    CF = policies
-    RK = tenantId
-    CK = groupID:policyId
+        Scaling Policies (doesn't mirror config):
+        CF = policies
+        RK = tenantId
+        CK = groupID:policyId
     """
     zope.interface.implements(IScalingGroupCollection)
 
