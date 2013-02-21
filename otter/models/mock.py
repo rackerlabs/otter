@@ -431,7 +431,7 @@ class MockScalingGroupCollection:
 
     def list_scaling_groups(self, tenant):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group`
+        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
         return defer.succeed(self.data.get(tenant, {}).values())
 

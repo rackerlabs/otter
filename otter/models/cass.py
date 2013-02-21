@@ -476,7 +476,7 @@ class CassScalingGroupCollection:
 
     def list_scaling_groups(self, tenant_id):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group`
+        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
         def _grab_list(rawResponse):
             if rawResponse is None:
