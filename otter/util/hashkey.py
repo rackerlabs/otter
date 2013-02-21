@@ -25,7 +25,7 @@ def generate_transaction_id():
     Generally returns a UUID, but we can always change it later
     """
 
-    return uuid.uuid4()
+    return str(uuid.uuid4())
 
 
 def generate_key_str(keytype):
