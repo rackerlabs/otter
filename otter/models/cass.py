@@ -51,12 +51,6 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenan
                     '"groupId" = :groupId AND deleted = False;')
 
 
-_config_table = "scaling_config"
-_launch_table = "launch_config"
-_policies_table = "scaling_policies"
-_webhooks_table = "policy_webhooks"
-
-
 def get_consistency_level(operation, resource):
     """
     Get the consistency level for a particular operation.
@@ -77,7 +71,7 @@ def get_consistency_level(operation, resource):
     return ConsistencyLevel.ONE
 
 
-def _build_policies(policies, queries, data, outpolicies):
+def _build_policies(policies, policies_table, queries, data, outpolicies):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -85,6 +79,9 @@ def _build_policies(policies, queries, data, outpolicies):
 
     :param policies: a list of policy data without ID
     :type policies: ``list`` of ``dict``
+
+    :param policies_table: the name of the policies table
+    :type policies_table: ``str``
 
     :param queries: a list of existing CQL queries to add to
     :type queries: ``list`` of ``str``
@@ -101,14 +98,15 @@ def _build_policies(policies, queries, data, outpolicies):
         for i in range(len(policies)):
             polname = "policy{}".format(i)
             polId = generate_key_str('policy')
-            queries.append(_cql_insert_policy.format(cf=_policies_table,
+            queries.append(_cql_insert_policy.format(cf=policies_table,
                                                      name=':' + polname))
             data[polname] = _serial_json_data(policies[i], 1)
             data[polname + "Id"] = polId
             outpolicies[polId] = policies[i]
 
 
-def _build_webhooks(bare_webhooks, queries, cql_parameters, output):
+def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
+                    output):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -117,6 +115,9 @@ def _build_webhooks(bare_webhooks, queries, cql_parameters, output):
     :param bare_webhooks: a list of webhook data without ID or webhook keys,
         or any generated capability hash info
     :type bare_webhooks: ``list`` of ``dict``
+
+    :param webhooks_table: the name of the webhooks table
+    :type webhooks_table: ``str``
 
     :param queries: a list of existing CQL queries to add to
     :type queries: ``list`` of ``str``
@@ -132,7 +133,7 @@ def _build_webhooks(bare_webhooks, queries, cql_parameters, output):
     for i in range(len(bare_webhooks)):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
-        queries.append(_cql_insert_webhook.format(cf=_webhooks_table,
+        queries.append(_cql_insert_webhook.format(cf=webhooks_table,
                                                   name=name))
 
         # generate the real data that will be stored, which includes the webhook
@@ -148,8 +149,6 @@ def _build_webhooks(bare_webhooks, queries, cql_parameters, output):
         cql_parameters['{0}Id'.format(name)] = webhook_id
         cql_parameters['{0}Key'.format(name)] = token
         output[webhook_id] = webhook_real
-
-    return queries
 
 
 class CassScalingGroup(object):
@@ -175,6 +174,10 @@ class CassScalingGroup(object):
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
+        self.config_table = "scaling_config"
+        self.launch_table = "launch_config"
+        self.policies_table = "scaling_policies"
+        self.webhooks_table = "policy_webhooks"
 
     def view_manifest(self):
         """
@@ -186,7 +189,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
-        query = _cql_view.format(cf=_config_table)
+        query = _cql_view.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
@@ -198,7 +201,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
-        query = _cql_view.format(cf=_launch_table)
+        query = _cql_view.format(cf=self.launch_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
@@ -224,7 +227,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_update.format(cf=_config_table, name=":scaling")]
+            queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -246,7 +249,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_update.format(cf=_launch_table, name=":launch")]
+            queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -305,7 +308,7 @@ class CassScalingGroup(object):
                 return self.view_config().addCallback(lambda _: data)
             return defer.succeed(data)
 
-        query = _cql_list_policy.format(cf=_policies_table)
+        query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
@@ -317,7 +320,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.get_policy`
         """
-        query = _cql_view_policy.format(cf=_policies_table)
+        query = _cql_view_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
@@ -342,7 +345,8 @@ class CassScalingGroup(object):
                        "groupId": self.uuid}
             outpolicies = {}
 
-            _build_policies(data, queries, cqldata, outpolicies)
+            _build_policies(data, self.policies_table, queries, cqldata,
+                            outpolicies)
 
             b = Batch(queries, cqldata,
                       consistency=get_consistency_level('create', 'policy'))
@@ -363,7 +367,7 @@ class CassScalingGroup(object):
             # previous state hasn't changed between when you
             # got it back from Cassandra and when you are
             # sending your new insert request.
-            queries = [_cql_update_policy.format(cf=_policies_table, name=":policy")]
+            queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -388,7 +392,7 @@ class CassScalingGroup(object):
             # got it back from Cassandra and when you are
             # sending your new insert request.
             queries = [
-                _cql_delete_policy.format(cf=_policies_table)]
+                _cql_delete_policy.format(cf=self.policies_table)]
             b = Batch(
                 queries, {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
@@ -425,7 +429,8 @@ class CassScalingGroup(object):
                           "policyId": policy_id}
             output = {}
 
-            _build_webhooks(data, queries, cql_params, output)
+            _build_webhooks(data, self.webhooks_table, queries, cql_params,
+                            output)
 
             b = Batch(queries, cql_params,
                       consistency=get_consistency_level('create', 'webhook'))
@@ -513,6 +518,10 @@ class CassScalingGroupCollection:
         :param cflist: Column family list
         """
         self.connection = connection
+        self.config_table = "scaling_config"
+        self.launch_table = "launch_config"
+        self.policies_table = "scaling_policies"
+        self.webhooks_table = "policy_webhooks"
 
     def create_scaling_group(self, tenant_id, config, launch, policies=None):
         """
@@ -521,8 +530,8 @@ class CassScalingGroupCollection:
         scaling_group_id = generate_key_str('scalinggroup')
 
         queries = [
-            _cql_insert.format(cf=_config_table, name=":scaling"),
-            _cql_insert.format(cf=_launch_table, name=":launch")]
+            _cql_insert.format(cf=self.config_table, name=":scaling"),
+            _cql_insert.format(cf=self.launch_table, name=":launch")]
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
@@ -531,7 +540,8 @@ class CassScalingGroupCollection:
                 }
 
         outpolicies = {}
-        _build_policies(policies, queries, data, outpolicies)
+        _build_policies(policies, self.policies_table, queries, data,
+                        outpolicies)
 
         b = Batch(queries, data,
                   consistency=get_consistency_level('create', 'group'))
@@ -550,9 +560,9 @@ class CassScalingGroupCollection:
             # got it back from Cassandra and when you are
             # sending your new insert request.
             queries = [
-                _cql_delete.format(cf=_config_table),
-                _cql_delete.format(cf=_launch_table),
-                _cql_delete.format(cf=_policies_table)]
+                _cql_delete.format(cf=self.config_table),
+                _cql_delete.format(cf=self.launch_table),
+                _cql_delete.format(cf=self.policies_table)]
             b = Batch(
                 queries, {"tenantId": tenant_id, "groupId": scaling_group_id},
                 consistency=get_consistency_level('delete', 'group'))
@@ -586,7 +596,7 @@ class CassScalingGroupCollection:
                                              self.connection))
             return data
 
-        query = _cql_list.format(cf=_config_table)
+        query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
