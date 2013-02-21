@@ -259,6 +259,37 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         })
         self.flushLoggedErrors(BlahError)
 
+    def test_specified_failure_escaping(self):
+        """
+        Tests that you can select a specific error from the schema
+        and fail on it.
+        :return nothing
+        """
+        mapping = {KeyError: 404, BlahError: 400}
+
+        @fails_with(select_dict([BlahError], mapping))
+        @succeeds_with(204)
+        def doWork(request, log):
+            return defer.fail(BlahError('fail {'))
+
+        d = doWork(self.mockRequest, self.mockLog)
+        r = self.assert_deferred_succeeded(d)
+        self.mockRequest.setResponseCode.assert_called_once_with(400)
+
+        self.mockLog.fields.assert_called_once_with(code=400, uri='/',
+                                                    details='', message='fail {',
+                                                    type='BlahError')
+        self.mockLog.fields().info.assert_called_once_with('fail {{')
+
+        faultDoc = json.loads(r)
+        self.assertEqual(faultDoc, {
+            "message": "fail {",
+            "code": 400,
+            "type": "BlahError",
+            "details": ""
+        })
+        self.flushLoggedErrors(BlahError)
+
     def test_unspecified_failure(self):
         """
         Tests that errors that were not expected will 500
