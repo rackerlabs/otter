@@ -164,6 +164,17 @@ class CassScalingGroup(object):
 
     :ivar connection: silverberg client used to connect to cassandra
     :type connection: :class:`silverberg.client.CQLClient`
+
+    IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
+    exist.  Therefore, before doing an update, a read must be performed first
+    else an entry is created where none should have been.
+
+    Cassandra doesn't have atomic read-update.  You can't be guaranteed that the
+    previous state (from the read) hasn't changed between when you got it back
+    from Cassandra and when you are sending your new update/insert request.
+
+    Also, because deletes are done as tombstones rather than actually deleting,
+    deletes are also updates and hence a read must be performed before deletes.
     """
     zope.interface.implements(IScalingGroup)
 
@@ -222,11 +233,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
         def _do_update_config(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -244,11 +250,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
         def _do_update_launch(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -334,12 +335,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.create_policies`
         """
         def _do_create_pol(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
-
             queries = []
             cqldata = {"tenantId": self.tenant_id,
                        "groupId": self.uuid}
@@ -362,11 +357,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
         def _do_update_launch(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -386,11 +376,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
         def _do_delete_policy(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [
                 _cql_delete_policy.format(cf=self.policies_table)]
             b = Batch(
@@ -417,12 +402,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
         def _do_create(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
-
             queries = []
             cql_params = {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
@@ -506,6 +485,17 @@ class CassScalingGroupCollection:
         CF = policies
         RK = tenantId
         CK = groupID:policyId
+
+    IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
+    exist.  Therefore, before doing an update, a read must be performed first
+    else an entry is created where none should have been.
+
+    Cassandra doesn't have atomic read-update.  You can't be guaranteed that the
+    previous state (from the read) hasn't changed between when you got it back
+    from Cassandra and when you are sending your new update/insert request.
+
+    Also, because deletes are done as tombstones rather than actually deleting,
+    deletes are also updates and hence a read must be performed before deletes.
     """
     zope.interface.implements(IScalingGroupCollection)
 
@@ -554,11 +544,6 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
         def _delete_it(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [
                 _cql_delete.format(cf=self.config_table),
                 _cql_delete.format(cf=self.launch_table),
