@@ -114,15 +114,7 @@ class MockScalingGroup:
 
     def view_manifest(self):
         """
-        The manifest contains everything required to configure this scaling:
-        the config, the launch config, and all the scaling policies.
-
-        :return: a dictionary corresponding to the JSON schema at
-            :data:``otter.json_schema.model_schemas.view_manifest``
-        :rtype: ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
         if self.config is None:
             return defer.fail(self.error)
@@ -135,13 +127,7 @@ class MockScalingGroup:
 
     def view_config(self):
         """
-        :return: a view of the config, as specified by
-            :data:`otter.json_schema.group_schemas.config`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -149,13 +135,7 @@ class MockScalingGroup:
 
     def view_launch_config(self):
         """
-        :return: a view of the launch config, as specified by
-            :data:`otter.json_schema.group_schemas.launch_config`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -163,22 +143,7 @@ class MockScalingGroup:
 
     def view_state(self):
         """
-        The state of the scaling group consists of a mapping of entity id's to
-        entity links for the current entities in the scaling group, a mapping
-        of entity id's to entity links for the pending entities in the scaling
-        group, the desired steady state number of entities, and a boolean
-        specifying whether scaling is currently paused.
-
-        The entity links are in JSON link format.
-
-        :return: a view of the state of the scaling group corresponding to the
-            JSON schema at :data:``otter.json_schema.model_schemas.group_state``
-
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -191,22 +156,7 @@ class MockScalingGroup:
 
     def update_config(self, data, partial_update=False):
         """
-        Update the scaling group configuration paramaters based on the
-        attributes in ``config``.  This can update the already-existing values,
-        or just overwrite them - it is up to the implementation.
-
-        Every time this is updated, the steady state and the number of entities
-        should be checked/modified to ensure compliance with the minimum and
-        maximum number of entities.
-
-        :param config: Configuration data in JSON format, as specified by
-            :data:`otter.json_schema.scaling_group.config`
-        :type config: ``dict``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -223,18 +173,7 @@ class MockScalingGroup:
 
     def update_launch_config(self, data):
         """
-        Update the scaling group launch configuration parameters based on the
-        attributes in ``launch_config``.  This can update the already-existing
-        values, or just overwrite them - it is up to the implementation.
-
-        :param launch_config: launch config data in JSON format, as specified
-            by :data:`otter.json_schema.scaling_group.launch_config`
-        :type launch_config: ``dict``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -244,23 +183,7 @@ class MockScalingGroup:
 
     def set_steady_state(self, steady_state):
         """
-        The steady state represents the number of entities - defaults to the
-        minimum. This number represents how many entities _should_ be
-        currently in the system to handle the current load. Its value is
-        constrained to be between ``min_entities`` and ``max_entities``,
-        inclusive.
-
-        :param steady_state: The new value for the desired number of entities
-            in steady state.  If this value is greater than ``max_entities``,
-            the value will be set to ``max_entities``.  Similarly, if this
-            value is less than ``min_entities``, the value will be set to
-            ``min_entities``.
-        :type steady_state: ``int``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.set_steady_state`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -273,18 +196,7 @@ class MockScalingGroup:
 
     def bounce_entity(self, entity_id):
         """
-        Rebuilds an entity given by the entity ID.  This essentially deletes
-        the given entity and a new one will be rebuilt in its place.
-
-        :param entity_id: the uuid of the entity to delete
-        :type entity_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: NoSuchEntityError if the entity is not a member of the scaling
-            group
+        see :meth:`otter.models.interface.IScalingGroup.bounce_entity`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -298,15 +210,7 @@ class MockScalingGroup:
 
     def list_policies(self):
         """
-        Gets all the policies associated with particular scaling group.
-
-        :return: a dict of the policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.list_policies`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -315,19 +219,7 @@ class MockScalingGroup:
 
     def get_policy(self, policy_id):
         """
-        Gets the specified policy on this particular scaling group.
-
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
-
-        :return: a policy, as specified by
-            :data:`otter.json_schema.scaling_group.policy`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.get_policy`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -341,20 +233,7 @@ class MockScalingGroup:
 
     def create_policies(self, data):
         """
-        Create a set of new scaling policies.
-
-        :param data: a list of one or more scaling policies in JSON format,
-            each of which is defined by
-            :data:`otter.json_schema.group_schemas.policy`
-        :type data: ``list`` of ``dict``
-
-        :return: dictionary of UUIDs to their matching newly created scaling
-            policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: ``dict`` of ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.create_policies`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -370,19 +249,7 @@ class MockScalingGroup:
 
     def update_policy(self, policy_id, data):
         """
-        Updates an existing policy with the data given.
-
-        :param policy_id: the uuid of the entity to update
-        :type policy_id: ``str``
-
-        :param data: the details of the scaling policy in JSON format
-        :type data: ``dict``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -396,17 +263,7 @@ class MockScalingGroup:
 
     def delete_policy(self, policy_id):
         """
-        Delete the specified policy on this particular scaling group, and all
-        of its associated webhooks as well.
-
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -424,16 +281,7 @@ class MockScalingGroup:
 
     def list_webhooks(self, policy_id):
         """
-        Gets all the capability URLs created for one particular scaling policy
-
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
-
-        :return: a dict of the webhooks, as specified by
-            :data:`otter.json_schema.group_schemas.webhook`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -447,18 +295,7 @@ class MockScalingGroup:
 
     def create_webhooks(self, policy_id, data):
         """
-        Creates a new capability URL for one particular scaling policy
-
-        :param policy_id: the uuid of the policy to be deleted
-        :type policy_id: ``str``
-
-        :param data: the details of the webhook in JSON format, as specified
-            by :data:`otter.json_schema.group_schemas.webhook`
-        :type data: ``dict``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -485,24 +322,7 @@ class MockScalingGroup:
 
     def get_webhook(self, policy_id, webhook_id):
         """
-        Gets the specified webhook for the specified policy on this particular
-        scaling group.
-
-        :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
-
-        :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
-
-        :return: a webhook, as specified by
-            :data:`otter.json_schema.model_schemas.webhook`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.get_webhook`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -518,24 +338,7 @@ class MockScalingGroup:
 
     def update_webhook(self, policy_id, webhook_id, data):
         """
-        Update the specified webhook for the specified policy on this particular
-        scaling group.
-
-        :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
-
-        :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
-
-        :param data: the details of the scaling policy in JSON format
-        :type data: ``dict``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -554,21 +357,7 @@ class MockScalingGroup:
 
     def delete_webhook(self, policy_id, webhook_id):
         """
-        Delete the specified webhook for the specified policy on this particular
-        scaling group.
-
-        :param policy_id: the uuid of the policy
-        :type policy_id: ``str``
-
-        :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-        :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        see :meth:`otter.models.interface.IScalingGroup.delete_webhook`
         """
         if self.error is not None:
             return defer.fail(self.error)
@@ -618,11 +407,7 @@ class MockScalingGroupCollection:
 
     def create_scaling_group(self, tenant, config, launch, policies=None):
         """
-        Create the scaling group, and create config's ``minEntities`` number
-        of pending entities on the scaling group.
-
-        :return: :class:`Deferred` that fires with the uuid of the created
-            scaling group
+        see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         uuid = str(uuid4())
         self.data[tenant][uuid] = MockScalingGroup(
@@ -636,9 +421,7 @@ class MockScalingGroupCollection:
 
     def delete_scaling_group(self, tenant, uuid):
         """
-        Delete the scaling group
-
-        :return: :class:`Deferred` that fires with None
+        see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
         if (tenant not in self.data or uuid not in self.data[tenant]):
             return defer.fail(NoSuchScalingGroupError(tenant, uuid))
@@ -647,21 +430,13 @@ class MockScalingGroupCollection:
 
     def list_scaling_groups(self, tenant):
         """
-        List the scaling groups
-
-        :return: :class:`Deferred` that fires with a mapping of scaling
-            group uuids to scaling groups
-        :rtype: :class:`Deferred` that fires with a ``dict``
+        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group`
         """
         return defer.succeed(self.data.get(tenant, {}).values())
 
     def get_scaling_group(self, tenant, uuid):
         """
-        Get a scaling group
-
-        :return: a scaling group model
-        :rtype: a :class:`IScalingGroup`
-            provider
+        see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         result = self.data.get(tenant, {}).get(uuid, None)
 
@@ -671,16 +446,6 @@ class MockScalingGroupCollection:
 
     def execute_webhook(self, capability_hash):
         """
-        Identify the scaling policy (and tenant ID, group ID, etc.) associated
-        with this particular capability URL hash and execute said policy.
-
-        :param capability_hash: the capability hash associated with a particular
-            scaling policy
-        :type capability_hash: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`UnrecognizedCapabilityError` if the capability hash
-            does not match any non-deleted policy
+        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
         """
         raise NotImplementedError()
