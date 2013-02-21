@@ -213,11 +213,11 @@ class TwiggyLoggingTests(TestCase):
         Log fields should be included in the formatted message prefixed with
         an underscore.
         """
-        log.fields(foo='bar', baz='bax').info('hello')
+        log.fields(foo='bar', baz='bax {').info('hello')
 
         m = self.last_logged_json()
         self.assertEqual(m['_foo'], 'bar')
-        self.assertEqual(m['_baz'], 'bax')
+        self.assertEqual(m['_baz'], 'bax {')
 
     def test_fallback(self):
         """
@@ -290,3 +290,4 @@ class TwiggyLoggingTests(TestCase):
         self.assertEqual(m['short_message'], 'uh oh')
         self.assertIn('ZeroDivisionError: integer division or modulo by zero',
                       m['full_message'])
+
