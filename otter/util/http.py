@@ -1,3 +1,7 @@
+"""
+HTTP utils, such as formulation of URLs
+"""
+
 from itertools import chain
 from urllib import quote
 
