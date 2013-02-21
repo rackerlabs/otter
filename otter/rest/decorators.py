@@ -33,6 +33,12 @@ def _get_real_failure(possible_first_error):
     return possible_first_error  # not a defer.FirstError
 
 
+def _escape_python_formats(str):
+    s = str.replace('{', '{{')
+    s = s.replace('}', '}}')
+    return s
+
+
 def fails_with(mapping):
     """
     Map a result.  In success case, returns the success_code, otherwise uses
@@ -55,7 +61,7 @@ def fails_with(mapping):
                         'details': getattr(failure.value, 'details', '')
                     }
                     bound_log.fields(uri=request.uri,
-                                     **errorObj).info(failure.value.message)
+                                     **errorObj).info(_escape_python_formats(failure.value.message))
                 else:
                     errorObj = {
                         'type': 'InternalError',
