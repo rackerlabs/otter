@@ -123,7 +123,8 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
     :type queries: ``list`` of ``str``
 
     :param cql_parameters: the dictionary of named parameters and values passed
-        in addition to the query to execute the query
+        in addition to the query to execute the query - additional parameters
+        will be added to this dictionary
     :type cql_paramters: ``dict``
 
     :param output: a dictionary to which to insert the created policies
