@@ -55,7 +55,7 @@ def makeService(config):
     """
     if not config.get('mock', False):
         seed_endpoints = [
-            clientFromString(reactor, host)
+            clientFromString(reactor, str(host))
             for host in config['cassandra']['seed_hosts']]
 
         cassandra_cluster = RoundRobinCassandraCluster(
@@ -69,7 +69,7 @@ def makeService(config):
     site = Site(root)
     site.displayTracebacks = False
 
-    api_service = service(config['port'], site)
+    api_service = service(str(config['port']), site)
     api_service.setServiceParent(s)
 
     return s
