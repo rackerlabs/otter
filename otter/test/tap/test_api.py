@@ -2,6 +2,7 @@
 Tests for the otter-api tap plugin.
 """
 
+import json
 import mock
 
 from twisted.internet import reactor
@@ -109,6 +110,16 @@ class APIMakeServiceTests(TestCase):
         makeService(test_config)
         self.service.assert_called_with('tcp:9999', self.Site.return_value)
 
+    def test_unicode_service_site_on_port(self):
+        """
+        makeService will create strports service with a byte endpoint string
+        even if config was given in unicode
+        """
+        unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
+        makeService(unicode_config)
+        self.service.assert_called_with('tcp:9999', self.Site.return_value)
+        self.assertTrue(isinstance(self.service.call_args[0][0], str))
+
     def test_is_MultiService(self):
         """
         makeService will return a MultiService.
@@ -130,6 +141,17 @@ class APIMakeServiceTests(TestCase):
         """
         makeService(test_config)
         self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+
+    def test_unicode_cassandra_seed_hosts_endpoints(self):
+        """
+        makeService will create a client endpoint for each address in the
+        cassandra seed_hosts with a byte endpoint string even if config was
+        given in unicode
+        """
+        unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
+        makeService(unicode_config)
+        self.clientFromString.assert_called_once_with(reactor, 'tcp:127.0.0.1:9160')
+        self.assertTrue(isinstance(self.clientFromString.call_args[0][1], str))
 
     def test_cassandra_cluster_with_endpoints_and_keyspace(self):
         """
