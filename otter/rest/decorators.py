@@ -106,7 +106,7 @@ def succeeds_with(success_code):
             def _succeed(result, request):
                 # Default twisted response code is 200.  Assuming that if this
                 # is 200, then it is the default and can be overriden
-                if request.code == 200:
+                if request.code == 200 or request.code is None:
                     request.setResponseCode(success_code)
                 bound_log.fields(
                     uri=request.uri,
