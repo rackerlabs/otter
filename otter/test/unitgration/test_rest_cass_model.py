@@ -185,7 +185,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
             'name': 'updated_config',
             'cooldown': 5,
             'minEntities': self._config['minEntities'] + 5,
-            'maxEntities': (self._config['maxEntities'] or 10) + 5,
+            'maxEntities': self._config['maxEntities'] + 5,
             'metadata': {
                 'anotherkey': 'anothervalue'
             }
@@ -238,7 +238,6 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
     As above, this could be made a base case instead... yadda yadda.
     """
     tenant_id = '11111'
-    group_id = None
 
     def setUp(self):
         """
@@ -247,22 +246,20 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         keyspace.resume()
         set_store(store)  # ensure it's the cassandra store
 
-        if self.group_id is None:
-            # only do this once
-            self._config = config()[0]
-            self._launch = launch_server_config()[0]
+        self._config = config()[0]
+        self._launch = launch_server_config()[0]
 
-            def _set_group_id(group_id):
-                self.group_id = group_id
-                self.policies_url = (
-                    '/v1.0/{tenant}/groups/{group}/policies'.format(
-                        tenant=self.tenant_id, group=self.group_id))
+        def _set_group_id(group_id):
+            self.group_id = group_id
+            self.policies_url = (
+                '/v1.0/{tenant}/groups/{group}/policies'.format(
+                    tenant=self.tenant_id, group=self.group_id))
 
-            mock_log = mock.MagicMock()
-            d = store.create_scaling_group(mock_log, self.tenant_id,
-                                           self._config, self._launch)
-            d.addCallback(_set_group_id)
-            return d
+        mock_log = mock.MagicMock()
+        d = store.create_scaling_group(mock_log, self.tenant_id,
+                                       self._config, self._launch)
+        d.addCallback(_set_group_id)
+        return d
 
     def tearDown(self):
         """
