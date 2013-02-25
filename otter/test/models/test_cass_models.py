@@ -52,6 +52,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Create a mock group
         """
         self.connection = mock.MagicMock()
+        self.mockLog = mock.MagicMock()
 
         self.returns = [None]
 
@@ -672,6 +673,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.connection.execute.side_effect = _responses
 
+        self.mockLog = mock.MagicMock()
+
         self.collection = CassScalingGroupCollection(self.connection)
         self.tenant_id = 'goo1234'
         self.config = _de_identify({
@@ -708,7 +711,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group('123', {}, {})
+        d = self.collection.create_scaling_group(self.mockLog, '123', {}, {})
         self.assertEqual(self.assert_deferred_succeeded(d),
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -735,7 +738,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group('123', {}, {}, [{}])
+        d = self.collection.create_scaling_group(self.mockLog, '123', {}, {}, [{}])
         self.assertEqual(self.assert_deferred_succeeded(d),
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -766,7 +769,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'VALUES (:tenantId, :groupId, :policy1Id, :policy1, False) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group('123', {}, {}, [{}, {}])
+        d = self.collection.create_scaling_group(self.mockLog, '123', {}, {}, [{}, {}])
         self.assertEqual(self.assert_deferred_succeeded(d),
                          self.mock_key.return_value)
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -786,7 +789,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        d = self.collection.list_scaling_groups('123')
+        d = self.collection.list_scaling_groups(self.mockLog,'123')
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 2)
         for row in r:
@@ -806,7 +809,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        d = self.collection.list_scaling_groups('123')
+        d = self.collection.list_scaling_groups(self.mockLog,'123')
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 0)
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -832,7 +835,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         )
         for bad in bads:
             self.returns = [bad]
-            self.assert_deferred_failed(self.collection.list_scaling_groups('123'),
+            self.assert_deferred_failed(self.collection.list_scaling_groups(self.mockLog,'123'),
                                         CassBadDataError)
             self.flushLoggedErrors(CassBadDataError)
 
@@ -854,7 +857,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[], None]  # view returns an empty list
 
         self.assert_deferred_failed(
-            self.collection.delete_scaling_group('123', 'group1'),
+            self.collection.delete_scaling_group(self.mockLog, '123', 'group1'),
             NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
         # only called once to view
@@ -874,7 +877,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             None]  # executing update returns None
 
         result = self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group('123', 'group1'))
+            self.collection.delete_scaling_group(self.mockLog, '123', 'group1'))
         self.assertIsNone(result)  # delete returns None
         # called twice - once to view and once to delete
         self.assertEqual(len(self.connection.execute.mock_calls), 2)

@@ -68,7 +68,7 @@ def list_all_scaling_groups(request, log, tenantId):
             "groups_links": []
         }
 
-    deferred = get_store().list_scaling_groups(tenantId)
+    deferred = get_store().list_scaling_groups(log, tenantId)
     deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred
@@ -247,7 +247,7 @@ def create_new_scaling_group(request, log, tenantId, data):
         wrapped.update(data)
         return {"group": wrapped}
 
-    deferred = get_store().create_scaling_group(
+    deferred = get_store().create_scaling_group(log, 
         tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
     deferred.addCallback(send_redirect, data)
@@ -407,7 +407,7 @@ def delete_scaling_group(request, log, tenantId, groupId):
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
     """
-    return get_store().delete_scaling_group(tenantId, groupId)
+    return get_store().delete_scaling_group(log, tenantId, groupId)
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state',

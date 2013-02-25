@@ -664,7 +664,7 @@ class CassScalingGroupCollection:
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
 
-    def create_scaling_group(self, tenant_id, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
         Create scaling group based on the tenant id, the configuration
         paramaters, the launch config, and optional scaling policies.
@@ -712,7 +712,7 @@ class CassScalingGroupCollection:
         d.addCallback(lambda _: scaling_group_id)
         return d
 
-    def delete_scaling_group(self, tenant_id, scaling_group_id):
+    def delete_scaling_group(self, log, tenant_id, scaling_group_id):
         """
         Delete the scaling group
 
@@ -746,7 +746,7 @@ class CassScalingGroupCollection:
         d = group.view_config()  # ensure that it's actually there
         return d.addCallback(_delete_it)  # only delete if it exists
 
-    def list_scaling_groups(self, tenant_id):
+    def list_scaling_groups(self, log, tenant_id):
         """
         List the scaling groups for this tenant ID
 

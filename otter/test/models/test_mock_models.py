@@ -674,6 +674,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
+        self.mockLog = mock.MagicMock()
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.config = {
@@ -727,7 +728,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, launch, policies))
+                self.mockLog, self.tenant_id, self.config, launch, policies))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1)
@@ -750,7 +751,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, launch, policies))
+                self.mockLog, self.tenant_id, self.config, launch, policies))
 
         self.assertEqual(len(mock_sgrp.return_value.add_entities.mock_calls), 1)
         self.assertEqual(
@@ -765,7 +766,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         mock_sgrp.assert_called_once_with(
             self.tenant_id, uuid,
@@ -778,13 +779,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1, "Group not added correctly")
 
         self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.tenant_id, uuid))
+            self.collection.delete_scaling_group(self.mockLog, self.tenant_id, uuid))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result, [], "Group not deleted from collection")
@@ -794,7 +795,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Deleting a scaling group that doesn't exist raises a
         :class:`NoSuchScalingGroupError` exception
         """
-        deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
+        deferred = self.collection.delete_scaling_group(self.mockLog, self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     @mock.patch('otter.models.mock.generate_capability',
@@ -854,7 +855,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         succeeded_deferreds = self._call_all_methods_on_group(uuid)
         for deferred in succeeded_deferreds:

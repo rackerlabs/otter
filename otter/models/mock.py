@@ -616,7 +616,7 @@ class MockScalingGroupCollection:
         # then they must be a valid new user.  Just create an account for them.
         self.data = defaultdict(dict)
 
-    def create_scaling_group(self, tenant, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant, config, launch, policies=None):
         """
         Create the scaling group, and create config's ``minEntities`` number
         of pending entities on the scaling group.
@@ -634,7 +634,7 @@ class MockScalingGroupCollection:
 
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, uuid):
+    def delete_scaling_group(self, log, tenant, uuid):
         """
         Delete the scaling group
 
@@ -645,7 +645,7 @@ class MockScalingGroupCollection:
         del self.data[tenant][uuid]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant):
+    def list_scaling_groups(self, log, tenant):
         """
         List the scaling groups
 
