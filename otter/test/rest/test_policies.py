@@ -200,7 +200,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             204, method="PUT", body=json.dumps(policy_examples()[1]))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_policy.assert_called_once_with(
             self.policy_id, policy_examples()[1])
 
@@ -266,7 +266,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.delete_policy.assert_called_once_with(self.policy_id)
 
     def test_delete_policy_failure_404(self):
