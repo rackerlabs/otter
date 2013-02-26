@@ -4,6 +4,7 @@ response from the rest resource.
 """
 
 from collections import defaultdict, namedtuple
+from urlparse import urlsplit
 
 from klein.test_resource import requestMock
 
@@ -114,7 +115,62 @@ class DummyException(Exception):
     pass
 
 
-class RestAPITestMixin(DeferredTestMixin):
+class RequestTestMixin(object):
+    """
+    Mixin that has utilities for asserting something about the status code,
+    getting header info, etc.
+    """
+    def assert_response(self, response_wrapper, expected_status, message=None):
+        """
+        Asserts that the response wrapper has the provided status code and
+        that it has a response ID header.
+
+        :param response_wrapper: the callbacked result from :func:`request`
+        :type response_wrapper: :class:`ResponseWrapper`
+
+        :param expected_status: what the response status code should be
+        :type expected_status: ``int``
+
+        :return: None
+        """
+        # If we're expecting a 405, it never hits the decorator;
+        # otherwise it needs to have sent a transaction ID.
+
+        if expected_status != 405:
+            self.assertNotEqual(response_wrapper.response.headers.getRawHeaders('X-Response-ID'), None)
+
+        error_message = [
+            "Got status {0} but expected {1}".format(
+                response_wrapper.response.code, expected_status),
+            "Response: {0}".format(response_wrapper.content)]
+        if message:
+            error_message.insert(0, message)
+
+        self.assertEqual(response_wrapper.response.code, expected_status,
+                         "\n".join(error_message))
+
+    def get_location_header(self, response_wrapper):
+        """
+        Retrieves the location header from the response wrapper, and returns
+        only the path portion of the url (also asserts that location should
+        only have been set once)
+
+        :param response_wrapper: the callbacked result from :func:`request`
+        :type response_wrapper: :class:`ResponseWrapper`
+
+        :return: path-only portion location header of the response wrapper
+        :rtype: ``str``
+        """
+        locations = response_wrapper.response.headers.getRawHeaders('location')
+        if locations is None:
+            return locations
+
+        self.assertEqual(len(locations), 1,
+                         "Too many location headers: {0!r}".format(locations))
+        return urlsplit(locations[0]).path
+
+
+class RestAPITestMixin(DeferredTestMixin, RequestTestMixin):
     """
     Setup and teardown for tests for the REST API endpoints
     """
@@ -159,17 +215,10 @@ class RestAPITestMixin(DeferredTestMixin):
         response_wrapper = self.assert_deferred_succeeded(
             request(root, method, endpoint or self.endpoint, body=body))
 
-        # If we're expecting a 405, it never hits the decorator;
-        # otherwise it needs to have sent a transaction ID.
-
-        if expected_status != 405:
-            self.assertNotEqual(response_wrapper.response.headers.getRawHeaders('X-Response-ID'), None)
-
-        self.assertEqual(response_wrapper.response.code, expected_status)
+        self.assert_response(response_wrapper, expected_status)
         if location is not None:
-            self.assertEqual(
-                response_wrapper.response.headers.getRawHeaders('location'),
-                [location])
+            self.assertEqual(self.get_location_header(response_wrapper),
+                             location)
         return response_wrapper.content
 
     def test_invalid_methods_are_405(self):
