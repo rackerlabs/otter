@@ -32,7 +32,7 @@ class TransactionIdTestCase(DeferredTestMixin, TestCase):
     def setUp(self):
         """ Basic Setup and patch the log """
         self.mockRequest = mock.MagicMock()
-        self.mockRequest.code = None
+        self.mockRequest.code = 200
         self.mockRequest.uri = '/'
         self.mockRequest.clientproto = 'HTTP/1.1'
         self.mockRequest.method = 'PROPFIND'
@@ -88,7 +88,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
     def setUp(self):
         """ Basic Setup and patch the log """
         self.mockRequest = mock.MagicMock()
-        self.mockRequest.code = None
+        self.mockRequest.code = 200
         self.mockRequest.uri = '/'
 
         self.mockLog = mock.MagicMock()
