@@ -179,10 +179,11 @@ class CassScalingGroup(object):
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, tenant_id, uuid, connection):
+    def __init__(self, log, tenant_id, uuid, connection):
         """
         Creates a CassScalingGroup object.
         """
+        self.log = log.name(self.__class__.__name__)
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
@@ -514,7 +515,7 @@ class CassScalingGroupCollection:
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
 
-    def create_scaling_group(self, tenant_id, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
@@ -540,7 +541,7 @@ class CassScalingGroupCollection:
         d.addCallback(lambda _: scaling_group_id)
         return d
 
-    def delete_scaling_group(self, tenant_id, scaling_group_id):
+    def delete_scaling_group(self, log, tenant_id, scaling_group_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
@@ -554,11 +555,11 @@ class CassScalingGroupCollection:
                 consistency=get_consistency_level('delete', 'group'))
             return b.execute(self.connection)
 
-        group = self.get_scaling_group(tenant_id, scaling_group_id)
+        group = self.get_scaling_group(log, tenant_id, scaling_group_id)
         d = group.view_config()  # ensure that it's actually there
         return d.addCallback(_delete_it)  # only delete if it exists
 
-    def list_scaling_groups(self, tenant_id):
+    def list_scaling_groups(self, log, tenant_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
@@ -578,7 +579,7 @@ class CassScalingGroupCollection:
                 if rec is None:
                     raise CassBadDataError("Received malformed response without the "
                                            "required fields")
-                data.append(CassScalingGroup(tenant_id, rec,
+                data.append(CassScalingGroup(log, tenant_id, rec,
                                              self.connection))
             return data
 
@@ -589,11 +590,11 @@ class CassScalingGroupCollection:
         d.addCallback(_grab_list)
         return d
 
-    def get_scaling_group(self, tenant_id, scaling_group_id):
+    def get_scaling_group(self, log, tenant_id, scaling_group_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
-        return CassScalingGroup(tenant_id, scaling_group_id,
+        return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
     def execute_webhook(self, capability_hash):
