@@ -177,4 +177,23 @@ class RestAPITestMixin(DeferredTestMixin):
         All methods other than GET return a 405: Forbidden Method
         """
         for method in self.invalid_methods:
+            print method, self.endpoint
             self.assert_status_code(405, method=method)
+
+    # def test_non_trailing_slash_redirects_to_trailing_slash(self):
+    #     """
+    #     Trying to hit the non-trailing-slash version of the URL results in a
+    #     redirect to the trailing slash version
+    #     """
+    #     self.assertTrue(self.endpoint.endswith('/'),
+    #                     "The default endpoint should have a trailing slash")
+
+    #     # HEAD works even if it's not listed in the available methods, but
+    #     # but that's handled elsewhere (probably in Twisted), so we can't use
+    #     # it for testing here.  So find a method that is not invalid, and use
+    #     # that.
+    #     for method in ('GET', 'PUT', 'POST', 'DELETE'):
+    #         if not method in self.invalid_methods:
+    #             self.assert_status_code(301, method=method,
+    #                                     endpoint=self.endpoint.rstrip('/'))
+    #             break
