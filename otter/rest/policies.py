@@ -117,7 +117,7 @@ def list_policies(request, log, tenantId, groupId):
             "policies_links": []
         }
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.list_policies()
     deferred.addCallback(format_policies)
     deferred.addCallback(json.dumps)
@@ -207,7 +207,7 @@ def create_policies(request, log, tenantId, groupId, data):
 
         return {'policies': policy_list}
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.create_policies(data)
     deferred.addCallback(format_policies_and_send_redirect)
     deferred.addCallback(json.dumps)
@@ -252,7 +252,7 @@ def get_policy(request, log, tenantId, groupId, policyId):
         policy_dict['links'] = get_autoscale_links(tenantId, groupId, policyId)
         return {'policy': policy_dict}
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.get_policy(policyId)
     deferred.addCallback(openstackify)
     deferred.addCallback(json.dumps)
@@ -282,7 +282,7 @@ def update_policy(request, log, tenantId, groupId, policyId, data):
 
 
     """
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.update_policy(policyId, data)
     return deferred
 
@@ -297,6 +297,6 @@ def delete_policy(request, log, tenantId, groupId, policyId):
     """
     Delete a scaling policy. If successful, no response body will be returned.
     """
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.delete_policy(policyId)
     return deferred

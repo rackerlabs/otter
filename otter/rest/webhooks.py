@@ -107,7 +107,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
             "webhooks_links": []
         }
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.list_webhooks(policyId)
     deferred.addCallback(format_webhooks)
     deferred.addCallback(json.dumps)
@@ -206,7 +206,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
 
         return {'webhooks': webhook_list}
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.create_webhooks(policyId, data)
     deferred.addCallback(format_webhooks_and_send_redirect)
     deferred.addCallback(json.dumps)
@@ -253,7 +253,7 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
                                  tenantId, groupId, policyId)
         return {'webhook': result}
 
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.get_webhook(policyId, webhookId)
     deferred.addCallback(format_one_webhook)
     deferred.addCallback(json.dumps)
@@ -283,7 +283,7 @@ def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
             }
         }
     """
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.update_webhook(policyId, webhookId, data)
     return deferred
 
@@ -299,6 +299,6 @@ def delete_webhook(request, log, tenantId, groupId, policyId, webhookId):
     Deletes a particular webhook.
     If successful, no response body will be returned.
     """
-    rec = get_store().get_scaling_group(tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.delete_webhook(policyId, webhookId)
     return deferred

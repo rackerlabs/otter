@@ -76,12 +76,13 @@ class MockScalingGroup:
     """
     zope.interface.implements(IScalingGroup)
 
-    def __init__(self, tenant_id, uuid, creation=None):
+    def __init__(self, log, tenant_id, uuid, creation=None):
         """
         Creates a MockScalingGroup object.  If the actual scaling group should
         be created, a creation argument is provided containing the config, the
         launch config, and optional scaling policies.
         """
+        self.log = log
         self.tenant_id = tenant_id
         self.uuid = uuid
 
@@ -406,12 +407,12 @@ class MockScalingGroupCollection:
         # then they must be a valid new user.  Just create an account for them.
         self.data = defaultdict(dict)
 
-    def create_scaling_group(self, tenant, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant, config, launch, policies=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         uuid = str(uuid4())
-        self.data[tenant][uuid] = MockScalingGroup(
+        self.data[tenant][uuid] = MockScalingGroup(log,
             tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
 
@@ -420,7 +421,7 @@ class MockScalingGroupCollection:
 
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, uuid):
+    def delete_scaling_group(self, log, tenant, uuid):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
@@ -429,13 +430,13 @@ class MockScalingGroupCollection:
         del self.data[tenant][uuid]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant):
+    def list_scaling_groups(self, log, tenant):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
         return defer.succeed(self.data.get(tenant, {}).values())
 
-    def get_scaling_group(self, tenant, uuid):
+    def get_scaling_group(self, log, tenant, uuid):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
@@ -443,7 +444,7 @@ class MockScalingGroupCollection:
 
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
-        return result or MockScalingGroup(tenant, uuid, None)
+        return result or MockScalingGroup(log, tenant, uuid, None)
 
     def execute_webhook(self, capability_hash):
         """

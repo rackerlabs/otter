@@ -11,6 +11,7 @@ tests and mock model unit tests do not lie.
 """
 
 import json
+import mock
 from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
@@ -241,8 +242,9 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         Replace the store every time with a clean one.
         """
         store = MockScalingGroupCollection()
+        self.mock_log = mock.MagicMock()
         self.group_id = self.assert_deferred_succeeded(
-            store.create_scaling_group(self.tenant_id, config()[0],
+            store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
         set_store(store)
 
@@ -388,11 +390,14 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         Replace the store every time with a clean one.
         """
+        self.mock_log = mock.MagicMock()
         store = MockScalingGroupCollection()
         self.group_id = self.assert_deferred_succeeded(
-            store.create_scaling_group(self.tenant_id, config()[0],
+            store.create_scaling_group(self.mock_log, self.tenant_id,
+                                       config()[0],
                                        launch_server_config()[0]))
-        group = store.get_scaling_group(self.tenant_id, self.group_id)
+        group = store.get_scaling_group(self.mock_log,
+                                        self.tenant_id, self.group_id)
         self.policy_id = self.assert_deferred_succeeded(
             group.create_policies([{
                 "name": 'set number of servers to 10',
