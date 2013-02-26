@@ -25,9 +25,9 @@ from otter.test.rest.request import DummyException, RestAPITestMixin
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups`` endpoints (create, list)
+    Tests for ``/{tenantId}/groups/`` endpoints (create, list)
     """
-    endpoint = "/v1.0/11111/groups"
+    endpoint = "/v1.0/11111/groups/"
     invalid_methods = ("DELETE", "PUT")
 
     def test_list_unknown_error_is_500(self):
@@ -188,10 +188,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups/{groupId}`` endpoints (view manifest,
+    Tests for ``/{tenantId}/groups/{groupId}/`` endpoints (view manifest,
     view state, delete)
     """
-    endpoint = "/v1.0/11111/groups/one"
+    endpoint = "/v1.0/11111/groups/one/"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
 
     def setUp(self):
@@ -290,9 +290,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
 class GroupStateTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups/{groupId}/state`` endpoint
+    Tests for ``/{tenantId}/groups/{groupId}/state/`` endpoint
     """
-    endpoint = "/v1.0/11111/groups/one/state"
+    endpoint = "/v1.0/11111/groups/one/state/"
     invalid_methods = ("DELETE", "POST", "PUT")  # cannot update in bulk
 
     def setUp(self):
