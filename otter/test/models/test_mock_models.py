@@ -71,6 +71,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
+        self.mockLog = mock.MagicMock()
         self.tenant_id = '11111'
         self.config = {
             'name': 'aname',
@@ -230,7 +231,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 1000,
             'name': 'UPDATED'
         }
-        self.assert_deferred_succeeded(self.group.update_config(expected))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, expected))
         result = self.validate_view_config_return_value()
         self.assertEqual(result, expected)
 
@@ -241,7 +242,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         provided are not overwritten.
         """
         self.assert_deferred_succeeded(self.group.update_config(
-            {}, partial_update=True))
+            self.mockLog, {}, partial_update=True))
         result = self.validate_view_config_return_value()
 
         # because the returned value has the defaults filled in even if they
@@ -263,7 +264,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 10,
             'metadata': {}
         }
-        self.assert_deferred_succeeded(self.group.update_config(updated))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -280,7 +281,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'metadata': {}
         }
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        self.assert_deferred_succeeded(self.group.update_config(updated))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -288,7 +289,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         When the config is updated, the launch config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_config({
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, {
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
             'minEntities': 100,
@@ -308,7 +309,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }
-        self.assert_deferred_succeeded(self.group.update_launch_config(updated))
+        self.assert_deferred_succeeded(self.group.update_launch_config(self.mockLog, updated))
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, updated)
 
@@ -316,7 +317,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         When the launch_config is updated, the config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_launch_config({
+        self.assert_deferred_succeeded(self.group.update_launch_config(self.mockLog, {
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }))
@@ -817,14 +818,14 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.view_config(),
             group.view_launch_config(),
             group.view_state(),
-            group.update_config({
+            group.update_config(self.mockLog, {
                 'name': '1',
                 'minEntities': 0,
                 'cooldown': 0,
                 'maxEntities': None,
                 'metadata': {}
             }),
-            group.update_launch_config({
+            group.update_launch_config(self.mockLog, {
                 "type": "launch_server",
                 "args": {
                     "server": {

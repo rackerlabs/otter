@@ -101,7 +101,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
                                                 body=json.dumps(request_body))
         resp = json.loads(response_body)
 
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(mock.ANY, request_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
@@ -118,7 +118,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(mock.ANY, request_body)
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
@@ -138,7 +138,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
                                                 body=json.dumps(request_body))
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(mock.ANY, request_body)
 
     def test_group_modify_bad_or_missing_input_400(self):
         """
@@ -249,7 +249,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
 
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples()[0])
+            mock.ANY, launch_examples()[0])
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
@@ -266,7 +266,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples()[0])
+            mock.ANY, launch_examples()[0])
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
@@ -280,7 +280,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
-            launch_examples()[0])
+            mock.ANY, launch_examples()[0])
 
     def test_launch_config_modify_bad_or_missing_input_400(self):
         """

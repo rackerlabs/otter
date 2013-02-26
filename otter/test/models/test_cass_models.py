@@ -275,7 +275,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
 
         self.returns = [mock, None]
-        d = self.group.update_config({"b": "lah"})
+        d = self.group.update_config(self.mockLog, {"b": "lah"})
         self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", "groupId", data) VALUES '
                        '(:tenantId, :groupId, :scaling) APPLY BATCH;')
@@ -298,7 +298,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
 
         self.returns = [mock, None]
-        d = self.group.update_launch_config({"b": "lah"})
+        d = self.group.update_launch_config(self.mockLog, {"b": "lah"})
         self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
         expectedCql = ('BEGIN BATCH INSERT INTO launch_config("tenantId", "groupId", data) VALUES '
                        '(:tenantId, :groupId, :launch) APPLY BATCH;')
@@ -314,8 +314,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         and if it fails, the rest of the update does not continue
         """
         updates = [
-            lambda: self.group.update_config({'b': 'lah'}),
-            lambda: self.group.update_launch_config({'b': 'lah'})
+            lambda: self.group.update_config(self.mockLog, {'b': 'lah'}),
+            lambda: self.group.update_launch_config(self.mockLog, {'b': 'lah'})
         ]
 
         for callback in updates:
@@ -627,7 +627,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         an update to a nonexistant group
         """
         self.returns = [[], None]
-        d = self.group.update_config({"b": "lah"})
+        d = self.group.update_config(self.mockLog, {"b": "lah"})
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')

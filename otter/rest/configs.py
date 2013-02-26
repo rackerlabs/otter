@@ -83,7 +83,7 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     a mimimal schema, and if so, what happens with defaults?
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
-    deferred = rec.update_config(data)
+    deferred = rec.update_config(log, data)
     return deferred
 
 
@@ -196,5 +196,5 @@ def edit_launch_config(request, log, tenantId, groupId, data):
     Users may have an invalid configuration based on dependencies.
     """
     rec = get_store().get_scaling_group(tenantId, groupId)
-    deferred = rec.update_launch_config(data)
+    deferred = rec.update_launch_config(log, data)
     return deferred

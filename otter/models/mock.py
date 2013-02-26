@@ -99,7 +99,7 @@ class MockScalingGroup:
                 'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
-            self.update_config(creation['config'], partial_update=True)
+            self.update_config(None, creation['config'], partial_update=True)
             self.launch = creation['launch']
             self.policies = {}
             if creation['policies']:
@@ -189,7 +189,7 @@ class MockScalingGroup:
             'paused': self.paused
         })
 
-    def update_config(self, data, partial_update=False):
+    def update_config(self, log, data, partial_update=False):
         """
         Update the scaling group configuration paramaters based on the
         attributes in ``config``.  This can update the already-existing values,
@@ -221,7 +221,7 @@ class MockScalingGroup:
         # make sure the steady state is still within bounds
         return self.set_steady_state(self.steady_state)
 
-    def update_launch_config(self, data):
+    def update_launch_config(self, log, data):
         """
         Update the scaling group launch configuration parameters based on the
         attributes in ``launch_config``.  This can update the already-existing

@@ -117,7 +117,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def update_config(config):
+    def update_config(log, config):
         """
         Update the scaling group configuration paramaters based on the
         attributes in ``config``.  This can update the already-existing values,
@@ -137,7 +137,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def update_launch_config(launch_config):
+    def update_launch_config(log, launch_config):
         """
         Update the scaling group launch configuration parameters based on the
         attributes in ``launch_config``.  This can update the already-existing

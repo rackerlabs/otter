@@ -208,7 +208,7 @@ class CassScalingGroup(object):
 
     # TODO: There is no state yet, and updating the config should update the
     # state
-    def update_config(self, data):
+    def update_config(self, log, data):
         """
         Update the scaling group configuration paramaters based on the
         attributes in ``config``.  This can update the already-existing values,
@@ -245,7 +245,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_config)
         return d
 
-    def update_launch_config(self, data):
+    def update_launch_config(self, log, data):
         """
         Update the scaling group launch configuration parameters based on the
         attributes in ``launch_config``.  This can update the already-existing
