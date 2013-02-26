@@ -58,7 +58,7 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     mock_request.postpath.pop(0)
 
     # these are used when writing the response
-    mock_request.code = None
+    mock_request.code = 200
     mock_request.setHeader = mock.MagicMock(spec=())
 
     # if setHeader has been called a with unicode value, twisted will raise a
