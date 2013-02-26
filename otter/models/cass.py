@@ -7,7 +7,7 @@ import zope.interface
 
 from twisted.internet import defer
 from otter.util.cqlbatch import Batch
-from otter.util.hashkey import generate_key_str
+from otter.util.hashkey import generate_capability, generate_key_str
 
 from silverberg.client import ConsistencyLevel
 
@@ -36,6 +36,9 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
                'VALUES (:tenantId, :groupId, {name}, False)')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+_cql_insert_webhook = (
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, "webhookKey", deleted) '
+    'VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, :{name}Key, False)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -69,6 +72,28 @@ def get_consistency_level(operation, resource):
 
 
 def _build_policies(policies, policies_table, queries, data, outpolicies):
+    """
+    Because inserting many values into a table with compound keys with one
+    insert statement is hard. This builds a bunch of insert statements and a
+    dictionary matching different parameter names to different policies.
+
+    :param policies: a list of policy data without ID
+    :type policies: ``list`` of ``dict``
+
+    :param policies_table: the name of the policies table
+    :type policies_table: ``str``
+
+    :param queries: a list of existing CQL queries to add to
+    :type queries: ``list`` of ``str``
+
+    :param data: the dictionary of named parameters and values passed in
+        addition to the query to execute the query
+    :type data: ``dict``
+
+    :param outpolicies: a dictionary to which to insert the created policies
+        along with their generated IDs
+    :type outpolicies: ``dict``
+    """
     if policies is not None:
         for i in range(len(policies)):
             polname = "policy{}".format(i)
@@ -78,6 +103,53 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
             data[polname] = _serial_json_data(policies[i], 1)
             data[polname + "Id"] = polId
             outpolicies[polId] = policies[i]
+
+
+def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
+                    output):
+    """
+    Because inserting many values into a table with compound keys with one
+    insert statement is hard. This builds a bunch of insert statements and a
+    dictionary matching different parameter names to different policies.
+
+    :param bare_webhooks: a list of webhook data without ID or webhook keys,
+        or any generated capability hash info
+    :type bare_webhooks: ``list`` of ``dict``
+
+    :param webhooks_table: the name of the webhooks table
+    :type webhooks_table: ``str``
+
+    :param queries: a list of existing CQL queries to add to
+    :type queries: ``list`` of ``str``
+
+    :param cql_parameters: the dictionary of named parameters and values passed
+        in addition to the query to execute the query - additional parameters
+        will be added to this dictionary
+    :type cql_paramters: ``dict``
+
+    :param output: a dictionary to which to insert the created policies
+        along with their generated IDs
+    :type output: ``dict``
+    """
+    for i in range(len(bare_webhooks)):
+        name = "webhook{0}".format(i)
+        webhook_id = generate_key_str('webhook')
+        queries.append(_cql_insert_webhook.format(cf=webhooks_table,
+                                                  name=name))
+
+        # generate the real data that will be stored, which includes the webhook
+        # token, the capability stuff, and metadata by default
+        # TODO: capability format should change so that multiple capability
+        #       hash versions can be stored
+        webhook_real = {'metadata': {}, 'capability': {}}
+        webhook_real.update(bare_webhooks[i])
+        (token, webhook_real['capability']['hash'],
+            webhook_real['capability']['version']) = generate_capability()
+
+        cql_parameters[name] = _serial_json_data(webhook_real, 1)
+        cql_parameters['{0}Id'.format(name)] = webhook_id
+        cql_parameters['{0}Key'.format(name)] = token
+        output[webhook_id] = webhook_real
 
 
 class CassScalingGroup(object):
@@ -93,6 +165,17 @@ class CassScalingGroup(object):
 
     :ivar connection: silverberg client used to connect to cassandra
     :type connection: :class:`silverberg.client.CQLClient`
+
+    IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
+    exist.  Therefore, before doing an update, a read must be performed first
+    else an entry is created where none should have been.
+
+    Cassandra doesn't have atomic read-update.  You can't be guaranteed that the
+    previous state (from the read) hasn't changed between when you got it back
+    from Cassandra and when you are sending your new update/insert request.
+
+    Also, because deletes are done as tombstones rather than actually deleting,
+    deletes are also updates and hence a read must be performed before deletes.
     """
     zope.interface.implements(IScalingGroup)
 
@@ -106,6 +189,7 @@ class CassScalingGroup(object):
         self.config_table = "scaling_config"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
+        self.webhooks_table = "policy_webhooks"
 
     def view_manifest(self):
         """
@@ -150,11 +234,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
         def _do_update_config(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -172,11 +251,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
         def _do_update_launch(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -262,18 +336,13 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.create_policies`
         """
         def _do_create_pol(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
-
             queries = []
             cqldata = {"tenantId": self.tenant_id,
                        "groupId": self.uuid}
             outpolicies = {}
 
-            _build_policies(data, self.policies_table, queries, cqldata, outpolicies)
+            _build_policies(data, self.policies_table, queries, cqldata,
+                            outpolicies)
 
             b = Batch(queries, cqldata,
                       consistency=get_consistency_level('create', 'policy'))
@@ -289,11 +358,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
         def _do_update_launch(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -313,11 +377,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
         def _do_delete_policy(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [
                 _cql_delete_policy.format(cf=self.policies_table)]
             b = Batch(
@@ -343,7 +402,24 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
-        raise NotImplementedError()
+        def _do_create(lastRev):
+            queries = []
+            cql_params = {"tenantId": self.tenant_id,
+                          "groupId": self.uuid,
+                          "policyId": policy_id}
+            output = {}
+
+            _build_webhooks(data, self.webhooks_table, queries, cql_params,
+                            output)
+
+            b = Batch(queries, cql_params,
+                      consistency=get_consistency_level('create', 'webhook'))
+            d = b.execute(self.connection)
+            return d.addCallback(lambda _: output)
+
+        d = self.get_policy(policy_id)  # check that policy exists first
+        d.addCallback(_do_create)
+        return d
 
     def get_webhook(self, policy_id, webhook_id):
         """
@@ -410,6 +486,17 @@ class CassScalingGroupCollection:
         CF = policies
         RK = tenantId
         CK = groupID:policyId
+
+    IMPORTANT REMINDER: In CQL, update will create a new row if one doesn't
+    exist.  Therefore, before doing an update, a read must be performed first
+    else an entry is created where none should have been.
+
+    Cassandra doesn't have atomic read-update.  You can't be guaranteed that the
+    previous state (from the read) hasn't changed between when you got it back
+    from Cassandra and when you are sending your new update/insert request.
+
+    Also, because deletes are done as tombstones rather than actually deleting,
+    deletes are also updates and hence a read must be performed before deletes.
     """
     zope.interface.implements(IScalingGroupCollection)
 
@@ -425,6 +512,7 @@ class CassScalingGroupCollection:
         self.config_table = "scaling_config"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
+        self.webhooks_table = "policy_webhooks"
 
     def create_scaling_group(self, tenant_id, config, launch, policies=None):
         """
@@ -443,7 +531,8 @@ class CassScalingGroupCollection:
                 }
 
         outpolicies = {}
-        _build_policies(policies, self.policies_table, queries, data, outpolicies)
+        _build_policies(policies, self.policies_table, queries, data,
+                        outpolicies)
 
         b = Batch(queries, data,
                   consistency=get_consistency_level('create', 'group'))
@@ -456,11 +545,6 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
         def _delete_it(lastRev):
-            # IMPORTANT REMINDER: lastRev contains the previous
-            # state.... but you can't be guaranteed that the
-            # previous state hasn't changed between when you
-            # got it back from Cassandra and when you are
-            # sending your new insert request.
             queries = [
                 _cql_delete.format(cf=self.config_table),
                 _cql_delete.format(cf=self.launch_table),
