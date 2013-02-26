@@ -60,7 +60,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.list_scaling_groups.return_value = defer.succeed([])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with('11111')
+        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
 
         resp = json.loads(body)
         self.assertEqual(resp, {"groups": [], "groups_links": []})
@@ -78,7 +78,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             mock.MagicMock(spec=['uuid'], uuid="2")
         ])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with('11111')
+        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
 
         resp = json.loads(body)
         validate(resp, rest_schemas.list_groups_response)
@@ -134,6 +134,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1')
         self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY,
             '11111',
             request_body['groupConfiguration'],
             request_body['launchConfiguration'],
@@ -270,7 +271,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.delete_scaling_group.assert_called_once_with(
-            '11111', 'one')
+            mock.ANY, '11111', 'one')
 
     def test_group_delete_404(self):
         """
@@ -281,7 +282,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(404, method="DELETE")
         self.mock_store.delete_scaling_group.assert_called_once_with(
-            '11111', 'one')
+            mock.ANY, '11111', 'one')
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')

@@ -145,7 +145,7 @@ class CassScalingGroup(object):
 
     # TODO: There is no state yet, and updating the config should update the
     # state
-    def update_config(self, data):
+    def update_config(self, log, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
@@ -167,7 +167,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_config)
         return d
 
-    def update_launch_config(self, data):
+    def update_launch_config(self, log, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
@@ -426,7 +426,7 @@ class CassScalingGroupCollection:
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
 
-    def create_scaling_group(self, tenant_id, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
@@ -451,7 +451,7 @@ class CassScalingGroupCollection:
         d.addCallback(lambda _: scaling_group_id)
         return d
 
-    def delete_scaling_group(self, tenant_id, scaling_group_id):
+    def delete_scaling_group(self, log, tenant_id, scaling_group_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
@@ -474,7 +474,7 @@ class CassScalingGroupCollection:
         d = group.view_config()  # ensure that it's actually there
         return d.addCallback(_delete_it)  # only delete if it exists
 
-    def list_scaling_groups(self, tenant_id):
+    def list_scaling_groups(self, log, tenant_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """

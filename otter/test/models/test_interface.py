@@ -159,8 +159,9 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_scaling_groups()``
         """
+        log = {}
         result = self.assert_deferred_succeeded(
-            self.collection.list_scaling_groups(*args, **kwargs))
+            self.collection.list_scaling_groups(log, *args, **kwargs))
 
         # not valid JSON, since the ultimate objects are IScalingGroup
         # objects, so assert that it's a dictionary, all its

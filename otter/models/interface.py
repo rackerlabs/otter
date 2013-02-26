@@ -117,7 +117,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def update_config(config):
+    def update_config(log, config):
         """
         Update the scaling group configuration paramaters based on the
         attributes in ``config``.  This can update the already-existing values,
@@ -137,7 +137,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def update_launch_config(launch_config):
+    def update_launch_config(log, launch_config):
         """
         Update the scaling group launch configuration parameters based on the
         attributes in ``launch_config``.  This can update the already-existing
@@ -369,7 +369,7 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, config, launch, policies=None):
+    def create_scaling_group(log, tenant_id, config, launch, policies=None):
         """
         Create scaling group based on the tenant id, the configuration
         paramaters, the launch config, and optional scaling policies.
@@ -406,7 +406,7 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
         """
 
-    def delete_scaling_group(tenant_id, scaling_group_id):
+    def delete_scaling_group(log, tenant_id, scaling_group_id):
         """
         Delete the scaling group
 
@@ -422,7 +422,7 @@ class IScalingGroupCollection(Interface):
             doesn't exist for this tenant id
         """
 
-    def list_scaling_groups(tenant_id):
+    def list_scaling_groups(log, tenant_id):
         """
         List the scaling groups for this tenant ID
 

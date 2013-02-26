@@ -71,6 +71,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
+        self.mockLog = mock.MagicMock()
         self.tenant_id = '11111'
         self.config = {
             'name': 'aname',
@@ -230,7 +231,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 1000,
             'name': 'UPDATED'
         }
-        self.assert_deferred_succeeded(self.group.update_config(expected))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, expected))
         result = self.validate_view_config_return_value()
         self.assertEqual(result, expected)
 
@@ -241,7 +242,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         provided are not overwritten.
         """
         self.assert_deferred_succeeded(self.group.update_config(
-            {}, partial_update=True))
+            self.mockLog, {}, partial_update=True))
         result = self.validate_view_config_return_value()
 
         # because the returned value has the defaults filled in even if they
@@ -263,7 +264,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 10,
             'metadata': {}
         }
-        self.assert_deferred_succeeded(self.group.update_config(updated))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -280,7 +281,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'metadata': {}
         }
         self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        self.assert_deferred_succeeded(self.group.update_config(updated))
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
         state = self.validate_view_state_return_value()
         self.assertEqual(state.get('steadyState', None), 5)
 
@@ -288,7 +289,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         When the config is updated, the launch config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_config({
+        self.assert_deferred_succeeded(self.group.update_config(self.mockLog, {
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
             'minEntities': 100,
@@ -308,7 +309,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }
-        self.assert_deferred_succeeded(self.group.update_launch_config(updated))
+        self.assert_deferred_succeeded(self.group.update_launch_config(self.mockLog, updated))
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, updated)
 
@@ -316,7 +317,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         When the launch_config is updated, the config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_launch_config({
+        self.assert_deferred_succeeded(self.group.update_launch_config(self.mockLog, {
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }))
@@ -674,6 +675,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
+        self.mockLog = mock.MagicMock()
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.config = {
@@ -727,7 +729,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, launch, policies))
+                self.mockLog, self.tenant_id, self.config, launch, policies))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1)
@@ -750,7 +752,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, launch, policies))
+                self.mockLog, self.tenant_id, self.config, launch, policies))
 
         self.assertEqual(len(mock_sgrp.return_value.add_entities.mock_calls), 1)
         self.assertEqual(
@@ -765,7 +767,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         mock_sgrp.assert_called_once_with(
             self.tenant_id, uuid,
@@ -778,13 +780,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(len(result), 1, "Group not added correctly")
 
         self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.tenant_id, uuid))
+            self.collection.delete_scaling_group(self.mockLog, self.tenant_id, uuid))
 
         result = self.validate_list_return_value(self.tenant_id)
         self.assertEqual(result, [], "Group not deleted from collection")
@@ -794,7 +796,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Deleting a scaling group that doesn't exist raises a
         :class:`NoSuchScalingGroupError` exception
         """
-        deferred = self.collection.delete_scaling_group(self.tenant_id, 1)
+        deferred = self.collection.delete_scaling_group(self.mockLog, self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     @mock.patch('otter.models.mock.generate_capability',
@@ -816,14 +818,14 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.view_config(),
             group.view_launch_config(),
             group.view_state(),
-            group.update_config({
+            group.update_config(self.mockLog, {
                 'name': '1',
                 'minEntities': 0,
                 'cooldown': 0,
                 'maxEntities': None,
                 'metadata': {}
             }),
-            group.update_launch_config({
+            group.update_launch_config(self.mockLog, {
                 "type": "launch_server",
                 "args": {
                     "server": {
@@ -854,7 +856,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
-                self.tenant_id, self.config, {}))  # empty launch for testing
+                self.mockLog, self.tenant_id, self.config, {}))  # empty launch for testing
 
         succeeded_deferreds = self._call_all_methods_on_group(uuid)
         for deferred in succeeded_deferreds:

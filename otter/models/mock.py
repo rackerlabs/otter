@@ -100,7 +100,7 @@ class MockScalingGroup:
                 'maxEntities': None,  # no upper limit
                 'metadata': {}
             }
-            self.update_config(creation['config'], partial_update=True)
+            self.update_config(None, creation['config'], partial_update=True)
             self.launch = creation['launch']
             self.policies = {}
             if creation['policies']:
@@ -155,7 +155,7 @@ class MockScalingGroup:
             'paused': self.paused
         })
 
-    def update_config(self, data, partial_update=False):
+    def update_config(self, log, data, partial_update=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
@@ -172,7 +172,7 @@ class MockScalingGroup:
         # make sure the steady state is still within bounds
         return self.set_steady_state(self.steady_state)
 
-    def update_launch_config(self, data):
+    def update_launch_config(self, log, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
@@ -406,7 +406,7 @@ class MockScalingGroupCollection:
         # then they must be a valid new user.  Just create an account for them.
         self.data = defaultdict(dict)
 
-    def create_scaling_group(self, tenant, config, launch, policies=None):
+    def create_scaling_group(self, log, tenant, config, launch, policies=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
@@ -420,7 +420,7 @@ class MockScalingGroupCollection:
 
         return defer.succeed(uuid)
 
-    def delete_scaling_group(self, tenant, uuid):
+    def delete_scaling_group(self, log, tenant, uuid):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
@@ -429,7 +429,7 @@ class MockScalingGroupCollection:
         del self.data[tenant][uuid]
         return defer.succeed(None)
 
-    def list_scaling_groups(self, tenant):
+    def list_scaling_groups(self, log, tenant):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
