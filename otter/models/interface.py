@@ -292,11 +292,14 @@ class IScalingGroup(Interface):
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
 
-        :param data: a list of details of the webhook in JSON format, as specified
-            by :data:`otter.json_schema.model_schemas.webhook_list`
-        :type data: ``dict``
+        :param data: a list of details of the webhook in JSON format, as
+            specified by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``list``
 
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        :return: a dict of the webhooks mapped to their ids, as specified by
+            :data:`otter.json_schema.model_schemas.webhook_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
+            ``dict``
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
