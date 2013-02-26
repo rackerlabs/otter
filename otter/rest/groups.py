@@ -247,8 +247,8 @@ def create_new_scaling_group(request, log, tenantId, data):
         wrapped.update(data)
         return {"group": wrapped}
 
-    deferred = get_store().create_scaling_group(log,
-        tenantId, data['groupConfiguration'], data['launchConfiguration'],
+    deferred = get_store().create_scaling_group(
+        log, tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
     deferred.addCallback(send_redirect, data)
     deferred.addCallback(json.dumps)

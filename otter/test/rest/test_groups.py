@@ -60,7 +60,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.list_scaling_groups.return_value = defer.succeed([])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY,'11111')
+        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
 
         resp = json.loads(body)
         self.assertEqual(resp, {"groups": [], "groups_links": []})

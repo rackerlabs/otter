@@ -412,8 +412,8 @@ class MockScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         uuid = str(uuid4())
-        self.data[tenant][uuid] = MockScalingGroup(log,
-            tenant, uuid,
+        self.data[tenant][uuid] = MockScalingGroup(
+            log, tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
 
         self.data[tenant][uuid].add_entities(
