@@ -487,7 +487,7 @@ def get_scaling_group_state(request, log, tenantId, groupId):
         return {"group": state_blob}
 
     group = get_store().get_scaling_group(tenantId, groupId)
-    deferred = group.view_state()
+    deferred = group.view_state(log)
     deferred.addCallback(reformat_active_and_pending)
     deferred.addCallback(json.dumps)
     return deferred

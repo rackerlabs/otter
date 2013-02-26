@@ -185,7 +185,7 @@ class CassScalingGroup(object):
         d.addCallback(self._grab_json_data)
         return d
 
-    def view_state(self):
+    def view_state(self, log):
         """
         The state of the scaling group consists of a mapping of entity id's to
         entity links for the current entities in the scaling group, a mapping
@@ -279,7 +279,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def set_steady_state(self, steady_state):
+    def set_steady_state(self, log, steady_state):
         """
         The steady state represents the number of entities - defaults to the
         minimum. This number represents how many entities _should_ be
@@ -301,7 +301,7 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def bounce_entity(self, entity_id):
+    def bounce_entity(self, log, entity_id):
         """
         Rebuilds an entity given by the entity ID.  This essentially deletes
         the given entity and a new one will be rebuilt in its place.
@@ -318,7 +318,7 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def list_policies(self):
+    def list_policies(self, log):
         """
         Gets all the policies associated with particular scaling group.
 
@@ -392,7 +392,7 @@ class CassScalingGroup(object):
         d.addCallback(self._grab_json_data, policy_id)
         return d
 
-    def create_policies(self, data):
+    def create_policies(self, log, data):
         """
         Create a set of new scaling policies.
 
@@ -432,7 +432,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_create_pol)
         return d
 
-    def update_policy(self, policy_id, data):
+    def update_policy(self, log, policy_id, data):
         """
         Updates an existing policy with the data given.
 
@@ -468,7 +468,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def delete_policy(self, policy_id):
+    def delete_policy(self, log, policy_id):
         """
         Delete the specified policy on this particular scaling group, and all
         of its associated webhooks as well.

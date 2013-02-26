@@ -97,7 +97,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def view_state():
+    def view_state(log):
         """
         The state of the scaling group consists of a mapping of entity id's to
         entity links for the current entities in the scaling group, a mapping
@@ -153,7 +153,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def set_steady_state(steady_state):
+    def set_steady_state(log, steady_state):
         """
         The steady state represents the number of entities - defaults to the
         minimum. This number represents how many entities _should_ be
@@ -174,7 +174,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def bounce_entity(entity_id):
+    def bounce_entity(log, entity_id):
         """
         Rebuilds an entity given by the entity ID.  This essentially deletes
         the given entity and a new one will be rebuilt in its place.
@@ -190,7 +190,7 @@ class IScalingGroup(Interface):
             group
         """
 
-    def create_policies(data):
+    def create_policies(log, data):
         """
         Create a set of new scaling policies.
 
@@ -208,7 +208,7 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def update_policy(policy_id, data):
+    def update_policy(log, policy_id, data):
         """
         Updates an existing policy with the data given.
 
@@ -225,7 +225,7 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
-    def list_policies():
+    def list_policies(log):
         """
         Gets all the policies associated with particular scaling group.
 
@@ -256,7 +256,7 @@ class IScalingGroup(Interface):
             :class:`NoSuchPolicyError` can be raised instead
         """
 
-    def delete_policy(policy_id):
+    def delete_policy(log, policy_id):
         """
         Delete the specified policy on this particular scaling group, and all
         of its associated webhooks as well.

@@ -313,7 +313,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(404, method="GET")
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
-        self.mock_group.view_state.assert_called_once_with()
+        self.mock_group.view_state.assert_called_once_with(mock.ANY)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
@@ -366,4 +366,4 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             '11111', 'one')
-        self.mock_group.view_state.assert_called_once_with()
+        self.mock_group.view_state.assert_called_once_with(mock.ANY)

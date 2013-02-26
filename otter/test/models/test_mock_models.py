@@ -153,7 +153,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected_active = generate_entity_links(self.tenant_id, ("1", "2", "3"))
         expected_pending = generate_entity_links(self.tenant_id, ("4", "5", "6"))
         self.group.steady_state = 6
-        self.assertEquals(self.validate_view_state_return_value(), {
+        self.assertEquals(self.validate_view_state_return_value(self.mockLog), {
             'steadyState': 6,
             'active': expected_active,
             'pending': expected_pending,
@@ -171,7 +171,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
-        self.assert_deferred_succeeded(self.group.set_steady_state(1))
+        self.assert_deferred_succeeded(self.group.set_steady_state(self.mockLog, 1))
         self.assertEqual(self.group.steady_state, 5)
 
     def test_set_steady_state_does_not_exceed_max(self):
@@ -184,8 +184,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
+        self.assert_deferred_succeeded(self.group.set_steady_state(self.mockLog, 10))
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('steadyState', None), 5)
 
     def test_set_steady_state_within_limit_succeeds(self):
@@ -193,8 +193,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Setting a steady state that is between the min and max will set the
         steady state to to the specified number.
         """
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
+        self.assert_deferred_succeeded(self.group.set_steady_state(self.mockLog, 10))
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('steadyState', None), 10)
 
     def test_bounce_existing_entity_succeeds(self):
@@ -204,8 +204,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.active_entities = {"1": [{'rel': 'self', 'href': ''}]}
         self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.bounce_entity("1")))
-        state = self.validate_view_state_return_value()
+            self.group.bounce_entity(self.mockLog,"1")))
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('active', None),
                          {"1": [{'rel': 'self', 'href': ''}]})
 
@@ -214,9 +214,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Bouncing an invalid valid entity fails
         """
         self.assert_deferred_failed(
-            self.group.bounce_entity("1"), NoSuchEntityError)
+            self.group.bounce_entity(self.mockLog, "1"), NoSuchEntityError)
         self.flushWarnings(NoSuchEntityError)
-        state = self.validate_view_state_return_value()
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('active', None), {})
 
     def test_update_config_overwrites_existing_data(self):
@@ -265,7 +265,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'metadata': {}
         }
         self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
-        state = self.validate_view_state_return_value()
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('steadyState', None), 5)
 
     def test_update_config_max_updates_steady_state(self):
@@ -280,9 +280,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 5,
             'metadata': {}
         }
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
+        self.assert_deferred_succeeded(self.group.set_steady_state(self.mockLog, 10))
         self.assert_deferred_succeeded(self.group.update_config(self.mockLog, updated))
-        state = self.validate_view_state_return_value()
+        state = self.validate_view_state_return_value(self.mockLog)
         self.assertEqual(state.get('steadyState', None), 5)
 
     def test_update_config_does_not_change_launch_config(self):
@@ -330,7 +330,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Adding new policies to the scaling group returns a dictionary of
         scaling policies mapped to their ids
         """
-        create_response = self.validate_create_policies_return_value([
+        create_response = self.validate_create_policies_return_value(self.mockLog, [
             {
                 "name": "set number of servers to 3000",
                 "steadyState": 3000,
@@ -342,7 +342,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 "cooldown": 200
             }
         ])
-        list_result = self.assert_deferred_succeeded(self.group.list_policies())
+        list_result = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         self.assertGreater(len(list_result), len(create_response))
         for key, value in create_response.iteritems():
             self.assertEqual(list_result[key], value)
@@ -356,14 +356,14 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
              'policies': None})
-        self.assertEqual(self.validate_list_policies_return_value(), {})
+        self.assertEqual(self.validate_list_policies_return_value(self.mockLog), {})
 
     def test_list_all_policies(self):
         """
         List existing policies returns a dictionary of the policy mapped to the
         ID
         """
-        policies_dict = self.validate_list_policies_return_value()
+        policies_dict = self.validate_list_policies_return_value(self.mockLog)
         self.assertEqual(len(policies_dict), len(self.policies))
         policies = policies_dict.values()
         for a_policy in self.policies:
@@ -373,7 +373,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Try to get a policy by looking up all available UUIDs, and getting one.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         uuid = policy_list.keys()[0]
         value = policy_list.values()[0]
         result = self.assert_deferred_succeeded(self.group.get_policy(uuid))
@@ -391,10 +391,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Delete a policy, check that it is actually deleted.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         uuid = policy_list.keys()[0]
-        self.assert_deferred_succeeded(self.group.delete_policy(uuid))
-        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.assert_deferred_succeeded(self.group.delete_policy(self.mockLog,uuid))
+        result = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         self.assertNotIn(uuid, result)
         self.assertEqual({}, result)
 
@@ -402,7 +402,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Delete a policy that doesn't exist. Should return with NoSuchPolicyError
         """
-        deferred = self.group.delete_policy("puppies")
+        deferred = self.group.delete_policy(self.mockLog,"puppies")
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     def test_delete_policy_removes_webhooks(self):
@@ -411,21 +411,21 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.policies = {"2": {}}
         self.group.webhooks = {"2": {}}
-        self.assert_deferred_succeeded(self.group.delete_policy("2"))
+        self.assert_deferred_succeeded(self.group.delete_policy(self.mockLog,"2"))
         self.assertNotIn("2", self.group.webhooks)
 
     def test_update_policy_succeeds(self):
         """
         Get a UUID and attempt to update the policy.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         uuid = policy_list.keys()[0]
         update_data = {
             "name": "Otters are not good pets",
             "steadyState": 1234,
             "cooldown": 555
         }
-        self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
+        self.assert_deferred_succeeded(self.group.update_policy(self.mockLog, uuid, update_data))
         result = self.assert_deferred_succeeded(
             self.group.get_policy(uuid))
         self.assertEqual(update_data, result)
@@ -439,7 +439,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "steadyState": 1234,
             "cooldown": 555
         }
-        deferred = self.group.update_policy("puppies", update_data)
+        deferred = self.group.update_policy(self.mockLog, "puppies", update_data)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     def test_list_webhooks_nonexistant_policy_fails(self):
@@ -455,7 +455,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If there are no webhooks, an empty dictionary is returned when
         ``list_webhooks`` is called
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         uuid = policy_list.keys()[0]
         result = self.validate_list_webhooks_return_value(uuid)
         self.assertEqual(result, {})
@@ -465,7 +465,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If there are webhooks for a particular policy, listing webhooks returns
         a dictionary for all of them
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         uuid = policy_list.keys()[0]
         webhooks = {
             '10': {'capabilityHash': 'hook', 'metadata': {}},
@@ -817,7 +817,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         return [
             group.view_config(),
             group.view_launch_config(),
-            group.view_state(),
+            group.view_state(self.mockLog),
             group.update_config(self.mockLog, {
                 'name': '1',
                 'minEntities': 0,
@@ -835,13 +835,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                     }
                 }
             }),
-            group.set_steady_state(1),
-            group.bounce_entity("1"),
-            group.list_policies(),
-            group.create_policies([]),
+            group.set_steady_state(self.mockLog, 1),
+            group.bounce_entity(self.mockLog, "1"),
+            group.list_policies(self.mockLog),
+            group.create_policies(self.mockLog,[]),
             group.get_policy('2'),
-            group.update_policy('2', {}),
-            group.delete_policy('1'),
+            group.update_policy(self.mockLog, '2', {}),
+            group.delete_policy(self.mockLog,'1'),
             group.list_webhooks('2'),
             group.create_webhooks('2', [{}, {}]),
             group.get_webhook('3', '3x'),

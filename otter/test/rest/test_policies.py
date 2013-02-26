@@ -118,7 +118,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             # location header points to the policy list
             '/v1.0/11111/groups/1/policies')
 
-        self.mock_group.create_policies.assert_called_once_with(
+        self.mock_group.create_policies.assert_called_once_with(mock.ANY,
             policy_examples()[:1])
 
         resp = json.loads(response_body)
@@ -202,7 +202,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
         self.mock_group.update_policy.assert_called_once_with(
-            self.policy_id, policy_examples()[1])
+            mock.ANY, self.policy_id, policy_examples()[1])
 
     def test_update_policy_failure_404(self):
         """
@@ -216,7 +216,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             404, method="PUT", body=json.dumps(policy_examples()[0]))
         resp = json.loads(response_body)
 
-        self.mock_group.update_policy.assert_called_once_with(
+        self.mock_group.update_policy.assert_called_once_with(mock.ANY, 
             self.policy_id, policy_examples()[0])
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -267,7 +267,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
-        self.mock_group.delete_policy.assert_called_once_with(self.policy_id)
+        self.mock_group.delete_policy.assert_called_once_with(mock.ANY, self.policy_id)
 
     def test_delete_policy_failure_404(self):
         """
@@ -280,7 +280,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(404, method="DELETE")
         resp = json.loads(response_body)
 
-        self.mock_group.delete_policy.assert_called_once_with(
+        self.mock_group.delete_policy.assert_called_once_with(mock.ANY, 
             self.policy_id)
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)

@@ -103,7 +103,7 @@ class MockScalingGroup:
             self.launch = creation['launch']
             self.policies = {}
             if creation['policies']:
-                self.create_policies(creation['policies'])
+                self.create_policies(None, creation['policies'])
             self.webhooks = defaultdict(dict)
         else:
             self.error = NoSuchScalingGroupError(tenant_id, uuid)
@@ -161,7 +161,7 @@ class MockScalingGroup:
             return defer.fail(self.error)
         return defer.succeed(self.launch.copy())
 
-    def view_state(self):
+    def view_state(self, log):
         """
         The state of the scaling group consists of a mapping of entity id's to
         entity links for the current entities in the scaling group, a mapping
@@ -219,7 +219,7 @@ class MockScalingGroup:
             self.config = data
 
         # make sure the steady state is still within bounds
-        return self.set_steady_state(self.steady_state)
+        return self.set_steady_state(log, self.steady_state)
 
     def update_launch_config(self, log, data):
         """
@@ -242,7 +242,7 @@ class MockScalingGroup:
         self.launch = data
         return defer.succeed(None)
 
-    def set_steady_state(self, steady_state):
+    def set_steady_state(self, log, steady_state):
         """
         The steady state represents the number of entities - defaults to the
         minimum. This number represents how many entities _should_ be
@@ -271,7 +271,7 @@ class MockScalingGroup:
                                     self.config['maxEntities'])
         return defer.succeed(None)
 
-    def bounce_entity(self, entity_id):
+    def bounce_entity(self, log, entity_id):
         """
         Rebuilds an entity given by the entity ID.  This essentially deletes
         the given entity and a new one will be rebuilt in its place.
@@ -296,7 +296,7 @@ class MockScalingGroup:
             "Scaling group {0} has no such active entity {1}".format(
                 self.uuid, entity_id)))
 
-    def list_policies(self):
+    def list_policies(self, log):
         """
         Gets all the policies associated with particular scaling group.
 
@@ -339,7 +339,7 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def create_policies(self, data):
+    def create_policies(self, log, data):
         """
         Create a set of new scaling policies.
 
@@ -368,7 +368,7 @@ class MockScalingGroup:
 
         return defer.succeed(return_data)
 
-    def update_policy(self, policy_id, data):
+    def update_policy(self, log, policy_id, data):
         """
         Updates an existing policy with the data given.
 
@@ -394,7 +394,7 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def delete_policy(self, policy_id):
+    def delete_policy(self, log, policy_id):
         """
         Delete the specified policy on this particular scaling group, and all
         of its associated webhooks as well.

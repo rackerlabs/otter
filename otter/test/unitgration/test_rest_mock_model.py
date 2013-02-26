@@ -395,7 +395,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
                                        launch_server_config()[0]))
         group = store.get_scaling_group(self.tenant_id, self.group_id)
         self.policy_id = self.assert_deferred_succeeded(
-            group.create_policies([{
+            group.create_policies(mock.ANY, [{
                 "name": 'set number of servers to 10',
                 "steadyState": 10,
                 "cooldown": 3

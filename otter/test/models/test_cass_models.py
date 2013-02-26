@@ -413,7 +413,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         "tenantId": '11111'}
         expectedCql = ('SELECT "policyId", data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND deleted = False;')
-        d = self.group.list_policies()
+        d = self.group.list_policies(self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(len(r), 2)
         self.assertEqual(r, {'group1': {}, 'group3': {}})
@@ -439,7 +439,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 return defer.succeed(_de_identify([]))
         self.connection.execute.side_effect = execute_respond
 
-        result = self.assert_deferred_succeeded(self.group.list_policies())
+        result = self.assert_deferred_succeeded(self.group.list_policies(self.mockLog))
         self.assertEqual(result, {})
 
     def test_list_policy_invalid_group(self):
@@ -449,7 +449,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         # no scaling policies, and view config is empty too
         self.returns = [[], []]
-        self.assert_deferred_failed(self.group.list_policies(),
+        self.assert_deferred_failed(self.group.list_policies(self.mockLog),
                                     NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
@@ -482,7 +482,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         )
         for bad in bads:
             self.returns = [bad]
-            self.assert_deferred_failed(self.group.list_policies(),
+            self.assert_deferred_failed(self.group.list_policies(self.mockLog),
                                         CassBadDataError)
             self.flushLoggedErrors(CassBadDataError)
 
@@ -501,7 +501,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                       {'timestamp': None, 'name': 'data',
                        'value': '{"_ver": 2}', 'ttl': None}], 'key': ''}]
         self.returns = [mock]
-        d = self.group.list_policies()
+        d = self.group.list_policies(self.mockLog)
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {'group1': {}, 'group3': {}})
 
@@ -518,7 +518,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
 
         self.returns = [mock, None]
-        d = self.group.create_policies([{"b": "lah"}])
+        d = self.group.create_policies(self.mockLog, [{"b": "lah"}])
         result = self.assert_deferred_succeeded(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
@@ -539,7 +539,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
         self.returns = [None]
-        d = self.group.create_policies([{"b": "lah"}])
+        d = self.group.create_policies(self.mockLog, [{"b": "lah"}])
         self.assert_deferred_succeeded(d)
         self.group.view_config.assert_called_once_with()
 
@@ -556,7 +556,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
 
         self.returns = [view_policy, None]
-        d = self.group.delete_policy('3222')
+        d = self.group.delete_policy(self.mockLog,'3222')
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
         expectedCql = ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
@@ -574,7 +574,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError` is raised
         """
         self.returns = [[], None]
-        d = self.group.delete_policy('3222')
+        d = self.group.delete_policy(self.mockLog, '3222')
         self.assert_deferred_failed(d, NoSuchPolicyError)
         self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -592,7 +592,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
 
         self.returns = [mock, None]
-        d = self.group.update_policy('12345678', {"b": "lah"})
+        d = self.group.update_policy(self.mockLog, '12345678', {"b": "lah"})
         self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
         expectedCql = (
             'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
@@ -609,7 +609,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Tests that if you try to update a scaling policy that doesn't exist, the right thing happens
         """
         self.returns = [[], None]
-        d = self.group.update_policy('12345678', {"b": "lah"})
+        d = self.group.update_policy(self.mockLog, '12345678', {"b": "lah"})
         self.assert_deferred_failed(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
@@ -643,7 +643,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.get_policy = mock.MagicMock(
             return_value=defer.fail(CassBadDataError("Cassandra failure")))
-        self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
+        self.assert_deferred_failed(self.group.update_policy(self.mockLog, '1', {'b': 'lah'}),
                                     CassBadDataError)
 
         # view is called
