@@ -82,7 +82,7 @@ class MockScalingGroup:
         be created, a creation argument is provided containing the config, the
         launch config, and optional scaling policies.
         """
-        self.log = log
+        self.log = log.name(self.__class__.__name__)
         self.tenant_id = tenant_id
         self.uuid = uuid
 

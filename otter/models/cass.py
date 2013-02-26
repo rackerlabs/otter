@@ -183,7 +183,7 @@ class CassScalingGroup(object):
         """
         Creates a CassScalingGroup object.
         """
-        self.log = log
+        self.log = log.name(self.__class__.__name__)
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
