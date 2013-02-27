@@ -45,7 +45,7 @@ _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data)
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
 _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
-                      'AND "groupId" = :groupId AND "policyId" = :policyId')
+                      'AND "groupId" = :groupId AND "policyId" = {name}')
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
@@ -278,9 +278,11 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def list_policies(self):
+    def _naive_list_policies(self):
         """
-        see :meth:`otter.models.interface.IScalingGroup.list_policies`
+        Like :meth:`otter.models.cass.CassScalingGroup.list_policies`, but gets
+        all the policies associated with particular scaling group
+        irregardless of whether the scaling group still exists.
         """
         def _grab_pol_list(rawResponse):
             if rawResponse is None:
@@ -305,12 +307,7 @@ class CassScalingGroup(object):
                         del data[policyId]["_ver"]
                 except ValueError:
                     raise CassBadDataError("Bad data in database")
-
-            if len(data) == 0:
-                # If there is no data - make sure it's not because the group
-                # doesn't exist
-                return self.view_config().addCallback(lambda _: data)
-            return defer.succeed(data)
+            return data
 
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
@@ -319,6 +316,28 @@ class CassScalingGroup(object):
                                     get_consistency_level('list', 'policy'))
         d.addCallback(_grab_pol_list)
         return d
+
+    def list_policies(self):
+        """
+        Gets all the policies associated with particular scaling group.
+
+        :return: a dict of the policies, as specified by
+            :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
+            ``dict``
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        """
+        # If there are no policies - make sure it's not because the group
+        # doesn't exist
+        def _check_if_empty(policies_dict):
+            if len(policies_dict) == 0:
+                return self.view_config().addCallback(lambda _: policies_dict)
+            return policies_dict
+
+        d = self._naive_list_policies()
+        return d.addCallback(_check_if_empty)
 
     def get_policy(self, policy_id):
         """
@@ -380,7 +399,8 @@ class CassScalingGroup(object):
         """
         def _do_delete_policy(lastRev):
             queries = [
-                _cql_delete_policy.format(cf=self.policies_table)]
+                _cql_delete_policy.format(cf=self.policies_table,
+                                          name=":policyId")]
             b = Batch(
                 queries, {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
@@ -546,19 +566,39 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
-        def _delete_it(lastRev):
+        def _delete_configs():
             queries = [
                 _cql_delete.format(cf=self.config_table),
                 _cql_delete.format(cf=self.launch_table),
-                _cql_delete.format(cf=self.policies_table)]
-            b = Batch(
-                queries, {"tenantId": tenant_id, "groupId": scaling_group_id},
-                consistency=get_consistency_level('delete', 'group'))
+            ]
+            b = Batch(queries,
+                      {"tenantId": tenant_id, "groupId": scaling_group_id},
+                      consistency=get_consistency_level('delete', 'group'))
             return b.execute(self.connection)
 
+        def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
+            data = {"tenantId": tenant_id, "groupId": scaling_group_id}
+            queries = []
+            for i, policy_id in enumerate(policy_dict.keys()):
+                varname = 'policyId{0}'.format(i)
+                queries.append(_cql_delete_policy.format(
+                    cf=self.policies_table, name=':{0}'.format(varname)))
+                data[varname] = policy_id
+
+            b = Batch(queries, data,
+                      consistency=get_consistency_level('delete', 'group'))
+            return b.execute(self.connection)
+
+        def _delete_it(lastRev, group):
+            d = defer.gatherResults([
+                _delete_configs(),
+                group._naive_list_policies().addCallback(_delete_policies)
+            ])
+            d.addCallback(lambda _: None)
+            return d
         group = self.get_scaling_group(log, tenant_id, scaling_group_id)
         d = group.view_config()  # ensure that it's actually there
-        return d.addCallback(_delete_it)  # only delete if it exists
+        return d.addCallback(_delete_it, group)  # only delete if it exists
 
     def list_scaling_groups(self, log, tenant_id):
         """
