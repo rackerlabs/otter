@@ -944,31 +944,58 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         If the scaling group exists, deletes scaling group
         """
-        self.returns = [
-            [
-                {'cols': [{'timestamp': None,
-                           'name': 'data',
-                           'value': '{}',
-                           'ttl': None}],
-                 'key': ''}],
-            None]  # executing update returns None
+        def execute_respond(query, *args, **kwargs):
+            if query.lower().startswith("select"):
+                # this query is to get the ids of all the policies.  make
+                # sure there are some
+                if "policyId" in query:
+                    return defer.succeed(_de_identify([{
+                        'cols': [{'timestamp': None, 'name': 'policyId',
+                                  'value': 'pol1', 'ttl': None},
+                                 {'timestamp': None, 'name': 'data',
+                                  'value': '{"_ver": 5}', 'ttl': None}],
+                        'key': ''}]))
+                # nope, this query is to see if the group exists.
+                # make sure it does
+                return defer.succeed(_de_identify([{
+                    'cols': [{'timestamp': None, 'name': 'data',
+                              'value': '{}', 'ttl': None}],
+                    'key': ''}]))
+
+            # the rest of the queries are updates
+            return defer.succeed(None)
+
+        self.connection.execute.side_effect = execute_respond
 
         result = self.assert_deferred_succeeded(
             self.collection.delete_scaling_group(self.mock_log, '123', 'group1'))
         self.assertIsNone(result)  # delete returns None
-        # called twice - once to view and once to delete
-        self.assertEqual(len(self.connection.execute.mock_calls), 2)
+        # called four times - once to view config, once to delete configs,
+        # once to view policies, and once to delete policies
+        self.assertEqual(len(self.connection.execute.mock_calls), 4)
 
-        expected_data = {'tenantId': '123', 'groupId': 'group1'}
+        # delete configs
+        expected_data = {'tenantId': '123',
+                         'groupId': 'group1'}
         expected_cql = (
             'BEGIN BATCH '
             'UPDATE scaling_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'UPDATE launch_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'APPLY BATCH;')
+        self.connection.execute.assert_called_any(expected_cql, expected_data,
+                                                  ConsistencyLevel.TWO)
+
+        # delete policies
+        expected_data = {'tenantId': '123',
+                         'groupId': 'group1',
+                         'policyId0': 'pol1'}
+        expected_cql = (
+            'BEGIN BATCH '
             'UPDATE scaling_policies SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'AND "policyId" = :policyId0 '
             'APPLY BATCH;')
-
-        self.connection.execute.assert_called_with(expected_cql, expected_data,
-                                                   ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_any(expected_cql, expected_data,
+                                                  ConsistencyLevel.TWO)
