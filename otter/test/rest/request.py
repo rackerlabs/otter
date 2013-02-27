@@ -106,6 +106,16 @@ def request(root_resource, method, endpoint, headers=None, body=None):
         mock_request).addCallback(build_response)
 
 
+def path_only(url):
+    """
+    Retrieves the path-only part of a URL
+
+    :param url: the url to remove the host and scheme from
+    :type url: ``str``
+    """
+    return urlsplit(url).path
+
+
 class DummyException(Exception):
     """
     A dummy exception to be passed around as if it was a real one.
@@ -151,23 +161,22 @@ class RequestTestMixin(object):
 
     def get_location_header(self, response_wrapper):
         """
-        Retrieves the location header from the response wrapper, and returns
-        only the path portion of the url (also asserts that location should
-        only have been set once)
+        If a location header is expected, retrieves the location header from
+        the response wrapper (also asserts that there is a location header and
+        that the location should only have been set once)
 
         :param response_wrapper: the callbacked result from :func:`request`
         :type response_wrapper: :class:`ResponseWrapper`
 
-        :return: path-only portion location header of the response wrapper
+        :return: the location header of the response wrapper
         :rtype: ``str``
         """
         locations = response_wrapper.response.headers.getRawHeaders('location')
-        if locations is None:
-            return locations
 
+        self.assertNotEqual(locations, None)
         self.assertEqual(len(locations), 1,
                          "Too many location headers: {0!r}".format(locations))
-        return urlsplit(locations[0]).path
+        return locations[0]
 
 
 class RestAPITestMixin(DeferredTestMixin, RequestTestMixin):

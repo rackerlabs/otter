@@ -12,7 +12,6 @@ tests and Cassandra model unit tests do not lie.
 
 import json
 import mock
-from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
@@ -25,11 +24,8 @@ from otter.rest.application import root, set_store
 
 from otter.test.resources import OtterKeymaster
 
-from otter.test.rest.request import request
+from otter.test.rest.request import path_only, request, RequestTestMixin
 
-
-def _strip_base_url(url):
-    return urlsplit(url)[2].rstrip('/')
 
 try:
     keymaster = OtterKeymaster()
@@ -40,7 +36,7 @@ else:
     store = CassScalingGroupCollection(keyspace.client)
 
 
-class CassStoreRestScalingGroupTestCase(TestCase):
+class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
     """
     Test case for testing the REST API for the scaling group specific endpoints
     (not policies or webhooks) against the Cassandra model.
@@ -71,20 +67,15 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         Creates a scaling group and returns the path.
         """
         def _check_create_body(wrapper):
-            self.assertEqual(wrapper.response.code, 201,
-                             "Create failed: {0}".format(wrapper.content))
+            self.assert_response(wrapper, 201, "Create failed.")
             response = json.loads(wrapper.content)
             for key in request_body:
                 self.assertEqual(response["group"][key], request_body[key])
             for key in ("id", "links"):
                 self.assertTrue(key in response["group"])
 
-            headers = wrapper.response.headers.getRawHeaders('Location')
-            self.assertTrue(headers is not None)
-            self.assertEqual(1, len(headers))
-
             # now make sure the Location header points to something good!
-            return _strip_base_url(headers[0])
+            return path_only(self.get_location_header(wrapper))
 
         request_body = {
             "groupConfiguration": self._config,
@@ -107,7 +98,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         """
 
         def _check_policies_created(wrapper):
-            self.assertEqual(200, wrapper.response.code)
+            self.assert_response(wrapper, 200)
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["policies"]), len(self._policies))
 
@@ -130,14 +121,13 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         attempt to view the scaling group should return a 404 not found.
         """
         wrapper = yield request(root, 'DELETE', path)
-        self.assertEqual(wrapper.response.code, 204,
-                         "Delete failed: {0}".format(wrapper.content))
+        self.assert_response(wrapper, 204, "Delete failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view policies
         # TODO: view state and manifest too, once they have been implemented
         wrapper = yield request(root, 'GET', path + '/policies')
-        self.assertEqual(wrapper.response.code, 404)
+        self.assert_response(wrapper, 404, "Deleted group still there.")
 
         # flush any logged errors
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -147,7 +137,7 @@ class CassStoreRestScalingGroupTestCase(TestCase):
         Asserts that there are ``number`` number of scaling groups
         """
         def _check_number(wrapper):
-            self.assertEqual(200, wrapper.response.code)
+            self.assert_response(wrapper, 200)
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["groups"]), number)
 
@@ -193,13 +183,12 @@ class CassStoreRestScalingGroupTestCase(TestCase):
 
         wrapper = yield request(root, 'PUT', config_path,
                                 body=json.dumps(edited_config))
-        self.assertEqual(wrapper.response.code, 204,
-                         "Edit failed: {0}".format(wrapper.content))
+        self.assert_response(wrapper, 204, "Edit config failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view again - the config should be the edited config
         wrapper = yield request(root, 'GET', config_path)
-        self.assertEqual(wrapper.response.code, 200)
+        self.assert_response(wrapper, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'groupConfiguration': edited_config})
 
@@ -219,18 +208,17 @@ class CassStoreRestScalingGroupTestCase(TestCase):
 
         wrapper = yield request(root, 'PUT',
                                 launch_path, body=json.dumps(edited_launch))
-        self.assertEqual(wrapper.response.code, 204,
-                         "Edit failed: {0}".format(wrapper.content))
+        self.assert_response(wrapper, 204, "Edit launch config failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view again - the config should be the edited config
         wrapper = yield request(root, 'GET', launch_path)
-        self.assertEqual(wrapper.response.code, 200)
+        self.assert_response(wrapper, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'launchConfiguration': edited_launch})
 
 
-class CassStoreRestScalingPolicyTestCase(TestCase):
+class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
     """
     Test case for testing the REST API for the scaling policy specific endpoints
     (but not webhooks) against the mock model.
@@ -275,7 +263,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         Asserts that there are ``number`` number of scaling policies
         """
         def _check_number(wrapper):
-            self.assertEqual(200, wrapper.response.code)
+            self.assert_response(wrapper, 200)
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["policies"]), number)
 
@@ -294,8 +282,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         request_body = policy()[:-1]  # however many of them there are minus one
 
         def _verify_create_response(wrapper):
-            self.assertEqual(wrapper.response.code, 201,
-                             "Create failed: {0}".format(wrapper.content))
+            self.assert_response(wrapper, 201, "Create policies failed.")
             response = json.loads(wrapper.content)
 
             self.assertEqual(len(request_body), len(response["policies"]))
@@ -311,15 +298,12 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
                     del original_pol[key]
                 self.assertIn(original_pol, request_body)
 
-            headers = wrapper.response.headers.getRawHeaders('Location')
-            self.assertTrue(headers is not None)
-            self.assertEqual(1, len(headers))
-
             # now make sure the Location header points to the list policies
             #header
-            self.assertEqual(_strip_base_url(headers[0]), self.policies_url)
+            location = path_only(self.get_location_header(wrapper))
+            self.assertEqual(location, self.policies_url)
 
-            links = [_strip_base_url(link["href"])
+            links = [path_only(link["href"])
                      for link in pol["links"] if link["rel"] == "self"
                      for pol in response["policies"]]
             return links
@@ -337,13 +321,12 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         request_body = policy()[-1]  # the one that was not created
         wrapper = yield request(root, 'PUT', path,
                                 body=json.dumps(request_body))
-        self.assertEqual(wrapper.response.code, 204,
-                         "Update failed: {0}".format(wrapper.content))
+        self.assert_response(wrapper, 204, "Update policy failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view
         wrapper = yield request(root, 'GET', path)
-        self.assertEqual(wrapper.response.code, 200)
+        self.assert_response(wrapper, 200)
 
         response = json.loads(wrapper.content)
         updated = response['policy']
@@ -351,7 +334,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         self.assertIn('id', updated)
         self.assertIn('links', updated)
         self.assertIn(
-            path, [_strip_base_url(link["href"]) for link in updated["links"]])
+            path, [path_only(link["href"]) for link in updated["links"]])
 
         del updated['id']
         del updated['links']
@@ -365,13 +348,12 @@ class CassStoreRestScalingPolicyTestCase(TestCase):
         attempt to view the scaling policy should return a 404 not found.
         """
         wrapper = yield request(root, 'DELETE', path)
-        self.assertEqual(wrapper.response.code, 204,
-                         "Delete failed: {0}".format(wrapper.content))
+        self.assert_response(wrapper, 204, "Delete policy failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view
         wrapper = yield request(root, 'GET', path)
-        self.assertEqual(wrapper.response.code, 404)
+        self.assert_response(wrapper, 404, "Deleted policy still there.")
 
         # flush any logged errors
         self.flushLoggedErrors(NoSuchPolicyError)
