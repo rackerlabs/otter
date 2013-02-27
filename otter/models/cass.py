@@ -134,6 +134,7 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
     for i in range(len(bare_webhooks)):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
+        webhook_cap = generate_capability(webhook_id)
         queries.append(_cql_insert_webhook.format(cf=webhooks_table,
                                                   name=name))
 
@@ -144,11 +145,11 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         webhook_real = {'metadata': {}, 'capability': {}}
         webhook_real.update(bare_webhooks[i])
         (token, webhook_real['capability']['hash'],
-            webhook_real['capability']['version']) = generate_capability()
+            webhook_real['capability']['version']) = webhook_cap
 
         cql_parameters[name] = _serial_json_data(webhook_real, 1)
         cql_parameters['{0}Id'.format(name)] = webhook_id
-        cql_parameters['{0}Key'.format(name)] = token
+        cql_parameters['{0}Key'.format(name)] = webhook_cap[1]
         output[webhook_id] = webhook_real
 
 
