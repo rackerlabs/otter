@@ -91,8 +91,8 @@ def request(root_resource, method, endpoint, headers=None, body=None):
         # content-type to be whatever is in
         # twisted.web.server.Request.defaultContentType, so replicate that
         # functionality
-        if (headers.getRawHeaders('Content-Type', None) is None and
-                Request.defaultContentType is not None):
+        if not (headers.hasHeader('Content-Type') or
+                Request.defaultContentType is None):
             headers.setRawHeaders('Content-Type', [Request.defaultContentType])
 
         response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
