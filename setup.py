@@ -32,7 +32,10 @@ if os.path.exists('twisted/plugins'):
 setup(
     name=NAME,
     version='0.0.0',
-    packages=packages
+    packages=packages,
+    data_files = [
+        ('otter/rest', ['otter/rest/otter_ascii.txt'])
+    ]
 )
 
 # Make Twisted regenerate the dropin.cache, if possible.  This is necessary

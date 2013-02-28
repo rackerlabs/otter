@@ -292,11 +292,14 @@ class IScalingGroup(Interface):
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
 
-        :param data: a list of details of the webhook in JSON format, as specified
-            by :data:`otter.json_schema.model_schemas.webhook_list`
-        :type data: ``dict``
+        :param data: a list of details of the webhook in JSON format, as
+            specified by :data:`otter.json_schema.group_schemas.webhook`
+        :type data: ``list``
 
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        :return: a dict of the webhooks mapped to their ids, as specified by
+            :data:`otter.json_schema.model_schemas.webhook_list`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
+            ``dict``
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
@@ -369,7 +372,7 @@ class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups
     """
-    def create_scaling_group(tenant_id, config, launch, policies=None):
+    def create_scaling_group(log, tenant_id, config, launch, policies=None):
         """
         Create scaling group based on the tenant id, the configuration
         paramaters, the launch config, and optional scaling policies.
@@ -406,7 +409,7 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
         """
 
-    def delete_scaling_group(tenant_id, scaling_group_id):
+    def delete_scaling_group(log, tenant_id, scaling_group_id):
         """
         Delete the scaling group
 
@@ -422,7 +425,7 @@ class IScalingGroupCollection(Interface):
             doesn't exist for this tenant id
         """
 
-    def list_scaling_groups(tenant_id):
+    def list_scaling_groups(log, tenant_id):
         """
         List the scaling groups for this tenant ID
 
@@ -434,7 +437,7 @@ class IScalingGroupCollection(Interface):
             ``list`` of :class:`IScalingGroup` providers
         """
 
-    def get_scaling_group(tenant_id, scaling_group_id):
+    def get_scaling_group(log, tenant_id, scaling_group_id):
         """
         Get a scaling group model
 

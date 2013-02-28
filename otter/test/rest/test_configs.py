@@ -50,7 +50,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(404)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -63,7 +63,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(500)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -86,7 +86,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         validate(response_body, rest_schemas.view_config)
         self.assertEqual(response_body, {'groupConfiguration': config})
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
@@ -117,7 +117,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
                                                 body=json.dumps(request_body))
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(request_body)
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -137,7 +137,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method='PUT',
                                                 body=json.dumps(request_body))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(request_body)
 
     def test_group_modify_bad_or_missing_input_400(self):
@@ -202,7 +202,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(404)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
@@ -216,7 +216,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(500)
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
@@ -234,7 +234,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.view_launch_config)
         self.assertEqual(resp, {'launchConfiguration': launch_examples()[0]})
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
 
     def test_update_group_config_404(self):
@@ -264,7 +264,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             500, method="PUT", body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
         self.assertEqual(resp['type'], 'InternalError')
@@ -278,7 +278,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             204, method='PUT', body=json.dumps(launch_examples()[0]))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with('11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
 
