@@ -130,6 +130,7 @@ def with_transaction_id():
         def _(request, *args, **kwargs):
             transaction_id = generate_transaction_id()
             request.setHeader('X-Response-Id', transaction_id)
+            request.setHeader('Content-Type', 'application/json')
             bound_log = log.fields(transaction_id=transaction_id)
             bound_log.struct(
                 method=request.method,

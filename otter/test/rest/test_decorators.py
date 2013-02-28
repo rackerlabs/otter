@@ -80,6 +80,10 @@ class TransactionIdTestCase(DeferredTestMixin, TestCase):
                                                                     referer='referrer(sic)',
                                                                     uri='/',
                                                                     method='PROPFIND')
+        self.mockRequest.setHeader.assert_has_calls([
+            mock.call('X-Response-Id', '12345678'),
+            mock.call('Content-Type', 'application/json')
+        ])
         self.assertEqual('hello', r)
 
 
