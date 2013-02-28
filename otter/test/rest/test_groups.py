@@ -87,15 +87,15 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 {
                     'id': '1',
                     'links': [
-                        {"href": '/v1.0/11111/groups/1', "rel": "self"},
-                        {"href": '/11111/groups/1', "rel": "bookmark"}
+                        {"href": '/v1.0/11111/groups/1/', "rel": "self"},
+                        {"href": '/11111/groups/1/', "rel": "bookmark"}
                     ]
                 },
                 {
                     'id': '2',
                     'links': [
-                        {"href": '/v1.0/11111/groups/2', "rel": "self"},
-                        {"href": '/11111/groups/2', "rel": "bookmark"}
+                        {"href": '/v1.0/11111/groups/2/', "rel": "self"},
+                        {"href": '/11111/groups/2/', "rel": "bookmark"}
                     ]
                 }
             ],
@@ -132,7 +132,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.create_scaling_group.return_value = defer.succeed("1")
         response_body = self.assert_status_code(
-            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1')
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
         self.mock_store.create_scaling_group.assert_called_once_with(
             mock.ANY, '11111',
             request_body['groupConfiguration'],
@@ -145,8 +145,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         expected = {
             "id": "1",
             "links": [
-                {"href": "/v1.0/11111/groups/1", "rel": "self"},
-                {"href": "/11111/groups/1", "rel": "bookmark"}
+                {"href": "/v1.0/11111/groups/1/", "rel": "self"},
+                {"href": "/11111/groups/1/", "rel": "bookmark"}
             ],
             'groupConfiguration': request_body['groupConfiguration'],
             'launchConfiguration': request_body['launchConfiguration']
@@ -238,8 +238,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         expected_policy.update({
             "id": "5",
             "links": [
-                {"href": "/v1.0/11111/groups/one/policies/5", "rel": "self"},
-                {"href": "/11111/groups/one/policies/5", "rel": "bookmark"}
+                {"href": "/v1.0/11111/groups/one/policies/5/", "rel": "self"},
+                {"href": "/11111/groups/one/policies/5/", "rel": "bookmark"}
             ]
         })
 
@@ -250,8 +250,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
                 'scalingPolicies': [expected_policy],
                 "id": "one",
                 "links": [
-                    {"href": "/v1.0/11111/groups/one", "rel": "self"},
-                    {"href": "/11111/groups/one", "rel": "bookmark"}
+                    {"href": "/v1.0/11111/groups/one/", "rel": "self"},
+                    {"href": "/11111/groups/one/", "rel": "bookmark"}
                 ]
             }
         }
@@ -358,8 +358,8 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
             'paused': False,
             'id': "one",
             "links": [
-                {"href": "/v1.0/11111/groups/one", "rel": "self"},
-                {"href": "/11111/groups/one", "rel": "bookmark"}
+                {"href": "/v1.0/11111/groups/one/", "rel": "self"},
+                {"href": "/11111/groups/one/", "rel": "bookmark"}
             ]
         }})
 

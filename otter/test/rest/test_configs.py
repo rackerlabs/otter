@@ -29,7 +29,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
     max, and steady state number of entities, as well as the metadata
     associated with the group).
     """
-    endpoint = "/v1.0/11111/groups/1/config"
+    endpoint = "/v1.0/11111/groups/1/config/"
     invalid_methods = ("DELETE", "POST")
 
     def setUp(self):
@@ -179,7 +179,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
     what kind of server to start up, how to provision it, whether to add it to
     a load balancer, etc.)
     """
-    endpoint = "/v1.0/11111/groups/1/launch"
+    endpoint = "/v1.0/11111/groups/1/launch/"
     invalid_methods = ("DELETE", "POST")
 
     def setUp(self):

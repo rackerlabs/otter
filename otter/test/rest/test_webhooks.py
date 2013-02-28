@@ -26,7 +26,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     tenant_id = '11111'
     group_id = '1'
     policy_id = '2'
-    endpoint = "/v1.0/11111/groups/1/policies/2/webhooks"
+    endpoint = "/v1.0/11111/groups/1/policies/2/webhooks/"
 
     invalid_methods = ("DELETE", "PUT")
 
@@ -94,9 +94,9 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'name': 'three',
                     'metadata': {},
                     'links': [
-                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/3',
+                        {"href": '/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
@@ -106,9 +106,9 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'name': 'four',
                     'metadata': {},
                     'links': [
-                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/4',
+                        {"href": '/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
@@ -197,9 +197,9 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'name': 'three',
                     'metadata': {},
                     'links': [
-                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/3',
+                        {"href": '/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
@@ -209,9 +209,9 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'name': 'four',
                     'metadata': {},
                     'links': [
-                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
+                        {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/4',
+                        {"href": '/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
@@ -230,7 +230,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     group_id = '1'
     policy_id = '2'
     webhook_id = '3'
-    endpoint = "/v1.0/11111/groups/1/policies/2/webhooks/3"
+    endpoint = "/v1.0/11111/groups/1/policies/2/webhooks/3/"
 
     invalid_methods = ("POST")
 
@@ -294,13 +294,13 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                 'links': [
                     {
                         'rel': 'self',
-                        'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                        'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}/'
                                  .format(t=self.tenant_id, g=self.group_id,
                                          p=self.policy_id, w=self.webhook_id))
                     },
                     {
                         'rel': 'bookmark',
-                        'href': ('/{t}/groups/{g}/policies/{p}/webhooks/{w}'
+                        'href': ('/{t}/groups/{g}/policies/{p}/webhooks/{w}/'
                                  .format(t=self.tenant_id, g=self.group_id,
                                          p=self.policy_id, w=self.webhook_id))
                     },

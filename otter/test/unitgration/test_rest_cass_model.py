@@ -83,7 +83,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
             "scalingPolicies": self._policies
         }
         deferred = request(
-            root, 'POST', '/v1.0/11111/groups', body=json.dumps(request_body))
+            root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body))
         deferred.addCallback(_check_create_body)
         return deferred
 
@@ -104,7 +104,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
 
         def _check_creation_worked(path):
             # TODO: check manifest and state as well
-            d = request(root, 'GET', path + '/policies').addCallback(
+            d = request(root, 'GET', path + 'policies/').addCallback(
                 _check_policies_created)
 
             # no matter what, just return the path
@@ -126,7 +126,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
 
         # now try to view policies
         # TODO: view state and manifest too, once they have been implemented
-        wrapper = yield request(root, 'GET', path + '/policies')
+        wrapper = yield request(root, 'GET', path + 'policies/')
         self.assert_response(wrapper, 404, "Deleted group still there.")
 
         # flush any logged errors
@@ -141,7 +141,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["groups"]), number)
 
-        d = request(root, 'GET', '/v1.0/11111/groups')
+        d = request(root, 'GET', '/v1.0/11111/groups/')
         return d.addCallback(_check_number)
 
     @defer.inlineCallbacks
@@ -170,7 +170,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         if necessary.
         """
         path = yield self.create_scaling_group()
-        config_path = path + '/config'
+        config_path = path + 'config/'
         edited_config = {
             'name': 'updated_config',
             'cooldown': 5,
@@ -203,7 +203,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         config should return the new launch config.
         """
         path = yield self.create_scaling_group()
-        launch_path = path + '/launch'
+        launch_path = path + 'launch/'
         edited_launch = launch_server_config()[1]
 
         wrapper = yield request(root, 'PUT',
@@ -240,7 +240,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         def _set_group_id(group_id):
             self.group_id = group_id
             self.policies_url = (
-                '/v1.0/{tenant}/groups/{group}/policies'.format(
+                '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
 
         mock_log = mock.MagicMock()
