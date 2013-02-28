@@ -179,6 +179,8 @@ class IScalingGroup(Interface):
         Rebuilds an entity given by the entity ID.  This essentially deletes
         the given entity and a new one will be rebuilt in its place.
 
+        V1.0: do not implement this
+
         :param entity_id: the uuid of the entity to delete
         :type entity_id: ``str``
 
