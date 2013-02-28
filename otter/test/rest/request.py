@@ -162,6 +162,9 @@ class RequestTestMixin(object):
             self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
             self.assertEqual(headers.getRawHeaders('Content-Type'),
                              ['application/json'])
+        else:
+            self.assertEqual(headers.getRawHeaders('Content-Type'),
+                             ['text/html'])
 
         error_message = [
             "Got status {0} but expected {1}".format(
