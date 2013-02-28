@@ -26,13 +26,6 @@ def maybe_execute_scaling_policy(log, transaction_id, scaling_group, policy_id):
     record_policy_trigger_time(scaling_group, policy_id, time.time())
 
 
-def generate_audit_id(log):
-    """
-    Come up with an ID to use for the audit log
-    """
-    raise NotImplementedError
-
-
 def calculate_new_steady_state(log):
     """
     :raises: Some exception about why you don't the steady state shouldn't
