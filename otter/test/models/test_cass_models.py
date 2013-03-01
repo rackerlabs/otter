@@ -811,10 +811,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(result, {})
 
-    def test_list_webhooks_invalid_group(self):
+    def test_list_webhooks_invalid_policy(self):
         """
         If the group does not exist, `list_policies` raises a
-        :class:`NoSuchScalingGroupError`
+        :class:`NoSuchScalingPolicy`
         """
         # no scaling policies, and view config is empty too
         self.returns = [[], []]
