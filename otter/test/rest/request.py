@@ -13,6 +13,7 @@ import mock
 from twisted.internet import defer
 from twisted.web import server, http
 from twisted.web.resource import getChildForRequest
+from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.rest.application import root, set_store
@@ -84,8 +85,18 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             # setHeader(name, value)
             # a call in mock_calls is a tuple of (name, args, kwargs))
             headers[call[1][0]].append(call[1][1])
+        headers = http.Headers(headers)
+
+        # if the content-type has not been set, Twisted by default sets the
+        # content-type to be whatever is in
+        # twisted.web.server.Request.defaultContentType, so replicate that
+        # functionality
+        if not (headers.hasHeader('Content-Type') or
+                Request.defaultContentType is None):
+            headers.setRawHeaders('Content-Type', [Request.defaultContentType])
+
         response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
-                                  headers=http.Headers(headers))
+                                  headers=headers)
 
         # Annoying implementation detail: if the status code is one of the
         # status codes that should not have a body, twisted replaces the
@@ -133,7 +144,7 @@ class RequestTestMixin(object):
     def assert_response(self, response_wrapper, expected_status, message=None):
         """
         Asserts that the response wrapper has the provided status code and
-        that it has a response ID header.
+        that it has a response ID header and the correct content-type header.
 
         :param response_wrapper: the callbacked result from :func:`request`
         :type response_wrapper: :class:`ResponseWrapper`
@@ -144,10 +155,16 @@ class RequestTestMixin(object):
         :return: None
         """
         # If we're expecting a 405, it never hits the decorator;
-        # otherwise it needs to have sent a transaction ID.
-
+        # otherwise it needs to have sent a transaction ID, and its
+        # content-type must be set to application/json
+        headers = response_wrapper.response.headers
         if expected_status != 405:
-            self.assertNotEqual(response_wrapper.response.headers.getRawHeaders('X-Response-ID'), None)
+            self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
+            self.assertEqual(headers.getRawHeaders('Content-Type'),
+                             ['application/json'])
+        else:
+            self.assertEqual(headers.getRawHeaders('Content-Type'),
+                             ['text/html'])
 
         error_message = [
             "Got status {0} but expected {1}".format(
