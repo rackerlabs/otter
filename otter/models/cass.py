@@ -50,6 +50,8 @@ _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
+_cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
 
 
 def get_consistency_level(operation, resource):
@@ -454,7 +456,20 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
         """
-        raise NotImplementedError()
+        def _check_if_empty(webhooks_dict):
+            if len(webhooks_dict) == 0:
+                policy_there = self.get_policy(policy_id)
+                return policy_there.addCallback(lambda _: webhooks_dict)
+            return webhooks_dict
+
+        query = _cql_list_webhook.format(cf=self.webhooks_table)
+        d = self.connection.execute(query, {"tenantId": self.tenant_id,
+                                            "groupId": self.uuid,
+                                            "policyId": policy_id},
+                                    get_consistency_level('list', 'webhook'))
+        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        d.addCallback(_check_if_empty)
+        return d
 
     def create_webhooks(self, policy_id, data):
         """
@@ -501,10 +516,11 @@ class CassScalingGroup(object):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            if not policy_id:
+            if policy_id is None:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             else:
                 raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
