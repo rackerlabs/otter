@@ -167,8 +167,8 @@ class RequestTestMixin(object):
             self.assertEqual(headers.getRawHeaders('Content-Type'),
                              ['application/json'])
         else:
-            self.assertEqual(headers.getRawHeaders('Content-Type'),
-                             ['text/html'])
+            content_type = headers.getRawHeaders('Content-Type')[0]
+            self.assertIn('text/html', content_type)
 
         error_message = [
             "Got status {0} but expected {1}".format(
