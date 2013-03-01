@@ -18,6 +18,12 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
     :ivar group: an instance of an :class:`IScalingGroup` provider
     """
 
+    sample_webhook_data = {
+        'name': 'a name',
+        'metadata': {},
+        'capability': {'hash': 'h', 'version': '1'}
+    }
+
     def test_implements_interface(self):
         """
         The provider correctly implements
