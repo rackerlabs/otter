@@ -80,6 +80,7 @@ class TransactionIdTestCase(DeferredTestMixin, TestCase):
                                                                     referer='referrer(sic)',
                                                                     uri='/',
                                                                     method='PROPFIND')
+        self.mockRequest.setHeader.called_once_with('X-Response-Id', '12345678')
         self.assertEqual('hello', r)
 
 
