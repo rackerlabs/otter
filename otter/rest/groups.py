@@ -167,11 +167,11 @@ def create_new_scaling_group(request, log, tenantId, data):
                 "id": "{groupId}",
                 "links": [
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
                     "rel": "self"
                   },
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}/"
                     "rel": "bookmark"
                   }
                 ],
@@ -272,11 +272,11 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                 "id": "{groupId}",
                 "links": [
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
                     "rel": "self"
                   },
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}/"
                     "rel": "bookmark"
                   }
                 ],
@@ -326,11 +326,11 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId1}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}/"
                             "rel": "bookmark"
                           }
                         ],
@@ -342,11 +342,11 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId2}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}/"
                             "rel": "bookmark"
                           }
                         ],
@@ -358,11 +358,11 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId3}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
                             "rel": "self"
                           },
                           {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
+                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}/"
                             "rel": "bookmark"
                           }
                         ],

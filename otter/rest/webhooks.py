@@ -57,11 +57,11 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "bookmark"
                         },
                         {
@@ -78,11 +78,11 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "bookmark"
                         },
                         {
@@ -157,11 +157,11 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "bookmark"
                         },
                         {
@@ -176,11 +176,11 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                     "metadata": {},
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "bookmark"
                         },
                         {
@@ -233,11 +233,11 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
                 "metadata": {},
                 "links": [
                     {
-                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}",
+                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/",
                         "rel": "self"
                     },
                     {
-                        "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId}",
+                        "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId}/",
                         "rel": "bookmark"
                     },
                     {
