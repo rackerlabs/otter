@@ -136,10 +136,12 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         ]
 
         if capability_hash is not None:
-            capability_url = "/".join(
-                [get_url_root(), api, "execute", capability_version,
-                 capability_hash])
-            capability_url = capability_url
+            capability_url = append_segments(
+                get_url_root(),
+                api,
+                "execute",
+                capability_version,
+                capability_hash)
 
             links.append({"href": capability_url, "rel": "capability"})
 
