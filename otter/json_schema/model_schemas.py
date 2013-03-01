@@ -150,7 +150,6 @@ webhook['properties']['capability'] = {
             "type": "string",
             "description": 'The "unguessable" part of the capability URL',
             "required": True,
-            "minLength": 64
         },
         "version": {
             "type": "string",
@@ -169,12 +168,6 @@ webhook['required'] = True
 webhook_list = {
     "type": "object",
     "description": "Schema returned by the interface for viewing all webhooks",
-    "patternProperties": {
-        "^\S+$": {
-            "type": "object",
-            "required": True,
-            "items": [webhook]
-        }
-    },
+    "patternProperties": {"^\S+$": webhook},
     "additionalProperties": False
 }

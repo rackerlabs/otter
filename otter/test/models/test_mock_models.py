@@ -468,8 +468,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         policy_list = self.assert_deferred_succeeded(self.group.list_policies())
         uuid = policy_list.keys()[0]
         webhooks = {
-            '10': {'capabilityHash': 'hook', 'metadata': {}},
-            '11': {'capabilityHash': 'anotherhook', 'metadata': {}}
+            '10': self.sample_webhook_data,
+            '11': self.sample_webhook_data
         }
         self.group.webhooks = {uuid: webhooks}
         result = self.validate_list_webhooks_return_value(uuid)
