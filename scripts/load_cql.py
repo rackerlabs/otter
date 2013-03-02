@@ -29,8 +29,9 @@ the_parser.add_argument(
     help='Replication factor to use if creating the keyspace.  Default: 1')
 
 the_parser.add_argument(
-    '--ban-drops', action='store_true',
-    help='Whether to check for unsafe instructions (drop, currently)')
+    '--ban-unsafe', action='store_true',
+    help=('Whether to check for unsafe instructions ("alter", "drop", '
+          '"truncate", and "delete", currently)'))
 
 the_parser.add_argument(
     '--dry-run', action='store_true',
@@ -58,7 +59,7 @@ def run(args):
     Generate CQL and/or load it into a cassandra instance/cluster.
     """
     try:
-        generator = CQLGenerator(args.cql_dir, no_drops=args.ban_drops)
+        generator = CQLGenerator(args.cql_dir, safe_only=args.ban_unsafe)
     except Exception as e:
         print e.message
         sys.exit(1)
