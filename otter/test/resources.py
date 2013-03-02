@@ -248,6 +248,7 @@ class CQLGenerator(object):
                         'Unsafe "DROP" command in file {0}'.format(cql_file))
 
                 text.write(content)
+                text.write('\n')
 
         self.cql = text.getvalue()
 

@@ -33,6 +33,10 @@ the_parser.add_argument(
     help='Whether to check for unsafe instructions (drop, currently)')
 
 the_parser.add_argument(
+    '--dry-run', action='store_true',
+    help="If this option is passed, nothing actually gets loaded into cassandra.")
+
+the_parser.add_argument(
     '--host', type=str, default='localhost',
     help='The host of the cluster to connect to. Default: localhost')
 
@@ -63,6 +67,9 @@ def run(args):
         keyspace_name=args.keyspace,
         replication_factor=args.replication,
         outfile=args.outfile)
+
+    if args.dry_run:
+        return
 
     # filter out comments, to make debugging easier
     cql = "\n".join(
