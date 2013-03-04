@@ -525,6 +525,12 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
+    def execute_webhook(self, policy_id, webhook_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.execute_webhook`
+        """
+        raise NotImplementedError()
+
     def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
