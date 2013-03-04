@@ -42,6 +42,41 @@ def _de_identify(json_obj):
         return json.loads(json.dumps(json_obj))
 
 
+def _cassandrify_data(list_of_dicts):
+    """
+    To make mocked up test data less verbose, produce what cassandra would
+    return from a list of dictionaries.  So for instance, passing the following:
+
+        [{'policyId': 'group1', 'data': '{}'},
+         {'policyId': 'group2', 'data': '{}'}]
+
+    would return:
+
+        {'cols': [{'timestamp': None, 'name': 'policyId',
+                   'value': 'group1', 'ttl': None},
+                  {'timestamp': None, 'name': 'data',
+                   'value': '{}', 'ttl': None}], 'key': ''},
+        {'cols': [{'timestamp': None, 'name': 'policyId',
+                   'value': 'group3', 'ttl': None},
+                  {'timestamp': None, 'name': 'data',
+                   'value': '{}', 'ttl': None}], 'key': ''}]
+
+    This function also de-identifies the data for you.
+    """
+    results = []
+    for data_dict in list_of_dicts:
+        columns = []
+        for key, value in data_dict.iteritems():
+            columns.append({
+                'timestamp': None,
+                'name': key,
+                'value': value,
+                'ttl': None
+            })
+        results.append({'cols': columns, 'key': ''})
+    return _de_identify(results)
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -658,7 +693,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(CassBadDataError)
 
-    def test_add_webhooks(self):
+    def test_add_webhooks_valid_policy(self):
         """
         When adding one or more webhooks is successful, what is returned is a
         dictionary of the webhook ids to the webhooks, which include capability
@@ -729,6 +764,64 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                          expected_results['100001'])
         self.assertEqual(json.loads(cql_params['webhook1']),
                          expected_results['100002'])
+
+    def test_add_webhooks_invalid_policy(self):
+        """
+        Can't add webhooks to an invalid policy.
+        """
+        self.returns = [[], None]
+        d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
+        self.assert_deferred_failed(d, NoSuchPolicyError)
+
+    def test_list_webhooks_valid_policy(self):
+        """
+        Listing a valid policy produces a valid dictionary as per
+        :data:`otter.json_schema.model_schemas.webhook_list`
+        """
+        data = json.dumps(self.sample_webhook_data)
+        self.returns = [_cassandrify_data([
+            {'webhookId': 'webhook1', 'data': data},
+            {'webhookId': 'webhook2', 'data': data}
+        ])]
+
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "policyId": '23456789'}
+        expectedCql = ('SELECT "webhookId", data FROM policy_webhooks WHERE '
+                       '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       '"policyId" = :policyId AND deleted = False;')
+        r = self.validate_list_webhooks_return_value('23456789')
+        self.assertEqual(r, {'webhook1': self.sample_webhook_data,
+                             'webhook2': self.sample_webhook_data})
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_list_webhooks_empty_list(self):
+        """
+        If the policy exists but there are no webhooks, `list_webhooks` returns
+        an empty list
+        """
+        def execute_respond(cql, cqlargs, *other_args, **kwargs):
+            if 'scaling_policies' in cql:  # view policy - seeing if it's there
+                return defer.succeed(_cassandrify_data([{'data': '{}'}]))
+            else:
+                return defer.succeed(_de_identify([]))
+        self.connection.execute.side_effect = execute_respond
+
+        result = self.validate_list_webhooks_return_value('23456789')
+        self.assertEqual(result, {})
+
+    def test_list_webhooks_invalid_policy(self):
+        """
+        If the group does not exist, `list_policies` raises a
+        :class:`NoSuchScalingPolicy`
+        """
+        # no scaling policies, and view config is empty too
+        self.returns = [[], []]
+        self.assert_deferred_failed(self.group.list_webhooks('23456789'),
+                                    NoSuchPolicyError)
+        self.flushLoggedErrors(NoSuchPolicyError)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

@@ -1,11 +1,12 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchPolicyError)
 import zope.interface
 
 from twisted.internet import defer
+
+from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
+                                    NoSuchScalingGroupError, NoSuchPolicyError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -49,6 +50,8 @@ _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
+_cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
 
 
 def get_consistency_level(operation, resource):
@@ -151,6 +154,59 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         cql_parameters['{0}Id'.format(name)] = webhook_id
         cql_parameters['{0}Key'.format(name)] = webhook_cap[1]
         output[webhook_id] = webhook_real
+
+
+def _grab_list(raw_response, id_name, has_data=True):
+    """
+    The response is a list of stuff.  Return the list.
+
+    :param raw_response: the raw response from cassandra
+    :type raw_response: ``dict``
+
+    :param id_name: The column name to look for and get
+    :type id_name: ``str``
+
+    :param has_data: Whether to pull a data object out or not.  Determines
+        whether the returned value is a list or a dictionary
+    :type has_data: ``bool``
+
+    :return: a ``list`` or ``dict`` representing the data in Cassandra
+    """
+    if raw_response is None:
+        raise CassBadDataError("received unexpected None response")
+
+    if has_data:
+        data = {}
+    else:
+        data = []
+
+    for row in raw_response:
+        if 'cols' not in row:
+            raise CassBadDataError("Received malformed response with no cols")
+        raw_data = None
+        col_id = None
+        for column in row['cols']:
+            if column.get('name', None) == id_name:
+                col_id = column.get('value')
+            if column.get('name', None) == 'data':
+                raw_data = column.get('value')
+
+        if col_id is None or (has_data and raw_data is None):
+            raise CassBadDataError("Received malformed response without the "
+                                   "required fields")
+
+        if has_data:
+            try:
+                data[col_id] = json.loads(raw_data)
+                if "_ver" in data[col_id]:
+                    del data[col_id]["_ver"]
+            except ValueError:
+                raise CassBadDataError("Bad data in database - not JSON")
+
+        else:
+            data.append(col_id)
+
+    return data
 
 
 class CassScalingGroup(object):
@@ -284,29 +340,11 @@ class CassScalingGroup(object):
         all the policies associated with particular scaling group
         irregardless of whether the scaling group still exists.
         """
-        def _grab_pol_list(rawResponse):
-            if rawResponse is None:
-                raise CassBadDataError("received unexpected None response")
-            data = {}
-            for row in rawResponse:
-                if 'cols' not in row:
-                    raise CassBadDataError("Received malformed response with no cols")
-                rec = None
-                policyId = None
-                for rawRec in row['cols']:
-                    if rawRec.get('name', None) == 'policyId':
-                        policyId = rawRec.get('value')
-                    if rawRec.get('name', None) == 'data':
-                        rec = rawRec.get('value')
-                if rec is None or policyId is None:
-                    raise CassBadDataError("Received malformed response without the "
-                                           "required fields")
-                try:
-                    data[policyId] = json.loads(rec)
-                    if "_ver" in data[policyId]:
-                        del data[policyId]["_ver"]
-                except ValueError:
-                    raise CassBadDataError("Bad data in database")
+        def _check_zero_length(data):
+            if len(data) == 0:
+                # If there is no data - make sure it's not because the group
+                # doesn't exist
+                return self.view_config().addCallback(lambda _: data)
             return data
 
         query = _cql_list_policy.format(cf=self.policies_table)
@@ -314,7 +352,8 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(_grab_pol_list)
+        d.addCallback(_grab_list, id_name='policyId', has_data=True)
+        d.addCallback(_check_zero_length)
         return d
 
     def list_policies(self):
@@ -418,7 +457,20 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
         """
-        raise NotImplementedError()
+        def _check_if_empty(webhooks_dict):
+            if len(webhooks_dict) == 0:
+                policy_there = self.get_policy(policy_id)
+                return policy_there.addCallback(lambda _: webhooks_dict)
+            return webhooks_dict
+
+        query = _cql_list_webhook.format(cf=self.webhooks_table)
+        d = self.connection.execute(query, {"tenantId": self.tenant_id,
+                                            "groupId": self.uuid,
+                                            "policyId": policy_id},
+                                    get_consistency_level('list', 'webhook'))
+        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        d.addCallback(_check_if_empty)
+        return d
 
     def create_webhooks(self, policy_id, data):
         """
@@ -465,10 +517,11 @@ class CassScalingGroup(object):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            if not policy_id:
+            if policy_id is None:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             else:
                 raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
         rec = None
@@ -604,31 +657,15 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
-        def _grab_list(rawResponse):
-            if rawResponse is None:
-                raise CassBadDataError("received unexpected None response")
-            if len(rawResponse) == 0:
-                return defer.succeed([])
-            data = []
-            for row in rawResponse:
-                if 'cols' not in row:
-                    raise CassBadDataError("Received malformed response with no cols")
-                rec = None
-                for rawRec in row.get('cols', []):
-                    if rawRec.get('name', None) == 'groupId':
-                        rec = rawRec.get('value', None)
-                if rec is None:
-                    raise CassBadDataError("Received malformed response without the "
-                                           "required fields")
-                data.append(CassScalingGroup(log, tenant_id, rec,
-                                             self.connection))
-            return data
-
+        def _build_cass_groups(group_ids):
+            return [CassScalingGroup(log, tenant_id, group_id, self.connection)
+                    for group_id in group_ids]
         query = _cql_list.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
-        d.addCallback(_grab_list)
+        d.addCallback(_grab_list, 'groupId', has_data=False)
+        d.addCallback(_build_cass_groups)
         return d
 
     def get_scaling_group(self, log, tenant_id, scaling_group_id):

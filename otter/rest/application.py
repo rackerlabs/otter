@@ -5,6 +5,7 @@ handlers for the REST service.
 import os.path
 
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 from twisted.web.static import File
 
 from klein import Klein
@@ -15,6 +16,8 @@ from otter.util.http import append_segments
 _store = None
 _urlRoot = 'http://127.0.0.1'
 _otter = File(os.path.join(os.path.dirname(__file__), 'otter_ascii.txt'))
+
+Request.defaultContentType = 'application/json'  # everything should be json
 
 
 def get_store():
