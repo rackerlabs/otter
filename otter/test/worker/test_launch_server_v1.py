@@ -21,7 +21,8 @@ from otter.worker.launch_server_v1 import (
     server_details,
     wait_for_status,
     create_server,
-    launch_server
+    launch_server,
+    prepare_launch_config
 )
 
 
@@ -538,3 +539,76 @@ class ServerTests(TestCase):
 
         self.assertEqual(failure.value.code, 500)
         self.assertEqual(failure.value.body, "Oh noes")
+
+
+class ConfigPreparationTests(TestCase):
+    def setUp(self):
+        generate_server_name_patcher = mock.patch('otter.worker.launch_server_v1.generate_server_name')
+        self.generate_server_name = generate_server_name_patcher.start()
+        self.addCleanup(generate_server_name_patcher.stop)
+        self.generate_server_name.return_value = 'as000000'
+
+        self.scaling_group = mock.Mock()
+        self.scaling_group.uuid = '1111111-11111-11111-11111111'
+
+    def test_server_name_suffix(self):
+        test_config = {'server': {'name': 'web.example.com'}}
+        expected_name = 'as000000-web.example.com'
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_name, launch_config['server']['name'])
+
+    def test_server_name_no_suffix(self):
+        test_config = {'server': {}}
+        expected_name = 'as000000'
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_name, launch_config['server']['name'])
+
+    def test_server_metadata(self):
+        test_config = {'server': {}}
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group.uuid}
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+
+    def test_server_merge_metadata(self):
+        test_config = {'server': {'metadata': {'foo': 'bar'}}}
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group.uuid,
+                             'foo': 'bar'}
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+
+    def test_load_balancer_metadata(self):
+        test_config = {'server': {}, 'loadBalancers': [{'id': 1, 'port': 80}]}
+
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group.uuid,
+                             'rax:auto_scaling_server_name': 'as000000'}
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+
+    def test_load_balancer_metadata_merge(self):
+        test_config = {'server': {}, 'loadBalancers': [
+            {'id': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
+
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group.uuid,
+                             'rax:auto_scaling_server_name': 'as000000',
+                             'foo': 'bar'}
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+
+    def test_launch_config_is_copy(self):
+        test_config = {'server': {}}
+
+        launch_config = prepare_launch_config(self.scaling_group, test_config)
+
+        self.assertNotIdentical(test_config, launch_config)

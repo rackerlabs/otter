@@ -35,3 +35,14 @@ def generate_capability():
     :rtype: ``tuple``
     """
     return ("1", os.urandom(32).encode('hex'))
+
+
+def generate_server_name():
+    """
+    Generate a string suitable for use as either the complele server name or
+    the prefix of a user specified server name.
+
+    :return: A server name prefix.
+    :rtype: ``str``
+    """
+    return 'as{0}'.format(os.urandom(4).encode('hex'))
