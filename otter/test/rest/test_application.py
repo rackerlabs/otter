@@ -34,10 +34,6 @@ class LinkGenerationTestCase(TestCase):
             {
                 'rel': 'self',
                 'href': url
-            },
-            {
-                'rel': 'bookmark',
-                'href': '/' + url.split('/', 2)[-1]
             }
         ]
 
@@ -217,7 +213,7 @@ class LinkGenerationTestCase(TestCase):
             json_blob = get_autoscale_links(
                 '11111', capability_hash='xxx', **dict(pairs[:(i + 1)]))
 
-            self.assertEqual(len(json_blob), 3)
+            self.assertEqual(len(json_blob), 2)
             self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx'},
                           json_blob)
 

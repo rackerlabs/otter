@@ -131,8 +131,7 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
 
     if format == "json":
         links = [
-            {"href": url, "rel": "self"},
-            {"href": url.replace('/{0}/'.format(api), '/'), "rel": "bookmark"}
+            {"href": url, "rel": "self"}
         ]
 
         if capability_hash is not None:

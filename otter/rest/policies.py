@@ -40,10 +40,6 @@ def list_policies(request, log, tenantId, groupId):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId1}/"
-                            "rel": "bookmark"
                         }
                     ]
                 },
@@ -58,10 +54,6 @@ def list_policies(request, log, tenantId, groupId):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId2}/"
-                            "rel": "bookmark"
                         }
                     ]
                 },
@@ -76,10 +68,6 @@ def list_policies(request, log, tenantId, groupId):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId3}/"
-                            "rel": "bookmark"
                         }
                     ]
                 },
@@ -94,10 +82,6 @@ def list_policies(request, log, tenantId, groupId):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId1}/policy/{policyId4}/"
-                            "rel": "bookmark"
                         }
                     ]
                 }
@@ -162,10 +146,6 @@ def create_policies(request, log, tenantId, groupId, data):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId1}/"
-                            "rel": "bookmark"
                         }
                     ],
                     "name": "scale up by one server",
@@ -178,10 +158,6 @@ def create_policies(request, log, tenantId, groupId, data):
                         {
                             "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}/"
                             "rel": "self"
-                        },
-                        {
-                            "href": "{url_root}/010101/groups/{groupId}/policy/{policyId2}/"
-                            "rel": "bookmark"
                         }
                     ],
                     "name": 'scale down a 5.5 percent because of a tweet',
