@@ -139,7 +139,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             NoSuchScalingGroupError(self.tenant_id, self.group_id),
             NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id)]
         for error in errors:
-            self.mock_group.list_webhooks.return_value = defer.fail(error)
+            self.mock_group.create_webhooks.return_value = defer.fail(error)
             self.assert_status_code(404, None, 'POST', json.dumps(
                                     [{'name': 'one'}]))
             self.mock_group.create_webhooks.assert_called_once_with(
@@ -220,7 +220,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         })
 
 
-class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
+class OneWebhookTestCase(RestAPITestMixin, TestCase):
     """
     Tests for
     ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}``
