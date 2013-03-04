@@ -61,10 +61,6 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}",
-                            "rel": "bookmark"
-                        },
-                        {
                             "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
@@ -80,10 +76,6 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                         {
                             "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
                             "rel": "self"
-                        },
-                        {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}",
-                            "rel": "bookmark"
                         },
                         {
                             "href": ".../execute/1/{capability_hash2},
@@ -161,10 +153,6 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                             "rel": "self"
                         },
                         {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId1}",
-                            "rel": "bookmark"
-                        },
-                        {
                             "href": ".../execute/1/{capability_hash1},
                             "rel": "capability"
                         }
@@ -178,10 +166,6 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                         {
                             "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
                             "rel": "self"
-                        },
-                        {
-                            "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId2}",
-                            "rel": "bookmark"
                         },
                         {
                             "href": ".../execute/1/{capability_hash2},
@@ -235,10 +219,6 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
                     {
                         "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}",
                         "rel": "self"
-                    },
-                    {
-                        "href": ".../{groupId1}/policy/{policyId1}/webhooks/{webhookId}",
-                        "rel": "bookmark"
                     },
                     {
                         "href": ".../execute/1/{capability_hash2},

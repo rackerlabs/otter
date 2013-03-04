@@ -96,8 +96,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/3',
-                         "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
                 },
@@ -108,8 +106,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/4',
-                         "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
                 }
@@ -139,7 +135,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             NoSuchScalingGroupError(self.tenant_id, self.group_id),
             NoSuchPolicyError(self.tenant_id, self.group_id, self.policy_id)]
         for error in errors:
-            self.mock_group.list_webhooks.return_value = defer.fail(error)
+            self.mock_group.create_webhooks.return_value = defer.fail(error)
             self.assert_status_code(404, None, 'POST', json.dumps(
                                     [{'name': 'one'}]))
             self.mock_group.create_webhooks.assert_called_once_with(
@@ -199,8 +195,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/3',
-                         "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
                     ]
                 },
@@ -211,8 +205,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4',
                          "rel": "self"},
-                        {"href": '/11111/groups/1/policies/2/webhooks/4',
-                         "rel": "bookmark"},
                         {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
                     ]
                 }
@@ -220,7 +212,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         })
 
 
-class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
+class OneWebhookTestCase(RestAPITestMixin, TestCase):
     """
     Tests for
     ``/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}``
@@ -295,12 +287,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     {
                         'rel': 'self',
                         'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}'
-                                 .format(t=self.tenant_id, g=self.group_id,
-                                         p=self.policy_id, w=self.webhook_id))
-                    },
-                    {
-                        'rel': 'bookmark',
-                        'href': ('/{t}/groups/{g}/policies/{p}/webhooks/{w}'
                                  .format(t=self.tenant_id, g=self.group_id,
                                          p=self.policy_id, w=self.webhook_id))
                     },

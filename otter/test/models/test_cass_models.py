@@ -11,7 +11,8 @@ from otter.models.cass import (
     CassScalingGroupCollection,
     CassBadDataError)
 
-from otter.models.interface import NoSuchScalingGroupError, NoSuchPolicyError
+from otter.models.interface import (NoSuchScalingGroupError, NoSuchPolicyError,
+                                    NoSuchWebhookError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -822,6 +823,49 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_failed(self.group.list_webhooks('23456789'),
                                     NoSuchPolicyError)
         self.flushLoggedErrors(NoSuchPolicyError)
+
+    def test_view_webhook(self):
+        """
+        Test that you can call view and receive a valid parsed response
+        """
+        self.returns = [_cassandrify_data([{'data': '{}'}])]
+        d = self.group.get_webhook("3444", "4555")
+        r = self.assert_deferred_succeeded(d)
+        expectedCql = ('SELECT data FROM policy_webhooks WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId AND '
+                       '"webhookId" = :webhookId AND deleted = False;')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g",
+                        "policyId": "3444", "webhookId": "4555"}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+        self.assertEqual(r, {})
+
+    def test_view_webhook_bad_db_data(self):
+        """
+        Test what happens if you retrieve bad db policy data, including None, rows
+        without keys, or bad JSON data (e.g. database corruption)
+        """
+        self._test_view_things_errors(self.group.get_webhook, "3444", "4555")
+
+    def test_view_webhook_no_such_webhook(self):
+        """
+        Tests what happens if you try to view a policy that doesn't exist.
+        """
+        self.returns = [[]]
+        d = self.group.get_webhook('3444', '4555')
+        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.flushLoggedErrors(NoSuchPolicyError)
+
+    def test_view_webhook_no_version(self):
+        """
+        When viewing the policy, any version information is removed from the
+        final output
+        """
+        self.returns = [_cassandrify_data([{'data': '{"_ver": 5}'}])]
+        d = self.group.get_policy("3444")
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, {})
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

@@ -6,7 +6,8 @@ import zope.interface
 from twisted.internet import defer
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchPolicyError)
+                                    NoSuchScalingGroupError, NoSuchPolicyError,
+                                    NoSuchWebhookError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -33,6 +34,9 @@ _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId AND deleted = False;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+_cql_view_webhook = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+                     '"groupId" = :groupId AND "policyId" = :policyId AND '
+                     '"webhookId" = :webhookId AND deleted = False;')
 _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
                'VALUES (:tenantId, :groupId, {name}, False)')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
@@ -499,7 +503,15 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.get_webhook`
         """
-        raise NotImplementedError()
+        query = _cql_view_webhook.format(cf=self.webhooks_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "policyId": policy_id,
+                                     "webhookId": webhook_id},
+                                    get_consistency_level('view', 'webhook'))
+        d.addCallback(self._grab_json_data, policy_id, webhook_id)
+        return d
 
     def update_webhook(self, policy_id, webhook_id, data):
         """
@@ -513,14 +525,17 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def _grab_json_data(self, rawResponse, policy_id=None):
+    def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
         if rawResponse is None:
             raise CassBadDataError("received unexpected None response")
         if len(rawResponse) == 0:
-            if policy_id is None:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            else:
+            if webhook_id is not None:
+                raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
+                                         webhook_id)
+            elif policy_id is not None:
                 raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
+            else:
+                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
         if 'cols' not in rawResponse[0]:
             raise CassBadDataError("Received malformed response with no cols")
