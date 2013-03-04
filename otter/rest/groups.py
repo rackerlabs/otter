@@ -30,10 +30,6 @@ def list_all_scaling_groups(request, log, tenantId):
               {
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
                 "rel": "self"
-              },
-              {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId1}"
-                "rel": "bookmark"
               }
             ]
           },
@@ -43,10 +39,6 @@ def list_all_scaling_groups(request, log, tenantId):
               {
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
                 "rel": "self"
-              },
-              {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId2}"
-                "rel": "bookmark"
               }
             ]
           }
@@ -169,10 +161,6 @@ def create_new_scaling_group(request, log, tenantId, data):
                   {
                     "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
                     "rel": "self"
-                  },
-                  {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
-                    "rel": "bookmark"
                   }
                 ],
                 "groupConfiguration": {
@@ -274,10 +262,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                   {
                     "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
                     "rel": "self"
-                  },
-                  {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
-                    "rel": "bookmark"
                   }
                 ],
                 "groupConfiguration": {
@@ -328,10 +312,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                           {
                             "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
                             "rel": "self"
-                          },
-                          {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}"
-                            "rel": "bookmark"
                           }
                         ],
                         "name": "scale up by 10",
@@ -344,10 +324,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                           {
                             "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
                             "rel": "self"
-                          },
-                          {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}"
-                            "rel": "bookmark"
                           }
                         ],
                         "name": 'scale down 5.5 percent',
@@ -360,10 +336,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                           {
                             "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
                             "rel": "self"
-                          },
-                          {
-                            "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
-                            "rel": "bookmark"
                           }
                         ],
                         "name": 'set number of servers to 10',
@@ -433,10 +405,6 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                   {
                     "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
                     "rel": "self"
-                  },
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                    "rel": "bookmark"
                   }
                 ]
               },
@@ -446,10 +414,6 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                   {
                     "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
                     "rel": "self"
-                  },
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
-                    "rel": "bookmark"
                   }
                 ]
               }
@@ -461,10 +425,6 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                   {
                     "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
                     "rel": "self"
-                  },
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3}"
-                    "rel": "bookmark"
                   }
                 ]
               }
