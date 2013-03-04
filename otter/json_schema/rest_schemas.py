@@ -71,10 +71,10 @@ def make_example_links(group_id):
                 "rel": "self",
                 "href": "{0}/v1.0/{1}".format(example_url_root, url)
             },
-            {
-                "rel": "bookmark",
-                "href": "{0}/{1}".format(example_url_root, url)
-            }
+            # {
+            #     "rel": "bookmark",
+            #     "href": "{0}/{1}".format(example_url_root, url)
+            # }
         ]
     }
 

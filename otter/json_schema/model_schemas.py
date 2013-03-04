@@ -40,10 +40,7 @@ entity_schema = {
 #         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
 #         "rel": "self"
 #       },
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-#         "rel": "bookmark"
-#       }
+#       ...
 #     ]
 #   },
 #   "pending": {
@@ -52,10 +49,7 @@ entity_schema = {
 #         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
 #         "rel": "self"
 #       },
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}"
-#         "rel": "bookmark"
-#       }
+#       ...
 #     ]
 #   },
 #   "steadyState": 2,
