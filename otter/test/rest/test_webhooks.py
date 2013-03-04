@@ -178,7 +178,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(creation),
             # location header points to the webhooks list
-            '/v1.0/11111/groups/1/policies/2/webhooks')
+            '/v1.0/11111/groups/1/policies/2/webhooks/')
 
         self.mock_group.create_webhooks.assert_called_once_with(
             self.policy_id, creation)

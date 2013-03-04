@@ -246,8 +246,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
                 'scalingPolicies': [expected_policy],
                 "id": "one",
                 "links": [
-                    {"href": "/v1.0/11111/groups/one/", "rel": "self"},
-                    {"href": "/v1.0/11111/groups/one", "rel": "self"}
+                    {"href": "/v1.0/11111/groups/one/", "rel": "self"}
                 ]
             }
         }
