@@ -56,29 +56,6 @@ _list_of_links = {
 }
 
 
-example_url_root = "https://dfw.autoscale.api.rackspacecloud.com"
-
-
-def make_example_links(group_id):
-    """
-    Create a dictionary containing links and an ID, for the example responses
-    """
-    url = "/010101/groups/{0}".format(group_id)
-    return {
-        "id": group_id,
-        "links": [
-            {
-                "rel": "self",
-                "href": "{0}/v1.0/{1}".format(example_url_root, url)
-            },
-            # {
-            #     "rel": "bookmark",
-            #     "href": "{0}/{1}".format(example_url_root, url)
-            # }
-        ]
-    }
-
-
 def _openstackify_schema(key, schema, include_id=False, paginated=False):
     """
     To make responses more open-stack like, wrap everything in a dictionary
@@ -224,16 +201,6 @@ create_group_request_examples = [
 create_group_response = _openstackify_schema("group", create_group_request,
                                              include_id=True)
 create_group_response["description"] = "Schema of the create group response."
-
-create_group_response_examples = [
-    {
-        "group": {
-            "id": "f236a93f-a46d-455c-9403-f26838011522",
-            "links": make_example_links("f236a93f-a46d-455c-9403-f26838011522")
-        }.update(request)
-    }
-    for request in create_group_request_examples
-]
 
 
 # ----- schemas for viewing configs

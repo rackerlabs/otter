@@ -116,6 +116,7 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
     """
     api = "v{0}".format(api_version)
     segments = [get_url_root(), api, tenant_id, "groups"]
+
     if group_id is not None:
         segments.append(group_id)
         if policy_id is not None:
@@ -123,7 +124,10 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
             if webhook_id is not None:
                 segments.extend(("webhooks", webhook_id))
 
-    url = append_segments(*segments).rstrip('/')
+    if segments[-1] != '':
+        segments.append('')
+
+    url = append_segments(*segments)
 
     if format == "json":
         links = [
@@ -131,10 +135,12 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         ]
 
         if capability_hash is not None:
-            capability_url = "/".join(
-                [get_url_root(), api, "execute", capability_version,
-                 capability_hash])
-            capability_url = capability_url.rstrip('/')
+            capability_url = append_segments(
+                get_url_root(),
+                api,
+                "execute",
+                capability_version,
+                capability_hash)
 
             links.append({"href": capability_url, "rel": "capability"})
 

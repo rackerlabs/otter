@@ -25,9 +25,9 @@ from otter.test.rest.request import DummyException, RestAPITestMixin
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups`` endpoints (create, list)
+    Tests for ``/{tenantId}/groups/`` endpoints (create, list)
     """
-    endpoint = "/v1.0/11111/groups"
+    endpoint = "/v1.0/11111/groups/"
     invalid_methods = ("DELETE", "PUT")
 
     def test_list_unknown_error_is_500(self):
@@ -87,13 +87,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 {
                     'id': '1',
                     'links': [
-                        {"href": '/v1.0/11111/groups/1', "rel": "self"}
+                        {"href": '/v1.0/11111/groups/1/', "rel": "self"},
                     ]
                 },
                 {
                     'id': '2',
                     'links': [
-                        {"href": '/v1.0/11111/groups/2', "rel": "self"}
+                        {"href": '/v1.0/11111/groups/2/', "rel": "self"},
                     ]
                 }
             ],
@@ -130,7 +130,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.create_scaling_group.return_value = defer.succeed("1")
         response_body = self.assert_status_code(
-            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1')
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
         self.mock_store.create_scaling_group.assert_called_once_with(
             mock.ANY, '11111',
             request_body['groupConfiguration'],
@@ -143,7 +143,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         expected = {
             "id": "1",
             "links": [
-                {"href": "/v1.0/11111/groups/1", "rel": "self"}
+                {"href": "/v1.0/11111/groups/1/", "rel": "self"},
             ],
             'groupConfiguration': request_body['groupConfiguration'],
             'launchConfiguration': request_body['launchConfiguration']
@@ -185,10 +185,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups/{groupId}`` endpoints (view manifest,
+    Tests for ``/{tenantId}/groups/{groupId}/`` endpoints (view manifest,
     view state, delete)
     """
-    endpoint = "/v1.0/11111/groups/one"
+    endpoint = "/v1.0/11111/groups/one/"
     invalid_methods = ("POST", "PUT")  # cannot update in bulk
 
     def setUp(self):
@@ -235,7 +235,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         expected_policy.update({
             "id": "5",
             "links": [
-                {"href": "/v1.0/11111/groups/one/policies/5", "rel": "self"}
+                {"href": "/v1.0/11111/groups/one/policies/5/", "rel": "self"},
             ]
         })
 
@@ -246,7 +246,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
                 'scalingPolicies': [expected_policy],
                 "id": "one",
                 "links": [
-                    {"href": "/v1.0/11111/groups/one", "rel": "self"}
+                    {"href": "/v1.0/11111/groups/one/", "rel": "self"}
                 ]
             }
         }
@@ -285,9 +285,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
 class GroupStateTestCase(RestAPITestMixin, TestCase):
     """
-    Tests for ``/{tenantId}/groups/{groupId}/state`` endpoint
+    Tests for ``/{tenantId}/groups/{groupId}/state/`` endpoint
     """
-    endpoint = "/v1.0/11111/groups/one/state"
+    endpoint = "/v1.0/11111/groups/one/state/"
     invalid_methods = ("DELETE", "POST", "PUT")  # cannot update in bulk
 
     def setUp(self):
@@ -353,7 +353,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
             'paused': False,
             'id': "one",
             "links": [
-                {"href": "/v1.0/11111/groups/one", "rel": "self"}
+                {"href": "/v1.0/11111/groups/one/", "rel": "self"},
             ]
         }})
 

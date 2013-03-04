@@ -24,7 +24,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
     """
-    endpoint = "/v1.0/11111/groups/1/policies"
+    endpoint = "/v1.0/11111/groups/1/policies/"
     invalid_methods = ("PUT", "DELETE")
 
     def test_list_unknown_error_is_500(self):
@@ -71,7 +71,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         expected['links'] = [
             {
                 'rel': 'self',
-                'href': '/v1.0/11111/groups/1/policies/5'
+                'href': '/v1.0/11111/groups/1/policies/5/'
             }
         ]
         self.assertEqual(resp, {
@@ -112,7 +112,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(policy_examples()[:1]),
             # location header points to the policy list
-            '/v1.0/11111/groups/1/policies')
+            '/v1.0/11111/groups/1/policies/')
 
         self.mock_group.create_policies.assert_called_once_with(
             policy_examples()[:1])
@@ -125,7 +125,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         expected_policy['links'] = [
             {
                 'rel': 'self',
-                'href': '/v1.0/11111/groups/1/policies/5'
+                'href': '/v1.0/11111/groups/1/policies/5/'
             }
         ]
         self.assertEqual(resp, {"policies": [expected_policy]})
@@ -136,7 +136,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
     Tests for ``/{tenantId}/groups/{groupId}/policies`` endpoint, which updates
     and views the policy part of a scaling group.
     """
-    endpoint = "/v1.0/11111/groups/1/policies/2"
+    endpoint = "/v1.0/11111/groups/1/policies/2/"
     invalid_methods = ("POST")
     policy_id = "2"
 
@@ -159,7 +159,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         expected['links'] = [
             {
                 'rel': 'self',
-                'href': '/v1.0/11111/groups/1/policies/{0}'.format(self.policy_id)
+                'href': '/v1.0/11111/groups/1/policies/{0}/'.format(self.policy_id)
             }
         ]
         self.assertEqual(resp, {'policy': expected})

@@ -27,7 +27,7 @@ from otter.test.utils import DeferredTestMixin
 
 
 def _strip_base_url(url):
-    return urlsplit(url)[2].rstrip('/')
+    return urlsplit(url)[2]
 
 
 class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
@@ -73,7 +73,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
             "launchConfiguration": launch_server_config()[0]
         }
         wrapper = self.assert_deferred_succeeded(request(
-            root, 'POST', '/v1.0/11111/groups', body=json.dumps(request_body)))
+            root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
@@ -91,7 +91,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         path = _strip_base_url(headers[0])
 
         wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
-        self.assertEqual(wrapper.response.code, 200)
+        self.assertEqual(wrapper.response.code, 200, path)
 
         response = json.loads(wrapper.content)
         self.assertEqual(response["group"]['groupConfiguration'], config()[1])
@@ -101,7 +101,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         # make sure the created group has enough pending entities, and is
         # not paused
         wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', path + '/state'))
+            request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -125,7 +125,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
         wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', path + '/state'))
+            request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -136,7 +136,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         Asserts that there are ``number`` number of scaling groups
         """
         wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', '/v1.0/11111/groups'))
+            request(root, 'GET', '/v1.0/11111/groups/'))
         self.assertEqual(200, wrapper.response.code)
 
         response = json.loads(wrapper.content)
@@ -167,7 +167,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         # make sure there is a scaling group
         path = self.create_and_view_scaling_group()
-        config_path = path + '/config'
+        config_path = path + 'config/'
         edited_config = {
             'name': 'updated_config',
             'cooldown': 5,
@@ -195,7 +195,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         # make sure the created group has updated pending entities, and is
         # still not paused
         wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', path + '/state'))
+            request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -210,7 +210,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         config should return the new launch config.
         """
         # make sure there is a scaling group
-        path = self.create_and_view_scaling_group() + '/launch'
+        path = self.create_and_view_scaling_group() + 'launch/'
         edited_launch = launch_server_config()[1]
 
         wrapper = self.assert_deferred_succeeded(
@@ -248,7 +248,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                        launch_server_config()[0]))
         set_store(store)
 
-        self.policies_url = '/v1.0/{tenant}/groups/{group}/policies'.format(
+        self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
             tenant=self.tenant_id, group=self.group_id)
 
     def assert_number_of_scaling_policies(self, number):
@@ -407,7 +407,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         set_store(store)
 
         self.webhooks_url = (
-            '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks'.format(
+            '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks/'.format(
                 tenant=self.tenant_id, group=self.group_id,
                 policy=self.policy_id))
 

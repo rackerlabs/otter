@@ -14,7 +14,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -38,7 +38,7 @@ def list_policies(request, log, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}/"
                             "rel": "self"
                         }
                     ]
@@ -52,7 +52,7 @@ def list_policies(request, log, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}/"
                             "rel": "self"
                         }
                     ]
@@ -66,7 +66,7 @@ def list_policies(request, log, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}/"
                             "rel": "self"
                         }
                     ]
@@ -80,7 +80,7 @@ def list_policies(request, log, tenantId, groupId):
                     },
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}/"
                             "rel": "self"
                         }
                     ]
@@ -108,7 +108,7 @@ def list_policies(request, log, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policies',
+@app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
            methods=['POST'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -144,7 +144,7 @@ def create_policies(request, log, tenantId, groupId, data):
                     "id": {policyId1},
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}/"
                             "rel": "self"
                         }
                     ],
@@ -156,7 +156,7 @@ def create_policies(request, log, tenantId, groupId, data):
                     "id": {policyId2},
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}/"
                             "rel": "self"
                         }
                     ],
@@ -191,7 +191,7 @@ def create_policies(request, log, tenantId, groupId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
     methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -209,11 +209,11 @@ def get_policy(request, log, tenantId, groupId, policyId):
                 "id": {policyId},
                 "links": [
                     {
-                        "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}"
+                        "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}/"
                         "rel": "self"
                     },
                     {
-                        "href": "{url_root}/010101/groups/{groupId}/policy/{policyId}"
+                        "href": "{url_root}/010101/groups/{groupId}/policy/{policyId}/"
                         "rel": "bookmark"
                     }
                 ],
@@ -236,7 +236,7 @@ def get_policy(request, log, tenantId, groupId, policyId):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
     methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -264,7 +264,7 @@ def update_policy(request, log, tenantId, groupId, policyId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
     methods=['DELETE'])
 @with_transaction_id()
 @fails_with(exception_codes)
