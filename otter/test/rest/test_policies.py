@@ -72,10 +72,6 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             {
                 'rel': 'self',
                 'href': '/v1.0/11111/groups/1/policies/5'
-            },
-            {
-                'rel': 'bookmark',
-                'href': '/11111/groups/1/policies/5'
             }
         ]
         self.assertEqual(resp, {
@@ -130,10 +126,6 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             {
                 'rel': 'self',
                 'href': '/v1.0/11111/groups/1/policies/5'
-            },
-            {
-                'rel': 'bookmark',
-                'href': '/11111/groups/1/policies/5'
             }
         ]
         self.assertEqual(resp, {"policies": [expected_policy]})
@@ -168,10 +160,6 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             {
                 'rel': 'self',
                 'href': '/v1.0/11111/groups/1/policies/{0}'.format(self.policy_id)
-            },
-            {
-                'rel': 'bookmark',
-                'href': '/11111/groups/1/policies/{0}'.format(self.policy_id)
             }
         ]
         self.assertEqual(resp, {'policy': expected})
