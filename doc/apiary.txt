@@ -620,9 +620,11 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
 < 204
 
 
-Execute a scaling policy. If successful, no resposne body will be returned.
+Execute a scaling policy. If successful, a response body will be returned. (TBD)
 POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
-< 204
+< 202
+< Content-Type: application/json
+{}}
 
 
 --
