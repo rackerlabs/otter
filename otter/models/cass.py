@@ -59,6 +59,9 @@ _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data)
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
 _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                       'AND "groupId" = :groupId AND "policyId" = {name}')
+_cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId AND '
+                       '"webhookId" = :{name}')
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
@@ -495,6 +498,20 @@ class CassScalingGroup(object):
         d = self.get_policy(policy_id)
         d.addCallback(_do_stuff)
 
+    def _naive_list_webhooks(self, policy_id):
+        """
+        Like :meth:`otter.models.cass.CassScalingGroup.list_webhooks`, but gets
+        all the webhooks associated with particular scaling policy
+        irregardless of whether the scaling policy still exists.
+        """
+        query = _cql_list_webhook.format(cf=self.webhooks_table)
+        d = self.connection.execute(query, {"tenantId": self.tenant_id,
+                                            "groupId": self.uuid,
+                                            "policyId": policy_id},
+                                    get_consistency_level('list', 'webhook'))
+        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        return d
+
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
@@ -505,12 +522,7 @@ class CassScalingGroup(object):
                 return policy_there.addCallback(lambda _: webhooks_dict)
             return webhooks_dict
 
-        query = _cql_list_webhook.format(cf=self.webhooks_table)
-        d = self.connection.execute(query, {"tenantId": self.tenant_id,
-                                            "groupId": self.uuid,
-                                            "policyId": policy_id},
-                                    get_consistency_level('list', 'webhook'))
-        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        d = self._naive_list_webhooks(policy_id)
         d.addCallback(_check_if_empty)
         return d
 
@@ -561,7 +573,19 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_webhook`
         """
-        raise NotImplementedError()
+        def _do_delete(lastRev):
+            query = _cql_delete_webhook.format(
+                cf=self.webhooks_table, name="webhookId")
+
+            d = self.connection.execute(query,
+                                        {"tenantId": self.tenant_id,
+                                         "groupId": self.uuid,
+                                         "policyId": policy_id,
+                                         "webhookId": webhook_id},
+                                        get_consistency_level('delete', 'webhook'))
+            return d
+
+        return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
 
     def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
         if rawResponse is None:

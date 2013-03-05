@@ -866,6 +866,37 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {})
 
+    def test_delete_webhook(self):
+        """
+        Tests that you can delete a scaling policy webhook, and if successful
+        return value is None
+        """
+        # return values for get webhook and then delete
+        self.returns = [_cassandrify_data([{'data': '{}'}]), None]
+        d = self.group.delete_webhook('3444', '4555')
+        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '
+                       '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       '"policyId" = :policyId AND "webhookId" = :webhookId')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g",
+                        "policyId": "3444", "webhookId": "4555"}
+
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
+    def test_delete_non_existant_webhooks(self):
+        """
+        If you try to delete a scaling policy webhook that doesn't exist,
+        :class:`NoSuchWebhookError` is raised
+        """
+        self.returns = [[], None]
+        d = self.group.delete_webhook('3444', '4555')
+        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
+        self.flushLoggedErrors(NoSuchWebhookError)
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
