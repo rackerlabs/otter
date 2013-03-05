@@ -17,8 +17,7 @@ def notify_group_size_change(transaction_id, scaling_group, policy_id=None):
     """
     magnitude = calculate_change_magnitude(scaling_group)
     if magnitude > 0:
-        boot_servers(magnitude,
-                     synthesize_launch_config(scaling_group))
+        boot_servers(magnitude, scaling_group)
     else:
         kill_servers(magnitude)
 
@@ -34,20 +33,10 @@ def calculate_change_magnitude(scaling_group):
     raise NotImplementedError()
 
 
-def synthesize_launch_config(scaling_group):
+def boot_servers(number, scaling_group):
     """
-    Gets the latest launch config, synthesizes in the server name, metadata,
-    and other autoscaling stuff into the server config
-
-    :return: synthesized launch config
-    """
-    raise NotImplementedError()
-
-
-def boot_servers(number, launch_config):
-    """
-    Starts ``number`` of servers using ``launch_config`` - this probably
-    starts up ``number`` of scaling workers
+    Starts ``number`` of servers using ``scaling_group``'s launch config - this
+    probably starts up ``number`` of scaling workers
     """
     raise NotImplementedError()
 
