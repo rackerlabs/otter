@@ -271,6 +271,20 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
+    def execute_policy(policy_id):
+        """
+        Execute a scaling policy
+
+        :param policy_id: the uuid of the policy
+        :type policy_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        """
+
     def list_webhooks(policy_id):
         """
         Gets all the capability URLs created for one particular scaling policy
@@ -453,7 +467,7 @@ class IScalingGroupCollection(Interface):
             :class:`twisted.internet.defer.Deferred`)
         """
 
-    def execute_webhook(capability_hash):
+    def execute_webhook_hash(capability_hash):
         """
         Identify the scaling policy (and tenant ID, group ID, etc.) associated
         with this particular capability URL hash and execute said policy.

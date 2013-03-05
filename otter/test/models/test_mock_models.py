@@ -8,7 +8,8 @@ from twisted.trial.unittest import TestCase
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
-                                    NoSuchPolicyError, NoSuchWebhookError)
+                                    NoSuchPolicyError, NoSuchWebhookError,
+                                    UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -801,6 +802,62 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         deferred = self.collection.delete_scaling_group(self.mock_log, self.tenant_id, 1)
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
+
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
+    def test_webhook_execute(self, mock_generation):
+        """
+        Tests that we can execute a webhook given a capability token.
+        """
+        launch = {"launch": "config"}
+        policy = {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        }
+        self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.mock_log, self.tenant_id, self.config, launch, {}))
+
+        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
+        group = result[0]
+
+        pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
+
+        pol_uuid = pol_rec.keys()[0]
+
+        self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
+
+        deferred = self.collection.execute_webhook_hash('hash')
+        self.assert_deferred_succeeded(deferred)
+
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
+    def test_webhook_execute_no_hash(self, mock_generation):
+        """
+        Tests that, given a bad capability token, we error out.
+        """
+        launch = {"launch": "config"}
+        policy = {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        }
+        self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.mock_log, self.tenant_id, self.config, launch, {}))
+
+        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
+        group = result[0]
+
+        pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
+
+        pol_uuid = pol_rec.keys()[0]
+
+        self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
+
+        deferred = self.collection.execute_webhook_hash('weasel')
+        self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("num", "hash", "ver"))
