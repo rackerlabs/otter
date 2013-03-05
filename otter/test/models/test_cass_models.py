@@ -752,10 +752,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "groupId": '12345678g',
             "policyId": '23456789',
             'webhook0Id': '100001',
-            "webhook0Key": "x",
+            "webhook0Key": "y",
             'webhook1Id': '100002',
-            "webhook1Key": "x"
+            "webhook1Key": "y"
         }
+
         for key, val in expected_params.iteritems():
             self.assertEqual(cql_params[key], val)
 
