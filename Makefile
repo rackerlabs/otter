@@ -5,13 +5,10 @@ PYDIRS=${CODEDIR} ${SCRIPTSDIR}
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
 UNITTESTS ?= ${CODEDIR}
-CQLSHARGS ?= localhost 9170
+CASSANDRA_HOST ?= localhost
+CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
-CONTROL_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/$(REPLICATION_FACTOR)/g
-DEV_CQL_REPLACEMENT ?= s/@@KEYSPACE@@/$(CONTROL_KEYSPACE)/g;s/@@REPLICATION_FACTOR@@/1/g
-CONTROL_SETUP    = $(shell ls schema/setup/control_*.cql | sort)
-CONTROL_TEARDOWN = $(shell ls schema/teardown/control_*.cql | sort)
 
 test: unit integration
 
@@ -54,20 +51,15 @@ docs: cleandocs
 schema: FORCE schema-setup schema-teardown
 
 schema-setup:
-	echo "-- *** Generated Schema ***" > schema/setup-dev.cql
-	echo "-- *** Generated Schema ***" > schema/setup-prod.cql
-	for f in $(CONTROL_SETUP); do \
-	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/setup-prod.cql; \
-	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/setup-dev.cql; \
-	done \
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
 
 schema-teardown:
-	echo "-- *** Generated Schema ***" > schema/teardown-dev.cql
-	echo "-- *** Generated Schema ***" > schema/teardown-prod.cql
-	for f in $(CONTROL_TEARDOWN); do \
-	  sed -e "$(CONTROL_CQL_REPLACEMENT)" $$f >> schema/teardown-prod.cql; \
-	  sed -e "$(DEV_CQL_REPLACEMENT)" $$f >> schema/teardown-dev.cql; \
-	done \
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE}  --dry-run
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-prod.cql --replication ${REPLICATION_FACTOR} --keyspace ${CONTROL_KEYSPACE}  --dry-run
+
+load-dev-schema:
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
 
 FORCE:
 

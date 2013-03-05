@@ -1,7 +1,8 @@
 import os
 from setuptools import setup
 
-NAME='otter'
+NAME = 'otter'
+SCHEMA_DIR = 'schema'
 
 
 def getPackages(base):
@@ -18,8 +19,27 @@ def getPackages(base):
 
     return packages
 
-
 packages = getPackages(NAME)
+
+
+def getSchema(base):
+    """
+    Recursively find cql files
+    """
+    schemas = []
+
+    def visit(arg, directory, files):
+        schemas.append(
+            (directory.rstrip('/'),
+             [os.path.join(directory, filename)
+              for filename in files if filename.endswith('.cql')]))
+
+    os.path.walk(base, visit, None)
+    return schemas
+
+data_files = getSchema(SCHEMA_DIR)
+data_files.append(('otter/rest', ['otter/rest/otter_ascii.txt']))
+
 
 # If a twisted/plugins directory exists make sure we install the
 # twisted.plugins packages.
@@ -33,9 +53,8 @@ setup(
     name=NAME,
     version='0.0.0',
     packages=packages,
-    data_files = [
-        ('otter/rest', ['otter/rest/otter_ascii.txt'])
-    ]
+    data_files=data_files,
+    scripts=['scripts/load_cql.py']
 )
 
 # Make Twisted regenerate the dropin.cache, if possible.  This is necessary
