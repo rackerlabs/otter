@@ -308,10 +308,10 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 
         # Can't compare Failures
-        self.assertEqual(self.mockLog.failure.called, True)
+        self.assertEqual(self.mockLog.trace.called, True)
 
-        self.mockLog.failure().fields.assert_called_once_with(code=500, uri='/')
-        self.mockLog.failure().fields().error.assert_called_once_with('Unhandled Error')
+        self.mockLog.trace().fields.assert_called_once_with(code=500, uri='/')
+        self.mockLog.trace().fields().error.assert_called_once_with('Unhandled Error')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
