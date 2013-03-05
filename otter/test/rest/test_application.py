@@ -40,13 +40,13 @@ class LinkGenerationTestCase(TestCase):
     def test_get_only_groups_link(self):
         """
         If only the tenant ID is passed, and the rest of the arguments are
-        blank, then the returned base link is /v<api>/<tenant>/groups
+        blank, then the returned base link is /v<api>/<tenant>/groups/
         """
         self.assertEqual(
             get_autoscale_links('11111', api_version='3', format=None),
-            '/v3/11111/groups')
+            '/v3/11111/groups/')
 
-        expected_url = '/v1.0/11111/groups'
+        expected_url = '/v1.0/11111/groups/'
         # test default API
         self.assertEqual(get_autoscale_links('11111', format=None),
                          expected_url)
@@ -57,7 +57,7 @@ class LinkGenerationTestCase(TestCase):
     def test_get_only_groups_link_for_varying_other_args(self):
         """
         So long as the group ID is not a valid number, we still get the groups
-        link /v<api>/<tenant>/groups
+        link /v<api>/<tenant>/groups/
         """
         equivalents = [
             get_autoscale_links('11111', group_id='', format=None),
@@ -65,7 +65,7 @@ class LinkGenerationTestCase(TestCase):
             get_autoscale_links('11111', policy_id='', format=None)
         ]
         for equivalent in equivalents:
-            self.assertEqual(equivalent, '/v1.0/11111/groups')
+            self.assertEqual(equivalent, '/v1.0/11111/groups/')
 
     def test_get_tenant_id_and_group_id(self):
         """
@@ -76,9 +76,9 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', api_version='3',
                                 format=None),
-            '/v3/11111/groups/1')
+            '/v3/11111/groups/1/')
 
-        expected_url = '/v1.0/11111/groups/1'
+        expected_url = '/v1.0/11111/groups/1/'
         # test default API
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', format=None),
@@ -99,7 +99,7 @@ class LinkGenerationTestCase(TestCase):
                                 format=None),
         ]
         for equivalent in equivalents:
-            self.assertEqual(equivalent, '/v1.0/11111/groups/1')
+            self.assertEqual(equivalent, '/v1.0/11111/groups/1/')
 
     def test_get_tenant_id_and_group_id_and_blank_policy_id(self):
         """
@@ -110,9 +110,9 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="",
                                 api_version='3', format=None),
-            '/v3/11111/groups/1/policies')
+            '/v3/11111/groups/1/policies/')
 
-        expected_url = '/v1.0/11111/groups/1/policies'
+        expected_url = '/v1.0/11111/groups/1/policies/'
         # test default API
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="",
@@ -132,9 +132,9 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="5",
                                 api_version='3', format=None),
-            '/v3/11111/groups/1/policies/5')
+            '/v3/11111/groups/1/policies/5/')
 
-        expected_url = '/v1.0/11111/groups/1/policies/5'
+        expected_url = '/v1.0/11111/groups/1/policies/5/'
         # test default API
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="5",
@@ -154,9 +154,9 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="2",
                                 webhook_id="", api_version='3', format=None),
-            '/v3/11111/groups/1/policies/2/webhooks')
+            '/v3/11111/groups/1/policies/2/webhooks/')
 
-        expected_url = '/v1.0/11111/groups/1/policies/2/webhooks'
+        expected_url = '/v1.0/11111/groups/1/policies/2/webhooks/'
         # test default API
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="2",
@@ -177,9 +177,9 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="2",
                                 webhook_id="3", api_version='3', format=None),
-            '/v3/11111/groups/1/policies/2/webhooks/3')
+            '/v3/11111/groups/1/policies/2/webhooks/3/')
 
-        expected_url = '/v1.0/11111/groups/1/policies/2/webhooks/3'
+        expected_url = '/v1.0/11111/groups/1/policies/2/webhooks/3/'
         # test default API
         self.assertEqual(
             get_autoscale_links('11111', group_id='1', policy_id="2",
@@ -199,9 +199,9 @@ class LinkGenerationTestCase(TestCase):
         """
         pairs = [("group_id", "1"), ("policy_id", "2"), ("webhook_id", "3")]
         expected = [
-            '/v1.0/11111/groups/1',
-            '/v1.0/11111/groups/1/policies/2',
-            '/v1.0/11111/groups/1/policies/2/webhooks/3'
+            '/v1.0/11111/groups/1/',
+            '/v1.0/11111/groups/1/policies/2/',
+            '/v1.0/11111/groups/1/policies/2/webhooks/3/'
         ]
         for i in range(3):
             self.assertEqual(
@@ -244,5 +244,5 @@ class LinkGenerationTestCase(TestCase):
                                 format=None),
             str))
         snowman = get_autoscale_links('☃', group_id='☃', format=None)
-        self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83')
+        self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))

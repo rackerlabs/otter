@@ -34,7 +34,7 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/',
     methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -57,7 +57,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "self"
                         },
                         {
@@ -74,7 +74,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "self"
                         },
                         {
@@ -107,7 +107,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/',
     methods=['POST'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -149,7 +149,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                     },
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
                             "rel": "self"
                         },
                         {
@@ -164,7 +164,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                     "metadata": {},
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
                             "rel": "self"
                         },
                         {
@@ -198,7 +198,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
     methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -217,7 +217,7 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
                 "metadata": {},
                 "links": [
                     {
-                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}",
+                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/",
                         "rel": "self"
                     },
                     {
@@ -241,7 +241,7 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
     methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -269,7 +269,7 @@ def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>',
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
     methods=['DELETE'])
 @with_transaction_id()
 @fails_with(exception_codes)

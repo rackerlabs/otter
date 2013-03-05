@@ -17,7 +17,7 @@ from otter.rest.application import app, get_store
 # TODO: in the implementation story, the interface get scaling group
 #       definition should be changed to remove colo, and the mock store and
 #       corresponding tests also changed
-@app.route('/<string:tenantId>/groups/<string:groupId>/config',
+@app.route('/<string:tenantId>/groups/<string:groupId>/config/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -53,7 +53,7 @@ def view_config_for_scaling_group(request, log, tenantId, groupId):
 # TODO: in the implementation story, the interface get scaling group
 #       definition should be changed to remove colo, and the mock store and
 #       corresponding tests also changed
-@app.route('/<string:tenantId>/groups/<string:groupId>/config',
+@app.route('/<string:tenantId>/groups/<string:groupId>/config/',
            methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -87,7 +87,7 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/launch',
+@app.route('/<string:tenantId>/groups/<string:groupId>/launch/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -141,7 +141,7 @@ def view_launch_config(request, log, tenantId, groupId):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/launch',
+@app.route('/<string:tenantId>/groups/<string:groupId>/launch/',
            methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
