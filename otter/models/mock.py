@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
-    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError)
+    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
 
 
@@ -374,6 +374,18 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
+    def execute_webhook(self, policy_id, webhook_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.execute_webhook`
+        """
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        if not webhook_id in self.webhooks[policy_id]:
+            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
+                                                 policy_id, webhook_id))
+        return defer.succeed(None)
+
     # ---- not interface methods
     def add_entities(self, pending=None, active=None):
         """
@@ -446,8 +458,16 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, None)
 
-    def execute_webhook(self, capability_hash):
+    def execute_webhook_hash(self, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
+        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
         """
-        raise NotImplementedError()
+        for tenant_id in self.data:
+            for group_id in self.data[tenant_id]:
+                webhooks = self.data[tenant_id][group_id].webhooks
+                for policy_id in webhooks:
+                    for webhook_id in webhooks[policy_id]:
+                        if webhooks[policy_id][webhook_id]['capability']['hash'] == capability_hash:
+                            return self.data[tenant_id][group_id].execute_webhook(policy_id, webhook_id)
+
+        return UnrecognizedCapabilityError()
