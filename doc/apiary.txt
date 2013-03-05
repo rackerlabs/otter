@@ -231,7 +231,7 @@ GET /{tenantId}/groups/{groupId}
 
 
 Delete a scaling group if there are no entities belonging to the scaling
-group.  If successful, no response body will be returned.    
+group.  If successful, no response body will be returned.
 DELETE /{tenantId}/groups/{groupId}
 < 204
 < Content-Type: application/json
@@ -619,6 +619,10 @@ Delete a scaling policy. If successful, no response body will be returned.
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
 < 204
 
+
+Execute a scaling policy. If successful, no resposne body will be returned.
+POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
+< 204
 
 
 --
