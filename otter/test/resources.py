@@ -49,8 +49,11 @@ def simple_drop_keyspace(keyspace_name):
     return "DROP KEYSPACE {name}".format(name=keyspace_name)
 
 
-_table_regex = re.compile('create\s+(?:table|columnfamily)\s+(?P<table>\S+)\s*\(',
-                          re.I)
+_table_regex = re.compile(
+    '^\s*create\s+(?:table|columnfamily)\s+(?P<table>\S+)\s*\(',
+    re.I | re.M)
+
+_drop_regex = re.compile('^\s*(alter|drop|truncate|delete)\s', re.I | re.M)
 
 
 class RunningCassandraCluster(object):
@@ -224,12 +227,31 @@ class CQLGenerator(object):
     Reads all cql files from a particular directory in sorted order (by name),
     mashes them together.
     """
-    def __init__(self, directory):
+    def __init__(self, directory, safe_only=True):
+        """
+        :param directory: directory in which all the cql files are that should
+            be merged (the files should be named such that sorting them
+            alphabetically will list them in the right order)
+        :type directory: ``str``
+
+        :param safe_only: whether or not to ban drop statements
+        :type safe_only: ``bool``
+        """
         files = sorted(glob(os.path.join(directory, '*.cql')))
         text = StringIO()
         for cql_file in files:
             with open(cql_file) as fd:
-                text.write(fd.read())
+                content = fd.read()
+                if safe_only:
+                    unsafe = _drop_regex.search(content)
+                    if unsafe:
+                        unsafe = unsafe.group().strip()
+                        raise Exception(
+                            'Unsafe "{0}" command in file {1}'.format(
+                                unsafe, cql_file))
+
+                text.write(content)
+                text.write('\n')
 
         self.cql = text.getvalue()
 
