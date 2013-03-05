@@ -278,9 +278,6 @@ class IScalingGroup(Interface):
         :param policy_id: the uuid of the policy
         :type policy_id: ``str``
 
-        :param webhook_id: the uuid of the webhook
-        :type webhook_id: ``str``
-
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
