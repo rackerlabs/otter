@@ -456,6 +456,12 @@ class CassScalingGroup(object):
         d.addCallback(lambda _: None)
         return d
 
+    def execute_policy(self, policy_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
+        """
+        raise NotImplementedError()
+
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
@@ -689,7 +695,7 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def execute_webhook(self, capability_hash):
+    def execute_webhook_hash(self, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
         """

@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
-    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError)
+    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
 
 
@@ -281,6 +281,15 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
+    def execute_policy(self, policy_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
+        """
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        return defer.succeed(None)
+
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
@@ -446,8 +455,16 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, None)
 
-    def execute_webhook(self, capability_hash):
+    def execute_webhook_hash(self, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
+        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
         """
-        raise NotImplementedError()
+        for tenant_id in self.data:
+            for group_id in self.data[tenant_id]:
+                webhooks = self.data[tenant_id][group_id].webhooks
+                for policy_id in webhooks:
+                    for webhook_id in webhooks[policy_id]:
+                        if webhooks[policy_id][webhook_id]['capability']['hash'] == capability_hash:
+                            return self.data[tenant_id][group_id].execute_policy(policy_id)
+
+        return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
