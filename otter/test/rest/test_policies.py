@@ -272,3 +272,33 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             self.policy_id)
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
+
+    def test_execute_policy_success(self):
+        """
+        Try to execute a policy.
+        """
+        self.mock_group.execute_policy.return_value = defer.succeed(None)
+
+        response_body = self.assert_status_code(202,
+                                                endpoint=self.endpoint + 'execute/',
+                                                method="POST")
+        self.assertEqual(response_body, "{}")
+        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_group.execute_policy.assert_called_once_with(self.policy_id)
+
+    def test_execute_policy_failure_404(self):
+        """
+        Try to execute a nonexistant policy, fails with a 404.
+        """
+        (self.mock_group.
+            execute_policy.
+            return_value) = defer.fail(NoSuchPolicyError('11111', '1', '2'))
+
+        response_body = self.assert_status_code(404,
+                                                endpoint=self.endpoint + 'execute/',
+                                                method="POST")
+        resp = json.loads(response_body)
+
+        self.mock_group.execute_policy.assert_called_once_with(self.policy_id)
+        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.flushLoggedErrors(NoSuchPolicyError)
