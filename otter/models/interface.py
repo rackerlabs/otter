@@ -273,7 +273,7 @@ class IScalingGroup(Interface):
 
     def execute_policy(policy_id):
         """
-        Execute a webhook policy
+        Execute a scaling policy
 
         :param policy_id: the uuid of the policy
         :type policy_id: ``str``
