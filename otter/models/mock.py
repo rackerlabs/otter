@@ -281,6 +281,15 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
+    def execute_policy(self, policy_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
+        """
+        if not policy_id in self.policies:
+            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
+                                                policy_id))
+        return defer.succeed(None)
+
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
@@ -374,18 +383,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
-    def execute_webhook(self, policy_id, webhook_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.execute_webhook`
-        """
-        if not policy_id in self.policies:
-            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
-                                                policy_id))
-        if not webhook_id in self.webhooks[policy_id]:
-            return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
-                                                 policy_id, webhook_id))
-        return defer.succeed(None)
-
     # ---- not interface methods
     def add_entities(self, pending=None, active=None):
         """
@@ -468,6 +465,6 @@ class MockScalingGroupCollection:
                 for policy_id in webhooks:
                     for webhook_id in webhooks[policy_id]:
                         if webhooks[policy_id][webhook_id]['capability']['hash'] == capability_hash:
-                            return self.data[tenant_id][group_id].execute_webhook(policy_id, webhook_id)
+                            return self.data[tenant_id][group_id].execute_policy(policy_id)
 
         return UnrecognizedCapabilityError()
