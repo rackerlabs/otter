@@ -815,7 +815,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        uuid = self.assert_deferred_succeeded(
+        self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
@@ -843,7 +843,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        uuid = self.assert_deferred_succeeded(
+        self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
@@ -857,7 +857,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
 
         deferred = self.collection.execute_webhook_hash('weasel')
-        self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)        
+        self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("num", "hash", "ver"))
