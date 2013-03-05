@@ -8,7 +8,8 @@ from twisted.trial.unittest import TestCase
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
-                                    NoSuchPolicyError, NoSuchWebhookError)
+                                    NoSuchPolicyError, NoSuchWebhookError,
+                                    UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -806,15 +807,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                 return_value=("num", "hash", "ver"))
     def test_webhook_execute(self, mock_generation):
         """
-        Listing a scaling group returns a mapping of scaling group uuid to
-        scaling group model, and adding another scaling group increases the
-        number of scaling groups in the collection. These are tested together
-        since testing list involves putting scaling groups in the collection
-        (create), and testing creation involves enumerating the collection
-        (list)
-
-        Creation of a scaling group with a 'config' parameter creates a
-        scaling group with the specified configuration.
+        Tests that we can execute a webhook given a capability token.
         """
         launch = {"launch": "config"}
         policy = {
@@ -822,18 +815,11 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        self.assertEqual(self.validate_list_return_value(
-                         self.mock_log, self.
-                         tenant_id), [],
-                         "Should start off with zero groups")
         uuid = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
         result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].uuid, uuid, "Group not added to collection")
-
         group = result[0]
 
         pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
@@ -842,7 +828,36 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
 
-        self.collection.execute_webhook_hash('hash')
+        deferred = self.collection.execute_webhook_hash('hash')
+        self.assert_deferred_succeeded(deferred)
+
+    @mock.patch('otter.models.mock.generate_capability',
+                return_value=("num", "hash", "ver"))
+    def test_webhook_execute_no_hash(self, mock_generation):
+        """
+        Tests that, given a bad capability token, we error out.
+        """
+        launch = {"launch": "config"}
+        policy = {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        }
+        uuid = self.assert_deferred_succeeded(
+            self.collection.create_scaling_group(
+                self.mock_log, self.tenant_id, self.config, launch, {}))
+
+        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
+        group = result[0]
+
+        pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
+
+        pol_uuid = pol_rec.keys()[0]
+
+        self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
+
+        deferred = self.collection.execute_webhook_hash('weasel')
+        self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)        
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("num", "hash", "ver"))

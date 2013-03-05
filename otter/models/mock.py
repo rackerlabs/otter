@@ -467,4 +467,4 @@ class MockScalingGroupCollection:
                         if webhooks[policy_id][webhook_id]['capability']['hash'] == capability_hash:
                             return self.data[tenant_id][group_id].execute_policy(policy_id)
 
-        return UnrecognizedCapabilityError()
+        return defer.fail(UnrecognizedCapabilityError(capability_hash,1))
