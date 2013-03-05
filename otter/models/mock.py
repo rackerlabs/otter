@@ -318,8 +318,8 @@ class MockScalingGroup:
                 webhook_real.update(webhook_input)
                 webhook_real['capability'] = {}
 
-                (ignore, webhook_real['capability']['hash'],
-                 webhook_real['capability']['version']) = generate_capability()
+                (webhook_real['capability']['version'],
+                 webhook_real['capability']['hash']) = generate_capability()
 
                 uuid = str(uuid4())
                 self.webhooks[policy_id][uuid] = webhook_real

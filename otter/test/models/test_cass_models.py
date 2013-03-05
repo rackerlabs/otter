@@ -129,7 +129,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.capability_patch = mock.patch(
             'otter.models.cass.generate_capability',
-            return_value=('x', 'y', '1'))
+            return_value=('ver', 'hash'))
         self.mock_capability = self.capability_patch.start()
         self.addCleanup(self.capability_patch.stop)
 
@@ -721,7 +721,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             '100001': {'metadata': {}},
             '100002': {'metadata': 'who'}
         }
-        capability = {'capability': {"hash": 'y', "version": '1'}}
+        capability = {'capability': {"hash": 'hash', "version": 'ver'}}
         for value in expected_results.values():
             value.update(capability)
 
@@ -752,9 +752,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "groupId": '12345678g',
             "policyId": '23456789',
             'webhook0Id': '100001',
-            "webhook0Key": "x",
+            "webhook0Key": "hash",
             'webhook1Id': '100002',
-            "webhook1Key": "x"
+            "webhook1Key": "hash"
         }
         for key, val in expected_params.iteritems():
             self.assertEqual(cql_params[key], val)
