@@ -591,17 +591,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         no webhooks no call to delete its webhooks is made. If successful return
         value is None
         """
-        def _assert_delete_policy(query, params, consistency):
-            self.assertEqual(
-                query,
-                ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
-                 '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
-                 'APPLY BATCH;'))
-            self.assertEqual(
-                params,
-                {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"})
-            self.assertEqual(consistency, ConsistencyLevel.TWO)
-
         def _fake_cassandra_results(query, params, consistency):
             """
             This has to return different data depending in the query, since
@@ -612,7 +601,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 if 'SELECT' in query:  # seeing if it exists
                     return defer.succeed(_cassandrify_data([{'data': '{}'}]))
                 else:  # delete policy
-                    _assert_delete_policy(query, params, consistency)
                     return defer.succeed(None)
             elif 'policy_webhooks' in query:
                 if 'SELECT' in query:   # no webhooks
@@ -630,29 +618,19 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
         # calls: select policy, delete policy, list webhooks, no delete webhooks
         self.assertEqual(len(self.connection.execute.mock_calls), 3)
+        # make sure that delete policy execution happend
+        self.connection.execute.assert_called_with(
+            ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
+             'APPLY BATCH;'),
+            {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"},
+            ConsistencyLevel.TWO)
 
     def test_delete_policy_deletes_webhooks(self):
         """
         When you delete a scaling policy that exists, any existing webhooks are
         also deleted
         """
-        def _assert_delete_webhooks(query, params, consistency):
-            self.assertEqual(
-                query,
-                ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
-                 '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-                 '"policyId" = :policyId AND "webhookId" = :webhookId0 '
-                 'UPDATE policy_webhooks SET deleted=True WHERE '
-                 '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-                 '"policyId" = :policyId AND "webhookId" = :webhookId1 '
-                 'APPLY BATCH;'))
-            self.assertEqual(
-                params,
-                {"tenantId": "11111", "groupId": "12345678g",
-                 "policyId": "3222", "webhookId0": "webhook1",
-                 "webhookId1": "webhook2"})
-            self.assertEqual(consistency, ConsistencyLevel.TWO)
-
         def _fake_cassandra_results(query, params, consistency):
             """
             This has to return different data depending in the query, since
@@ -671,7 +649,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                         {'webhookId': 'webhook1', 'data': '{}'},
                         {'webhookId': 'webhook2', 'data': '{}'}]))
                 else:  # delete webhooks
-                    _assert_delete_webhooks(query, params, consistency)
                     return defer.succeed(None)
             else:
                 raise self.fail(
@@ -683,6 +660,19 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
         # calls: select policy, delete policy, list webhooks, delete webhooks
         self.assertEqual(len(self.connection.execute.mock_calls), 4)
+        # make sure delete webhooks was called
+        self.connection.execute.assert_called_with(
+            ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+             '"policyId" = :policyId AND "webhookId" = :webhookId0 '
+             'UPDATE policy_webhooks SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+             '"policyId" = :policyId AND "webhookId" = :webhookId1 '
+             'APPLY BATCH;'),
+            {"tenantId": "11111", "groupId": "12345678g",
+             "policyId": "3222", "webhookId0": "webhook1",
+             "webhookId1": "webhook2"},
+            ConsistencyLevel.TWO)
 
     def test_delete_non_existant_policy(self):
         """
