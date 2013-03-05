@@ -628,6 +628,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.side_effect = _fake_cassandra_results
         d = self.group.delete_policy('3222')
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        # calls: select policy, delete policy, list webhooks, no delete webhooks
+        self.assertEqual(len(self.connection.execute.mock_calls), 3)
 
     def test_delete_policy_deletes_webhooks(self):
         """
@@ -679,6 +681,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.side_effect = _fake_cassandra_results
         d = self.group.delete_policy('3222')
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        # calls: select policy, delete policy, list webhooks, delete webhooks
+        self.assertEqual(len(self.connection.execute.mock_calls), 4)
 
     def test_delete_non_existant_policy(self):
         """
