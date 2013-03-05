@@ -619,7 +619,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         # calls: select policy, delete policy, list webhooks, no delete webhooks
         self.assertEqual(len(self.connection.execute.mock_calls), 3)
         # make sure that delete policy execution happend
-        self.connection.execute.assert_called_with(
+        self.connection.execute.assert_any_call(
             ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
              '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
              'APPLY BATCH;'),
@@ -661,7 +661,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         # calls: select policy, delete policy, list webhooks, delete webhooks
         self.assertEqual(len(self.connection.execute.mock_calls), 4)
         # make sure delete webhooks was called
-        self.connection.execute.assert_called_with(
+        self.connection.execute.assert_any_call(
             ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
              '"tenantId" = :tenantId AND "groupId" = :groupId AND '
              '"policyId" = :policyId AND "webhookId" = :webhookId0 '
@@ -1172,27 +1172,26 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # only called once to view
         self.assertEqual(len(self.connection.execute.mock_calls), 1)
 
-    def test_delete_existing_scaling_group(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+                return_value=defer.succeed(None))
+    def test_delete_existing_scaling_group(self, mock_delete_policy):
         """
         If the scaling group exists, deletes scaling group
         """
+        # we mock out delete policy, since that is already tested separately
+
         def execute_respond(query, *args, **kwargs):
             if query.lower().startswith("select"):
                 # this query is to get the ids of all the policies.  make
                 # sure there are some
                 if "policyId" in query:
-                    return defer.succeed(_de_identify([{
-                        'cols': [{'timestamp': None, 'name': 'policyId',
-                                  'value': 'pol1', 'ttl': None},
-                                 {'timestamp': None, 'name': 'data',
-                                  'value': '{"_ver": 5}', 'ttl': None}],
-                        'key': ''}]))
+                    return defer.succeed(_cassandrify_data([
+                        {'policyId': 'pol1', 'data': '{"_ver": 5}'},
+                        {'policyId': 'pol2', 'data': '{"_ver": 5}'}]))
+
                 # nope, this query is to see if the group exists.
                 # make sure it does
-                return defer.succeed(_de_identify([{
-                    'cols': [{'timestamp': None, 'name': 'data',
-                              'value': '{}', 'ttl': None}],
-                    'key': ''}]))
+                return defer.succeed(_cassandrify_data([{'data': '{}'}]))
 
             # the rest of the queries are updates
             return defer.succeed(None)
@@ -1202,9 +1201,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.assert_deferred_succeeded(
             self.collection.delete_scaling_group(self.mock_log, '123', 'group1'))
         self.assertIsNone(result)  # delete returns None
-        # called four times - once to view config, once to delete configs,
-        # once to view policies, and once to delete policies
-        self.assertEqual(len(self.connection.execute.mock_calls), 4)
+        # one call to view config, one to delete configs, one to view policies
+        self.assertEqual(len(self.connection.execute.mock_calls), 3)
+        # there were 2 policies, so there should be 2 calls to delete_policy
+        mock_delete_policy.assert_has_calls(
+            [mock.call('pol1'), mock.call('pol2')], any_order=True)
 
         # delete configs
         expected_data = {'tenantId': '123',
@@ -1215,19 +1216,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'UPDATE launch_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'APPLY BATCH;')
-        self.connection.execute.assert_called_any(expected_cql, expected_data,
-                                                  ConsistencyLevel.TWO)
-
-        # delete policies
-        expected_data = {'tenantId': '123',
-                         'groupId': 'group1',
-                         'policyId0': 'pol1'}
-        expected_cql = (
-            'BEGIN BATCH '
-            'UPDATE scaling_policies SET deleted=True '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'AND "policyId" = :policyId0 '
             'APPLY BATCH;')
         self.connection.execute.assert_called_any(expected_cql, expected_data,
                                                   ConsistencyLevel.TWO)

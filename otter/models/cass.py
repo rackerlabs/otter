@@ -726,60 +726,6 @@ class CassScalingGroupCollection:
         d.addCallback(lambda _: scaling_group_id)
         return d
 
-    # def delete_scaling_group(self, log, tenant_id, scaling_group_id):
-    #     """
-    #     see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
-    #     """
-    #     def _delete_configs():
-    #         """
-    #         Delete all the configs
-    #         """
-    #         queries = [
-    #             _cql_delete.format(cf=self.config_table),
-    #             _cql_delete.format(cf=self.launch_table),
-    #         ]
-    #         b = Batch(queries,
-    #                   {"tenantId": tenant_id, "groupId": scaling_group_id},
-    #                   consistency=get_consistency_level('delete', 'group'))
-    #         return b.execute(self.connection)
-
-    #     def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
-    #         """
-    #         Delete all policies for one group (including all the webhooks)
-    #         """
-    #         if len(policy_dict) == 0:
-    #             return  # don't hit cassandra at all
-
-    #         data = {"tenantId": tenant_id, "groupId": scaling_group_id}
-    #         queries = []
-    #         deletion_deferreds = []
-
-    #         for i, policy_id in enumerate(policy_dict.keys()):
-    #             varname = 'policyId{0}'.format(i)
-    #             queries.append(_cql_delete_policy.format(
-    #                 cf=self.policies_table, name=':{0}'.format(varname)))
-    #             data[varname] = policy_id
-    #             deletion_deferreds.append(group._delete_all_webhooks(policy_id))
-
-    #         b = Batch(queries, data,
-    #                   consistency=get_consistency_level('delete', 'group'))
-
-    #         deletion_deferreds.append(b.execute(self.connection))
-
-    #         return defer.gatherResults(deletion_deferreds)
-
-    #     def _delete_it(lastRev, group):
-    #         d = defer.gatherResults([
-    #             _delete_configs(),
-    #             group._naive_list_policies().addCallback(_delete_policies, group)
-    #         ])
-    #         d.addCallback(lambda _: None)
-    #         return d
-
-    #     group = self.get_scaling_group(log, tenant_id, scaling_group_id)
-    #     d = group.view_config()  # ensure that it's actually there
-    #     return d.addCallback(_delete_it, group)  # only delete if it exists
-
     def delete_scaling_group(self, log, tenant_id, scaling_group_id):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
@@ -794,23 +740,16 @@ class CassScalingGroupCollection:
                       consistency=get_consistency_level('delete', 'group'))
             return b.execute(self.connection)
 
-        def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
-            data = {"tenantId": tenant_id, "groupId": scaling_group_id}
-            queries = []
-            for i, policy_id in enumerate(policy_dict.keys()):
-                varname = 'policyId{0}'.format(i)
-                queries.append(_cql_delete_policy.format(
-                    cf=self.policies_table, name=':{0}'.format(varname)))
-                data[varname] = policy_id
-
-            b = Batch(queries, data,
-                      consistency=get_consistency_level('delete', 'group'))
-            return b.execute(self.connection)
+        def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
+            deferreds = []
+            for policy_id in policy_dict:
+                deferreds.append(group.delete_policy(policy_id))
+            return defer.gatherResults(deferreds)
 
         def _delete_it(lastRev, group):
             d = defer.gatherResults([
                 _delete_configs(),
-                group._naive_list_policies().addCallback(_delete_policies)
+                group._naive_list_policies().addCallback(_delete_policies, group)
             ])
             d.addCallback(lambda _: None)
             return d
