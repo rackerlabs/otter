@@ -12,7 +12,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
 
 
-@app.route('/<string:tenantId>/groups',  methods=['GET'])
+@app.route('/<string:tenantId>/groups/',  methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -74,7 +74,7 @@ def list_all_scaling_groups(request, log, tenantId):
 # we are just repeating whatever the request body was, with an ID and links
 # attached.  If we are going to create the scaling policies here too, we should
 # probably also return their ids and links, just like the manifest.
-@app.route('/<string:tenantId>/groups', methods=['POST'])
+@app.route('/<string:tenantId>/groups/', methods=['POST'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(201)
@@ -159,7 +159,7 @@ def create_new_scaling_group(request, log, tenantId, data):
                 "id": "{groupId}",
                 "links": [
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
                     "rel": "self"
                   }
                 ],
@@ -243,7 +243,7 @@ def create_new_scaling_group(request, log, tenantId, data):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>', methods=['GET'])
+@app.route('/<string:tenantId>/groups/<string:groupId>/', methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
@@ -260,7 +260,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                 "id": "{groupId}",
                 "links": [
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
                     "rel": "self"
                   }
                 ],
@@ -310,7 +310,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId1}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
                             "rel": "self"
                           }
                         ],
@@ -322,7 +322,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId2}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
                             "rel": "self"
                           }
                         ],
@@ -334,7 +334,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "id": "{policyId3}",
                         "links": [
                           {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
                             "rel": "self"
                           }
                         ],
@@ -370,7 +370,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
 # Feature: Force delete, which stops scaling, deletes all servers for you, then
 #       deletes the scaling group.
 # D
-@app.route('/<string:tenantId>/groups/<string:groupId>', methods=['DELETE'])
+@app.route('/<string:tenantId>/groups/<string:groupId>/', methods=['DELETE'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
@@ -382,7 +382,7 @@ def delete_scaling_group(request, log, tenantId, groupId):
     return get_store().delete_scaling_group(log, tenantId, groupId)
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/state',
+@app.route('/<string:tenantId>/groups/<string:groupId>/state/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)

@@ -35,7 +35,7 @@ def _render(resource, request):
         raise ValueError("Unexpected return value: %r" % (result,))
 
 
-ResponseWrapper = namedtuple('ResponseWrapper', ['response', 'content'])
+ResponseWrapper = namedtuple('ResponseWrapper', ['response', 'content', 'request'])
 
 
 def request(root_resource, method, endpoint, headers=None, body=None):
@@ -110,7 +110,7 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             content = "".join(
                 [call[1][0] for call in mock_request.write.mock_calls])
 
-        return ResponseWrapper(response=response, content=content)
+        return ResponseWrapper(response=response, content=content, request=mock_request)
 
     return _render(
         getChildForRequest(root_resource, mock_request),
@@ -154,17 +154,21 @@ class RequestTestMixin(object):
 
         :return: None
         """
-        # If we're expecting a 405, it never hits the decorator;
+        # If we're expecting a 405 or a 301, it never hits the decorator;
         # otherwise it needs to have sent a transaction ID, and its
         # content-type must be set to application/json
+        #
+        # There are probably other response codes we need to add here,
+        # but I don't have a good idea for how best to discover them.
+        #
         headers = response_wrapper.response.headers
-        if expected_status != 405:
+        if expected_status not in [405, 301]:
             self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
             self.assertEqual(headers.getRawHeaders('Content-Type'),
                              ['application/json'])
         else:
-            self.assertEqual(headers.getRawHeaders('Content-Type'),
-                             ['text/html'])
+            content_type = headers.getRawHeaders('Content-Type')[0]
+            self.assertIn('text/html', content_type)
 
         error_message = [
             "Got status {0} but expected {1}".format(
@@ -253,3 +257,21 @@ class RestAPITestMixin(DeferredTestMixin, RequestTestMixin):
         """
         for method in self.invalid_methods:
             self.assert_status_code(405, method=method)
+
+    def test_non_trailing_slash_redirects_to_trailing_slash(self):
+        """
+        Trying to hit the non-trailing-slash version of the URL results in a
+        redirect to the trailing slash version
+        """
+        self.assertTrue(self.endpoint.endswith('/'),
+                        "The default endpoint should have a trailing slash: {0}".format(
+                            self.endpoint))
+
+        # HEAD works even if it's not listed in the available methods, but
+        # but that's handled elsewhere (probably in Twisted), so we can't use
+        # it for testing here.  So find a method that is not invalid, and use
+        # that.
+        for method in ('GET', 'PUT', 'POST', 'DELETE'):
+            if not method in self.invalid_methods:
+                self.assert_status_code(301, method=method,
+                                        endpoint=self.endpoint.rstrip('/'))
