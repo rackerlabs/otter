@@ -150,12 +150,12 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         #       hash versions can be stored
         webhook_real = {'metadata': {}, 'capability': {}}
         webhook_real.update(bare_webhooks[i])
-        (token, webhook_real['capability']['hash'],
-            webhook_real['capability']['version']) = generate_capability()
+        (webhook_real['capability']['version'],
+         webhook_real['capability']['hash']) = generate_capability()
 
         cql_parameters[name] = _serial_json_data(webhook_real, 1)
         cql_parameters['{0}Id'.format(name)] = webhook_id
-        cql_parameters['{0}Key'.format(name)] = token
+        cql_parameters['{0}Key'.format(name)] = webhook_real['capability']['hash']
         output[webhook_id] = webhook_real
 
 

@@ -485,7 +485,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
 
     @mock.patch('otter.models.mock.generate_capability',
-                return_value=("num", "hash", "ver"))
+                return_value=("ver", "hash"))
     def test_create_webhooks_succeed(self, fake_random):
         """
         Adding new webhooks to the scaling policy returns a dictionary of
@@ -804,7 +804,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     @mock.patch('otter.models.mock.generate_capability',
-                return_value=("num", "hash", "ver"))
+                return_value=("ver", "hash"))
     def test_webhook_execute(self, mock_generation):
         """
         Tests that we can execute a webhook given a capability token.
@@ -832,7 +832,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assert_deferred_succeeded(deferred)
 
     @mock.patch('otter.models.mock.generate_capability',
-                return_value=("num", "hash", "ver"))
+                return_value=("ver", "hash"))
     def test_webhook_execute_no_hash(self, mock_generation):
         """
         Tests that, given a bad capability token, we error out.
@@ -860,7 +860,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
 
     @mock.patch('otter.models.mock.generate_capability',
-                return_value=("num", "hash", "ver"))
+                return_value=("ver", "hash"))
     def _call_all_methods_on_group(self, group_id, mock_generation):
         """
         Gets a group, asserts that it's a MockScalingGroup, and runs all of its
