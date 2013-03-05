@@ -376,6 +376,32 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.delete_and_view_scaling_policy(second_policies[0])
         self.assert_number_of_scaling_policies(len_total_policies - 1)
 
+    def test_execute_scaling_policy_success(self):
+        """
+        Executing a scaling policy should result in a 202.
+        """
+        self.assert_number_of_scaling_policies(0)
+        first_policies = self.create_and_view_scaling_policies()
+
+        self.assert_number_of_scaling_policies(len(first_policies))
+
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'POST', first_policies[0] + 'execute/'))
+        self.assertEqual(wrapper.response.code, 202,
+                         "Execute failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "{}")
+
+    def test_execute_scaling_policy_failed(self):
+        """
+        Executing a non-existant scaling policy should result in a 404.
+        """
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'POST', self.policies_url + '1/execute/'))
+        self.assertEqual(wrapper.response.code, 404,
+                         "Execute did not fail as expected: {0}".format(wrapper.content))
+
+        self.flushLoggedErrors(NoSuchPolicyError)
+
 
 class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
     """

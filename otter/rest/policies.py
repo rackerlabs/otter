@@ -276,3 +276,25 @@ def delete_policy(request, log, tenantId, groupId, policyId):
     rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.delete_policy(policyId)
     return deferred
+
+
+@app.route(
+    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/execute/',
+    methods=['POST'])
+@with_transaction_id()
+@fails_with(exception_codes)
+@succeeds_with(202)
+def execute_policy(request, log, tenantId, groupId, policyId):
+    """
+    Execute this scaling policy.
+
+    TBD: Response body.
+
+    Example response::
+
+        {}
+    """
+    rec = get_store().get_scaling_group(log, tenantId, groupId)
+    deferred = rec.execute_policy(policyId)
+    deferred.addCallback(lambda _: "{}")
+    return deferred
