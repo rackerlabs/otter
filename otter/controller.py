@@ -20,10 +20,13 @@ def maybe_execute_scaling_policy(log, transaction_id, scaling_group, policy_id):
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
     """
-    check_cooldowns(scaling_group, policy_id, "i got this data from the db")
-    scaling_group.set_steady_state(calculate_new_steady_state())
-    notify_group_size_change(transaction_id, scaling_group, policy_id)
-    record_policy_trigger_time(scaling_group, policy_id, time.time())
+    if check_cooldowns(log, scaling_group, policy_id, "i got this data from the db"):
+        scaling_group.set_steady_state(log, calculate_new_steady_state())
+        notify_group_size_change(log, transaction_id, scaling_group, policy_id)
+        record_policy_trigger_time(log, scaling_group, policy_id, time.time())
+    else:
+        record_policy_decision_time(log, scaling_group, policy_id, time.time(),
+                                    'i was rejected because...')
 
 
 def calculate_new_steady_state(log):
@@ -39,12 +42,10 @@ def check_cooldowns(log, scaling_group, policy_id, policy_data):
     If the most recent trigger of any policy is within <global cooldown> of
         now, False
 
-    If this policy is still running, or it finished within <policy cooldown>,
-        then False
+    If the most recent trigger of *this* policy is within <policy cooldown> of
+        now, then False
 
-    If it has been <policy cooldown>+ seconds since the last time the policy finished,
-        and <global cooldown>+ seconds since the last time any policy has been
-        triggered, then True
+    Else True
     """
     raise NotImplementedError()
 
@@ -52,5 +53,12 @@ def check_cooldowns(log, scaling_group, policy_id, policy_data):
 def record_policy_trigger_time(log, scaling_group, policy_id, timestamp):
     """
     Stores the time the policy was triggered/decided to be executed
+    """
+    raise NotImplementedError()
+
+
+def record_policy_decision_time(log, scaling_group, policy_id, timestamp, why):
+    """
+    Stores the time the policy was rejected
     """
     raise NotImplementedError()
