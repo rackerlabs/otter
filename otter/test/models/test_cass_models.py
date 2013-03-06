@@ -1143,11 +1143,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [_cassandrify_data([
             {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': False}]),
-            [{'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
+            _cassandrify_data([{'data': '{}'}])
         ]
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
@@ -1176,6 +1172,23 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"webhookKey" = :webhookKey;')
         d = self.collection.execute_webhook_hash(self.mock_log, 'x')
         self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_webhook_deleted(self):
+        """
+        Test that deletion works
+        """
+        self.returns = [_cassandrify_data([
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': True}])
+        ]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

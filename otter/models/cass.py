@@ -161,7 +161,7 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         output[webhook_id] = webhook_real
 
 
-def _unwrap_row(raw_response):
+def _unwrap_one_row(raw_response):
     """
     Unwrap a row into a dict
     """
@@ -175,10 +175,8 @@ def _unwrap_row(raw_response):
         raise CassBadDataError("Received malformed response with no cols")
 
     row = raw_response[0]['cols']
-    resp = {}
-    for col in row:
-        resp[col['name']] = col['value']
-    return resp
+
+    return {col['name']: col['value'] for col in row}
 
 
 def _grab_list(raw_response, id_name, has_data=True):
@@ -725,9 +723,11 @@ class CassScalingGroupCollection:
     def execute_webhook_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
+
+        Note: We have to post-filter deleted items because of the way that Cassandra indicies work
         """
         def _do_webhook_lookup(webhook_rec):
-            res = _unwrap_row(webhook_rec)
+            res = _unwrap_one_row(webhook_rec)
             if res is None:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             if res['deleted'] is True:
