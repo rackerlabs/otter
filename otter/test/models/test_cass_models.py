@@ -12,7 +12,7 @@ from otter.models.cass import (
     CassBadDataError)
 
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchPolicyError,
-                                    NoSuchWebhookError)
+                                    NoSuchWebhookError, UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -1136,3 +1136,59 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'APPLY BATCH;')
         self.connection.execute.assert_called_any(expected_cql, expected_data,
                                                   ConsistencyLevel.TWO)
+
+    def test_webhook_hash(self):
+        """
+        Test that you can execute a webhook hash
+        """
+        self.returns = [_cassandrify_data([
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': False}]),
+            _cassandrify_data([{'data': '{}'}])
+        ]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        r = self.assert_deferred_succeeded(d)
+        self.assertEqual(r, None)
+        self.connection.execute.assert_called_any(expectedCql,
+                                                  expectedData,
+                                                  ConsistencyLevel.TWO)
+
+        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+        expectedData = {"tenantId": "123", "groupId": "group1", "policyId": "pol1"}
+        self.connection.execute.assert_called_any(expectedCql,
+                                                  expectedData,
+                                                  ConsistencyLevel.TWO)
+
+    def test_webhook_bad(self):
+        """
+        Test that a bad webhook will fail predictably
+        """
+        self.returns = [None]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_webhook_deleted(self):
+        """
+        Test that deletion works
+        """
+        self.returns = [_cassandrify_data([
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': True}])
+        ]
+        expectedData = {'webhookKey': 'x'}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+                       '"webhookKey" = :webhookKey;')
+        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)

@@ -455,7 +455,7 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, None)
 
-    def execute_webhook_hash(self, capability_hash):
+    def execute_webhook_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
         """
