@@ -69,7 +69,9 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
-                    errlog = bound_log.failure(failure)
+                    errlog = bound_log.trace((failure.type,
+                                              failure.value,
+                                              failure.getTracebackObject()))
                     errlog.fields(uri=request.uri,
                                   code=code).error('Unhandled Error')
                 request.setResponseCode(code)
