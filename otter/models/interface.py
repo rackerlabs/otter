@@ -467,7 +467,7 @@ class IScalingGroupCollection(Interface):
             :class:`twisted.internet.defer.Deferred`)
         """
 
-    def execute_webhook_hash(capability_hash):
+    def execute_webhook_hash(log, capability_hash):
         """
         Identify the scaling policy (and tenant ID, group ID, etc.) associated
         with this particular capability URL hash and execute said policy.

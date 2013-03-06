@@ -7,7 +7,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchPolicyError,
-                                    NoSuchWebhookError)
+                                    NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -56,6 +56,8 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenan
                     '"groupId" = :groupId AND deleted = False;')
 _cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
+                           '"webhookKey"=:webhookKey;')
 
 
 def get_consistency_level(operation, resource):
@@ -157,6 +159,26 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         cql_parameters['{0}Id'.format(name)] = webhook_id
         cql_parameters['{0}Key'.format(name)] = webhook_real['capability']['hash']
         output[webhook_id] = webhook_real
+
+
+def _unwrap_row(raw_response):
+    """
+    Unwrap a row into a dict
+    """
+    if raw_response is None:
+        return None
+
+    if len(raw_response) != 1:
+        raise CassBadDataError("multiple responses when we expected 1")
+
+    if 'cols' not in raw_response[0]:
+        raise CassBadDataError("Received malformed response with no cols")
+
+    row = raw_response[0]['cols']
+    resp = {}
+    for col in row:
+        resp[col['name']] = col['value']
+    return resp
 
 
 def _grab_list(raw_response, id_name, has_data=True):
@@ -460,7 +482,12 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.execute_policy`
         """
-        raise NotImplementedError()
+        def _do_stuff(pol):
+            # Doing stuff will go here.
+            return None
+
+        d = self.get_policy(policy_id)
+        d.addCallback(_do_stuff)
 
     def list_webhooks(self, policy_id):
         """
@@ -695,8 +722,22 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def execute_webhook_hash(self, capability_hash):
+    def execute_webhook_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
+        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
         """
-        raise NotImplementedError()
+        def _do_webhook_lookup(webhook_rec):
+            res = _unwrap_row(webhook_rec)
+            if res is None:
+                return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
+            if res['deleted'] is True:
+                return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
+            group = self.get_scaling_group(log, res['tenantId'], res['groupId'])
+            return group.execute_policy(res['policyId'])
+
+        query = _cql_find_webhook_token.format(cf=self.webhooks_table)
+        d = self.connection.execute(query,
+                                    {"webhookKey": capability_hash},
+                                    get_consistency_level('list', 'group'))
+        d.addCallback(_do_webhook_lookup)
+        return d
