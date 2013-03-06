@@ -57,7 +57,7 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenan
 _cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
-                           '"webhookKey"=:webhookKey;')
+                           '"webhookKey" = :webhookKey;')
 
 
 def get_consistency_level(operation, resource):
@@ -729,9 +729,9 @@ class CassScalingGroupCollection:
         def _do_webhook_lookup(webhook_rec):
             res = _unwrap_row(webhook_rec)
             if res is None:
-                return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
+                raise UnrecognizedCapabilityError(capability_hash, 1)
             if res['deleted'] is True:
-                return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
+                raise UnrecognizedCapabilityError(capability_hash, 1)
             group = self.get_scaling_group(log, res['tenantId'], res['groupId'])
             return group.execute_policy(res['policyId'])
 

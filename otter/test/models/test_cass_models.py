@@ -1151,7 +1151,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         ]
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
-                       '"webhookKey"=:webhookKey;')
+                       '"webhookKey" = :webhookKey;')
         d = self.collection.execute_webhook_hash(self.mock_log, 'x')
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, None)
@@ -1173,7 +1173,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [None]
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
-                       '"webhookKey"=:webhookKey;')
+                       '"webhookKey" = :webhookKey;')
         d = self.collection.execute_webhook_hash(self.mock_log, 'x')
         self.assert_deferred_failed(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_called_once_with(expectedCql,
