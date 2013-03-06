@@ -29,7 +29,15 @@ def _serial_json_data(data, ver):
     dataOut["_ver"] = ver
     return json.dumps(dataOut)
 
-
+# ACHTUNG LOOKENPEEPERS!
+#
+# Batch operations don't let you have semicolons between statements.  Regular
+# operations require you to end them with a semicolon.
+#
+# If you are doing a INSERT or UPDATE query, it's going to be part of a batch.
+# Otherwise it won't.
+#
+# Thus, selects have a semicolon, everything else doesn't.
 _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId AND deleted = False;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -724,7 +732,22 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
 
-        Note: We have to post-filter deleted items because of the way that Cassandra indicies work
+        Note: We have to post-filter deleted items because of the way that Cassandra works
+
+        Cassandra has a notion of a 'primary key' that you use to look up a record.  It behooves
+        you to construct your data in such a way that it can always look up a primary key
+        (or, for that matter, a secondary index).  CQL3 lets you create a secondary index, but
+        only on one key at a time.... because they realized that everybody using the previous
+        version of CQL was spending bunches of time writing code to generate these secondary
+        indicies.
+
+        Furthermore, Cassandra doesn't have a proper query planner like a real SQL database,
+        so it doesn't actually have any way to determine which index to query first.
+
+        We have two secondary indicies.  One for finding the non-deleted records, one for
+        finding the records by capability_hash.  And we can only use one of them at a time.
+        It's more efficient for us to use the index that maps from the capability_hash to
+        the row instead of the index that picks out what has not been deleted.
         """
         def _do_webhook_lookup(webhook_rec):
             res = _unwrap_one_row(webhook_rec)
