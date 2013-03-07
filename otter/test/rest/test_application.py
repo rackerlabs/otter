@@ -214,7 +214,7 @@ class LinkGenerationTestCase(TestCase):
                 '11111', capability_hash='xxx', **dict(pairs[:(i + 1)]))
 
             self.assertEqual(len(json_blob), 2)
-            self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx'},
+            self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx/'},
                           json_blob)
 
     def test_capability_version(self):
@@ -226,13 +226,13 @@ class LinkGenerationTestCase(TestCase):
         json_blob = get_autoscale_links(
             '11111', group_id='1', policy_id='2', webhook_id='3',
             capability_hash='xxx')
-        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx'},
+        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/1/xxx/'},
                       json_blob)
 
         json_blob = get_autoscale_links(
             '11111', group_id='1', policy_id='2', webhook_id='3',
             capability_hash='xxx', capability_version="8")
-        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/8/xxx'},
+        self.assertIn({'rel': 'capability', 'href': '/v1.0/execute/8/xxx/'},
                       json_blob)
 
     def test_capability_urls_unicode_escaped(self):

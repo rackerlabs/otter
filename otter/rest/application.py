@@ -140,7 +140,7 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                 api,
                 "execute",
                 capability_version,
-                capability_hash)
+                capability_hash, '')
 
             links.append({"href": capability_url, "rel": "capability"})
 
