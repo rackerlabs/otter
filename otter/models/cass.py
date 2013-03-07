@@ -7,7 +7,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchScalingGroupError, NoSuchPolicyError,
-                                    NoSuchWebhookError)
+                                    NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -29,7 +29,15 @@ def _serial_json_data(data, ver):
     dataOut["_ver"] = ver
     return json.dumps(dataOut)
 
-
+# ACHTUNG LOOKENPEEPERS!
+#
+# Batch operations don't let you have semicolons between statements.  Regular
+# operations require you to end them with a semicolon.
+#
+# If you are doing a INSERT or UPDATE query, it's going to be part of a batch.
+# Otherwise it won't.
+#
+# Thus, selects have a semicolon, everything else doesn't.
 _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId AND deleted = False;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -56,6 +64,8 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenan
                     '"groupId" = :groupId AND deleted = False;')
 _cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
+                           '"webhookKey" = :webhookKey;')
 
 
 def get_consistency_level(operation, resource):
@@ -157,6 +167,24 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         cql_parameters['{0}Id'.format(name)] = webhook_id
         cql_parameters['{0}Key'.format(name)] = webhook_real['capability']['hash']
         output[webhook_id] = webhook_real
+
+
+def _unwrap_one_row(raw_response):
+    """
+    Unwrap a row into a dict
+    """
+    if raw_response is None:
+        return None
+
+    if len(raw_response) != 1:
+        raise CassBadDataError("multiple responses when we expected 1")
+
+    if 'cols' not in raw_response[0]:
+        raise CassBadDataError("Received malformed response with no cols")
+
+    row = raw_response[0]['cols']
+
+    return {col['name']: col['value'] for col in row}
 
 
 def _grab_list(raw_response, id_name, has_data=True):
@@ -460,7 +488,12 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.execute_policy`
         """
-        raise NotImplementedError()
+        def _do_stuff(pol):
+            # Doing stuff will go here.
+            return None
+
+        d = self.get_policy(policy_id)
+        d.addCallback(_do_stuff)
 
     def list_webhooks(self, policy_id):
         """
@@ -695,8 +728,39 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def execute_webhook_hash(self, capability_hash):
+    def execute_webhook_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook`
+        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
+
+        Note: We have to post-filter deleted items because of the way that Cassandra works
+
+        Cassandra has a notion of a 'primary key' that you use to look up a record.  It behooves
+        you to construct your data in such a way that it can always look up a primary key
+        (or, for that matter, a secondary index).  CQL3 lets you create a secondary index, but
+        only on one key at a time.... because they realized that everybody using the previous
+        version of CQL was spending bunches of time writing code to generate these secondary
+        indicies.
+
+        Furthermore, Cassandra doesn't have a proper query planner like a real SQL database,
+        so it doesn't actually have any way to determine which index to query first.
+
+        We have two secondary indicies.  One for finding the non-deleted records, one for
+        finding the records by capability_hash.  And we can only use one of them at a time.
+        It's more efficient for us to use the index that maps from the capability_hash to
+        the row instead of the index that picks out what has not been deleted.
         """
-        raise NotImplementedError()
+        def _do_webhook_lookup(webhook_rec):
+            res = _unwrap_one_row(webhook_rec)
+            if res is None:
+                raise UnrecognizedCapabilityError(capability_hash, 1)
+            if res['deleted'] is True:
+                raise UnrecognizedCapabilityError(capability_hash, 1)
+            group = self.get_scaling_group(log, res['tenantId'], res['groupId'])
+            return group.execute_policy(res['policyId'])
+
+        query = _cql_find_webhook_token.format(cf=self.webhooks_table)
+        d = self.connection.execute(query,
+                                    {"webhookKey": capability_hash},
+                                    get_consistency_level('list', 'group'))
+        d.addCallback(_do_webhook_lookup)
+        return d
