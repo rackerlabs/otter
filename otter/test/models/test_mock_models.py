@@ -228,8 +228,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected = {
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
-            'minEntities': 100,
-            'maxEntities': 1000,
+            'minEntities': 10,
+            'maxEntities': 15,
             'name': 'UPDATED'
         }
         self.assert_deferred_succeeded(self.group.update_config(expected))
@@ -293,8 +293,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(self.group.update_config({
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
-            'minEntities': 100,
-            'maxEntities': 1000,
+            'minEntities': 10,
+            'maxEntities': 15,
             'name': 'UPDATED'
         }))
         self.assertEqual(
