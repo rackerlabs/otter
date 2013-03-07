@@ -571,3 +571,29 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         # delete webhook - there should be one fewer webhook
         self.delete_and_view_webhook(first_webhooks[0])
         self.assert_number_of_webhooks(3)
+
+    def test_execute_webhook_by_hash(self):
+        """
+        Executing a webhook should look up the policy by hash and attempt
+        to execute that policy.
+        """
+        self.assert_number_of_webhooks(0)
+        first_webhooks = self.create_and_view_webhooks()
+
+        wrapper = self.assert_deferred_succeeded(request(root, 'GET', first_webhooks[0]))
+        webhook = json.loads(wrapper.content)['webhook']
+        links = {link['rel']: link['href'] for link in webhook['links']}
+        cap_path = _strip_base_url(links['capability'])
+
+        wrapper = self.assert_deferred_succeeded(request(root, 'POST', cap_path))
+        self.assertEqual(wrapper.response.code, 202)
+
+    def test_execute_non_existant_webhook_by_hash(self):
+        """
+        Executing a webhook that doesn't exist should still return a 202.
+        """
+        self.assert_number_of_webhooks(0)
+
+        wrapper = self.assert_deferred_succeeded(
+            request(root, 'POST', '/v1.0/execute/1/1/'))
+        self.assertEqual(wrapper.response.code, 202)

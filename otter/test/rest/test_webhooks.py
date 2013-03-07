@@ -13,7 +13,8 @@ from twisted.trial.unittest import TestCase
 
 from otter.json_schema import rest_schemas
 from otter.models.interface import (
-    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError)
+    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
+    UnrecognizedCapabilityError)
 from otter.rest.decorators import InvalidJsonError
 from otter.test.rest.request import DummyException, RestAPITestMixin
 
@@ -96,7 +97,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "self"},
-                        {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}
                     ]
                 },
                 {
@@ -106,7 +107,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "self"},
-                        {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}
                     ]
                 }
             ],
@@ -195,7 +196,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
                          "rel": "self"},
-                        {"href": '/v1.0/execute/1/xxx', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}
                     ]
                 },
                 {
@@ -205,7 +206,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
                     'links': [
                         {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
                          "rel": "self"},
-                        {"href": '/v1.0/execute/1/yyy', "rel": "capability"}
+                        {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}
                     ]
                 }
             ]
@@ -292,7 +293,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
                     },
                     {
                         'rel': 'capability',
-                        'href': '/v1.0/execute/ver/xxx'
+                        'href': '/v1.0/execute/ver/xxx/'
                     }
                 ]
             }
@@ -398,3 +399,35 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
+
+    def test_execute_webhook(self):
+        """
+        Execute a webhook by hash.
+        """
+        self.mock_store.execute_webhook_hash.return_value = defer.succeed(None)
+
+        response_body = self.assert_status_code(
+            202, '/v1.0/execute/1/11111/', 'POST')
+
+        self.assertEqual(response_body, '')
+
+    def test_execute_webhook_that_doesnt_exist(self):
+        """
+        Executing a webhook with an unknown hash should appear to succeed.
+        """
+        self.mock_store.execute_webhook_hash.return_value = defer.fail(
+            UnrecognizedCapabilityError("11111", 1))
+
+        response_body = self.assert_status_code(
+            202, '/v1.0/execute/1/11111/', 'POST')
+
+        self.assertEqual(response_body, '')
+
+    def test_execute_webhook_should_only_surface_500(self):
+        """
+        Executing a webhook should only surface 500 in the case of
+        a synchronous exception and not specific codes.
+        """
+        self.mock_store.execute_webhook_hash.return_value = ValueError('otters in pants')
+
+        self.assert_status_code(500, '/v1.0/execute/1/11111/', 'POST')
