@@ -15,6 +15,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
+from otter.models.interface import UnrecognizedCapabilityError
 
 
 def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
@@ -61,7 +62,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                             "rel": "self"
                         },
                         {
-                            "href": ".../execute/1/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1}/,
                             "rel": "capability"
                         }
                     ]
@@ -78,7 +79,7 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
                             "rel": "self"
                         },
                         {
-                            "href": ".../execute/1/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2}/,
                             "rel": "capability"
                         }
                     ]
@@ -153,7 +154,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                             "rel": "self"
                         },
                         {
-                            "href": ".../execute/1/{capability_hash1},
+                            "href": ".../execute/1/{capability_hash1}/,
                             "rel": "capability"
                         }
                     ]
@@ -168,7 +169,7 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
                             "rel": "self"
                         },
                         {
-                            "href": ".../execute/1/{capability_hash2},
+                            "href": ".../execute/1/{capability_hash2}/,
                             "rel": "capability"
                         }
                     ]
@@ -282,3 +283,25 @@ def delete_webhook(request, log, tenantId, groupId, policyId, webhookId):
     rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.delete_webhook(policyId, webhookId)
     return deferred
+
+
+@app.route(
+    '/execute/<string:capability_version>/<string:capability_hash>/',
+    methods=['POST'])
+@with_transaction_id()
+@fails_with({})  # This will allow us to surface internal server error only.
+@succeeds_with(202)
+def execute_webhook(request, log, capability_version, capability_hash):
+    """
+    Execute a scaling policy based the capability hash.
+    This returns a 202 in all cases except internal server error,
+    and does not wait for execution to finish.
+    """
+    d = get_store().execute_webhook_hash(log, capability_hash)
+
+    def _log_unrecognized_cap(failure):
+        exc = failure.trap(UnrecognizedCapabilityError)
+        log.fields(capability_hash=capability_hash,
+                   capability_version=capability_version).warning(exc)
+
+    d.addErrback(_log_unrecognized_cap)
