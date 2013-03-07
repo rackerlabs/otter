@@ -92,7 +92,7 @@ def config():
             "name": "workers",
             "cooldown": 60,
             "minEntities": 5,
-            "maxEntities": 100,
+            "maxEntities": 20,
             "metadata": {
                 "firstkey": "this is a string",
                 "secondkey": "1"

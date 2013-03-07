@@ -159,6 +159,7 @@ config = {
             "description": ("Minimum number of entities in the scaling group. "
                             "This number must be an integer."),
             "minimum": 0,
+            "maximum": 25,
             "required": True,
         },
         "maxEntities": {
@@ -167,6 +168,7 @@ config = {
                             "Defaults to null, meaning no maximum.  When "
                             "given, this number must be an integer."),
             "minimum": 0,
+            "maximum": 25,
             "default": None
         },
         "metadata": metadata
