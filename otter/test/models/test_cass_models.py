@@ -585,30 +585,94 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         self.group.view_config.assert_called_once_with()
 
-    def test_delete_policy(self):
+    def test_delete_policy_no_webhooks(self):
         """
-        Tests that you can delete a scaling policy, and if successful return
+        When you delete a scaling policy, the policy itself and if there are
+        no webhooks no call to delete its webhooks is made. If successful return
         value is None
         """
-        view_policy = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
+        def _fake_cassandra_results(query, params, consistency):
+            """
+            This has to return different data depending in the query, since
+            deleting requires multiple queries.  So may as well assert stuff
+            about the queries and parameters here.
+            """
+            if 'scaling_policies' in query:
+                if 'SELECT' in query:  # seeing if it exists
+                    return defer.succeed(_cassandrify_data([{'data': '{}'}]))
+                else:  # delete policy
+                    return defer.succeed(None)
+            elif 'policy_webhooks' in query:
+                if 'SELECT' in query:   # no webhooks
+                    return defer.succeed([])
+                else:  # delete webhooks
+                    self.fail("Since there were no webhooks, no attempt to "
+                              "delete webhooks should be made")
+            else:
+                raise self.fail(
+                    "Don't know what to make of this query: {0}, {1!r}".format(
+                        query, params))
 
-        self.returns = [view_policy, None]
+        self.connection.execute.side_effect = _fake_cassandra_results
         d = self.group.delete_policy('3222')
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
-        expectedCql = ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
-                       'APPLY BATCH;')
-        expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"}
+        # calls: select policy, delete policy, list webhooks, no delete webhooks
+        self.assertEqual(len(self.connection.execute.mock_calls), 3)
+        # make sure that delete policy execution happend
+        self.connection.execute.assert_any_call(
+            ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
+             'APPLY BATCH;'),
+            {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"},
+            ConsistencyLevel.TWO)
 
-        self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
-        self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData,
-                                                   ConsistencyLevel.TWO)
+    def test_delete_policy_deletes_webhooks(self):
+        """
+        When you delete a scaling policy that exists, any existing webhooks are
+        also deleted
+        """
+        def _fake_cassandra_results(query, params, consistency):
+            """
+            This has to return different data depending in the query, since
+            deleting requires multiple queries.  So may as well assert stuff
+            about the queries and parameters here.
+            """
+            if 'scaling_policies' in query:
+                if 'SELECT' in query:  # seeing if it exists
+                    return defer.succeed(_cassandrify_data([{'data': '{}'}]))
+                else:  # delete policy
+                    return defer.succeed(None)
+            elif 'policy_webhooks' in query:
+                if 'SELECT' in query:   # no webhooks
+                    # return 2 - webhook1 and webhook2
+                    return defer.succeed(_cassandrify_data([
+                        {'webhookId': 'webhook1', 'data': '{}'},
+                        {'webhookId': 'webhook2', 'data': '{}'}]))
+                else:  # delete webhooks
+                    return defer.succeed(None)
+            else:
+                raise self.fail(
+                    "Don't know what to make of this query: {0}, {1!r}".format(
+                        query, params))
+
+        self.connection.execute.side_effect = _fake_cassandra_results
+        d = self.group.delete_policy('3222')
+        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        # calls: select policy, delete policy, list webhooks, delete webhooks
+        self.assertEqual(len(self.connection.execute.mock_calls), 4)
+        # make sure delete webhooks was called
+        self.connection.execute.assert_any_call(
+            ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+             '"policyId" = :policyId AND "webhookId" = :webhookId0 '
+             'UPDATE policy_webhooks SET deleted=True WHERE '
+             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+             '"policyId" = :policyId AND "webhookId" = :webhookId1 '
+             'APPLY BATCH;'),
+            {"tenantId": "11111", "groupId": "12345678g",
+             "policyId": "3222", "webhookId0": "webhook1",
+             "webhookId1": "webhook2"},
+            ConsistencyLevel.TWO)
 
     def test_delete_non_existant_policy(self):
         """
@@ -866,6 +930,37 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {})
 
+    def test_delete_webhook(self):
+        """
+        Tests that you can delete a scaling policy webhook, and if successful
+        return value is None
+        """
+        # return values for get webhook and then delete
+        self.returns = [_cassandrify_data([{'data': '{}'}]), None]
+        d = self.group.delete_webhook('3444', '4555')
+        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '
+                       '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       '"policyId" = :policyId AND "webhookId" = :webhookId')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g",
+                        "policyId": "3444", "webhookId": "4555"}
+
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)  # view, delete
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
+    def test_delete_non_existant_webhooks(self):
+        """
+        If you try to delete a scaling policy webhook that doesn't exist,
+        :class:`NoSuchWebhookError` is raised
+        """
+        self.returns = [[], None]
+        d = self.group.delete_webhook('3444', '4555')
+        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
+        self.flushLoggedErrors(NoSuchWebhookError)
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -1077,27 +1172,26 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # only called once to view
         self.assertEqual(len(self.connection.execute.mock_calls), 1)
 
-    def test_delete_existing_scaling_group(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+                return_value=defer.succeed(None))
+    def test_delete_existing_scaling_group(self, mock_delete_policy):
         """
         If the scaling group exists, deletes scaling group
         """
+        # we mock out delete policy, since that is already tested separately
+
         def execute_respond(query, *args, **kwargs):
             if query.lower().startswith("select"):
                 # this query is to get the ids of all the policies.  make
                 # sure there are some
                 if "policyId" in query:
-                    return defer.succeed(_de_identify([{
-                        'cols': [{'timestamp': None, 'name': 'policyId',
-                                  'value': 'pol1', 'ttl': None},
-                                 {'timestamp': None, 'name': 'data',
-                                  'value': '{"_ver": 5}', 'ttl': None}],
-                        'key': ''}]))
+                    return defer.succeed(_cassandrify_data([
+                        {'policyId': 'pol1', 'data': '{"_ver": 5}'},
+                        {'policyId': 'pol2', 'data': '{"_ver": 5}'}]))
+
                 # nope, this query is to see if the group exists.
                 # make sure it does
-                return defer.succeed(_de_identify([{
-                    'cols': [{'timestamp': None, 'name': 'data',
-                              'value': '{}', 'ttl': None}],
-                    'key': ''}]))
+                return defer.succeed(_cassandrify_data([{'data': '{}'}]))
 
             # the rest of the queries are updates
             return defer.succeed(None)
@@ -1107,9 +1201,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.assert_deferred_succeeded(
             self.collection.delete_scaling_group(self.mock_log, '123', 'group1'))
         self.assertIsNone(result)  # delete returns None
-        # called four times - once to view config, once to delete configs,
-        # once to view policies, and once to delete policies
-        self.assertEqual(len(self.connection.execute.mock_calls), 4)
+        # one call to view config, one to delete configs, one to view policies
+        self.assertEqual(len(self.connection.execute.mock_calls), 3)
+        # there were 2 policies, so there should be 2 calls to delete_policy
+        mock_delete_policy.assert_has_calls(
+            [mock.call('pol1'), mock.call('pol2')], any_order=True)
 
         # delete configs
         expected_data = {'tenantId': '123',
@@ -1120,19 +1216,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'UPDATE launch_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'APPLY BATCH;')
-        self.connection.execute.assert_called_any(expected_cql, expected_data,
-                                                  ConsistencyLevel.TWO)
-
-        # delete policies
-        expected_data = {'tenantId': '123',
-                         'groupId': 'group1',
-                         'policyId0': 'pol1'}
-        expected_cql = (
-            'BEGIN BATCH '
-            'UPDATE scaling_policies SET deleted=True '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'AND "policyId" = :policyId0 '
             'APPLY BATCH;')
         self.connection.execute.assert_called_any(expected_cql, expected_data,
                                                   ConsistencyLevel.TWO)
