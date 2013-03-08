@@ -1042,7 +1042,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
-        self.connection = mock.MagicMock()
+        self.connection = mock.MagicMock(spec=['execute'])
 
         self.returns = [None]
 
@@ -1230,38 +1230,47 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
 
-    def test_delete_non_existant_scaling_group_fails(self):
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
+                return_value=defer.succeed(None))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
+    def test_delete_non_existant_scaling_group_fails(self, mock_view_config,
+                                                     mock_naive_list_policy,
+                                                     mock_naive_del_policy):
         """
         If the scaling group doesn't exist, :class:`NoSuchScalingGroup` is
         raised
         """
-        self.returns = [[], None]  # view returns an empty list
-
         self.assert_deferred_failed(
             self.collection.delete_scaling_group(self.mock_log, '123', 'group1'),
             NoSuchScalingGroupError)
-        self.flushLoggedErrors(NoSuchScalingGroupError)
-        # only called once to view
-        self.assertEqual(len(self.connection.execute.mock_calls), 1)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+        # only called once to view
+        mock_view_config.assert_called_once_with()
+
+        # nothing else called
+        self.assertEqual(len(mock_naive_list_policy.mock_calls), 0)
+        self.assertEqual(len(mock_naive_del_policy.mock_calls), 0)
+
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
                 return_value=defer.succeed(None))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
+                return_value=defer.succeed({'policy1': {}, 'policy2': {}}))
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
-    def test_delete_existing_scaling_group_with_policies(self,
+    @mock.patch('otter.models.cass.CassScalingGroup.list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy')
+    def test_delete_existing_scaling_group_with_policies(self, mock_del, mock_list,
                                                          mock_view_config,
                                                          mock_naive_list_policy,
-                                                         mock_delete_policy):
+                                                         mock_naive_del_policy):
         """
         If the scaling group exists, deletes scaling group and all of its
-        policies and webhooks
+        policies and webhooks.  Use naive calls all the way down.
         """
-        mock_naive_list_policy.return_value = defer.succeed({
-            'policy1': {},
-            'policy2': {}
-        })
-
         # we mock out delete policy, since that is already tested separately
 
         self.returns = [None]
@@ -1272,10 +1281,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # view config called to verify group exists
         mock_view_config.assert_called_once_with()
 
-        # naive_list_policies called before delete policy called
+        # naive_list_policies called before naive_delete_policy called
         mock_naive_list_policy.assert_called_once_with()
-        mock_delete_policy.assert_has_calls([
+        mock_naive_del_policy.assert_has_calls([
             mock.call('policy1'), mock.call('policy2')], any_order=True)
+
+        # the real delete and list policies are not called ever
+        self.assertEqual(len(mock_del.mock_calls), 0)
+        self.assertEqual(len(mock_list.mock_calls), 0)
 
         # delete configs happens
         expected_data = {'tenantId': '123',
@@ -1287,10 +1300,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'UPDATE launch_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
-        self.connection.execute.assert_called_any(expected_cql, expected_data,
-                                                  ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
                 return_value=defer.succeed(None))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
                 return_value=defer.succeed({}))
@@ -1299,10 +1312,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def test_delete_existing_scaling_group_with_no_policies(self,
                                                             mock_view_config,
                                                             mock_naive_list_policy,
-                                                            mock_delete_policy):
+                                                            mock_naive_del_policy):
         """
         If the scaling group exists but no scaling policies exist, deletes
-        only the configs.  Delete policy is not called.
+        only the configs.  ``_naive_delete_policy`` is not called.
         """
         self.returns = [None]
         result = self.assert_deferred_succeeded(
@@ -1314,7 +1327,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         # naive_list_policies called before delete policy called
         mock_naive_list_policy.assert_called_once_with()
-        self.assertEqual(len(mock_delete_policy.mock_calls), 0)
+        self.assertEqual(len(mock_naive_del_policy.mock_calls), 0)
 
     def test_webhook_hash(self):
         """

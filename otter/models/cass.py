@@ -731,7 +731,7 @@ class CassScalingGroupCollection:
 
             deferreds = []
             for policy_id in policy_dict:
-                deferreds.append(group.delete_policy(policy_id))
+                deferreds.append(group._naive_delete_policy(policy_id))
             return defer.gatherResults(deferreds)
 
         def _delete_it(lastRev, group):
@@ -741,6 +741,7 @@ class CassScalingGroupCollection:
             ])
             d.addCallback(lambda _: None)
             return d
+
         group = self.get_scaling_group(log, tenant_id, scaling_group_id)
         d = group.view_config()  # ensure that it's actually there
         return d.addCallback(_delete_it, group)  # only delete if it exists
