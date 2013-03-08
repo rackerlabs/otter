@@ -26,4 +26,4 @@ CREATE COLUMNFAMILY group_state (
     PRIMARY KEY("tenantId", "groupId")
     );
     
-CREATE INDEX deleted_launch_config ON group_state (deleted);
+CREATE INDEX deleted_group_state ON group_state (deleted);
