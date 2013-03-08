@@ -10,6 +10,7 @@ from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
                                     NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.controller import maybe_execute_scaling_policy
 
 from silverberg.client import ConsistencyLevel
 
@@ -499,6 +500,7 @@ class CassScalingGroup(object):
         """
         def _do_stuff(pol):
             # Doing stuff will go here.
+            maybe_execute_scaling_policy(self.log, None, self, pol)
             return None
 
         d = self.get_policy(policy_id)
