@@ -253,8 +253,6 @@ class RouteTests(RequestTestMixin, TestCase):
     """
     Test app.route.
     """
-    invalid_methods = []
-
     def test_non_strict_slashes(self):
         """
         app.route should use strict_slahes=False which means that for a given
