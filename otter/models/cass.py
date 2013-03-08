@@ -374,20 +374,12 @@ class CassScalingGroup(object):
         all the policies associated with particular scaling group
         irregardless of whether the scaling group still exists.
         """
-        def _check_zero_length(data):
-            if len(data) == 0:
-                # If there is no data - make sure it's not because the group
-                # doesn't exist
-                return self.view_config().addCallback(lambda _: data)
-            return data
-
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
         d.addCallback(_grab_list, id_name='policyId', has_data=True)
-        d.addCallback(_check_zero_length)
         return d
 
     def list_policies(self):
@@ -741,6 +733,9 @@ class CassScalingGroupCollection:
             return b.execute(self.connection)
 
         def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
+            if len(policy_dict) == 0:
+                return
+
             deferreds = []
             for policy_id in policy_dict:
                 deferreds.append(group.delete_policy(policy_id))
