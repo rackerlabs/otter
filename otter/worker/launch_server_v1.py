@@ -154,11 +154,6 @@ def create_server(server_endpoint, auth_token, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
-
-    # XXX: Is this where we should generate the name and insert metadata?
-    #   Or should that already be in the server_config by the time we
-    #   get here?  Perhaps an explicit prepare step that launch_server invokes?
-    #   If that is the case scaling_group doesn't need to be passed in here.2
     d = treq.post(append_segments(server_endpoint, 'servers'),
                   headers=auth_headers(auth_token),
                   data=json.dumps({'server': server_config}))
@@ -250,7 +245,7 @@ def private_ip_addresses(server):
             if addr['version'] == 4]
 
 
-def prepare_launch_config(scaling_group, launch_config):
+def prepare_launch_config(scaling_group_uuid, launch_config):
     """
     Prepare a launch_config for the specified scaling_group.
 
@@ -271,7 +266,7 @@ def prepare_launch_config(scaling_group, launch_config):
     if 'metadata' not in server_config:
         server_config['metadata'] = {}
 
-    server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group.uuid
+    server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
 
     name_parts = [generate_server_name()]
 
@@ -284,13 +279,13 @@ def prepare_launch_config(scaling_group, launch_config):
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
             lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group.uuid
+        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
         lb_config['metadata']['rax:auto_scaling_server_name'] = server_config['name']
 
     return launch_config
 
 
-def launch_server(region, service_catalog, auth_token, launch_config):
+def launch_server(region, scaling_group, service_catalog, auth_token, launch_config):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -309,7 +304,7 @@ def launch_server(region, service_catalog, auth_token, launch_config):
     TODO: Figure out if the return value is significant other than for
         communicating failure.
     """
-    #launch_config = prepare_launch_config(scaling_group, launch_config)
+    launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
     lb_endpoint = list(endpoints(
         service_catalog,
