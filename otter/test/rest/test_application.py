@@ -7,7 +7,8 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
-from otter.rest.application import get_autoscale_links
+from otter.rest.application import get_autoscale_links, app
+from otter.test.rest.request import RequestTestMixin
 
 
 class LinkGenerationTestCase(TestCase):
@@ -246,3 +247,27 @@ class LinkGenerationTestCase(TestCase):
         snowman = get_autoscale_links('☃', group_id='☃', format=None)
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
+
+
+class RouteTests(RequestTestMixin, TestCase):
+    """
+    Test app.route.
+    """
+    invalid_methods = []
+
+    def test_non_strict_slashes(self):
+        """
+        app.route should use strict_slahes=False which means that for a given
+        route ending in a '/' the non-'/' version will result in a the handler
+        being invoked directly instead of redirected.
+        """
+        requests = [0]
+
+        @app.route('/foo/')
+        def _foo(request):
+            request.setHeader("X-Response-Id", "appease-the-test-harness")
+            requests[0] += 1
+            return 'ok'
+
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo/')
+        self.assertEqual(requests[0], 1)
