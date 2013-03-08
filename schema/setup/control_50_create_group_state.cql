@@ -15,13 +15,27 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
+-- active is the active list.
+-- format:
+--   {"servername": {"instance": uri, "created": date}}
+--
+-- pending is the pending list.
+-- format:
+--  ["jobid": {"created": date}]
+-- 
+-- groupTouched is a timestamp of the last time a scaling policy
+--  was executed in the group
+--
+-- policyTouched is a list of timestamps for the policy
+--  {"policyid": {"touched": date}}
+
 CREATE COLUMNFAMILY group_state (
     "tenantId" ascii,
     "groupId" ascii, 
     active ascii, 
     pending ascii,
-    group_touched ascii,
-    policy_touched ascii,
+    groupTouched ascii,
+    policyTouched ascii,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId")
     );
