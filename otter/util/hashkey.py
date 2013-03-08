@@ -6,6 +6,13 @@ import os
 import uuid
 
 
+def generate_job_id(group_uuid):
+    """
+    Generates a job ID
+    """
+    return "{}.{}".format(group_uuid, uuid.uuid4())
+
+
 def generate_transaction_id():
     """
     Generates a transaction ID.
