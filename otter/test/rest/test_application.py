@@ -269,5 +269,5 @@ class RouteTests(RequestTestMixin, TestCase):
             requests[0] += 1
             return 'ok'
 
-        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo/')
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
         self.assertEqual(requests[0], 1)
