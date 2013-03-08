@@ -861,10 +861,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
         self.assert_deferred_failed(d, NoSuchPolicyError)
 
-    def test_list_webhooks_valid_policy(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
         """
-        Listing a valid policy produces a valid dictionary as per
-        :data:`otter.json_schema.model_schemas.webhook_list`
+        Naive list webhooks produces a valid dictionary as per
+        :data:`otter.json_schema.model_schemas.webhook_list`, whether or not
+        the policy is invalid
         """
         data = json.dumps(self.sample_webhook_data)
         self.returns = [_cassandrify_data([
@@ -878,37 +881,75 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedCql = ('SELECT "webhookId", data FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND deleted = False;')
-        r = self.validate_list_webhooks_return_value('23456789')
+        r = self.assert_deferred_succeeded(
+            self.group._naive_list_webhooks('23456789'))
         self.assertEqual(r, {'webhook1': self.sample_webhook_data,
                              'webhook2': self.sample_webhook_data})
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
-    def test_list_webhooks_empty_list(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_naive_list_webhooks_empty_list(self, mock_get_policy):
         """
-        If the policy exists but there are no webhooks, `list_webhooks` returns
-        an empty list
+        If there are no webhooks, list webhooks produces an empty dictionary
+        even if the policy were invalid
         """
-        def execute_respond(cql, cqlargs, *other_args, **kwargs):
-            if 'scaling_policies' in cql:  # view policy - seeing if it's there
-                return defer.succeed(_cassandrify_data([{'data': '{}'}]))
-            else:
-                return defer.succeed(_de_identify([]))
-        self.connection.execute.side_effect = execute_respond
+        self.returns = [[]]
+        r = self.assert_deferred_succeeded(
+            self.group._naive_list_webhooks('23456789'))
+        self.assertEqual(r, {})
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks')
+    def test_list_webhooks_valid_policy(self, mock_naive, mock_get_policy):
+        """
+        Listing a valid policy calls ``naive_list_webhooks``, and skips calling
+        ``get_policy`` since there are undeleted webhooks for said policy
+        """
+        expected_result = {
+            'webhook1': self.sample_webhook_data,
+            'webhook2': self.sample_webhook_data
+        }
+        mock_naive.return_value = defer.succeed(expected_result)
+        r = self.validate_list_webhooks_return_value('23456789')
+        self.assertEqual(r, expected_result)
+
+        mock_naive.assert_called_once_with('23456789')
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({}))
+    def test_list_webhooks_empty_list(self, mock_naive, mock_get_policy):
+        """
+        Listing a valid policy calls ``naive_list_webhooks``, and then calls
+        ``get_policy`` to see if the policy actually exists
+        """
         result = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(result, {})
 
-    def test_list_webhooks_invalid_policy(self):
+        mock_naive.assert_called_with('23456789')
+        mock_get_policy.assert_called_once_with('23456789')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'p', 'g')))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({}))
+    def test_list_webhooks_invalid_policy(self, mock_naive, mock_get_policy):
         """
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingPolicy`
         """
-        # no scaling policies, and view config is empty too
-        self.returns = [[], []]
         self.assert_deferred_failed(self.group.list_webhooks('23456789'),
                                     NoSuchPolicyError)
+        mock_naive.assert_called_with('23456789')
+        mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_webhook(self):
