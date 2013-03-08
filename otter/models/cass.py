@@ -500,7 +500,7 @@ class CassScalingGroup(object):
         """
         def _do_stuff(pol):
             # Doing stuff will go here.
-            maybe_execute_scaling_policy(self.log, None, self, pol)
+            #maybe_execute_scaling_policy(self.log, None, self, pol)
             return None
 
         d = self.get_policy(policy_id)
