@@ -1174,9 +1174,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
                 return_value=defer.succeed(None))
-    def test_delete_existing_scaling_group(self, mock_delete_policy):
+    def test_delete_existing_scaling_group_with_policies(self, mock_delete_policy):
         """
-        If the scaling group exists, deletes scaling group
+        If the scaling group exists, deletes scaling group and all of its
+        policies and webhooks
         """
         # we mock out delete policy, since that is already tested separately
 
@@ -1219,6 +1220,37 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'APPLY BATCH;')
         self.connection.execute.assert_called_any(expected_cql, expected_data,
                                                   ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+                return_value=defer.succeed(None))
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    def test_delete_existing_scaling_group_no_policies(self, mock_view_config,
+                                                       mock_delete_policy):
+        """
+        If the scaling group exists but no scaling policies exist, deletes
+        only the configs.
+        """
+        def execute_respond(query, *args, **kwargs):
+            if query.lower().startswith("select") and "policyId" in query:
+                # this query is to get the ids of all the policies.  make
+                # sure there are some
+                return defer.succeed(_cassandrify_data([]))
+
+            # the rest of the queries are updates
+            return defer.succeed(None)
+
+        self.connection.execute.side_effect = execute_respond
+
+        result = self.assert_deferred_succeeded(
+            self.collection.delete_scaling_group(self.mock_log, '123', 'group1'))
+        self.assertIsNone(result)  # delete returns None
+
+        # delete policies is never called, only one call to view config is ever
+        # called
+        self.assertEqual(len(mock_delete_policy), 0)
+        print mock_view_config
+        mock_view_config.assert_called_once_with()
 
     def test_webhook_hash(self):
         """
