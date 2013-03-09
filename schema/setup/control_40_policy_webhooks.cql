@@ -19,12 +19,14 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 -- data contains some useful information for the user and
--- the capability hash and version (which will be used
--- for link generation)
+-- including the name and metadata
 -- format:
---   {... (user editable stuff)...,
---    "capability": {"version": "1", "hash": XXXXXX}
---   }
+--   {"name": XXXXX, "metadata": {}}
+
+-- capability has the version mapped to the hash (these will
+-- be used for link generation)
+-- format:
+--   {"1": "hash"}
 
 CREATE TABLE policy_webhooks (
     "tenantId" ascii,
@@ -32,6 +34,7 @@ CREATE TABLE policy_webhooks (
     "policyId" ascii,
     "webhookId" ascii,
     data ascii,
+    capability ascii,
     "webhookKey" ascii,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId", "webhookId")

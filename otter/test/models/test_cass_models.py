@@ -1006,22 +1006,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     def test_update_webhook(self, mock_get_webhook):
         """
         You can update an existing webhook, and it would overwrite all data
-        except the capability
         """
         mock_get_webhook.return_value = defer.succeed(self.sample_webhook_data)
         self.returns = [None]
 
-        d = self.group.update_webhook('3444', '4555', {
+        new_webhook_data = {
             'name': 'newname',
             'metadata': {'new': 'metadata'}
-        })
-        self.assertIsNone(self.assert_deferred_succeeded(d))
-
-        expected_webhook_data = {
-            'name': 'newname',
-            'metadata': {'new': 'metadata'},
-            'capability': self.sample_webhook_data['capability']
         }
+
+        d = self.group.update_webhook('3444', '4555', new_webhook_data)
+        self.assertIsNone(self.assert_deferred_succeeded(d))
 
         expectedCql = (
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", '
@@ -1029,7 +1024,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             ':webhookId, :data);')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
                         "policyId": "3444", "webhookId": "4555",
-                        "data": expected_webhook_data}
+                        "data": new_webhook_data}
 
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
@@ -1048,8 +1043,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         expected_webhook_data = {
             'name': 'newname',
-            'metadata': {},
-            'capability': self.sample_webhook_data['capability']
+            'metadata': {}
         }
         self.assertEqual(self.connection.execute.call_args[0][1]['data'],
                          expected_webhook_data)
