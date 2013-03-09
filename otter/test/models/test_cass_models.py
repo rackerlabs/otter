@@ -1008,11 +1008,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         You can update an existing webhook, and it would overwrite all data
         except the capability
         """
-        mock_get_webhook.return_value = defer.succeed({
-            'name': 'webhook',
-            'metadata': {'some': 'key'},
-            'capability': {'hash': 'x', 'version': '1'}
-        })
+        mock_get_webhook.return_value = defer.succeed(self.sample_webhook_data)
         self.returns = [None]
 
         d = self.group.update_webhook('3444', '4555', {
@@ -1024,7 +1020,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected_webhook_data = {
             'name': 'newname',
             'metadata': {'new': 'metadata'},
-            'capability': {'hash': 'x', 'version': '1'}
+            'capability': self.sample_webhook_data['capability']
         }
 
         expectedCql = (
@@ -1044,11 +1040,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         You can update an existing webhook, and if new metadata is not provided
         a default empty dict will be assigned to the new metadata
         """
-        mock_get_webhook.return_value = defer.succeed({
-            'name': 'webhook',
-            'metadata': {'some': 'key'},
-            'capability': {'hash': 'x', 'version': '1'}
-        })
+        mock_get_webhook.return_value = defer.succeed(self.sample_webhook_data)
         self.returns = [None]
 
         d = self.group.update_webhook('3444', '4555', {'name': 'newname'})
@@ -1057,7 +1049,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected_webhook_data = {
             'name': 'newname',
             'metadata': {},
-            'capability': {'hash': 'x', 'version': '1'}
+            'capability': self.sample_webhook_data['capability']
         }
         self.assertEqual(self.connection.execute.call_args[0][1]['data'],
                          expected_webhook_data)
