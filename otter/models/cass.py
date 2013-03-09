@@ -241,41 +241,15 @@ def _grab_list(raw_response, id_name, has_data=True):
 
     :return: a ``list`` or ``dict`` representing the data in Cassandra
     """
-    if raw_response is None:
-        raise CassBadDataError("received unexpected None response")
-
-    if has_data:
-        data = {}
-    else:
-        data = []
-
-    for row in raw_response:
-        if 'cols' not in row:
-            raise CassBadDataError("Received malformed response with no cols")
-        raw_data = None
-        col_id = None
-        for column in row['cols']:
-            if column.get('name', None) == id_name:
-                col_id = column.get('value')
-            if column.get('name', None) == 'data':
-                raw_data = column.get('value')
-
-        if col_id is None or (has_data and raw_data is None):
-            raise CassBadDataError("Received malformed response without the "
-                                   "required fields")
-
+    results = _jsonize_cassandra_data(raw_response)
+    try:
         if has_data:
-            try:
-                data[col_id] = json.loads(raw_data)
-                if "_ver" in data[col_id]:
-                    del data[col_id]["_ver"]
-            except ValueError:
-                raise CassBadDataError("Bad data in database - not JSON")
-
+            return dict([(row[id_name], _jsonloads_data(row['data']))
+                         for row in results])
         else:
-            data.append(col_id)
-
-    return data
+            return [row[id_name] for row in results]
+    except KeyError:
+        raise CassBadDataError('Does not have expected columns.')
 
 
 class CassScalingGroup(object):
@@ -414,7 +388,7 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(_grab_list, id_name='policyId', has_data=True)
+        d.addCallback(_grab_list, 'policyId', has_data=True)
         return d
 
     def list_policies(self):
