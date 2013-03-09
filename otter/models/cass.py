@@ -175,9 +175,34 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         output[webhook_id] = webhook_real
 
 
+def _jsonize_cassandra_data(raw_response):
+    """
+    Unwrap cassandra responses into an array of dicts - this should probably
+    go into silverberg.
+
+    :param dict raw_response: the raw response from Cassandra
+
+    :return: ``list`` of ``dicts`` representing the Cassandra data
+    """
+    if raw_response is None:
+        raise CassBadDataError("Received unexpected None response")
+
+    results = []
+    for row in raw_response:
+        if 'cols' not in row:
+            raise CassBadDataError("Received malformed response with no cols")
+        try:
+            results.append({col['name']: col['value'] for col in row['cols']})
+        except KeyError:
+            raise CassBadDataError("Received malformed response without the "
+                                   "required fields")
+
+    return results
+
+
 def _unwrap_one_row(raw_response):
     """
-    Unwrap a row into a dict
+    Unwrap a row into a dict - None is an acceptable raw response
     """
     if raw_response is None:
         return None
@@ -185,12 +210,19 @@ def _unwrap_one_row(raw_response):
     if len(raw_response) != 1:
         raise CassBadDataError("multiple responses when we expected 1")
 
-    if 'cols' not in raw_response[0]:
-        raise CassBadDataError("Received malformed response with no cols")
+    results = _jsonize_cassandra_data(raw_response)
+    return results[0]
 
-    row = raw_response[0]['cols']
 
-    return {col['name']: col['value'] for col in row}
+def _jsonloads_data(raw_data):
+    try:
+        data = json.loads(raw_data)
+    except ValueError:
+        raise CassBadDataError("Bad data in database - not JSON")
+    else:
+        if "_ver" in data:
+            del data["_ver"]
+        return data
 
 
 def _grab_list(raw_response, id_name, has_data=True):
@@ -624,9 +656,8 @@ class CassScalingGroup(object):
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
 
     def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
-        if rawResponse is None:
-            raise CassBadDataError("received unexpected None response")
-        if len(rawResponse) == 0:
+        results = _jsonize_cassandra_data(rawResponse)
+        if len(results) == 0:
             if webhook_id is not None:
                 raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
                                          webhook_id)
@@ -635,23 +666,13 @@ class CassScalingGroup(object):
             else:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
-        if 'cols' not in rawResponse[0]:
-            raise CassBadDataError("Received malformed response with no cols")
-        rec = None
-        for rawRec in rawResponse[0].get('cols', []):
-            if rawRec.get('name', None) == 'data':
-                rec = rawRec.get('value', None)
-        if rec is None:
-            raise CassBadDataError("Received malformed response without the "
-                                   "required fields")
-        data = None
-        try:
-            data = json.loads(rec)
-            if "_ver" in data:
-                del data["_ver"]
-            return data
-        except ValueError:
-            raise CassBadDataError("Bad data")
+        elif len(results) > 1:
+            raise CassBadDataError("Recieved more than one expected response")
+
+        if 'data' not in results[0]:
+            raise CassBadDataError("No 'data' column")
+
+        return _jsonloads_data(results[0]['data'])
 
 
 class CassScalingGroupCollection:
