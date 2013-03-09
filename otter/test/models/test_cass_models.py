@@ -1002,6 +1002,78 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         r = self.assert_deferred_succeeded(d)
         self.assertEqual(r, {})
 
+    @mock.patch('otter.models.cass.CassScalingGroup.get_webhook')
+    def test_update_webhook(self, mock_get_webhook):
+        """
+        You can update an existing webhook, and it would overwrite all data
+        except the capability
+        """
+        mock_get_webhook.return_value = defer.succeed({
+            'name': 'webhook',
+            'metadata': {'some': 'key'},
+            'capability': {'hash': 'x', 'version': '1'}
+        })
+        self.returns = [None]
+
+        d = self.group.update_webhook('3444', '4555', {
+            'name': 'newname',
+            'metadata': {'new': 'metadata'}
+        })
+        self.assertIsNone(self.assert_deferred_succeeded(d))
+
+        expected_webhook_data = {
+            'name': 'newname',
+            'metadata': {'new': 'metadata'},
+            'capability': {'hash': 'x', 'version': '1'}
+        }
+
+        expectedCql = (
+            'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", '
+            '"webhookId", data) VALUES (:tenantId, :groupId, :policyId, '
+            ':webhookId, :data);')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g",
+                        "policyId": "3444", "webhookId": "4555",
+                        "data": expected_webhook_data}
+
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_webhook')
+    def test_update_webhook_default_empty_metadata(self, mock_get_webhook):
+        """
+        You can update an existing webhook, and if new metadata is not provided
+        a default empty dict will be assigned to the new metadata
+        """
+        mock_get_webhook.return_value = defer.succeed({
+            'name': 'webhook',
+            'metadata': {'some': 'key'},
+            'capability': {'hash': 'x', 'version': '1'}
+        })
+        self.returns = [None]
+
+        d = self.group.update_webhook('3444', '4555', {'name': 'newname'})
+        self.assertIsNone(self.assert_deferred_succeeded(d))
+
+        expected_webhook_data = {
+            'name': 'newname',
+            'metadata': {},
+            'capability': {'hash': 'x', 'version': '1'}
+        }
+        self.assertEqual(self.connection.execute.call_args[0][1]['data'],
+                         expected_webhook_data)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_webhook',
+                return_value=defer.fail(NoSuchWebhookError('t', 'g', 'p', 'w')))
+    def test_update_webhook_invalid_webhook(self, mock_get_webhook):
+        """
+        Updating a webhook that does not exist returns a
+        class:`NoSuchWebhookError` failure, and no update is attempted
+        """
+        d = self.group.update_webhook('3444', '4555', {'name': 'aname'})
+        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.assertEqual(len(self.connection.execute.mock_calls), 0)
+        self.flushLoggedErrors(NoSuchWebhookError)
+
     def test_delete_webhook(self):
         """
         Tests that you can delete a scaling policy webhook, and if successful

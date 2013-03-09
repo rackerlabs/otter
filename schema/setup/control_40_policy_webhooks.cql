@@ -18,6 +18,14 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
+-- data contains some useful information for the user and
+-- the capability hash and version (which will be used
+-- for link generation)
+-- format:
+--   {... (user editable stuff)...,
+--    "capability": {"version": "1", "hash": XXXXXX}
+--   }
+
 CREATE TABLE policy_webhooks (
     "tenantId" ascii,
     "groupId" ascii,

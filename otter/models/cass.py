@@ -57,6 +57,8 @@ _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
+_cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
+                       'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
 _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                       'AND "groupId" = :groupId AND "policyId" = {name}')
@@ -588,7 +590,23 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
-        raise NotImplementedError()
+        def _update_data(lastRev):
+            new_data = {'metadata': {}}
+            new_data.update(data)
+            new_data['capability'] = lastRev['capability']
+
+            query = _cql_update_webhook.format(cf=self.webhooks_table)
+            d = self.connection.execute(query,
+                                        {"tenantId": self.tenant_id,
+                                         "groupId": self.uuid,
+                                         "policyId": policy_id,
+                                         "webhookId": webhook_id,
+                                         "data": new_data},
+                                        get_consistency_level('update', 'webhook'))
+            return d
+
+        d = self.get_webhook(policy_id, webhook_id)
+        return d.addCallback(_update_data)
 
     def delete_webhook(self, policy_id, webhook_id):
         """
