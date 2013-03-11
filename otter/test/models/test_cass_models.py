@@ -1381,7 +1381,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # naive_list_policies called before naive_delete_policy called
         mock_naive_list_policy.assert_called_once_with()
         mock_naive_del_policy.assert_has_calls([
-            mock.call('policy1'), mock.call('policy2')], any_order=True)
+            mock.call('policy1', ConsistencyLevel.TWO),
+            mock.call('policy2', ConsistencyLevel.TWO)], any_order=True)
 
         # the real delete and list policies are not called ever
         self.assertEqual(len(mock_del.mock_calls), 0)

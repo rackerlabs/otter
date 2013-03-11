@@ -775,6 +775,8 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
+        consistency = get_consistency_level('delete', 'group')
+
         def _delete_configs():
             queries = [
                 _cql_delete.format(cf=self.config_table),
@@ -782,7 +784,7 @@ class CassScalingGroupCollection:
             ]
             b = Batch(queries,
                       {"tenantId": tenant_id, "groupId": scaling_group_id},
-                      consistency=get_consistency_level('delete', 'group'))
+                      consistency=consistency)
             return b.execute(self.connection)
 
         def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
@@ -791,7 +793,7 @@ class CassScalingGroupCollection:
 
             deferreds = []
             for policy_id in policy_dict:
-                deferreds.append(group._naive_delete_policy(policy_id))
+                deferreds.append(group._naive_delete_policy(policy_id, consistency))
             return defer.gatherResults(deferreds)
 
         def _delete_it(lastRev, group):
