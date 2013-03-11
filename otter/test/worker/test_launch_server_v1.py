@@ -21,7 +21,8 @@ from otter.worker.launch_server_v1 import (
     server_details,
     wait_for_status,
     create_server,
-    launch_server
+    launch_server,
+    prepare_launch_config
 )
 
 
@@ -323,6 +324,15 @@ class ServerTests(TestCase):
         self.treq = treq_patcher.start()
         self.addCleanup(treq_patcher.stop)
 
+        generate_server_name_patcher = mock.patch('otter.worker.launch_server_v1.generate_server_name')
+        self.generate_server_name = generate_server_name_patcher.start()
+        self.addCleanup(generate_server_name_patcher.stop)
+        self.generate_server_name.return_value = 'as000000'
+
+        self.scaling_group_uuid = '1111111-11111-11111-11111111'
+
+        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid)
+
     def test_server_details(self):
         """
         server_details will perform a properly formed GET request against
@@ -437,6 +447,10 @@ class ServerTests(TestCase):
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
 
+        expected_server_config = {
+            'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
+            'metadata': {'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}}
+
         server_details = {
             'server': {
                 'id': '1',
@@ -448,12 +462,17 @@ class ServerTests(TestCase):
 
         add_to_load_balancers.return_value = succeed([])
 
-        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+        d = launch_server('DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config)
+
         self.successResultOf(d)  # TODO: Currently the return value is not significant.
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
-                                              launch_config['server'])
+                                              expected_server_config)
 
         wait_for_status.assert_called_once_with('http://dfw.openstack/',
                                                 'my-auth-token',
@@ -473,7 +492,11 @@ class ServerTests(TestCase):
         """
         create_server.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', {'server': {}})
+        d = launch_server('DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          {'server': {}})
 
         failure = self.failureResultOf(d)
         failure.trap(APIError)
@@ -501,7 +524,11 @@ class ServerTests(TestCase):
 
         wait_for_status.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+        d = launch_server('DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config)
 
         failure = self.failureResultOf(d)
         failure.trap(APIError)
@@ -531,10 +558,115 @@ class ServerTests(TestCase):
 
         add_to_load_balancers.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW', fake_service_catalog, 'my-auth-token', launch_config)
+        d = launch_server('DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config)
 
         failure = self.failureResultOf(d)
         failure.trap(APIError)
 
         self.assertEqual(failure.value.code, 500)
         self.assertEqual(failure.value.body, "Oh noes")
+
+
+class ConfigPreparationTests(TestCase):
+    """
+    Test config preparation.
+    """
+    def setUp(self):
+        """
+        Configure mocks.
+        """
+        generate_server_name_patcher = mock.patch('otter.worker.launch_server_v1.generate_server_name')
+        self.generate_server_name = generate_server_name_patcher.start()
+        self.addCleanup(generate_server_name_patcher.stop)
+        self.generate_server_name.return_value = 'as000000'
+
+        self.scaling_group_uuid = '1111111-11111-11111-11111111'
+
+    def test_server_name_suffix(self):
+        """
+        The server name uses the name specified in the launch config as a
+        suffix.
+        """
+        test_config = {'server': {'name': 'web.example.com'}}
+        expected_name = 'as000000-web.example.com'
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_name, launch_config['server']['name'])
+
+    def test_server_name_no_suffix(self):
+        """
+        No server name in the launch config means no suffix.
+        """
+        test_config = {'server': {}}
+        expected_name = 'as000000'
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_name, launch_config['server']['name'])
+
+    def test_server_metadata(self):
+        """
+        The auto scaling group should be added to the server metadata.
+        """
+        test_config = {'server': {}}
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+
+    def test_server_merge_metadata(self):
+        """
+        The auto scaling metadata should be merged with specified metadata.
+        """
+        test_config = {'server': {'metadata': {'foo': 'bar'}}}
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
+                             'foo': 'bar'}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+
+    def test_load_balancer_metadata(self):
+        """
+        auto scaling group and auto scaling server name should be
+        added to the node metadata for a load balancer.
+        """
+        test_config = {'server': {}, 'loadBalancers': [{'id': 1, 'port': 80}]}
+
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
+                             'rax:auto_scaling_server_name': 'as000000'}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+
+    def test_load_balancer_metadata_merge(self):
+        """
+        auto scaling metadata should be merged with user specified metadata.
+        """
+        test_config = {'server': {}, 'loadBalancers': [
+            {'id': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
+
+        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
+                             'rax:auto_scaling_server_name': 'as000000',
+                             'foo': 'bar'}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+
+    def test_launch_config_is_copy(self):
+        """
+        The input launch config is not mutated by prepare_launch_config.
+        """
+        test_config = {'server': {}}
+
+        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+
+        self.assertNotIdentical(test_config, launch_config)
