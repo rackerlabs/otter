@@ -789,7 +789,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(CassBadDataError)
 
-    def test_add_webhooks_valid_policy(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_webhooks_valid_policy_check_return_value(self, mock_get_policy):
         """
         When adding one or more webhooks is successful, what is returned is a
         dictionary of the webhook ids to the webhooks, which include capability
@@ -801,64 +803,81 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             return mock_ids.pop(0)
 
         self.mock_key.side_effect = _return_uuid
+        self.returns = [None]
+        result = self.validate_create_webhooks_return_value(
+            '23456789',
+            [{'name': 'a name'}, {'name': 'new name', 'metadata': {"k": "v"}}])
 
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
-        self.returns = [cass_response, None]
-        d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
-
+        capability = {"hash": 'hash', "version": 'ver'}
         expected_results = {
-            '100001': {'metadata': {}},
-            '100002': {'metadata': 'who'}
+            '100001': {'name': 'a name',
+                       'metadata': {},
+                       'capability': capability},
+            '100002': {'name': 'new name',
+                       'metadata': {"k": "v"},
+                       'capability': capability}
         }
-        capability = {'capability': {"hash": 'hash', "version": 'ver'}}
-        for value in expected_results.values():
-            value.update(capability)
 
-        result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, dict(expected_results))
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_webhooks_valid_policy_check_query(self, mock_get_policy):
+        """
+        When adding one or more webhooks is successful, what is returned is a
+        dictionary of the webhook ids to the webhooks, which include capability
+        info and metadata.
+        """
+        mock_ids = ['100001', '100002']
+
+        def _return_uuid(*args, **kwargs):
+            return mock_ids.pop(0)
+
+        self.mock_key.side_effect = _return_uuid
+        self.returns = [None]
+
+        self.validate_create_webhooks_return_value(
+            '23456789',
+            [{'name': 'a name'}, {'name': 'new name', 'metadata': {'k': 'v'}}])
 
         expected_cql = (
             'BEGIN BATCH '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
-            'data, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
-            ':webhook0Id, :webhook0, :webhook0Key, False) '
+            'data, capability, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
+            ':webhook0Id, :webhook0, :webhook0Capability, :webhook0Key, False) '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
-            'data, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
-            ':webhook1Id, :webhook1, :webhook1Key, False) '
+            'data, capability, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
+            ':webhook1Id, :webhook1, :webhook1Capability, :webhook1Key, False) '
             'APPLY BATCH;')
+
+        # can't test the parameters, because they contain serialized JSON.
+        # have to pull out the serialized JSON, load it as an object, and then
+        # compare
         self.connection.execute.assert_called_with(
             expected_cql, mock.ANY, ConsistencyLevel.TWO)
 
-        version = {'_ver': 1}
-        for value in expected_results.values():
-            value.update(version)
-
-        # have to pull out the serialized JSON, load it as an object, and then
-        # compare
         cql_params = self.connection.execute.call_args[0][1]
+
+        for name in ('webhook0', 'webhook1'):
+            cql_params[name] = json.loads(cql_params[name])
+            capability_name = '{0}Capability'.format(name)
+            cql_params[capability_name] = json.loads(cql_params[capability_name])
+
         expected_params = {
             "tenantId": '11111',
             "groupId": '12345678g',
             "policyId": '23456789',
-            'webhook0Id': '100001',
+            "webhook0Id": '100001',
+            "webhook0": {'name': 'a name', 'metadata': {}, '_ver': 1},
+            "webhook0Capability": {"ver": "hash", "_ver": 1},
             "webhook0Key": "hash",
-            'webhook1Id': '100002',
+            "webhook1Id": '100002',
+            "webhook1": {'name': 'new name', 'metadata': {'k': 'v'}, '_ver': 1},
+            "webhook1Capability": {"ver": "hash", "_ver": 1},
             "webhook1Key": "hash"
         }
-        for key, val in expected_params.iteritems():
-            self.assertEqual(cql_params[key], val)
 
-        self.assertEqual(len(cql_params), len(expected_params) + 2)
-        self.assertEqual(json.loads(cql_params['webhook0']),
-                         expected_results['100001'])
-        self.assertEqual(json.loads(cql_params['webhook1']),
-                         expected_results['100002'])
+        self.assertEqual(cql_params, expected_params)
 
     def test_add_webhooks_invalid_policy(self):
         """

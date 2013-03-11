@@ -51,8 +51,9 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
 _cql_insert_webhook = (
-    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, "webhookKey", deleted) '
-    'VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, :{name}Key, False)')
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
+    '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
+    ':{name}Capability, :{name}Key, False)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -154,7 +155,7 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         along with their generated IDs
     :type output: ``dict``
     """
-    for i in range(len(bare_webhooks)):
+    for i, webhook in enumerate(bare_webhooks):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
         queries.append(_cql_insert_webhook.format(cf=webhooks_table,
@@ -162,17 +163,17 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
 
         # generate the real data that will be stored, which includes the webhook
         # token, the capability stuff, and metadata by default
-        # TODO: capability format should change so that multiple capability
-        #       hash versions can be stored
-        webhook_real = {'metadata': {}, 'capability': {}}
-        webhook_real.update(bare_webhooks[i])
-        (webhook_real['capability']['version'],
-         webhook_real['capability']['hash']) = generate_capability()
+        bare_webhooks[i].setdefault('metadata', {})
+        version, cap_hash = generate_capability()
 
-        cql_parameters[name] = _serial_json_data(webhook_real, 1)
+        cql_parameters[name] = _serial_json_data(webhook, 1)
         cql_parameters['{0}Id'.format(name)] = webhook_id
-        cql_parameters['{0}Key'.format(name)] = webhook_real['capability']['hash']
-        output[webhook_id] = webhook_real
+        cql_parameters['{0}Key'.format(name)] = cap_hash
+        cql_parameters['{0}Capability'.format(name)] = _serial_json_data(
+            {version: cap_hash}, 1)
+
+        output[webhook_id] = webhook.copy()
+        output[webhook_id]['capability'] = {'hash': cap_hash, 'version': version}
 
 
 def _assemble_webhook_from_row(row):
