@@ -976,18 +976,21 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Test that you can call view and receive a valid parsed response
         """
-        self.returns = [_cassandrify_data([{'data': '{}'}])]
+        self.returns = [_cassandrify_data(
+            [{'data': '{"name": "pokey"}', 'capability': '{"1": "h"}'}])]
         d = self.group.get_webhook("3444", "4555")
         r = self.assert_deferred_succeeded(d)
-        expectedCql = ('SELECT data FROM policy_webhooks WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND '
-                       '"webhookId" = :webhookId AND deleted = False;')
+        expectedCql = ('SELECT data, capability FROM policy_webhooks WHERE '
+                       '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       '"policyId" = :policyId AND "webhookId" = :webhookId AND '
+                       'deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
                         "policyId": "3444", "webhookId": "4555"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assertEqual(r, {})
+        self.assertEqual(
+            r, {'name': 'pokey', 'capability': {"version": "1", "hash": "h"}})
 
     def test_view_webhook_bad_db_data(self):
         """
@@ -1081,7 +1084,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         return value is None
         """
         # return values for get webhook and then delete
-        self.returns = [_cassandrify_data([{'data': '{}'}]), None]
+        self.returns = [
+            _cassandrify_data([{'data': '{}', 'capability': '{"1": "h"}'}]),
+            None]
         d = self.group.delete_webhook('3444', '4555')
         self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
         expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '

@@ -43,7 +43,7 @@ _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId AND deleted = False;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
-_cql_view_webhook = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId AND deleted = False;')
 _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
@@ -270,8 +270,9 @@ def _grab_list(raw_response, id_name, has_data=True):
                          for row in results])
         else:
             return [row[id_name] for row in results]
-    except KeyError:
-        raise CassBadDataError('Does not have expected columns.')
+    except KeyError as e:
+        raise CassBadDataError('Received malformed response without the '
+                               'required field "{0!s}"'.format(e))
 
 
 class CassScalingGroup(object):
@@ -561,8 +562,8 @@ class CassScalingGroup(object):
                 try:
                     new_results[row['webhookId']] = _assemble_webhook_from_row(row)
                 except KeyError as e:
-                    raise CassBadDataError(
-                        'Does not have expected columns: {0}'.format(e))
+                    raise CassBadDataError('Received malformed response without the '
+                                           'required field "{0!s}"'.format(e))
 
             return new_results
 
@@ -616,6 +617,16 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.get_webhook`
         """
+        def _assemble_webhook(cass_data):
+            if len(cass_data) == 0:
+                raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
+                                         webhook_id)
+            try:
+                return _assemble_webhook_from_row(cass_data[0])
+            except KeyError as e:
+                raise CassBadDataError('Received malformed response without the '
+                                       'required field "{0!s}"'.format(e))
+
         query = _cql_view_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
@@ -623,7 +634,8 @@ class CassScalingGroup(object):
                                      "policyId": policy_id,
                                      "webhookId": webhook_id},
                                     get_consistency_level('view', 'webhook'))
-        d.addCallback(self._grab_json_data, policy_id, webhook_id)
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(_assemble_webhook)
         return d
 
     def update_webhook(self, policy_id, webhook_id, data):
