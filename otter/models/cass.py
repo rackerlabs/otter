@@ -175,6 +175,28 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         output[webhook_id] = webhook_real
 
 
+def _assemble_webhook_from_row(row):
+    """
+    Builds a webhook as per :data:`otter.json_schema.model_schemas.webhook`
+    from the user-mutable user data (name and metadata) and the
+    non-user-mutable capability data.
+
+    :param dict row: a dictionary of cassandra data containing the key
+        ``data`` (the user-mutable data) and the key ``capability`` (the
+        capability info, stored in cassandra as: `{<version>: <capability hash>}`)
+
+    :return: the webhook, as per :data:`otter.json_schema.model_schemas.webhook`
+    :rtype: ``dict``
+    """
+    webhook_base = _jsonloads_data(row['data'])
+    capability_data = _jsonloads_data(row['capability'])
+
+    version, cap_hash = capability_data.iteritems().next()
+    webhook_base['capability'] = {'version': version, 'hash': cap_hash}
+
+    return webhook_base
+
+
 def _jsonize_cassandra_data(raw_response):
     """
     Unwrap cassandra responses into an array of dicts - this should probably
@@ -537,17 +559,11 @@ class CassScalingGroup(object):
             new_results = {}
             for row in results:
                 try:
-                    webhook = _jsonloads_data(row['data'])
-                    # there should only be one now
-                    version, cap_hash = (
-                        _jsonloads_data(row['capability']).iteritems().next())
-
-                    webhook['capability'] = {'version': version, 'hash': cap_hash}
-                    new_results[row['webhookId']] = webhook
-
+                    new_results[row['webhookId']] = _assemble_webhook_from_row(row)
                 except KeyError as e:
                     raise CassBadDataError(
                         'Does not have expected columns: {0}'.format(e))
+
             return new_results
 
         query = _cql_list_webhook.format(cf=self.webhooks_table)
