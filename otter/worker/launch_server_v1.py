@@ -17,6 +17,7 @@ initiating a launch_server job.
 """
 
 import json
+from copy import deepcopy
 
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet.task import LoopingCall
@@ -24,6 +25,7 @@ from twisted.internet.task import LoopingCall
 import treq
 
 from otter.util.http import append_segments
+from otter.util.hashkey import generate_server_name
 
 
 class APIError(Exception):
@@ -152,11 +154,6 @@ def create_server(server_endpoint, auth_token, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
-
-    # XXX: Is this where we should generate the name and insert metadata?
-    #   Or should that already be in the server_config by the time we
-    #   get here?  Perhaps an explicit prepare step that launch_server invokes?
-    #   If that is the case scaling_group doesn't need to be passed in here.2
     d = treq.post(append_segments(server_endpoint, 'servers'),
                   headers=auth_headers(auth_token),
                   data=json.dumps({'server': server_config}))
@@ -167,6 +164,8 @@ def create_server(server_endpoint, auth_token, server_config):
 def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     """
     Add an IP addressed to a load balancer based on the lb_config.
+
+    TODO: Handle load balancer node metadata.
 
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
@@ -246,11 +245,53 @@ def private_ip_addresses(server):
             if addr['version'] == 4]
 
 
-def launch_server(region, service_catalog, auth_token, launch_config):
+def prepare_launch_config(scaling_group_uuid, launch_config):
+    """
+    Prepare a launch_config for the specified scaling_group.
+
+    This is responsible for returning a copy of the launch config that
+    has metadata and unique server names added.
+
+    :param IScalingGroup scaling_group: The scaling group this server is
+        getting launched for.
+
+    :param dict launch_config: The complete launch_config args we want to build
+        servers from.
+
+    :return dict: The prepared launch config.
+    """
+    launch_config = deepcopy(launch_config)
+    server_config = launch_config['server']
+
+    if 'metadata' not in server_config:
+        server_config['metadata'] = {}
+
+    server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
+
+    name_parts = [generate_server_name()]
+
+    server_name_suffix = server_config.get('name')
+    if server_name_suffix:
+        name_parts.append(server_name_suffix)
+
+    server_config['name'] = '-'.join(name_parts)
+
+    for lb_config in launch_config.get('loadBalancers', []):
+        if 'metadata' not in lb_config:
+            lb_config['metadata'] = {}
+        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
+        lb_config['metadata']['rax:auto_scaling_server_name'] = server_config['name']
+
+    return launch_config
+
+
+def launch_server(region, scaling_group, service_catalog, auth_token, launch_config):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
 
+    :param IScalingGroup scaling_group: The scaling group to add the launched
+        server to.
     :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
@@ -263,6 +304,8 @@ def launch_server(region, service_catalog, auth_token, launch_config):
     TODO: Figure out if the return value is significant other than for
         communicating failure.
     """
+    launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
+
     lb_endpoint = list(endpoints(
         service_catalog,
         service_name='cloudLoadBalancers',
