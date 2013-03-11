@@ -876,22 +876,30 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :data:`otter.json_schema.model_schemas.webhook_list`, whether or not
         the policy is invalid
         """
-        data = json.dumps(self.sample_webhook_data)
+        expected_data = {'name': 'name', 'metadata': {}}
+        data = json.dumps(expected_data)
+        capability = '{"ver": "hash"}'
         self.returns = [_cassandrify_data([
-            {'webhookId': 'webhook1', 'data': data},
-            {'webhookId': 'webhook2', 'data': data}
+            {'webhookId': 'webhook1', 'data': data, 'capability': capability},
+            {'webhookId': 'webhook2', 'data': data, 'capability': capability}
         ])]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
                         "policyId": '23456789'}
-        expectedCql = ('SELECT "webhookId", data FROM policy_webhooks WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+        expectedCql = ('SELECT "webhookId", data, capability FROM policy_webhooks '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND deleted = False;')
         r = self.assert_deferred_succeeded(
             self.group._naive_list_webhooks('23456789'))
-        self.assertEqual(r, {'webhook1': self.sample_webhook_data,
-                             'webhook2': self.sample_webhook_data})
+
+        expected_data['capability'] = {
+            "version": "ver",
+            "hash": "hash"
+        }
+
+        self.assertEqual(r, {'webhook1': expected_data,
+                             'webhook2': expected_data})
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -918,9 +926,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Listing a valid policy calls ``naive_list_webhooks``, and skips calling
         ``get_policy`` since there are undeleted webhooks for said policy
         """
+        expected_webhook_data = {'name': 'name', 'metadata': {}}
+        expected_webhook_data['capability'] = {
+            'version': 'ver',
+            'hash': 'hash'
+        }
         expected_result = {
-            'webhook1': self.sample_webhook_data,
-            'webhook2': self.sample_webhook_data
+            'webhook1': expected_webhook_data,
+            'webhook2': expected_webhook_data
         }
         mock_naive.return_value = defer.succeed(expected_result)
         r = self.validate_list_webhooks_return_value('23456789')
@@ -1007,7 +1020,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         You can update an existing webhook, and it would overwrite all data
         """
-        mock_get_webhook.return_value = defer.succeed(self.sample_webhook_data)
+        mock_get_webhook.return_value = defer.succeed(
+            {'name': 'name', 'metadata': {'old': 'metadata'}})
         self.returns = [None]
 
         new_webhook_data = {
@@ -1035,7 +1049,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         You can update an existing webhook, and if new metadata is not provided
         a default empty dict will be assigned to the new metadata
         """
-        mock_get_webhook.return_value = defer.succeed(self.sample_webhook_data)
+        mock_get_webhook.return_value = defer.succeed(
+            {'name': 'name', 'metadata': {'old': 'metadata'}})
         self.returns = [None]
 
         d = self.group.update_webhook('3444', '4555', {'name': 'newname'})

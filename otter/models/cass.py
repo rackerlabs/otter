@@ -68,7 +68,7 @@ _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantI
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
-_cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -193,9 +193,9 @@ def _jsonize_cassandra_data(raw_response):
             raise CassBadDataError("Received malformed response with no cols")
         try:
             results.append({col['name']: col['value'] for col in row['cols']})
-        except KeyError:
-            raise CassBadDataError("Received malformed response without the "
-                                   "required fields")
+        except KeyError as e:
+            raise CassBadDataError('Received malformed response without the '
+                                   'required field "{0!s}"'.format(e))
 
     return results
 
@@ -533,12 +533,30 @@ class CassScalingGroup(object):
         all the webhooks associated with particular scaling policy
         irregardless of whether the scaling policy still exists.
         """
+        def _assemble_webhook_results(results):
+            new_results = {}
+            for row in results:
+                try:
+                    webhook = _jsonloads_data(row['data'])
+                    # there should only be one now
+                    version, cap_hash = (
+                        _jsonloads_data(row['capability']).iteritems().next())
+
+                    webhook['capability'] = {'version': version, 'hash': cap_hash}
+                    new_results[row['webhookId']] = webhook
+
+                except KeyError as e:
+                    raise CassBadDataError(
+                        'Does not have expected columns: {0}'.format(e))
+            return new_results
+
         query = _cql_list_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query, {"tenantId": self.tenant_id,
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
-        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(_assemble_webhook_results)
         return d
 
     def list_webhooks(self, policy_id):
@@ -644,7 +662,8 @@ class CassScalingGroup(object):
             raise CassBadDataError("Recieved more than one expected response")
 
         if 'data' not in results[0]:
-            raise CassBadDataError("No 'data' column")
+            raise CassBadDataError('Received malformed response without the '
+                                   'required field "data"')
 
         return _jsonloads_data(results[0]['data'])
 
