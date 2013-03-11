@@ -459,12 +459,12 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def delete_policy(self, policy_id):
+    def _naive_delete_policy(self, policy_id, consistency):
         """
-        see :meth:`otter.models.interface.IScalingGroup.delete_policy`
+        Like :meth:`otter.models.cass.CassScalingGroup.delete_policy` but
+        does not check if the policy exists first before deleting it.  Assumes
+        that it does exist.
         """
-        consistency = get_consistency_level('delete', 'policy')
-
         def _do_delete_policy():
             queries = [
                 _cql_delete_policy.format(cf=self.policies_table,
@@ -476,13 +476,34 @@ class CassScalingGroup(object):
                 consistency=consistency)
             return b.execute(self.connection)
 
-        def _delete_policy_and_webhooks(lastRev):
-            return defer.gatherResults(
-                [_do_delete_policy(),
-                 self._delete_all_webhooks(policy_id, consistency)])
+        def _do_delete_webhooks(webhook_dict):
+            if len(webhook_dict) == 0:  # don't hit cassandra at all
+                return defer.succeed(None)
 
+            queries = []
+            cql_params = {'tenantId': self.tenant_id, 'groupId': self.uuid,
+                          'policyId': policy_id}
+
+            for i, webhook_id in enumerate(webhook_dict.keys()):
+                varname = 'webhookId{0}'.format(i)
+                queries.append(_cql_delete_webhook.format(
+                    cf=self.webhooks_table, name=varname))
+                cql_params[varname] = webhook_id
+
+            b = Batch(queries, cql_params, consistency=consistency)
+            return b.execute(self.connection)
+
+        return defer.gatherResults(
+            [_do_delete_policy(),
+             self._naive_list_webhooks(policy_id).addCallback(_do_delete_webhooks)])
+
+    def delete_policy(self, policy_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.delete_policy`
+        """
         d = self.get_policy(policy_id)
-        d.addCallback(_delete_policy_and_webhooks)
+        d.addCallback(lambda _: self._naive_delete_policy(
+            policy_id, get_consistency_level('delete', 'policy')))
         d.addCallback(lambda _: None)
         return d
 
@@ -568,34 +589,6 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
         raise NotImplementedError()
-
-    def _delete_all_webhooks(self, policy_id, consistency):
-        """
-        Deletes all the webhooks from a single policy.
-
-        :param policy_id: the policy id for the webhooks
-        :type policy_id: ``str``
-        """
-        def _do_delete(webhook_dict):
-            if len(webhook_dict) == 0:  # don't hit cassandra at all
-                return defer.succeed(None)
-
-            queries = []
-            cql_params = {'tenantId': self.tenant_id, 'groupId': self.uuid,
-                          'policyId': policy_id}
-
-            for i, webhook_id in enumerate(webhook_dict.keys()):
-                varname = 'webhookId{0}'.format(i)
-                queries.append(_cql_delete_webhook.format(
-                    cf=self.webhooks_table, name=varname))
-                cql_params[varname] = webhook_id
-
-            b = Batch(queries, cql_params, consistency=consistency)
-            return b.execute(self.connection)
-
-        deferred = self._naive_list_webhooks(policy_id)
-        deferred.addCallback(_do_delete)
-        return deferred
 
     def delete_webhook(self, policy_id, webhook_id):
         """
@@ -740,7 +733,7 @@ class CassScalingGroupCollection:
 
             deferreds = []
             for policy_id in policy_dict:
-                deferreds.append(group.delete_policy(policy_id))
+                deferreds.append(group._naive_delete_policy(policy_id))
             return defer.gatherResults(deferreds)
 
         def _delete_it(lastRev, group):
@@ -750,6 +743,7 @@ class CassScalingGroupCollection:
             ])
             d.addCallback(lambda _: None)
             return d
+
         group = self.get_scaling_group(log, tenant_id, scaling_group_id)
         d = group.view_config()  # ensure that it's actually there
         return d.addCallback(_delete_it, group)  # only delete if it exists

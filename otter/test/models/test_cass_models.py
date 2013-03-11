@@ -87,7 +87,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
-        self.connection = mock.MagicMock()
+        self.connection = mock.MagicMock(spec=['execute'])
 
         self.returns = [None]
 
@@ -609,82 +609,63 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         self.group.view_config.assert_called_once_with()
 
-    def test_delete_policy_no_webhooks(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
+    def test_naive_delete_policy_no_webhooks(self, mock_list_webhooks,
+                                             mock_naive, mock_get_policy):
         """
-        When you delete a scaling policy, the policy itself and if there are
-        no webhooks no call to delete its webhooks is made. If successful return
-        value is None
-        """
-        def _fake_cassandra_results(query, params, consistency):
-            """
-            This has to return different data depending in the query, since
-            deleting requires multiple queries.  So may as well assert stuff
-            about the queries and parameters here.
-            """
-            if 'scaling_policies' in query:
-                if 'SELECT' in query:  # seeing if it exists
-                    return defer.succeed(_cassandrify_data([{'data': '{}'}]))
-                else:  # delete policy
-                    return defer.succeed(None)
-            elif 'policy_webhooks' in query:
-                if 'SELECT' in query:   # no webhooks
-                    return defer.succeed([])
-                else:  # delete webhooks
-                    self.fail("Since there were no webhooks, no attempt to "
-                              "delete webhooks should be made")
-            else:
-                raise self.fail(
-                    "Don't know what to make of this query: {0}, {1!r}".format(
-                        query, params))
+        When you delete a scaling policy, the policy is deleted but if there are
+        no webhooks no call to delete its webhooks is made.
 
-        self.connection.execute.side_effect = _fake_cassandra_results
-        d = self.group.delete_policy('3222')
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
-        # calls: select policy, delete policy, list webhooks, no delete webhooks
-        self.assertEqual(len(self.connection.execute.mock_calls), 3)
+        No call to verify if the policy exists is made.  For
+        listing the webhooks, ``_naive_list_webhooks`` is called, not
+        ``list_webhooks`.
+
+        ``naive_delete_policy`` should also use the consistency level provided
+
+        There is no assertion about the return value, because that doesn't
+        really matter.
+        """
+        self.returns = [None]
+        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
         # make sure that delete policy execution happend
-        self.connection.execute.assert_any_call(
+        self.connection.execute.assert_called_once_with(
             ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
              '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
              'APPLY BATCH;'),
             {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"},
             ConsistencyLevel.TWO)
 
-    def test_delete_policy_deletes_webhooks(self):
-        """
-        When you delete a scaling policy that exists, any existing webhooks are
-        also deleted
-        """
-        def _fake_cassandra_results(query, params, consistency):
-            """
-            This has to return different data depending in the query, since
-            deleting requires multiple queries.  So may as well assert stuff
-            about the queries and parameters here.
-            """
-            if 'scaling_policies' in query:
-                if 'SELECT' in query:  # seeing if it exists
-                    return defer.succeed(_cassandrify_data([{'data': '{}'}]))
-                else:  # delete policy
-                    return defer.succeed(None)
-            elif 'policy_webhooks' in query:
-                if 'SELECT' in query:   # no webhooks
-                    # return 2 - webhook1 and webhook2
-                    return defer.succeed(_cassandrify_data([
-                        {'webhookId': 'webhook1', 'data': '{}'},
-                        {'webhookId': 'webhook2', 'data': '{}'}]))
-                else:  # delete webhooks
-                    return defer.succeed(None)
-            else:
-                raise self.fail(
-                    "Don't know what to make of this query: {0}, {1!r}".format(
-                        query, params))
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
+        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
+        mock_naive.assert_called_with('3222')
 
-        self.connection.execute.side_effect = _fake_cassandra_results
-        d = self.group.delete_policy('3222')
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
-        # calls: select policy, delete policy, list webhooks, delete webhooks
-        self.assertEqual(len(self.connection.execute.mock_calls), 4)
-        # make sure delete webhooks was called
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({'webhook1': {}, 'webhook2': {}}))
+    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
+    def test_naive_delete_policy_some_webhooks(self, mock_list_webhooks,
+                                               mock_naive, mock_get_policy):
+        """
+        When you delete a scaling policy with webhooks, the policy itself and
+        its webhooks are deleted.
+
+        No call to verify if the policy exists is made.  For
+        listing the webhooks, ``_naive_list_webhooks`` is called, not
+        ``list_webhooks`.
+
+        ``naive_delete_policy`` should also use the consistency level provided
+
+        There is no assertion about the return value, because that doesn't
+        really matter.
+        """
+        self.returns = [None, None]
+        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
+        # make sure that delete policy execution happend
         self.connection.execute.assert_any_call(
             ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
              '"tenantId" = :tenantId AND "groupId" = :groupId AND '
@@ -698,15 +679,41 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              "webhookId1": "webhook2"},
             ConsistencyLevel.TWO)
 
-    def test_delete_non_existant_policy(self):
+        # =/  has_calls doesn't mean "has only these calls"
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)
+
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
+        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
+        mock_naive.assert_called_with('3222')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
+                return_value=defer.succeed(None))
+    def test_delete_policy_valid_policy(self, mock_naive, mock_get_policy):
         """
-        If you try to delete a scaling policy that doesn't exist,
+        When you delete a scaling policy, it checks if the policy exists and
+        if it does, calls _naive_delete_policy and if it succeeds, returns None
+        """
+        d = self.group.delete_policy('3222')
+        # delete returns None
+        self.assertIsNone(self.assert_deferred_succeeded(d))
+        mock_get_policy.assert_called_once_with('3222')
+        mock_naive.assert_called_once_with('3222', ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
+                return_value=defer.succeed(None))
+    def test_delete_policy_invalid_policy(self, mock_naive, mock_get_policy):
+        """
+        When you delete a scaling policy that doesn't exist, a
         :class:`NoSuchPolicyError` is raised
         """
-        self.returns = [[], None]
         d = self.group.delete_policy('3222')
         self.assert_deferred_failed(d, NoSuchPolicyError)
-        self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
+        mock_get_policy.assert_called_once_with('3222')
+        self.assertEqual(len(mock_naive.mock_calls), 0)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_scaling_policy(self):
@@ -861,10 +868,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
         self.assert_deferred_failed(d, NoSuchPolicyError)
 
-    def test_list_webhooks_valid_policy(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
         """
-        Listing a valid policy produces a valid dictionary as per
-        :data:`otter.json_schema.model_schemas.webhook_list`
+        Naive list webhooks produces a valid dictionary as per
+        :data:`otter.json_schema.model_schemas.webhook_list`, whether or not
+        the policy is invalid
         """
         data = json.dumps(self.sample_webhook_data)
         self.returns = [_cassandrify_data([
@@ -878,37 +888,75 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedCql = ('SELECT "webhookId", data FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND deleted = False;')
-        r = self.validate_list_webhooks_return_value('23456789')
+        r = self.assert_deferred_succeeded(
+            self.group._naive_list_webhooks('23456789'))
         self.assertEqual(r, {'webhook1': self.sample_webhook_data,
                              'webhook2': self.sample_webhook_data})
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
-    def test_list_webhooks_empty_list(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_naive_list_webhooks_empty_list(self, mock_get_policy):
         """
-        If the policy exists but there are no webhooks, `list_webhooks` returns
-        an empty list
+        If there are no webhooks, list webhooks produces an empty dictionary
+        even if the policy were invalid
         """
-        def execute_respond(cql, cqlargs, *other_args, **kwargs):
-            if 'scaling_policies' in cql:  # view policy - seeing if it's there
-                return defer.succeed(_cassandrify_data([{'data': '{}'}]))
-            else:
-                return defer.succeed(_de_identify([]))
-        self.connection.execute.side_effect = execute_respond
+        self.returns = [[]]
+        r = self.assert_deferred_succeeded(
+            self.group._naive_list_webhooks('23456789'))
+        self.assertEqual(r, {})
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks')
+    def test_list_webhooks_valid_policy(self, mock_naive, mock_get_policy):
+        """
+        Listing a valid policy calls ``naive_list_webhooks``, and skips calling
+        ``get_policy`` since there are undeleted webhooks for said policy
+        """
+        expected_result = {
+            'webhook1': self.sample_webhook_data,
+            'webhook2': self.sample_webhook_data
+        }
+        mock_naive.return_value = defer.succeed(expected_result)
+        r = self.validate_list_webhooks_return_value('23456789')
+        self.assertEqual(r, expected_result)
+
+        mock_naive.assert_called_once_with('23456789')
+        self.assertEqual(len(mock_get_policy.mock_calls), 0)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({}))
+    def test_list_webhooks_empty_list(self, mock_naive, mock_get_policy):
+        """
+        Listing a valid policy calls ``naive_list_webhooks``, and then calls
+        ``get_policy`` to see if the policy actually exists
+        """
         result = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(result, {})
 
-    def test_list_webhooks_invalid_policy(self):
+        mock_naive.assert_called_with('23456789')
+        mock_get_policy.assert_called_once_with('23456789')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'p', 'g')))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
+                return_value=defer.succeed({}))
+    def test_list_webhooks_invalid_policy(self, mock_naive, mock_get_policy):
         """
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingPolicy`
         """
-        # no scaling policies, and view config is empty too
-        self.returns = [[], []]
         self.assert_deferred_failed(self.group.list_webhooks('23456789'),
                                     NoSuchPolicyError)
+        mock_naive.assert_called_with('23456789')
+        mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_webhook(self):
@@ -994,7 +1042,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
-        self.connection = mock.MagicMock()
+        self.connection = mock.MagicMock(spec=['execute'])
 
         self.returns = [None]
 
@@ -1182,38 +1230,47 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(g.uuid, '12345678')
         self.assertEqual(g.tenant_id, '123')
 
-    def test_delete_non_existant_scaling_group_fails(self):
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
+                return_value=defer.succeed(None))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
+    def test_delete_non_existant_scaling_group_fails(self, mock_view_config,
+                                                     mock_naive_list_policy,
+                                                     mock_naive_del_policy):
         """
         If the scaling group doesn't exist, :class:`NoSuchScalingGroup` is
         raised
         """
-        self.returns = [[], None]  # view returns an empty list
-
         self.assert_deferred_failed(
             self.collection.delete_scaling_group(self.mock_log, '123', 'group1'),
             NoSuchScalingGroupError)
-        self.flushLoggedErrors(NoSuchScalingGroupError)
-        # only called once to view
-        self.assertEqual(len(self.connection.execute.mock_calls), 1)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+        # only called once to view
+        mock_view_config.assert_called_once_with()
+
+        # nothing else called
+        self.assertEqual(len(mock_naive_list_policy.mock_calls), 0)
+        self.assertEqual(len(mock_naive_del_policy.mock_calls), 0)
+
+        self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
                 return_value=defer.succeed(None))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
+                return_value=defer.succeed({'policy1': {}, 'policy2': {}}))
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
-    def test_delete_existing_scaling_group_with_policies(self,
+    @mock.patch('otter.models.cass.CassScalingGroup.list_policies')
+    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy')
+    def test_delete_existing_scaling_group_with_policies(self, mock_del, mock_list,
                                                          mock_view_config,
                                                          mock_naive_list_policy,
-                                                         mock_delete_policy):
+                                                         mock_naive_del_policy):
         """
         If the scaling group exists, deletes scaling group and all of its
-        policies and webhooks
+        policies and webhooks.  Use naive calls all the way down.
         """
-        mock_naive_list_policy.return_value = defer.succeed({
-            'policy1': {},
-            'policy2': {}
-        })
-
         # we mock out delete policy, since that is already tested separately
 
         self.returns = [None]
@@ -1224,10 +1281,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # view config called to verify group exists
         mock_view_config.assert_called_once_with()
 
-        # naive_list_policies called before delete policy called
+        # naive_list_policies called before naive_delete_policy called
         mock_naive_list_policy.assert_called_once_with()
-        mock_delete_policy.assert_has_calls([
+        mock_naive_del_policy.assert_has_calls([
             mock.call('policy1'), mock.call('policy2')], any_order=True)
+
+        # the real delete and list policies are not called ever
+        self.assertEqual(len(mock_del.mock_calls), 0)
+        self.assertEqual(len(mock_list.mock_calls), 0)
 
         # delete configs happens
         expected_data = {'tenantId': '123',
@@ -1239,10 +1300,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'UPDATE launch_config SET deleted=True '
             'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
-        self.connection.execute.assert_called_any(expected_cql, expected_data,
-                                                  ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy',
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
                 return_value=defer.succeed(None))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
                 return_value=defer.succeed({}))
@@ -1251,10 +1312,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def test_delete_existing_scaling_group_with_no_policies(self,
                                                             mock_view_config,
                                                             mock_naive_list_policy,
-                                                            mock_delete_policy):
+                                                            mock_naive_del_policy):
         """
         If the scaling group exists but no scaling policies exist, deletes
-        only the configs.  Delete policy is not called.
+        only the configs.  ``_naive_delete_policy`` is not called.
         """
         self.returns = [None]
         result = self.assert_deferred_succeeded(
@@ -1266,7 +1327,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         # naive_list_policies called before delete policy called
         mock_naive_list_policy.assert_called_once_with()
-        self.assertEqual(len(mock_delete_policy.mock_calls), 0)
+        self.assertEqual(len(mock_naive_del_policy.mock_calls), 0)
 
     def test_webhook_hash(self):
         """
