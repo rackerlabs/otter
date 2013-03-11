@@ -3,6 +3,7 @@ Contains the actual Klein app, backing store, and utilities used by the route
 handlers for the REST service.
 """
 import os.path
+from functools import partial
 
 from twisted.web.resource import Resource
 from twisted.web.server import Request
@@ -149,6 +150,8 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         return url
 
 app = Klein()
+app.route = partial(app.route, strict_slashes=False)
+
 root = Resource()
 root.putChild('v1.0', app.resource())
 root.putChild('', _otter)

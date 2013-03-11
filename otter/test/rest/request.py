@@ -136,7 +136,7 @@ class DummyException(Exception):
     pass
 
 
-class RequestTestMixin(object):
+class RequestTestMixin(DeferredTestMixin):
     """
     Mixin that has utilities for asserting something about the status code,
     getting header info, etc.
@@ -199,24 +199,6 @@ class RequestTestMixin(object):
                          "Too many location headers: {0!r}".format(locations))
         return locations[0]
 
-
-class RestAPITestMixin(DeferredTestMixin, RequestTestMixin):
-    """
-    Setup and teardown for tests for the REST API endpoints
-    """
-
-    def setUp(self):
-        """
-        Mock the interface
-
-        :return: None
-        """
-        self.mock_store = iMock(IScalingGroupCollection)
-        self.mock_group = iMock(IScalingGroup)
-        self.mock_store.get_scaling_group.return_value = self.mock_group
-
-        set_store(self.mock_store)
-
     def assert_status_code(self, expected_status, endpoint=None,
                            method="GET", body="", location=None):
         """
@@ -251,27 +233,27 @@ class RestAPITestMixin(DeferredTestMixin, RequestTestMixin):
                              location)
         return response_wrapper.content
 
+
+class RestAPITestMixin(RequestTestMixin):
+    """
+    Setup and teardown for tests for the REST API endpoints
+    """
+
+    def setUp(self):
+        """
+        Mock the interface
+
+        :return: None
+        """
+        self.mock_store = iMock(IScalingGroupCollection)
+        self.mock_group = iMock(IScalingGroup)
+        self.mock_store.get_scaling_group.return_value = self.mock_group
+
+        set_store(self.mock_store)
+
     def test_invalid_methods_are_405(self):
         """
         All methods other than GET return a 405: Forbidden Method
         """
         for method in self.invalid_methods:
             self.assert_status_code(405, method=method)
-
-    def test_non_trailing_slash_redirects_to_trailing_slash(self):
-        """
-        Trying to hit the non-trailing-slash version of the URL results in a
-        redirect to the trailing slash version
-        """
-        self.assertTrue(self.endpoint.endswith('/'),
-                        "The default endpoint should have a trailing slash: {0}".format(
-                            self.endpoint))
-
-        # HEAD works even if it's not listed in the available methods, but
-        # but that's handled elsewhere (probably in Twisted), so we can't use
-        # it for testing here.  So find a method that is not invalid, and use
-        # that.
-        for method in ('GET', 'PUT', 'POST', 'DELETE'):
-            if not method in self.invalid_methods:
-                self.assert_status_code(301, method=method,
-                                        endpoint=self.endpoint.rstrip('/'))
