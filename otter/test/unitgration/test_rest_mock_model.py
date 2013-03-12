@@ -106,8 +106,6 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
 
         response = json.loads(wrapper.content)
         self.assertTrue(not response["group"]['paused'])
-        self.assertTrue(len(response["group"]['pending']),
-                        config()[1]['minEntities'])
 
         return path
 
@@ -162,8 +160,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         Editing the config of a scaling group with a valid config returns with
         a 204 no content.  The next attempt to view the scaling config should
-        return the new config.  The steady state numbers get updated as well,
-        if necessary.
+        return the new config.
         """
         # make sure there is a scaling group
         path = self.create_and_view_scaling_group()
@@ -192,16 +189,13 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(json.loads(wrapper.content),
                          {'groupConfiguration': edited_config})
 
-        # make sure the created group has updated pending entities, and is
-        # still not paused
+        # make sure the it is still not paused
         wrapper = self.assert_deferred_succeeded(
             request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
         self.assertTrue(not response['group']['paused'])
-        self.assertTrue(len(response['group']['pending']),
-                        config()[1]['minEntities'] + 5)
 
     def test_ru_launch_config(self):
         """

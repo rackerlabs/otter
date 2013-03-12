@@ -355,24 +355,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
-    # ---- not interface methods
-    def add_entities(self, pending=None, active=None):
-        """
-        Takes a list of pending entity ids and active entity ids, and adds
-        them to the group's list of pending entitys and active entities,
-        respectively.
-
-        :param pending: list of pending entity ids
-        :type pending: ``list`` or ``tuple``
-
-        :param active: list of active entity ids
-        :type active: ``list`` or ``tuple``
-        """
-        mapping = ((pending or [], self.pending_entities),
-                   (active or [], self.active_entities))
-        for entity_ids, dictionary in mapping:
-            dictionary.update(generate_entity_links(self.tenant_id, entity_ids))
-
 
 class MockScalingGroupCollection:
     """
@@ -396,9 +378,6 @@ class MockScalingGroupCollection:
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
-
-        self.data[tenant][uuid].add_entities(
-            pending=[str(uuid4()) for i in xrange(config['minEntities'])])
 
         return defer.succeed(uuid)
 

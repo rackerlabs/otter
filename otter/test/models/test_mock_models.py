@@ -128,29 +128,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, self.launch_config)
 
-    def test_add_entities(self):
-        """
-        The add entity utility function adds pending/active entities to the
-        scaling group.  This is needed for testing view state.
-        """
-        active = ("1", "2", "3")
-        pending = ("4", "5", "6")
-        self.group.add_entities(pending=pending, active=active)
-
-        result_pending = self.group.pending_entities.keys()
-        result_pending.sort()
-        result_active = self.group.active_entities.keys()
-        result_active.sort()
-
-        self.assertEqual(list(result_pending), list(pending))
-        self.assertEqual(list(result_active), list(active))
-
     def test_view_state_returns_valid_scheme(self):
         """
         ``view_state`` returns something conforming to the scheme whether or
         not there are entities in the system
         """
-        self.group.add_entities(pending=("4", "5", "6"), active=("1", "2", "3"))
         expected_active = generate_entity_links(self.tenant_id, ("1", "2", "3"))
         expected_pending = generate_entity_links(self.tenant_id, ("4", "5", "6"))
         self.group.steady_state = 6
@@ -160,6 +142,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'pending': expected_pending,
             'paused': False
         })
+    test_view_state_returns_valid_scheme.skip = "Skipping until state model PR"
 
     def test_update_config_overwrites_existing_data(self):
         """
@@ -667,26 +650,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, uuid,
             {'config': self.config, 'launch': launch, 'policies': policies})
-
-    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_group_creates_min_entities(self, mock_sgrp):
-        """
-        Creating a scaling group means that the minimum number of entities as
-        specified by the config is created as well.
-        """
-        self.config['minEntities'] = 5
-        launch = {"launch": "config"}
-        policies = [1, 2, 3]
-        mock_sgrp.return_value = mock.MagicMock(spec=MockScalingGroup)
-
-        self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(
-                self.mock_log, self.tenant_id, self.config, launch, policies))
-
-        self.assertEqual(len(mock_sgrp.return_value.add_entities.mock_calls), 1)
-        self.assertEqual(
-            len(mock_sgrp.return_value.add_entities.call_args[1]['pending']),
-            5, "Add entities should have been called with 5 pending ids.")
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):
