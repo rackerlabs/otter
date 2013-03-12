@@ -53,8 +53,8 @@ the lock.  Note that the model reading state information from the group state
 will not require any lock interaction.
 
 
-Job State information
----------------------
+Job State information (tentative)
+---------------------------------
 
 This is a store for supervisors to coordinate/keep track of the statuses of
 jobs allocated to workers.
@@ -62,8 +62,8 @@ jobs allocated to workers.
 Access
 ^^^^^^
 
-Only supervisors can access or modify this information.  It does not require
-a lock.
+Only supervisors can access or modify this information.  Whether or not to
+lock TBD.
 
 
 Example Scenarios
