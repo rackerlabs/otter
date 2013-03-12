@@ -7,7 +7,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
+from otter.models.interface import (NoSuchScalingGroupError,
                                     NoSuchPolicyError, NoSuchWebhookError,
                                     UnrecognizedCapabilityError)
 
@@ -161,65 +161,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'paused': False
         })
 
-    def test_set_steady_state_does_not_exceed_min(self):
-        """
-        Setting a steady state that is below the min will set the steady state
-        to the min.
-        """
-        self.config['minEntities'] = 5
-        self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
-            {'config': self.config, 'launch': self.launch_config,
-             'policies': self.policies})
-
-        self.assert_deferred_succeeded(self.group.set_steady_state(1))
-        self.assertEqual(self.group.steady_state, 5)
-
-    def test_set_steady_state_does_not_exceed_max(self):
-        """
-        Setting a steady state that is above the max will set the steady state
-        to the max.
-        """
-        self.config['maxEntities'] = 5
-        self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
-            {'config': self.config, 'launch': self.launch_config,
-             'policies': self.policies})
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
-
-    def test_set_steady_state_within_limit_succeeds(self):
-        """
-        Setting a steady state that is between the min and max will set the
-        steady state to to the specified number.
-        """
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 10)
-
-    def test_bounce_existing_entity_succeeds(self):
-        """
-        Bouncing an existing entity succeeds (and does not change the list
-        view)
-        """
-        self.group.active_entities = {"1": [{'rel': 'self', 'href': ''}]}
-        self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.bounce_entity("1")))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('active', None),
-                         {"1": [{'rel': 'self', 'href': ''}]})
-
-    def test_bounce_invalid_entity_fails(self):
-        """
-        Bouncing an invalid valid entity fails
-        """
-        self.assert_deferred_failed(
-            self.group.bounce_entity("1"), NoSuchEntityError)
-        self.flushWarnings(NoSuchEntityError)
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('active', None), {})
-
     def test_update_config_overwrites_existing_data(self):
         """
         Passing in a dict only overwrites the existing dict unless the
@@ -252,39 +193,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected['maxEntities'] = None
         expected['metadata'] = {}
         self.assertEqual(result, expected)
-
-    def test_update_config_min_updates_steady_state(self):
-        """
-        If the updated min is greater than the current steady state, the
-        current steady state is set to that min
-        """
-        updated = {
-            'name': '',
-            'cooldown': 0,
-            'minEntities': 5,
-            'maxEntities': 10,
-            'metadata': {}
-        }
-        self.assert_deferred_succeeded(self.group.update_config(updated))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
-
-    def test_update_config_max_updates_steady_state(self):
-        """
-        If the updated max is less than the current steady state, the
-        current steady state is set to that max
-        """
-        updated = {
-            'name': '',
-            'cooldown': 0,
-            'minEntities': 0,
-            'maxEntities': 5,
-            'metadata': {}
-        }
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        self.assert_deferred_succeeded(self.group.update_config(updated))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
 
     def test_update_config_does_not_change_launch_config(self):
         """
@@ -913,8 +821,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                     }
                 }
             }),
-            group.set_steady_state(1),
-            group.bounce_entity("1"),
             group.list_policies(),
             group.create_policies([]),
             group.get_policy('2'),

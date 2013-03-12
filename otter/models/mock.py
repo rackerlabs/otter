@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
-    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
 
 
@@ -170,8 +170,7 @@ class MockScalingGroup:
         else:
             self.config = data
 
-        # make sure the steady state is still within bounds
-        return self.set_steady_state(self.steady_state)
+        return defer.succeed(None)
 
     def update_launch_config(self, data):
         """
@@ -182,33 +181,6 @@ class MockScalingGroup:
 
         self.launch = data
         return defer.succeed(None)
-
-    def set_steady_state(self, steady_state):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.set_steady_state`
-        """
-        if self.error is not None:
-            return defer.fail(self.error)
-
-        self.steady_state = max(steady_state, self.config['minEntities'])
-        if self.config['maxEntities'] is not None:
-            self.steady_state = min(self.steady_state,
-                                    self.config['maxEntities'])
-        return defer.succeed(None)
-
-    def bounce_entity(self, entity_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.bounce_entity`
-        """
-        if self.error is not None:
-            return defer.fail(self.error)
-
-        if entity_id in self.active_entities:
-            # don't actually do anything, since this is fake
-            return defer.succeed(None)
-        return defer.fail(NoSuchEntityError(
-            "Scaling group {0} has no such active entity {1}".format(
-                self.uuid, entity_id)))
 
     def list_policies(self):
         """
