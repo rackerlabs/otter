@@ -357,18 +357,6 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def set_steady_state(self, steady_state):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.set_steady_state`
-        """
-        raise NotImplementedError()
-
-    def bounce_entity(self, entity_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.bounce_entity`
-        """
-        raise NotImplementedError()
-
     def _naive_list_policies(self):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_policies`, but gets
