@@ -8,6 +8,10 @@ Diagram
 .. image:: data_and_execution_workflow.png
 
 
+All autoscaling information is stored in Cassandra and accessed via a model
+layer which knows about the schema.
+
+
 User-specified information
 --------------------------
 
@@ -24,11 +28,12 @@ scope of the scaling group.
 Access
 ^^^^^^
 
-The user-specified information is accessed and modified through the model
-store.  The main user of the model store is the REST API, but the controller
-also uses it to access the config (to enforce limits on how many servers can
-be started or shut down) and the launch config (to actually tell the launch
-config to start servers).
+The user-specified information is accessed and modified by the user via the
+REST API.
+
+It is also accessed (but not modified) by the controller, which needs the
+config (to enforce limits on how many servers can be started or shut down) and
+the launch config (to actually tell the launch config to start servers).
 
 
 Group State information
@@ -43,9 +48,8 @@ entities are part of the scaling group.
 Access
 ^^^^^^
 
-The group state information is accessed and modified mainly through the
-controller, although the model store may read from this information to present
-to the user.
+The group state information is accessed and modified mainly by the controller,
+although the REST API may read from this information to present it to the user.
 
 Every controller action should be atomic, so any controller will first acquire
 a lock before modifying or reading any information, and then it will release
@@ -72,8 +76,8 @@ Example Scenarios
 User executes policy
 ^^^^^^^^^^^^^^^^^^^^
 
-* The model store looks up the policy in Cassandra, and tells the controller
-  to execute said policy
+* The REST API looks up the policy in Cassandra, and tells the controller to
+  execute said policy
 
 * The controller acquires a lock
 
@@ -103,7 +107,7 @@ User executes policy
 User modifies the config
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* The model store updates the config, and tells the controller that the config
+* The REST API updates the config, and tells the controller that the config
   has been modified
 
 * The controller acquires a lock
