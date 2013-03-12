@@ -133,6 +133,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``view_state`` returns something conforming to the scheme whether or
         not there are entities in the system
         """
+        self.group.add_entities(pending=("4", "5", "6"), active=("1", "2", "3"))
         expected_active = generate_entity_links(self.tenant_id, ("1", "2", "3"))
         expected_pending = generate_entity_links(self.tenant_id, ("4", "5", "6"))
         self.group.steady_state = 6
