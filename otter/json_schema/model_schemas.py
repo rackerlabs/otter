@@ -5,70 +5,113 @@ model interface.
 from copy import deepcopy
 from otter.json_schema import group_schemas
 
-entity_schema = {
-    'type': 'object',
-    'patternProperties': {
-        "^\S+$": {
-            'type': 'array',
-            'required': True,
-            'uniqueItems': True,
-            'minItems': 1,
-            'items': {
-                "type": "object",
-                "properties": {
-                    'rel': {
-                        'type': 'string',
-                        'required': True
-                    },
-                    'href': {
-                        'type': 'string',
-                        'required': True
-                    }
-                },
-                "additionalProperties": False
-            }
-        }
-    },
-    'additionalProperties': False
-}
-
 # example:
 # {
 #   "active": {
-#     "{instanceId1}": [
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-#         "rel": "self"
-#       },
-#       ...
-#     ]
+#     "server_name": {
+#       "instanceId": "instance id",
+#       "instanceUri": "instance uri",
+#       "created": "created timestamp"
+#     },
+#     ...
 #   },
 #   "pending": {
-#     "{instanceId2}": [
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
-#         "rel": "self"
-#       },
+#     "job_id": {
+#         "created": "created timestamp"
+#     },
 #       ...
-#     ]
 #   },
-#   "steadyState": 2,
+#   "groupTouched": "timestamp any policy was last executed"
+#   "policyTouched": {
+#     "policy_id": "timestamp this policy was last executed",
+#     ...
+#   },
 #   "paused": false
 # }
+#
+# timestamps will be in this particular ISO8601 format:
+# YYYY-MM-DDTHH:MM:SS.mmmmmm or, if microsecond is 0, YYYY-MM-DDTHH:MM:SS
+#
+# as opposed to all the examples listed here:
+# http://www.pelagodesign.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
+
+timestamp = "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?$"
+
 group_state = {
     'type': 'object',
     'properties': {
-        'steadyState': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        },
         'paused': {
             'type': 'boolean',
             'required': True
         },
-        'active': entity_schema,
-        'pending': entity_schema
+        'active': {
+            'type': 'object',
+            'description': "The active servers in this group",
+            'patternProperties': {
+                "^\S+$": {
+                    'type': 'object',
+                    'properties': {
+                        "instanceId": {
+                            'type': 'string',
+                            'description': "The instance ID of the server",
+                            'required': True
+                        },
+                        "instanceUri": {
+                            'type': 'string',
+                            'description': "The instance URI of the server",
+                            'required': True
+                        },
+                        "created": {
+                            'type': 'string',
+                            'description': "The time the server was created",
+                            'pattern': timestamp,
+                            'required': True
+                        }
+                    },
+                    "additionalProperties": False
+                }
+            },
+            'additionalProperties': False,
+            'required': True
+        },
+        'pending': {
+            'type': 'object',
+            'description': "The pending job IDs of servers not yet built",
+            'patternProperties': {
+                "^\S+$": {
+                    'type': 'object',
+                    'properties': {
+                        "created": {
+                            'description': "The time the job was started",
+                            'type': 'string',
+                            'pattern': timestamp,
+                            'required': True
+                        }
+                    },
+                    'additionalProperties': False
+                }
+            },
+            'additionalProperties': False,
+            'required': True
+        },
+        "groupTouched": {
+            'description': "The timestamp of the last time any policy was executed",
+            'type': 'string',
+            'pattern': timestamp,
+            'required': True
+        },
+        "policyTouched": {
+            'description': "The timestamp of the last time a particular policy was executed",
+            'patternProperties': {
+                "^\S+$": {
+                    'type': 'string',
+                    'description': "The timestamp of the last time this policy was executed",
+                    'pattern': timestamp
+                }
+            },
+            'additionalProperties': False,
+            'required': True
+        }
     },
     'additionalProperties': False
 }

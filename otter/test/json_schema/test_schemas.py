@@ -2,11 +2,13 @@
 Tests for :mod:`otter.jsonschema.group_schemas`
 """
 from copy import deepcopy
+import re
 
 from twisted.trial.unittest import TestCase
 from jsonschema import Draft3Validator, validate, ValidationError
 
-from otter.json_schema import group_schemas, group_examples, rest_schemas
+from otter.json_schema import (
+    group_schemas, group_examples, rest_schemas, model_schemas)
 
 
 class ScalingGroupConfigTestCase(TestCase):
@@ -375,3 +377,55 @@ class CreateScalingGroupTestCase(TestCase):
                 group_examples.launch_server_config()[0],
                 'scalingPolicies': {"Hello!": "Yes quite."}
             }, rest_schemas.create_group_request)
+
+
+class GroupStateModelTestCase(TestCase):
+    """
+    Tests for the group state model schema
+    """
+    valid = {
+        'paused': False,
+        'pending': {},
+        'active': {},
+        'groupTouched': '2012-01-01T12:01:00',
+        'policyTouched': {}
+    }
+
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema and the valid schema
+        validates
+        """
+        Draft3Validator.check_schema(model_schemas.group_state)
+        validate(self.valid, model_schemas.group_state)
+
+    def test_iso_8601_regex(self):
+        """
+        Valid timestamps validate, invalid ones do not (valid ones being of
+        the format YYYY-MM-DDTHH:MM:SS.mmmmmm or, if microsecond is 0,
+        YYYY-MM-DDTHH:MM:SS)
+        """
+        timestamp_regex = re.compile(model_schemas.timestamp)
+
+        valids = ['2012-01-01T12:01:00', '2012-01-01T12:01:00.1',
+                  '2012-01-01T12:01:00.113566']
+        invalids = ['2012-01-01T12:01:00.1135663', '2012-01-01T12:01:00.',
+                    '2012-01-01T12:01']  # and lots more
+
+        for valid_timestamp in valids:
+            self.assertTrue(timestamp_regex.match(valid_timestamp))
+
+        for invalid_timestamp in invalids:
+            self.assertIsNone(timestamp_regex.match(invalid_timestamp))
+
+    def test_missing_parameter_does_not_validate(self):
+        """
+        paused, pending, active, groupTouched, and policyTouched must all
+        be there
+        """
+        for key in self.valid:
+            invalid = self.valid.copy()
+            del invalid[key]
+
+            self.assertRaises(ValidationError, validate, invalid,
+                              model_schemas.group_state)
