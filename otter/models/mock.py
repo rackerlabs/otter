@@ -12,7 +12,7 @@ from twisted.internet import defer
 
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
-    NoSuchEntityError, NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
 
 
@@ -170,8 +170,7 @@ class MockScalingGroup:
         else:
             self.config = data
 
-        # make sure the steady state is still within bounds
-        return self.set_steady_state(self.steady_state)
+        return defer.succeed(None)
 
     def update_launch_config(self, data):
         """
@@ -182,33 +181,6 @@ class MockScalingGroup:
 
         self.launch = data
         return defer.succeed(None)
-
-    def set_steady_state(self, steady_state):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.set_steady_state`
-        """
-        if self.error is not None:
-            return defer.fail(self.error)
-
-        self.steady_state = max(steady_state, self.config['minEntities'])
-        if self.config['maxEntities'] is not None:
-            self.steady_state = min(self.steady_state,
-                                    self.config['maxEntities'])
-        return defer.succeed(None)
-
-    def bounce_entity(self, entity_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.bounce_entity`
-        """
-        if self.error is not None:
-            return defer.fail(self.error)
-
-        if entity_id in self.active_entities:
-            # don't actually do anything, since this is fake
-            return defer.succeed(None)
-        return defer.fail(NoSuchEntityError(
-            "Scaling group {0} has no such active entity {1}".format(
-                self.uuid, entity_id)))
 
     def list_policies(self):
         """
@@ -383,24 +355,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
-    # ---- not interface methods
-    def add_entities(self, pending=None, active=None):
-        """
-        Takes a list of pending entity ids and active entity ids, and adds
-        them to the group's list of pending entitys and active entities,
-        respectively.
-
-        :param pending: list of pending entity ids
-        :type pending: ``list`` or ``tuple``
-
-        :param active: list of active entity ids
-        :type active: ``list`` or ``tuple``
-        """
-        mapping = ((pending or [], self.pending_entities),
-                   (active or [], self.active_entities))
-        for entity_ids, dictionary in mapping:
-            dictionary.update(generate_entity_links(self.tenant_id, entity_ids))
-
 
 class MockScalingGroupCollection:
     """
@@ -424,9 +378,6 @@ class MockScalingGroupCollection:
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
-
-        self.data[tenant][uuid].add_entities(
-            pending=[str(uuid4()) for i in xrange(config['minEntities'])])
 
         return defer.succeed(uuid)
 

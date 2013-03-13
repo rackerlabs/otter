@@ -27,13 +27,6 @@ class NoSuchScalingGroupError(Exception):
                 t=tenant_id, g=group_id))
 
 
-class NoSuchEntityError(Exception):
-    """
-    Error to be raised when attempting operations on an entity that does not
-    exist.
-    """
-
-
 class NoSuchPolicyError(Exception):
     """
     Error to be raised when attempting operations on an policy that does not
@@ -123,9 +116,7 @@ class IScalingGroup(Interface):
         attributes in ``config``.  This can update the already-existing values,
         or just overwrite them - it is up to the implementation.
 
-        Every time this is updated, the steady state and the number of entities
-        should be checked/modified to ensure compliance with the minimum and
-        maximum number of entities.
+        Enforcing the new min/max constraints should be done elsewhere.
 
         :param config: Configuration data in JSON format, as specified by
             :data:`otter.json_schema.scaling_group.config`
@@ -151,43 +142,6 @@ class IScalingGroup(Interface):
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
-        """
-
-    def set_steady_state(steady_state):
-        """
-        The steady state represents the number of entities - defaults to the
-        minimum. This number represents how many entities _should_ be
-        currently in the system to handle the current load. Its value is
-        constrained to be between ``min_entities`` and ``max_entities``,
-        inclusive.
-
-        :param steady_state: The new value for the desired number of entities
-            in steady state.  If this value is greater than ``max_entities``,
-            the value will be set to ``max_entities``.  Similarly, if this
-            value is less than ``min_entities``, the value will be set to
-            ``min_entities``.
-        :type steady_state: ``int``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        """
-
-    def bounce_entity(entity_id):
-        """
-        Rebuilds an entity given by the entity ID.  This essentially deletes
-        the given entity and a new one will be rebuilt in its place.
-
-        :param entity_id: the uuid of the entity to delete
-        :type entity_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
-        :raises: NoSuchEntityError if the entity is not a member of the scaling
-            group
         """
 
     def create_policies(data):

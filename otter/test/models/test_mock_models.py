@@ -7,7 +7,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import (NoSuchScalingGroupError, NoSuchEntityError,
+from otter.models.interface import (NoSuchScalingGroupError,
                                     NoSuchPolicyError, NoSuchWebhookError,
                                     UnrecognizedCapabilityError)
 
@@ -128,23 +128,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, self.launch_config)
 
-    def test_add_entities(self):
-        """
-        The add entity utility function adds pending/active entities to the
-        scaling group.  This is needed for testing view state.
-        """
-        active = ("1", "2", "3")
-        pending = ("4", "5", "6")
-        self.group.add_entities(pending=pending, active=active)
-
-        result_pending = self.group.pending_entities.keys()
-        result_pending.sort()
-        result_active = self.group.active_entities.keys()
-        result_active.sort()
-
-        self.assertEqual(list(result_pending), list(pending))
-        self.assertEqual(list(result_active), list(active))
-
     def test_view_state_returns_valid_scheme(self):
         """
         ``view_state`` returns something conforming to the scheme whether or
@@ -160,65 +143,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'pending': expected_pending,
             'paused': False
         })
-
-    def test_set_steady_state_does_not_exceed_min(self):
-        """
-        Setting a steady state that is below the min will set the steady state
-        to the min.
-        """
-        self.config['minEntities'] = 5
-        self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
-            {'config': self.config, 'launch': self.launch_config,
-             'policies': self.policies})
-
-        self.assert_deferred_succeeded(self.group.set_steady_state(1))
-        self.assertEqual(self.group.steady_state, 5)
-
-    def test_set_steady_state_does_not_exceed_max(self):
-        """
-        Setting a steady state that is above the max will set the steady state
-        to the max.
-        """
-        self.config['maxEntities'] = 5
-        self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
-            {'config': self.config, 'launch': self.launch_config,
-             'policies': self.policies})
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
-
-    def test_set_steady_state_within_limit_succeeds(self):
-        """
-        Setting a steady state that is between the min and max will set the
-        steady state to to the specified number.
-        """
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 10)
-
-    def test_bounce_existing_entity_succeeds(self):
-        """
-        Bouncing an existing entity succeeds (and does not change the list
-        view)
-        """
-        self.group.active_entities = {"1": [{'rel': 'self', 'href': ''}]}
-        self.assertIsNone(self.assert_deferred_succeeded(
-            self.group.bounce_entity("1")))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('active', None),
-                         {"1": [{'rel': 'self', 'href': ''}]})
-
-    def test_bounce_invalid_entity_fails(self):
-        """
-        Bouncing an invalid valid entity fails
-        """
-        self.assert_deferred_failed(
-            self.group.bounce_entity("1"), NoSuchEntityError)
-        self.flushWarnings(NoSuchEntityError)
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('active', None), {})
+    test_view_state_returns_valid_scheme.skip = "Skipping until state model PR"
 
     def test_update_config_overwrites_existing_data(self):
         """
@@ -252,39 +177,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expected['maxEntities'] = None
         expected['metadata'] = {}
         self.assertEqual(result, expected)
-
-    def test_update_config_min_updates_steady_state(self):
-        """
-        If the updated min is greater than the current steady state, the
-        current steady state is set to that min
-        """
-        updated = {
-            'name': '',
-            'cooldown': 0,
-            'minEntities': 5,
-            'maxEntities': 10,
-            'metadata': {}
-        }
-        self.assert_deferred_succeeded(self.group.update_config(updated))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
-
-    def test_update_config_max_updates_steady_state(self):
-        """
-        If the updated max is less than the current steady state, the
-        current steady state is set to that max
-        """
-        updated = {
-            'name': '',
-            'cooldown': 0,
-            'minEntities': 0,
-            'maxEntities': 5,
-            'metadata': {}
-        }
-        self.assert_deferred_succeeded(self.group.set_steady_state(10))
-        self.assert_deferred_succeeded(self.group.update_config(updated))
-        state = self.validate_view_state_return_value()
-        self.assertEqual(state.get('steadyState', None), 5)
 
     def test_update_config_does_not_change_launch_config(self):
         """
@@ -761,26 +653,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             {'config': self.config, 'launch': launch, 'policies': policies})
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_group_creates_min_entities(self, mock_sgrp):
-        """
-        Creating a scaling group means that the minimum number of entities as
-        specified by the config is created as well.
-        """
-        self.config['minEntities'] = 5
-        launch = {"launch": "config"}
-        policies = [1, 2, 3]
-        mock_sgrp.return_value = mock.MagicMock(spec=MockScalingGroup)
-
-        self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(
-                self.mock_log, self.tenant_id, self.config, launch, policies))
-
-        self.assertEqual(len(mock_sgrp.return_value.add_entities.mock_calls), 1)
-        self.assertEqual(
-            len(mock_sgrp.return_value.add_entities.call_args[1]['pending']),
-            5, "Add entities should have been called with 5 pending ids.")
-
-    @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):
         """
         Creating a scaling group with all arguments except policies passes None
@@ -913,8 +785,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                     }
                 }
             }),
-            group.set_steady_state(1),
-            group.bounce_entity("1"),
             group.list_policies(),
             group.create_policies([]),
             group.get_policy('2'),
