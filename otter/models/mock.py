@@ -97,7 +97,7 @@ class MockScalingGroup:
         self.active_entities = {}
         self.pending_jobs = {}
         self.policy_touched = {}
-        self.group_touched =
+        self.group_touched = None
         self.paused = False
 
         if creation is not None:
@@ -160,7 +160,9 @@ class MockScalingGroup:
         return defer.succeed({
             'active': self.active_entities,
             'pending': self.pending_jobs,
-            'paused': self.paused
+            'paused': self.paused,
+            'groupTouched': self.group_touched,
+            'policyTouched': self.policy_touched
         })
 
     def update_config(self, data, partial_update=False):

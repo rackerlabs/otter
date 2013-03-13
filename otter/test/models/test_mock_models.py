@@ -128,22 +128,18 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, self.launch_config)
 
-    def test_view_state_returns_valid_scheme(self):
+    def test_view_state_returns_valid_scheme_when_empty(self):
         """
         ``view_state`` returns something conforming to the scheme whether or
         not there are entities in the system
         """
-        self.group.add_entities(pending=("4", "5", "6"), active=("1", "2", "3"))
-        expected_active = generate_entity_links(self.tenant_id, ("1", "2", "3"))
-        expected_pending = generate_entity_links(self.tenant_id, ("4", "5", "6"))
-        self.group.steady_state = 6
         self.assertEquals(self.validate_view_state_return_value(), {
-            'steadyState': 6,
-            'active': expected_active,
-            'pending': expected_pending,
-            'paused': False
+            'active': {},
+            'pending': {},
+            'paused': False,
+            'groupTouched': None,
+            'policyTouched': {}
         })
-    test_view_state_returns_valid_scheme.skip = "Skipping until state model PR"
 
     def test_update_config_overwrites_existing_data(self):
         """
