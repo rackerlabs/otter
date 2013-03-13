@@ -29,6 +29,26 @@ from otter.json_schema import group_schemas
 #   "paused": false
 # }
 #
+pending_jobs = {
+    'type': 'object',
+    'description': "The pending job IDs of servers not yet built",
+    'patternProperties': {
+        "^\S+$": {
+            'type': 'object',
+            'properties': {
+                "created": {
+                    'description': "The time the job was started",
+                    'type': 'string',
+                    'required': True
+                }
+            },
+            'additionalProperties': False
+        }
+    },
+    'additionalProperties': False,
+    'required': True
+}
+
 
 group_state = {
     'type': 'object',
@@ -66,28 +86,10 @@ group_state = {
             'additionalProperties': False,
             'required': True
         },
-        'pending': {
-            'type': 'object',
-            'description': "The pending job IDs of servers not yet built",
-            'patternProperties': {
-                "^\S+$": {
-                    'type': 'object',
-                    'properties': {
-                        "created": {
-                            'description': "The time the job was started",
-                            'type': 'string',
-                            'required': True
-                        }
-                    },
-                    'additionalProperties': False
-                }
-            },
-            'additionalProperties': False,
-            'required': True
-        },
+        'pending': pending_jobs,
         "groupTouched": {
             'description': "The timestamp of the last time any policy was executed",
-            'type': 'string',
+            'type': ['null', 'string'],
             'required': True
         },
         "policyTouched": {
