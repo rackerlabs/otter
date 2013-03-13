@@ -43,7 +43,7 @@ _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId AND deleted = False;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
-_cql_view_webhook = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId AND deleted = False;')
 _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
@@ -51,12 +51,15 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
 _cql_insert_webhook = (
-    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, "webhookKey", deleted) '
-    'VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, :{name}Key, False)')
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
+    '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
+    ':{name}Capability, :{name}Key, False)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
+_cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
+                       'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
 _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                       'AND "groupId" = :groupId AND "policyId" = {name}')
@@ -66,7 +69,7 @@ _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantI
 _cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
-_cql_list_webhook = ('SELECT "webhookId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -152,7 +155,7 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         along with their generated IDs
     :type output: ``dict``
     """
-    for i in range(len(bare_webhooks)):
+    for i, webhook in enumerate(bare_webhooks):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
         queries.append(_cql_insert_webhook.format(cf=webhooks_table,
@@ -160,22 +163,69 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
 
         # generate the real data that will be stored, which includes the webhook
         # token, the capability stuff, and metadata by default
-        # TODO: capability format should change so that multiple capability
-        #       hash versions can be stored
-        webhook_real = {'metadata': {}, 'capability': {}}
-        webhook_real.update(bare_webhooks[i])
-        (webhook_real['capability']['version'],
-         webhook_real['capability']['hash']) = generate_capability()
+        bare_webhooks[i].setdefault('metadata', {})
+        version, cap_hash = generate_capability()
 
-        cql_parameters[name] = _serial_json_data(webhook_real, 1)
+        cql_parameters[name] = _serial_json_data(webhook, 1)
         cql_parameters['{0}Id'.format(name)] = webhook_id
-        cql_parameters['{0}Key'.format(name)] = webhook_real['capability']['hash']
-        output[webhook_id] = webhook_real
+        cql_parameters['{0}Key'.format(name)] = cap_hash
+        cql_parameters['{0}Capability'.format(name)] = _serial_json_data(
+            {version: cap_hash}, 1)
+
+        output[webhook_id] = webhook.copy()
+        output[webhook_id]['capability'] = {'hash': cap_hash, 'version': version}
+
+
+def _assemble_webhook_from_row(row):
+    """
+    Builds a webhook as per :data:`otter.json_schema.model_schemas.webhook`
+    from the user-mutable user data (name and metadata) and the
+    non-user-mutable capability data.
+
+    :param dict row: a dictionary of cassandra data containing the key
+        ``data`` (the user-mutable data) and the key ``capability`` (the
+        capability info, stored in cassandra as: `{<version>: <capability hash>}`)
+
+    :return: the webhook, as per :data:`otter.json_schema.model_schemas.webhook`
+    :rtype: ``dict``
+    """
+    webhook_base = _jsonloads_data(row['data'])
+    capability_data = _jsonloads_data(row['capability'])
+
+    version, cap_hash = capability_data.iteritems().next()
+    webhook_base['capability'] = {'version': version, 'hash': cap_hash}
+
+    return webhook_base
+
+
+def _jsonize_cassandra_data(raw_response):
+    """
+    Unwrap cassandra responses into an array of dicts - this should probably
+    go into silverberg.
+
+    :param dict raw_response: the raw response from Cassandra
+
+    :return: ``list`` of ``dicts`` representing the Cassandra data
+    """
+    if raw_response is None:
+        raise CassBadDataError("Received unexpected None response")
+
+    results = []
+    for row in raw_response:
+        if 'cols' not in row:
+            raise CassBadDataError("Received malformed response with no cols")
+        try:
+            results.append({col['name']: col['value'] for col in row['cols']})
+        except KeyError as e:
+            raise CassBadDataError('Received malformed response without the '
+                                   'required field "{0!s}"'.format(e))
+
+    return results
 
 
 def _unwrap_one_row(raw_response):
     """
-    Unwrap a row into a dict
+    Unwrap a row into a dict - None is an acceptable raw response
     """
     if raw_response is None:
         return None
@@ -183,12 +233,19 @@ def _unwrap_one_row(raw_response):
     if len(raw_response) != 1:
         raise CassBadDataError("multiple responses when we expected 1")
 
-    if 'cols' not in raw_response[0]:
-        raise CassBadDataError("Received malformed response with no cols")
+    results = _jsonize_cassandra_data(raw_response)
+    return results[0]
 
-    row = raw_response[0]['cols']
 
-    return {col['name']: col['value'] for col in row}
+def _jsonloads_data(raw_data):
+    try:
+        data = json.loads(raw_data)
+    except ValueError:
+        raise CassBadDataError("Bad data in database - not JSON")
+    else:
+        if "_ver" in data:
+            del data["_ver"]
+        return data
 
 
 def _grab_list(raw_response, id_name, has_data=True):
@@ -207,41 +264,16 @@ def _grab_list(raw_response, id_name, has_data=True):
 
     :return: a ``list`` or ``dict`` representing the data in Cassandra
     """
-    if raw_response is None:
-        raise CassBadDataError("received unexpected None response")
-
-    if has_data:
-        data = {}
-    else:
-        data = []
-
-    for row in raw_response:
-        if 'cols' not in row:
-            raise CassBadDataError("Received malformed response with no cols")
-        raw_data = None
-        col_id = None
-        for column in row['cols']:
-            if column.get('name', None) == id_name:
-                col_id = column.get('value')
-            if column.get('name', None) == 'data':
-                raw_data = column.get('value')
-
-        if col_id is None or (has_data and raw_data is None):
-            raise CassBadDataError("Received malformed response without the "
-                                   "required fields")
-
+    results = _jsonize_cassandra_data(raw_response)
+    try:
         if has_data:
-            try:
-                data[col_id] = json.loads(raw_data)
-                if "_ver" in data[col_id]:
-                    del data[col_id]["_ver"]
-            except ValueError:
-                raise CassBadDataError("Bad data in database - not JSON")
-
+            return dict([(row[id_name], _jsonloads_data(row['data']))
+                         for row in results])
         else:
-            data.append(col_id)
-
-    return data
+            return [row[id_name] for row in results]
+    except KeyError as e:
+        raise CassBadDataError('Received malformed response without the '
+                               'required field "{0!s}"'.format(e))
 
 
 class CassScalingGroup(object):
@@ -368,7 +400,7 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(_grab_list, id_name='policyId', has_data=True)
+        d.addCallback(_grab_list, 'policyId', has_data=True)
         return d
 
     def list_policies(self):
@@ -513,12 +545,24 @@ class CassScalingGroup(object):
         all the webhooks associated with particular scaling policy
         irregardless of whether the scaling policy still exists.
         """
+        def _assemble_webhook_results(results):
+            new_results = {}
+            for row in results:
+                try:
+                    new_results[row['webhookId']] = _assemble_webhook_from_row(row)
+                except KeyError as e:
+                    raise CassBadDataError('Received malformed response without the '
+                                           'required field "{0!s}"'.format(e))
+
+            return new_results
+
         query = _cql_list_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query, {"tenantId": self.tenant_id,
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
-        d.addCallback(_grab_list, 'webhookId', has_data=True)
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(_assemble_webhook_results)
         return d
 
     def list_webhooks(self, policy_id):
@@ -562,6 +606,16 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.get_webhook`
         """
+        def _assemble_webhook(cass_data):
+            if len(cass_data) == 0:
+                raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
+                                         webhook_id)
+            try:
+                return _assemble_webhook_from_row(cass_data[0])
+            except KeyError as e:
+                raise CassBadDataError('Received malformed response without the '
+                                       'required field "{0!s}"'.format(e))
+
         query = _cql_view_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
@@ -569,14 +623,28 @@ class CassScalingGroup(object):
                                      "policyId": policy_id,
                                      "webhookId": webhook_id},
                                     get_consistency_level('view', 'webhook'))
-        d.addCallback(self._grab_json_data, policy_id, webhook_id)
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(_assemble_webhook)
         return d
 
     def update_webhook(self, policy_id, webhook_id, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
-        raise NotImplementedError()
+        def _update_data(lastRev):
+            data.setdefault('metadata', {})
+            query = _cql_update_webhook.format(cf=self.webhooks_table)
+            d = self.connection.execute(query,
+                                        {"tenantId": self.tenant_id,
+                                         "groupId": self.uuid,
+                                         "policyId": policy_id,
+                                         "webhookId": webhook_id,
+                                         "data": data},
+                                        get_consistency_level('update', 'webhook'))
+            return d
+
+        d = self.get_webhook(policy_id, webhook_id)
+        return d.addCallback(_update_data)
 
     def delete_webhook(self, policy_id, webhook_id):
         """
@@ -597,9 +665,8 @@ class CassScalingGroup(object):
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
 
     def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
-        if rawResponse is None:
-            raise CassBadDataError("received unexpected None response")
-        if len(rawResponse) == 0:
+        results = _jsonize_cassandra_data(rawResponse)
+        if len(results) == 0:
             if webhook_id is not None:
                 raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
                                          webhook_id)
@@ -608,23 +675,14 @@ class CassScalingGroup(object):
             else:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
 
-        if 'cols' not in rawResponse[0]:
-            raise CassBadDataError("Received malformed response with no cols")
-        rec = None
-        for rawRec in rawResponse[0].get('cols', []):
-            if rawRec.get('name', None) == 'data':
-                rec = rawRec.get('value', None)
-        if rec is None:
-            raise CassBadDataError("Received malformed response without the "
-                                   "required fields")
-        data = None
-        try:
-            data = json.loads(rec)
-            if "_ver" in data:
-                del data["_ver"]
-            return data
-        except ValueError:
-            raise CassBadDataError("Bad data")
+        elif len(results) > 1:
+            raise CassBadDataError("Recieved more than one expected response")
+
+        if 'data' not in results[0]:
+            raise CassBadDataError('Received malformed response without the '
+                                   'required field "data"')
+
+        return _jsonloads_data(results[0]['data'])
 
 
 class CassScalingGroupCollection:
@@ -705,6 +763,8 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
+        consistency = get_consistency_level('delete', 'group')
+
         def _delete_configs():
             queries = [
                 _cql_delete.format(cf=self.config_table),
@@ -712,7 +772,7 @@ class CassScalingGroupCollection:
             ]
             b = Batch(queries,
                       {"tenantId": tenant_id, "groupId": scaling_group_id},
-                      consistency=get_consistency_level('delete', 'group'))
+                      consistency=consistency)
             return b.execute(self.connection)
 
         def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
@@ -721,7 +781,7 @@ class CassScalingGroupCollection:
 
             deferreds = []
             for policy_id in policy_dict:
-                deferreds.append(group._naive_delete_policy(policy_id))
+                deferreds.append(group._naive_delete_policy(policy_id, consistency))
             return defer.gatherResults(deferreds)
 
         def _delete_it(lastRev, group):
