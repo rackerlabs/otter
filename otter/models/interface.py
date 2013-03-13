@@ -49,6 +49,47 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class IScalingGroupState(Interface):
+    """
+    Represents an accessor for group state
+    """
+
+    def add_server(name, instance_id, uri, pending_job_id, created=None):
+        """
+        Takes information about an active server and adds it to the store of
+        active servers.
+
+        :param str name: the name of the server
+        :param str instance_id: the instance id of the server
+        :param str uri: the link to the server
+        :param str pending_job_id: the job ID that used to have this
+        :param str created: the time the server moved from pending to created -
+            if not provided, the created time will be the time this function
+            is called
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+    def add_jobs(job_dict):
+        """
+        Adds jobs to the store of pending jobs
+
+        :param dict job_dict: a dictionary mapping jobs to a dictionary as
+            defined by :data:`otter.json_schema.model_schemas.pending_jobs`
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+    def touch_policy(policy_id):
+        """
+        Update the last executed time of a policy (and also the group).
+
+        :param str policy_id: the id of the policy that was last executed
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
