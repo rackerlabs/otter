@@ -29,13 +29,6 @@ from otter.json_schema import group_schemas
 #   "paused": false
 # }
 #
-# timestamps will be in this particular ISO8601 format:
-# YYYY-MM-DDTHH:MM:SS.mmmmmm or, if microsecond is 0, YYYY-MM-DDTHH:MM:SS
-#
-# as opposed to all the examples listed here:
-# http://www.pelagodesign.com/blog/2009/05/20/iso-8601-date-validation-that-doesnt-suck/
-
-timestamp = "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?$"
 
 group_state = {
     'type': 'object',
@@ -64,7 +57,6 @@ group_state = {
                         "created": {
                             'type': 'string',
                             'description': "The time the server was created",
-                            'pattern': timestamp,
                             'required': True
                         }
                     },
@@ -84,7 +76,6 @@ group_state = {
                         "created": {
                             'description': "The time the job was started",
                             'type': 'string',
-                            'pattern': timestamp,
                             'required': True
                         }
                     },
@@ -97,7 +88,6 @@ group_state = {
         "groupTouched": {
             'description': "The timestamp of the last time any policy was executed",
             'type': 'string',
-            'pattern': timestamp,
             'required': True
         },
         "policyTouched": {
@@ -106,7 +96,6 @@ group_state = {
                 "^\S+$": {
                     'type': 'string',
                     'description': "The timestamp of the last time this policy was executed",
-                    'pattern': timestamp
                 }
             },
             'additionalProperties': False,

@@ -2,7 +2,6 @@
 Tests for :mod:`otter.jsonschema.group_schemas`
 """
 from copy import deepcopy
-import re
 
 from twisted.trial.unittest import TestCase
 from jsonschema import Draft3Validator, validate, ValidationError
@@ -398,25 +397,6 @@ class GroupStateModelTestCase(TestCase):
         """
         Draft3Validator.check_schema(model_schemas.group_state)
         validate(self.valid, model_schemas.group_state)
-
-    def test_iso_8601_regex(self):
-        """
-        Valid timestamps validate, invalid ones do not (valid ones being of
-        the format YYYY-MM-DDTHH:MM:SS.mmmmmm or, if microsecond is 0,
-        YYYY-MM-DDTHH:MM:SS)
-        """
-        timestamp_regex = re.compile(model_schemas.timestamp)
-
-        valids = ['2012-01-01T12:01:00', '2012-01-01T12:01:00.1',
-                  '2012-01-01T12:01:00.113566']
-        invalids = ['2012-01-01T12:01:00.1135663', '2012-01-01T12:01:00.',
-                    '2012-01-01T12:01']  # and lots more
-
-        for valid_timestamp in valids:
-            self.assertTrue(timestamp_regex.match(valid_timestamp))
-
-        for invalid_timestamp in invalids:
-            self.assertIsNone(timestamp_regex.match(invalid_timestamp))
 
     def test_missing_parameter_does_not_validate(self):
         """
