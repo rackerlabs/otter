@@ -49,30 +49,11 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
-class IScalingGroupState(Interface):
-    """
-    Represents an accessor for group state
-    """
-
-    def add_server(self, name, instance_id, uri, created, pending_job_id):
-        """
-        Takes information about an active server and adds it to the list of
-        active servers.
-
-        :param str name: the name of the server
-        :param str instance_id: the instance id of the server
-        :param str uri: the link to the server
-        :param str created: the time the server moved from pending to created
-        :param str pending_job_id: the job ID that used to have this
-        """
-
-
 class IScalingGroup(Interface):
     """
     Scaling group record
     """
     uuid = Attribute("UUID of the scaling group - immutable.")
-    tenant_id = Attribute("Tenant ID of the scaling group - immutable")
 
     def view_manifest():
         """
