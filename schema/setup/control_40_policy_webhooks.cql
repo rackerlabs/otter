@@ -18,12 +18,23 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
+-- data contains some useful information for the user and
+-- including the name and metadata
+-- format:
+--   {"name": XXXXX, "metadata": {}}
+
+-- capability has the version mapped to the hash (these will
+-- be used for link generation)
+-- format:
+--   {"1": "hash"}
+
 CREATE TABLE policy_webhooks (
     "tenantId" ascii,
     "groupId" ascii,
     "policyId" ascii,
     "webhookId" ascii,
     data ascii,
+    capability ascii,
     "webhookKey" ascii,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId", "webhookId")
