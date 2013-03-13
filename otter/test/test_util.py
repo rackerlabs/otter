@@ -1,12 +1,14 @@
 """
 Tests for ``otter.util``
 """
+from datetime import datetime
 import mock
 
 from twisted.trial.unittest import TestCase
 
 from otter.util.http import append_segments
 from otter.util.hashkey import generate_capability
+from otter.util import timestamp
 
 
 class HTTPUtilityTests(TestCase):
@@ -76,3 +78,61 @@ class CapabilityTests(TestCase):
         """
         (v, _cap) = generate_capability()
         self.assertEqual(v, "1")
+
+
+class TimestampTests(TestCase):
+    """
+    Test timestamp utilities
+    """
+    @mock.patch('otter.util.timestamp.datetime', spec=['utcnow'])
+    def test_now_returns_iso8601Z_timestamp_no_microseconds(self, mock_datetime):
+        """
+        ``now()`` returns the current UTC time in iso8601 zulu format
+        """
+        mock_datetime.utcnow.return_value = datetime(
+            2000, 01, 01, 12, 0, 0, 0, None)
+        self.assertEqual(timestamp.now(), "2000-01-01T12:00:00Z")
+
+    @mock.patch('otter.util.timestamp.datetime', spec=['utcnow'])
+    def test_now_returns_iso8601Z_timestamp_microseconds(self, mock_datetime):
+        """
+        ``now()`` returns the current UTC time in iso8601 zulu format
+        """
+        mock_datetime.utcnow.return_value = datetime(
+            2000, 01, 01, 12, 0, 0, 111111, None)
+        self.assertEqual(timestamp.now(), "2000-01-01T12:00:00.111111Z")
+
+    def test_min_returns_iso8601Z_timestamp(self):
+        """
+        datetime.min returns the earliest available time:
+        ``datetime(MINYEAR, 1, 1, tzinfo=None)`` according to the docs.  ``MIN``
+        returns this datetime in iso8601 zulu format.
+        """
+        self.assertEqual(timestamp.MIN, "0001-01-01T00:00:00Z")
+
+    @mock.patch('otter.util.timestamp.datetime', spec=['utcnow'])
+    def test_from_timestamp_can_read_now_timestamp(self, mock_datetime):
+        """
+        ``from_timestamp`` can parse timestamps produced by ``now()``
+        """
+        mock_datetime.utcnow.return_value = datetime(
+            2000, 01, 01, 12, 0, 0, 0, None)
+
+        parsed = timestamp.from_timestamp(timestamp.now())
+
+        # can't compare naive and timestamp-aware datetimes, so check that
+        # the parsed timezone is not None.  Then replace with None to compare.
+        self.assertTrue(parsed.tzinfo is not None)
+        self.assertEqual(parsed.replace(tzinfo=None),
+                         mock_datetime.utcnow.return_value)
+
+    def test_from_timestamp_can_read_min_timestamp(self):
+        """
+        ``from_timestamp`` can parse timestamps produced by ``MIN``
+        """
+        parsed = timestamp.from_timestamp(timestamp.MIN)
+
+        # can't compare naive and timestamp-aware datetimes, so check that
+        # the parsed timezone is not None.  Then replace with None to compare.
+        self.assertTrue(parsed.tzinfo is not None)
+        self.assertEqual(parsed.replace(tzinfo=None), datetime.min)

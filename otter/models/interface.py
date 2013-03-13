@@ -65,7 +65,9 @@ class IScalingGroupState(Interface):
         :param str pending_job_id: the job ID that used to have this
         :param str created: the time the server moved from pending to created -
             if not provided, the created time will be the time this function
-            is called
+            is called.  This should be a timestamp as produced by or parsed by
+            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
+            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
