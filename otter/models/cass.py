@@ -50,6 +50,11 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
                'VALUES (:tenantId, :groupId, {name}, False)')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
+                           '"policyTouched", deleted) VALUES(:tenantId, :groupId, :active:'
+                           ':pending, :groupTouched, :policyTouched, False)')
+_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched" FROM {cf} '
+                         'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -350,7 +355,28 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
-        raise NotImplementedError()
+        def _do_state_lookup(state_rec):
+            res = _unwrap_one_row(state_rec)
+            if res is None:
+                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            active = _jsonloads_data(res["active"])
+            policyTouched = _jsonloads_data(res["policyTouched"])
+            groupTouched = res["groupTouched"]
+            pending = _jsonloads_data(res["pending"])
+            return {
+                "active": active,
+                "policyTouched": policyTouched,
+                "groupTouched": groupTouched,
+                "pending": pending
+            }
+
+        query = _cql_view_group_state.format(cf=self.launch_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid},
+                                    get_consistency_level('view', 'partial'))
+        d.addCallback(_do_state_lookup)
+        return d
 
     # TODO: There is no state yet, and updating the config should update the
     # state
