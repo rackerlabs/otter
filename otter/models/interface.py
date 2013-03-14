@@ -51,7 +51,7 @@ class NoSuchWebhookError(Exception):
 
 class IScalingGroupState(Interface):
     """
-    Represents an accessor for group state
+    Represents an accessor for group state.
     """
 
     def add_server(name, instance_id, uri, pending_job_id, created=None):
@@ -72,21 +72,32 @@ class IScalingGroupState(Interface):
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
 
-    def add_jobs(job_dict):
+    def update_jobs(job_dict, transaction_id, policy_id=None, timestamp=None):
         """
-        Adds jobs to the store of pending jobs
+        Update jobs with the jobs dict, which should contain all outstanding
+        jobs in the group, not just new jobs.
+
+        If the jobs changed as a result of hte policy, modify the touched times
+        for the given policy (and the group at large).
 
         :param dict job_dict: a dictionary mapping jobs to a dictionary as
-            defined by :data:`otter.json_schema.model_schemas.pending_jobs`
+            defined by :data:`otter.json_schema.model_schemas.pending_jobs`.
+            This should contain both all the old jobs and new jobs to be added.
+            The old jobs should have been obtained by a call to
+            :meth:`read_state`.
 
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-        """
+        :param transaction_id: the ID of the transaction that caused the jobs
+            to be updated.  A policy execution would have a transaction ID,
+            as would a config update that causes jobs to execute.
 
-    def touch_policy(policy_id):
-        """
-        Update the last executed time of a policy (and also the group).
+        :param policy_id: The ID of the policy that was executed, if any.
 
-        :param str policy_id: the id of the policy that was last executed
+        :param str timestamp: the time the policy was executed, resulting in
+            the change in jobs.  If not provided, and ``policy_id`` is provided,
+            the created time will be the time this function is called.  This
+            should be a timestamp as produced by or parsed by
+            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
+            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """

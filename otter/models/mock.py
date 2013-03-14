@@ -361,15 +361,10 @@ class MockScalingGroup:
         """
         raise NotImplementedError()
 
-    def add_jobs(self, job_dict):
+    def update_jobs(self, job_dict, transaction_id, policy_id=None,
+                    timestamp=None):
         """
-        see :meth:`otter.models.interface.IScalingGroupState.add_jobs`
-        """
-        raise NotImplementedError()
-
-    def touch_policy(self, policy_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.touch_policy`
+        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
         """
         raise NotImplementedError()
 
