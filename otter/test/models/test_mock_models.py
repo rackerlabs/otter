@@ -76,16 +76,10 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
 
-        # config, launch config, etc. doesn't matter, only policies
-        self.policies = [{
-            "name": "set number of servers to 10",
-            "steadyState": 10,
-            "cooldown": 3
-        }]
+        # config, launch config, etc. policies don't matter
         self.state = MockScalingGroup(
             self.mock_log, self.tenant_id, 1,
-            {'config': {}, 'launch': {},
-             'policies': self.policies})
+            {'config': {}, 'launch': {}, 'policies': {}})
 
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
