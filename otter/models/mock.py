@@ -6,13 +6,14 @@ from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid4
 
-import zope.interface
+from zope.interface import implementer
 
 from twisted.internet import defer
 
 from otter.models.interface import (
-    IScalingGroup, IScalingGroupCollection, NoSuchScalingGroupError,
-    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
+    IScalingGroup, IScalingGroupState, IScalingGroupCollection,
+    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
+    UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
 
 
@@ -32,6 +33,7 @@ def generate_entity_links(tenant_id, entity_ids,
         for entity_id in entity_ids])
 
 
+@implementer(IScalingGroup, IScalingGroupState)
 class MockScalingGroup:
     """
     .. autointerface:: otter.models.interface.IScalingGroup
@@ -74,8 +76,6 @@ class MockScalingGroup:
     :ivar running: whether the scaling is currently running, or paused
     :type entities: ``bool``
     """
-    zope.interface.implements(IScalingGroup)
-
     def __init__(self, log, tenant_id, uuid, creation=None):
         """
         Creates a MockScalingGroup object.  If the actual scaling group should
@@ -355,13 +355,30 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
+    def add_server(self, name, instance_id, uri, pending_job_id, created=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.add_server`
+        """
+        raise NotImplementedError()
 
+    def add_jobs(self, job_dict):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.add_jobs`
+        """
+        raise NotImplementedError()
+
+    def touch_policy(self, policy_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.touch_policy`
+        """
+        raise NotImplementedError()
+
+
+@implementer(IScalingGroupCollection)
 class MockScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
     """
-    zope.interface.implements(IScalingGroupCollection)
-
     def __init__(self):
         """
         Init

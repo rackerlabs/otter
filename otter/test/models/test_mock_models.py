@@ -12,6 +12,7 @@ from otter.models.interface import (NoSuchScalingGroupError,
                                     UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
+    IScalingGroupStateProviderMixin,
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
 
@@ -61,6 +62,30 @@ class GenerateEntityLinksTestCase(TestCase):
         """
         links = generate_entity_links("1", [str(i) for i in range(5)])
         self.assertEqual(len(links), 5)
+
+
+class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
+    """
+    Tests for :class:`MockScalingGroup`
+    """
+
+    def setUp(self):
+        """
+        Create a mock group
+        """
+        self.tenant_id = '11111'
+        self.mock_log = mock.MagicMock()
+
+        # config, launch config, etc. doesn't matter, only policies
+        self.policies = [{
+            "name": "set number of servers to 10",
+            "steadyState": 10,
+            "cooldown": 3
+        }]
+        self.state = MockScalingGroup(
+            self.mock_log, self.tenant_id, 1,
+            {'config': {}, 'launch': {},
+             'policies': self.policies})
 
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
