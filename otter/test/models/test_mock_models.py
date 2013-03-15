@@ -130,10 +130,11 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_view_state_returns_valid_scheme_when_empty(self):
         """
-        ``view_state`` returns something conforming to the scheme whether or
-        not there are entities in the system
+        ``view_state`` returns all the state information stored in the
+        MockScalingGroup as the required keys
         """
-        self.assertEquals(self.validate_view_state_return_value(), {
+        result = self.assert_deferred_succeeded(self.group.view_state())
+        self.assertEquals(result, {
             'active': {},
             'pending': {},
             'paused': False,

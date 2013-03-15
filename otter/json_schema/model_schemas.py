@@ -1,111 +1,16 @@
 """
 JSON schema to be used to verify the return values from implementations of the
 model interface.
+
+This is only going to be used internally to verify the schemas returned by the
+interface.  Probably easier to test just by asserting simplified dictionaries
+so that all the correct data doesn't have to be mocked.
+
+Please delete from this file.
 """
 from copy import deepcopy
 from otter.json_schema import group_schemas
 
-# example:
-# {
-#   "active": {
-#     "server_name": {
-#       "instanceId": "instance id",
-#       "instanceUri": "instance uri",
-#       "created": "created timestamp"
-#     },
-#     ...
-#   },
-#   "pending": {
-#     "job_id": {
-#         "created": "created timestamp"
-#     },
-#       ...
-#   },
-#   "groupTouched": "timestamp any policy was last executed"
-#   "policyTouched": {
-#     "policy_id": "timestamp this policy was last executed",
-#     ...
-#   },
-#   "paused": false
-# }
-#
-pending_jobs = {
-    'type': 'object',
-    'description': "The pending job IDs of servers not yet built",
-    'patternProperties': {
-        "^\S+$": {
-            'type': 'object',
-            'properties': {
-                "created": {
-                    'description': "The time the job was started",
-                    'type': 'string',
-                    'required': True
-                }
-            },
-            'additionalProperties': False
-        }
-    },
-    'additionalProperties': False,
-    'required': True
-}
-
-
-group_state = {
-    'type': 'object',
-    'properties': {
-        'paused': {
-            'type': 'boolean',
-            'required': True
-        },
-        'active': {
-            'type': 'object',
-            'description': "The active servers in this group",
-            'patternProperties': {
-                "^\S+$": {
-                    'type': 'object',
-                    'properties': {
-                        "instanceId": {
-                            'type': 'string',
-                            'description': "The instance ID of the server",
-                            'required': True
-                        },
-                        "instanceUri": {
-                            'type': 'string',
-                            'description': "The instance URI of the server",
-                            'required': True
-                        },
-                        "created": {
-                            'type': 'string',
-                            'description': "The time the server was created",
-                            'required': True
-                        }
-                    },
-                    "additionalProperties": False
-                }
-            },
-            'additionalProperties': False,
-            'required': True
-        },
-        'pending': pending_jobs,
-        "groupTouched": {
-            'description': "The timestamp of the last time any policy was executed",
-            'type': ['null', 'string'],
-            'required': True
-        },
-        "policyTouched": {
-            'description': "The timestamp of the last time a particular policy was executed",
-            'patternProperties': {
-                "^\S+$": {
-                    'type': 'string',
-                    'description': "The timestamp of the last time this policy was executed",
-                }
-            },
-            'additionalProperties': False,
-            'required': True
-        }
-    },
-    'additionalProperties': False
-}
 
 # unlike updating or inputing a group config, the returned config must actually
 # have all the properties

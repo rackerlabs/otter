@@ -6,8 +6,7 @@ from copy import deepcopy
 from twisted.trial.unittest import TestCase
 from jsonschema import Draft3Validator, validate, ValidationError
 
-from otter.json_schema import (
-    group_schemas, group_examples, rest_schemas, model_schemas)
+from otter.json_schema import group_schemas, group_examples, rest_schemas
 
 
 class ScalingGroupConfigTestCase(TestCase):
@@ -376,36 +375,3 @@ class CreateScalingGroupTestCase(TestCase):
                 group_examples.launch_server_config()[0],
                 'scalingPolicies': {"Hello!": "Yes quite."}
             }, rest_schemas.create_group_request)
-
-
-class GroupStateModelTestCase(TestCase):
-    """
-    Tests for the group state model schema
-    """
-    valid = {
-        'paused': False,
-        'pending': {},
-        'active': {},
-        'groupTouched': '2012-01-01T12:01:00',
-        'policyTouched': {}
-    }
-
-    def test_schema_valid(self):
-        """
-        The schema itself is a valid Draft 3 schema and the valid schema
-        validates
-        """
-        Draft3Validator.check_schema(model_schemas.group_state)
-        validate(self.valid, model_schemas.group_state)
-
-    def test_missing_parameter_does_not_validate(self):
-        """
-        paused, pending, active, groupTouched, and policyTouched must all
-        be there
-        """
-        for key in self.valid:
-            invalid = self.valid.copy()
-            del invalid[key]
-
-            self.assertRaises(ValidationError, validate, invalid,
-                              model_schemas.group_state)
