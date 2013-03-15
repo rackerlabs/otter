@@ -319,6 +319,7 @@ class CassScalingGroup(object):
         self.config_table = "scaling_config"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
+        self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
 
     def view_manifest(self):
@@ -370,7 +371,7 @@ class CassScalingGroup(object):
                 "pending": pending
             }
 
-        query = _cql_view_group_state.format(cf=self.launch_table)
+        query = _cql_view_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},

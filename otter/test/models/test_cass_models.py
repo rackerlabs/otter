@@ -203,7 +203,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.assert_deferred_succeeded(d)
-        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched" FROM launch_config '
+        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched" FROM group_state '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
