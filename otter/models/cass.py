@@ -1,13 +1,14 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
-import zope.interface
+from zope.interface import implementer
 
 from twisted.internet import defer
 
-from otter.models.interface import (IScalingGroup, IScalingGroupCollection,
-                                    NoSuchScalingGroupError, NoSuchPolicyError,
-                                    NoSuchWebhookError, UnrecognizedCapabilityError)
+from otter.models.interface import (
+    IScalingGroupState, IScalingGroup, IScalingGroupCollection,
+    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
+    UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 #from otter.controller import maybe_execute_scaling_policy
@@ -281,6 +282,7 @@ def _grab_list(raw_response, id_name, has_data=True):
                                'required field "{0!s}"'.format(e))
 
 
+@implementer(IScalingGroup, IScalingGroupState)
 class CassScalingGroup(object):
     """
     .. autointerface:: otter.models.interface.IScalingGroup
@@ -306,8 +308,6 @@ class CassScalingGroup(object):
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    zope.interface.implements(IScalingGroup)
-
     def __init__(self, log, tenant_id, uuid, connection):
         """
         Creates a CassScalingGroup object.
@@ -711,7 +711,21 @@ class CassScalingGroup(object):
 
         return _jsonloads_data(results[0]['data'])
 
+    def add_server(self, name, instance_id, uri, pending_job_id, created=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.add_server`
+        """
+        raise NotImplementedError()
 
+    def update_jobs(self, job_dict, transaction_id, policy_id=None,
+                    timestamp=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
+        """
+        raise NotImplementedError()
+
+
+@implementer(IScalingGroupCollection)
 class CassScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
@@ -744,8 +758,6 @@ class CassScalingGroupCollection:
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    zope.interface.implements(IScalingGroupCollection)
-
     def __init__(self, connection):
         """
         Init

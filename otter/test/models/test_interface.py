@@ -5,17 +5,37 @@ from jsonschema import validate
 
 from zope.interface.verify import verifyObject
 
-from otter.models.interface import IScalingGroup, IScalingGroupCollection
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupCollection, IScalingGroupState)
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas
 from otter.test.utils import DeferredTestMixin
 
 
+class IScalingGroupStateProviderMixin(DeferredTestMixin):
+    """
+    Mixin that tests for anything that provides
+    :class:`otter.models.interface.IScalingGroupState`.
+
+    :ivar group: an instance of an
+        :class:`otter.models.interface.IScalingGroupState` provider
+    """
+
+    def test_implements_interface(self):
+        """
+        The provider correctly implements
+        :class:`otter.models.interface.IScalingGroupState`.
+        """
+        verifyObject(IScalingGroupState, self.state)
+
+
 class IScalingGroupProviderMixin(DeferredTestMixin):
     """
-    Mixin that tests for anything that provides :class:`IScalingGroup`.
+    Mixin that tests for anything that provides
+    :class:`otter.models.interface.IScalingGroup`.
 
-    :ivar group: an instance of an :class:`IScalingGroup` provider
+    :ivar group: an instance of an
+        :class:`otter.models.interface.IScalingGroup` provider
     """
 
     sample_webhook_data = {
@@ -27,7 +47,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
     def test_implements_interface(self):
         """
         The provider correctly implements
-        :class:`otter.scaling_groups_interface.IScalingGroup`.
+        :class:`otter.models.interface.IScalingGroup`.
         """
         verifyObject(IScalingGroup, self.group)
 
