@@ -52,9 +52,9 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", deleted) VALUES(:tenantId, :groupId, :active:'
-                           ':pending, :groupTouched, :policyTouched, False)')
-_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched" FROM {cf} '
+                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
+                           ':pending, :groupTouched, :policyTouched, :paused, False)')
+_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
                          'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -364,8 +364,10 @@ class CassScalingGroup(object):
             policyTouched = _jsonloads_data(res["policyTouched"])
             groupTouched = res["groupTouched"]
             pending = _jsonloads_data(res["pending"])
+            paused = res["paused"]
             return {
                 "active": active,
+                "paused": paused,
                 "policyTouched": policyTouched,
                 "groupTouched": groupTouched,
                 "pending": pending
