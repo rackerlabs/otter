@@ -198,12 +198,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         cass_response = _cassandrify_data([
             {'active': '{"F":"R"}', 'pending': '{"F":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"F":"R"}'}])
+             'policyTouched': '{"F":"R"}', 'paused': False}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.assert_deferred_succeeded(d)
-        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched" FROM group_state '
+        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM group_state '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -212,7 +212,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(r, {'active': {'F': 'R'},
                              'groupTouched': '123',
                              'pending': {'F': 'R'},
-                             'policyTouched': {'F': 'R'}})
+                             'policyTouched': {'F': 'R'},
+                             'paused': False})
 
     def test_view_config_bad_db_data(self):
         """
