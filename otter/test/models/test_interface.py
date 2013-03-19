@@ -90,18 +90,6 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         validate(result, launch_config)
         return result
 
-    def validate_view_state_return_value(self, *args, **kwargs):
-        """
-        Calls ``view_state()``, and validates that it returns a state
-        dictionary containing relevant state values
-
-        :return: the return value of ``view_state()``
-        """
-        result = self.assert_deferred_succeeded(
-            self.group.view_state(*args, **kwargs))
-        validate(result, model_schemas.group_state)
-        return result
-
     def validate_list_policies_return_value(self, *args, **kwargs):
         """
         Calls ``list_policies``, and validates that it returns a policy

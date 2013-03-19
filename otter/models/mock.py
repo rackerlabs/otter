@@ -57,21 +57,28 @@ class MockScalingGroup:
         by :data:`otter.json_schema.scaling_group.scaling_policy`
     :type config: ``dict``
 
-    :ivar steady: the desired steady state number of entities -
-        defaults to the minimum if not given.  This how many entities the
-        system thinks there should be.  It is like a variable used by
-        the scaling system to keep track of how many servers there should be,
-        as opposed to constants like the minimum and maximum (which constrain
-        what values the ``steady_state`` can be).
-    :type steady_state: ``int``
+    :ivar active_entities: the servers corresponding to the active
+        entities in this scaling group, in the following format::
 
-    :ivar active_entities: the entity id's corresponding to the active
-        entities in this scaling group
-    :type active_entities: ``list``
+            {
+                "server_name": {
+                    "instance_id": "instance_id"
+                    "instance_uri": "instance_uri",
+                    "created": <timestamp_of_creation>
+                }, ...
+            }
 
-    :ivar pending_entities: the entity id's corresponding to the pending
-        entities in this scaling group
-    :type pending_entities: ``list``
+    :type active_entities: ``dict`` of ``dict``
+
+    :ivar pending_jobs: the job id's corresponding to the pending
+        entities in this scaling group, in the following format::
+
+            {
+                "job_id": {"created": <timestamp_of_creation>},
+                ...
+            }
+
+    :type pending_jobs: ``dict`` of ``dict``
 
     :ivar running: whether the scaling is currently running, or paused
     :type entities: ``bool``
@@ -87,9 +94,10 @@ class MockScalingGroup:
         self.uuid = uuid
 
         # state that may be changed
-        self.steady_state = 0
         self.active_entities = {}
-        self.pending_entities = {}
+        self.pending_jobs = {}
+        self.policy_touched = {}
+        self.group_touched = None
         self.paused = False
 
         if creation is not None:
@@ -150,10 +158,11 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
         return defer.succeed({
-            'steadyState': self.steady_state,
             'active': self.active_entities,
-            'pending': self.pending_entities,
-            'paused': self.paused
+            'pending': self.pending_jobs,
+            'paused': self.paused,
+            'groupTouched': self.group_touched,
+            'policyTouched': self.policy_touched
         })
 
     def update_config(self, data, partial_update=False):

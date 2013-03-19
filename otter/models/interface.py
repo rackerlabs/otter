@@ -146,16 +146,31 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        The state of the scaling group consists of a mapping of entity id's to
-        entity links for the current entities in the scaling group, a mapping
-        of entity id's to entity links for the pending entities in the scaling
-        group, the desired steady state number of entities, and a boolean
-        specifying whether scaling is currently paused.
+        :return: the state information for the group, which looks like::
 
-        The entity links are in JSON link format.
+            {
+              "active": {
+                "server_name": {
+                  "instanceId": "instance id",
+                  "instanceUri": "instance uri",
+                  "created": "created timestamp"
+                },
+                ...
+              },
+              "pending": {
+                "job_id": {
+                    "created": "created timestamp"
+                },
+                  ...
+              },
+              "groupTouched": "timestamp any policy was last executed"
+              "policyTouched": {
+                "policy_id": "timestamp this policy was last executed",
+                ...
+              },
+              "paused": false
+            }
 
-        :return: a view of the state of the scaling group corresponding to the
-            JSON schema at :data:``otter.json_schema.model_schemas.group_state``
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
