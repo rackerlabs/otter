@@ -1,77 +1,16 @@
 """
 JSON schema to be used to verify the return values from implementations of the
 model interface.
+
+This is only going to be used internally to verify the schemas returned by the
+interface.  Probably easier to test just by asserting simplified dictionaries
+so that all the correct data doesn't have to be mocked.
+
+Please delete from this file.
 """
 from copy import deepcopy
 from otter.json_schema import group_schemas
 
-entity_schema = {
-    'type': 'object',
-    'patternProperties': {
-        "^\S+$": {
-            'type': 'array',
-            'required': True,
-            'uniqueItems': True,
-            'minItems': 1,
-            'items': {
-                "type": "object",
-                "properties": {
-                    'rel': {
-                        'type': 'string',
-                        'required': True
-                    },
-                    'href': {
-                        'type': 'string',
-                        'required': True
-                    }
-                },
-                "additionalProperties": False
-            }
-        }
-    },
-    'additionalProperties': False
-}
-
-# example:
-# {
-#   "active": {
-#     "{instanceId1}": [
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-#         "rel": "self"
-#       },
-#       ...
-#     ]
-#   },
-#   "pending": {
-#     "{instanceId2}": [
-#       {
-#         "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
-#         "rel": "self"
-#       },
-#       ...
-#     ]
-#   },
-#   "steadyState": 2,
-#   "paused": false
-# }
-group_state = {
-    'type': 'object',
-    'properties': {
-        'steadyState': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        },
-        'paused': {
-            'type': 'boolean',
-            'required': True
-        },
-        'active': entity_schema,
-        'pending': entity_schema
-    },
-    'additionalProperties': False
-}
 
 # unlike updating or inputing a group config, the returned config must actually
 # have all the properties
