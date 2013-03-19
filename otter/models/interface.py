@@ -49,6 +49,60 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class IScalingGroupState(Interface):
+    """
+    Represents an accessor for group state.
+    """
+
+    def add_server(name, instance_id, uri, pending_job_id, created=None):
+        """
+        Takes information about an active server and adds it to the store of
+        active servers.
+
+        :param str name: the name of the server
+        :param str instance_id: the instance id of the server
+        :param str uri: the link to the server
+        :param str pending_job_id: the job ID that used to have this
+        :param str created: the time the server moved from pending to created -
+            if not provided, the created time will be the time this function
+            is called.  This should be a timestamp as produced by or parsed by
+            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
+            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+    def update_jobs(job_dict, transaction_id, policy_id=None, timestamp=None):
+        """
+        Update jobs with the jobs dict, which should contain all outstanding
+        jobs in the group, not just new jobs.
+
+        If the jobs changed as a result of hte policy, modify the touched times
+        for the given policy (and the group at large).
+
+        :param dict job_dict: a dictionary mapping jobs to a dictionary as
+            defined by :data:`otter.json_schema.model_schemas.pending_jobs`.
+            This should contain both all the old jobs and new jobs to be added.
+            The old jobs should have been obtained by a call to
+            :meth:`read_state`.
+
+        :param transaction_id: the ID of the transaction that caused the jobs
+            to be updated.  A policy execution would have a transaction ID,
+            as would a config update that causes jobs to execute.
+
+        :param policy_id: The ID of the policy that was executed, if any.
+
+        :param str timestamp: the time the policy was executed, resulting in
+            the change in jobs.  If not provided, and ``policy_id`` is provided,
+            the created time will be the time this function is called.  This
+            should be a timestamp as produced by or parsed by
+            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
+            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record

@@ -15,6 +15,7 @@ from otter.models.interface import (NoSuchScalingGroupError, NoSuchPolicyError,
                                     NoSuchWebhookError, UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
+    IScalingGroupStateProviderMixin,
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
 
@@ -76,6 +77,30 @@ def _cassandrify_data(list_of_dicts):
             })
         results.append({'cols': columns, 'key': ''})
     return _de_identify(results)
+
+
+class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
+    """
+    Tests for :class:`CassScalingGroup`
+    """
+
+    def setUp(self):
+        """
+        Create a mock group
+        """
+        self.tenant_id = '11111'
+        self.group_id = '12345789g'
+        self.mock_log = mock.MagicMock()
+        self.connection = mock.MagicMock(spec=['execute'])
+
+        # config, launch config, etc. doesn't matter, only policies
+        self.policies = [{
+            "name": "set number of servers to 10",
+            "steadyState": 10,
+            "cooldown": 3
+        }]
+        self.state = CassScalingGroup(
+            self.mock_log, self.tenant_id, self.group_id, self.connection)
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
