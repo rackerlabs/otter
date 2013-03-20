@@ -81,6 +81,79 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
             self.mock_log, self.tenant_id, 1,
             {'config': {}, 'launch': {}, 'policies': {}})
 
+    def test_state(self):
+        """
+        Test the normal use case..  update an empty group with a job,
+        move the server to fully operational.
+        """
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        d = self.state.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.state.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
+    def test_state_bad_job_id(self):
+        """
+        Test that if we try to pass in a bad job ID it continues
+        """
+        d = self.state.add_server({}, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.state.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': None,
+                                  'pending': {},
+                                  'policyTouched': {}})
+
+    def test_state_bad_server(self):
+        """
+        Test that if we try to pass in a bad server it continues
+        """
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"},
+                "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        d = self.state.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'},
+                                              'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.state.add_server(result, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.state.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """

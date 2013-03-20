@@ -15,6 +15,7 @@ from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
+from otter.util.timestamp import now
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -80,7 +81,7 @@ class MockScalingGroup:
 
     :type pending_jobs: ``dict`` of ``dict``
 
-    :ivar running: whether the scaling is currently running, or paused
+    :ivar paused: whether the scaling is currently running, or paused
     :type entities: ``bool``
     """
     def __init__(self, log, tenant_id, uuid, creation=None):
@@ -368,14 +369,31 @@ class MockScalingGroup:
         """
         see :meth:`otter.models.interface.IScalingGroupState.add_server`
         """
-        raise NotImplementedError()
+        ts = created
+        if ts is None:
+            ts = now()
+        if pending_job_id in self.pending_jobs:
+            del self.pending_jobs[pending_job_id]
+
+        if not name in self.active_entities:
+            self.active_entities[name] = {"instance_id": instance_id,
+                                          "instance_uri": uri,
+                                          "created": ts}
+
+        return defer.succeed(None)
 
     def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
                     timestamp=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
         """
-        raise NotImplementedError()
+        ts = timestamp
+        if ts is None:
+            ts = now()
+        self.pending_jobs = job_dict
+        self.group_touched = ts
+        self.policy_touched[policy_id] = ts
+        return defer.succeed(None)
 
 
 @implementer(IScalingGroupCollection)
