@@ -713,13 +713,13 @@ class CassScalingGroup(object):
 
         return _jsonloads_data(results[0]['data'])
 
-    def add_server(self, name, instance_id, uri, pending_job_id, created=None):
+    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.add_server`
         """
         raise NotImplementedError()
 
-    def update_jobs(self, job_dict, transaction_id, policy_id=None,
+    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
                     timestamp=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
