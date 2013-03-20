@@ -373,16 +373,14 @@ class MockScalingGroup:
         if ts is None:
             ts = now()
         if pending_job_id in self.pending_jobs:
-            if not name in self.active_entities:
-                self.active_entities[name] = {"instance_id": instance_id,
-                                              "instance_uri": uri,
-                                              "created": ts}
-                del self.pending_jobs[pending_job_id]
-                return defer.succeed(None)
-            else:
-                return defer.fail(Exception("Entity already exists"))
-        else:
-            return defer.fail(Exception("No pending job"))
+            del self.pending_jobs[pending_job_id]
+
+        if not name in self.active_entities:
+            self.active_entities[name] = {"instance_id": instance_id,
+                                          "instance_uri": uri,
+                                          "created": ts}
+
+        return defer.succeed(None)
 
     def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
                     timestamp=None):
