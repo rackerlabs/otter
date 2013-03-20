@@ -54,11 +54,13 @@ class IScalingGroupState(Interface):
     Represents an accessor for group state.
     """
 
-    def add_server(name, instance_id, uri, pending_job_id, created=None):
+    def add_server(state, name, instance_id, uri, pending_job_id, created=None):
         """
         Takes information about an active server and adds it to the store of
         active servers.
 
+        :param dict state: a dict, like you'd see returned from view_state,
+            containing the state of the group
         :param str name: the name of the server
         :param str instance_id: the instance id of the server
         :param str uri: the link to the server
@@ -72,13 +74,16 @@ class IScalingGroupState(Interface):
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
 
-    def update_jobs(job_dict, transaction_id, policy_id=None, timestamp=None):
+    def update_jobs(state, job_dict, transaction_id, policy_id=None, timestamp=None):
         """
         Update jobs with the jobs dict, which should contain all outstanding
         jobs in the group, not just new jobs.
 
         If the jobs changed as a result of hte policy, modify the touched times
         for the given policy (and the group at large).
+
+        :param dict state: a dict, like you'd see returned from view_state,
+            containing the state of the group
 
         :param dict job_dict: a dictionary mapping jobs to a dictionary as
             defined by :data:`otter.json_schema.model_schemas.pending_jobs`.

@@ -364,13 +364,13 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
-    def add_server(self, name, instance_id, uri, pending_job_id, created=None):
+    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.add_server`
         """
         raise NotImplementedError()
 
-    def update_jobs(self, job_dict, transaction_id, policy_id=None,
+    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
                     timestamp=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
