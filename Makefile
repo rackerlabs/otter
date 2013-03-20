@@ -9,6 +9,7 @@ CASSANDRA_HOST ?= localhost
 CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
+CLOUDCAFE ?= $(shell which runner.py)
 
 test: unit integration
 
@@ -33,7 +34,12 @@ else
 endif
 
 integration:
-	@echo "integration test here"
+ifneq ($(CLOUDCAFE), )
+	runner.py autoscale dev
+else
+	@echo "Are you on the VM?  cloudcafe is not set up as desired."
+	@echo "So can't run integration tests."
+endif
 
 coverage:
 	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
