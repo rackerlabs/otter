@@ -38,7 +38,6 @@ def getSchema(base):
     return schemas
 
 data_files = getSchema(SCHEMA_DIR)
-data_files.append(('otter/rest', ['otter/rest/otter_ascii.txt']))
 
 
 # If a twisted/plugins directory exists make sure we install the
@@ -54,7 +53,8 @@ setup(
     version='0.0.0',
     packages=packages,
     data_files=data_files,
-    scripts=['scripts/load_cql.py']
+    scripts=['scripts/load_cql.py'],
+    package_data={'otter.rest': ['otter_ascii.txt']}
 )
 
 # Make Twisted regenerate the dropin.cache, if possible.  This is necessary
