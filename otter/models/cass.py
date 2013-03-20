@@ -52,9 +52,9 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", deleted) VALUES(:tenantId, :groupId, :active:'
-                           ':pending, :groupTouched, :policyTouched, False)')
-_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched" FROM {cf} '
+                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
+                           ':pending, :groupTouched, :policyTouched, :paused, False)')
+_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
                          'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -364,8 +364,10 @@ class CassScalingGroup(object):
             policyTouched = _jsonloads_data(res["policyTouched"])
             groupTouched = res["groupTouched"]
             pending = _jsonloads_data(res["pending"])
+            paused = res["paused"]
             return {
                 "active": active,
+                "paused": paused,
                 "policyTouched": policyTouched,
                 "groupTouched": groupTouched,
                 "pending": pending
@@ -711,13 +713,13 @@ class CassScalingGroup(object):
 
         return _jsonloads_data(results[0]['data'])
 
-    def add_server(self, name, instance_id, uri, pending_job_id, created=None):
+    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.add_server`
         """
         raise NotImplementedError()
 
-    def update_jobs(self, job_dict, transaction_id, policy_id=None,
+    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
                     timestamp=None):
         """
         see :meth:`otter.models.interface.IScalingGroupState.update_jobs`

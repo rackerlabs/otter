@@ -36,6 +36,7 @@ CREATE COLUMNFAMILY group_state (
     pending ascii,
     "groupTouched" ascii,
     "policyTouched" ascii,
+    paused boolean,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId")
     );
