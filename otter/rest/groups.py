@@ -395,6 +395,8 @@ def get_scaling_group_state(request, log, tenantId, groupId):
     of entities, the current desired number of steady state servers.  This
     data is returned in the body of the response in JSON format.
 
+    There is no guarantee about the sort order of the list of active entities.
+
     Example response::
 
         {
@@ -426,33 +428,34 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                 ]
               }
             ],
-            "pending": [
-              {
-                "id": "{instanceId3}"
-                "links": [
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId3},
-                    "rel": "self"
-                  }
-                ]
-              }
-            ],
-            "steadyState": 3,
+            "numActive": 2,
+            "numPending": 2,
+            "steadyState": 4,
             "paused": false
           }
         }
     """
     def reformat_active_and_pending(state_blob):
-        for key in ('active', 'pending'):
-            state_blob[key] = [
-                {
-                    'id': entity_id,
-                    'links': entity_links
-                } for entity_id, entity_links in state_blob[key].iteritems()]
+        response_dict = {
+            'numActive': len(state_blob['active']),
+            'numPending': len(state_blob['pending']),
+            'paused': state_blob['paused']
+        }
+        response_dict['steadyState'] = (
+            response_dict['numActive'] + response_dict['numPending'])
 
-        state_blob["id"] = groupId
-        state_blob["links"] = get_autoscale_links(tenantId, groupId)
-        return {"group": state_blob}
+        response_dict['active'] = [
+            {
+                'id': server_blob['instanceId'],
+                'links': [{
+                    'href': server_blob['instanceUri'],
+                    'rel': 'self'
+                }]
+            } for key, server_blob in state_blob['active'].iteritems()]
+
+        response_dict["id"] = groupId
+        response_dict["links"] = get_autoscale_links(tenantId, groupId)
+        return {"group": response_dict}
 
     group = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = group.view_state()
