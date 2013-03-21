@@ -1134,12 +1134,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.update_webhook('3444', '4555', {'name': 'newname'})
         self.assertIsNone(self.assert_deferred_succeeded(d))
 
-        expected_webhook_data = {
-            'name': 'newname',
-            'metadata': {}
-        }
-        self.assertEqual(self.connection.execute.call_args[0][1]['data'],
-                         expected_webhook_data)
+        self.assertEqual(
+            json.loads(self.connection.execute.call_args[0][1]['data']),
+            {'name': 'newname', 'metadata': {}, '_ver': 1})
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_webhook',
                 return_value=defer.fail(NoSuchWebhookError('t', 'g', 'p', 'w')))
