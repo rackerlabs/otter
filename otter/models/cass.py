@@ -663,14 +663,14 @@ class CassScalingGroup(object):
         def _update_data(lastRev):
             data.setdefault('metadata', {})
             query = _cql_update_webhook.format(cf=self.webhooks_table)
-            d = self.connection.execute(query,
-                                        {"tenantId": self.tenant_id,
-                                         "groupId": self.uuid,
-                                         "policyId": policy_id,
-                                         "webhookId": webhook_id,
-                                         "data": data},
-                                        get_consistency_level('update', 'webhook'))
-            return d
+            return self.connection.execute(
+                query,
+                {"tenantId": self.tenant_id,
+                 "groupId": self.uuid,
+                 "policyId": policy_id,
+                 "webhookId": webhook_id,
+                 "data": _serial_json_data(data, 1)},
+                get_consistency_level('update', 'webhook'))
 
         d = self.get_webhook(policy_id, webhook_id)
         return d.addCallback(_update_data)
