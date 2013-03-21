@@ -1107,12 +1107,19 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", '
             '"webhookId", data) VALUES (:tenantId, :groupId, :policyId, '
             ':webhookId, :data);')
-        expectedData = {"tenantId": "11111", "groupId": "12345678g",
-                        "policyId": "3444", "webhookId": "4555",
-                        "data": new_webhook_data}
 
+        # json is serialized, so unserialize it and check
         self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+            expectedCql, mock.ANY, ConsistencyLevel.TWO)
+
+        # first call, args
+        data = self.connection.execute.call_args[0][1]
+        data['data'] = json.loads(data['data'])
+        new_webhook_data['_ver'] = 1
+        self.assertEqual(data,
+                         {"tenantId": "11111", "groupId": "12345678g",
+                          "policyId": "3444", "webhookId": "4555",
+                          "data": new_webhook_data})
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_webhook')
     def test_update_webhook_default_empty_metadata(self, mock_get_webhook):
@@ -1127,12 +1134,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.update_webhook('3444', '4555', {'name': 'newname'})
         self.assertIsNone(self.assert_deferred_succeeded(d))
 
-        expected_webhook_data = {
-            'name': 'newname',
-            'metadata': {}
-        }
-        self.assertEqual(self.connection.execute.call_args[0][1]['data'],
-                         expected_webhook_data)
+        self.assertEqual(
+            json.loads(self.connection.execute.call_args[0][1]['data']),
+            {'name': 'newname', 'metadata': {}, '_ver': 1})
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_webhook',
                 return_value=defer.fail(NoSuchWebhookError('t', 'g', 'p', 'w')))
