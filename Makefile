@@ -35,7 +35,7 @@ endif
 
 integration:
 ifneq ($(CLOUDCAFE), )
-	runner.py autoscale dev
+	runner.py autoscale dev --parallel
 else
 	@echo "Are you on the VM?  cloudcafe is not set up as desired."
 	@echo "So can't run integration tests."
