@@ -1,5 +1,8 @@
 """
 JSON schemas for the rest responses from autoscale
+
+NOTE: this is out of date - specifically, group state.
+Not sure if the response schemas are useful, so not removing them yet.
 """
 
 from copy import deepcopy
