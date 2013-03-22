@@ -162,40 +162,6 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         yield self.assert_number_of_scaling_groups(0)
 
     @defer.inlineCallbacks
-    def test_update_scaling_config(self):
-        """
-        Editing the config of a scaling group with a valid config returns with
-        a 204 no content.  The next attempt to view the scaling config should
-        return the new config.  The steady state numbers get updated as well,
-        if necessary.
-        """
-        path = yield self.create_scaling_group()
-        config_path = path + 'config/'
-        edited_config = {
-            'name': 'updated_config',
-            'cooldown': 5,
-            'minEntities': self._config['minEntities'] + 5,
-            'maxEntities': self._config['maxEntities'] + 5,
-            'metadata': {
-                'anotherkey': 'anothervalue'
-            }
-        }
-
-        wrapper = yield request(root, 'PUT', config_path,
-                                body=json.dumps(edited_config))
-        self.assert_response(wrapper, 204, "Edit config failed.")
-        self.assertEqual(wrapper.content, "")
-
-        # now try to view again - the config should be the edited config
-        wrapper = yield request(root, 'GET', config_path)
-        self.assert_response(wrapper, 200)
-        self.assertEqual(json.loads(wrapper.content),
-                         {'groupConfiguration': edited_config})
-
-        # TODO: make sure the created group has updated pending entities, and
-        # is still not paused
-
-    @defer.inlineCallbacks
     def test_update_launch_config(self):
         """
         Editing the launch config of a scaling group with a valid launch config
