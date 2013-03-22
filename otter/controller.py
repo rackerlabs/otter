@@ -30,7 +30,8 @@ from otter.supervisor import execute_one_config
 def pause_scaling_group(log, transaction_id, scaling_group):
     """
     Pauses the scaling group, causing all scaling policy executions to be
-    rejected until unpaused.
+    rejected until unpaused.  This is an idempotent change, if it's already
+    paused, this does not raise an error.
 
     :raises: :class:`NoSuchScalingGroup` if the scaling group does not exist.
 
@@ -42,7 +43,8 @@ def pause_scaling_group(log, transaction_id, scaling_group):
 def resume_scaling_group(log, transaction_id, scaling_group):
     """
     Resumes the scaling group, causing all scaling policy executions to be
-    evaluated as normal again.
+    evaluated as normal again.  This is an idempotent change, if it's already
+    paused, this does not raise an error.
 
     :raises: :class:`NoSuchScalingGroup` if the scaling group does not exist.
 
