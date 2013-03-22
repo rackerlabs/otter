@@ -398,6 +398,13 @@ def get_scaling_group_state(request, log, tenantId, groupId):
 
         {
           "group": {
+            "id": "{groupId}",
+            "links": [
+              {
+                "href": "{url_root}/v1.0/010101/groups/{groupId},
+                "rel": "self"
+              }
+            ]
             "active": [
               {
                 "id": "{instanceId1}"
@@ -412,7 +419,7 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                 "id": "{instanceId2}"
                 "links": [
                   {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2},
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}",
                     "rel": "self"
                   }
                 ]

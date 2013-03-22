@@ -13,10 +13,9 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store
 
+from otter import controller
 
-# TODO: in the implementation story, the interface get scaling group
-#       definition should be changed to remove colo, and the mock store and
-#       corresponding tests also changed
+
 @app.route('/<string:tenantId>/groups/<string:groupId>/config/',
            methods=['GET'])
 @with_transaction_id()
@@ -50,9 +49,6 @@ def view_config_for_scaling_group(request, log, tenantId, groupId):
     return deferred
 
 
-# TODO: in the implementation story, the interface get scaling group
-#       definition should be changed to remove colo, and the mock store and
-#       corresponding tests also changed
 @app.route('/<string:tenantId>/groups/<string:groupId>/config/',
            methods=['PUT'])
 @with_transaction_id()
@@ -79,11 +75,18 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
             }
         }
 
-    The exact update cases are still up in the air -- can the user provide
-    a mimimal schema, and if so, what happens with defaults?
+    The entire schema body must be provided.  Any optional information that is
+    left out will be replaced by the defaults.
     """
+    def _do_obey_config_change(_):
+        # After the config has been updated, update the state, but we do not
+        # need to wait on the result of updating the state.  So this callback
+        # returns nothing.
+        transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+        controller.obey_config_change(log, transaction_id, rec)
+
     rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.update_config(data)
+    deferred = rec.update_config(data).addCallback(_do_obey_config_change)
     return deferred
 
 
