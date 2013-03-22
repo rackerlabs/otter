@@ -11,6 +11,8 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_autoscale_links, get_store
 
+from otter import controller
+
 
 @app.route('/<string:tenantId>/groups/',  methods=['GET'])
 @with_transaction_id()
@@ -369,7 +371,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
 
 # Feature: Force delete, which stops scaling, deletes all servers for you, then
 #       deletes the scaling group.
-# D
 @app.route('/<string:tenantId>/groups/<string:groupId>/', methods=['DELETE'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -458,3 +459,33 @@ def get_scaling_group_state(request, log, tenantId, groupId):
     deferred.addCallback(reformat_active_and_pending)
     deferred.addCallback(json.dumps)
     return deferred
+
+
+@app.route('/<string:tenantId>/groups/<string:groupId>/pause/', methods=['POST'])
+@with_transaction_id()
+@fails_with(exception_codes)
+@succeeds_with(204)
+def pause_scaling_group(request, log, tenantId, groupId):
+    """
+    Pause a scaling group.  This means that no scaling policies will get
+    executed (execution will be rejected).  This is an idempotent operation -
+    pausing an already paused group does nothing.
+    """
+    group = get_store().get_scaling_group(log, tenantId, groupId)
+    transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+    return controller.pause_scaling_group(log, transaction_id, group)
+
+
+@app.route('/<string:tenantId>/groups/<string:groupId>/resume/', methods=['POST'])
+@with_transaction_id()
+@fails_with(exception_codes)
+@succeeds_with(204)
+def resume_scaling_group(request, log, tenantId, groupId):
+    """
+    Resume a scaling group.  This means that scaling policies will now get
+    executed as usual.  This is an idempotent operation - resuming an already
+    running group does nothing.
+    """
+    group = get_store().get_scaling_group(log, tenantId, groupId)
+    transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+    return controller.resume_scaling_group(log, transaction_id, group)
