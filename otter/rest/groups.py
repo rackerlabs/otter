@@ -407,7 +407,7 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                 "href": "{url_root}/v1.0/010101/groups/{groupId},
                 "rel": "self"
               }
-            ]
+            ],
             "active": [
               {
                 "id": "{instanceId1}"
