@@ -17,10 +17,11 @@ from otter.json_schema.group_examples import (
 
 from otter.json_schema import rest_schemas
 
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.interface import IScalingGroupState, NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.utils import iMock
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
@@ -360,3 +361,81 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_group.view_state.assert_called_once_with()
+
+
+class GroupPauseTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{groupId}/pause/`` endpoint
+    """
+    endpoint = "/v1.0/11111/groups/one/pause/"
+    invalid_methods = ("DELETE", "GET", "PUT")
+
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(GroupPauseTestCase, self).setUp()
+        self.mock_group = iMock(IScalingGroupState)
+        self.mock_store.get_scaling_group.return_value = self.mock_group
+        self.mock_group.uuid = "one"
+
+        pause_patch = mock.patch(
+            'otter.rest.groups.controller.pause_scaling_group',
+            return_value=defer.succeed(None))
+        self.mock_pause = pause_patch.start()
+        self.addCleanup(pause_patch.stop)
+
+        transaction_patch = mock.patch(
+            'otter.rest.decorators.generate_transaction_id',
+            return_value="transaction!")
+        transaction_patch.start()
+        self.addCleanup(transaction_patch.stop)
+
+    def test_pause(self):
+        """
+        Pausing should call the controller's ``pause_scaling_group`` function
+        """
+        response_body = self.assert_status_code(204, method="POST")
+        self.assertEqual(response_body, "")
+
+        self.mock_pause.assert_called_once_with(mock.ANY, 'transaction!',
+                                                self.mock_group)
+
+
+class GroupResumeTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{groupId}/resume/`` endpoint
+    """
+    endpoint = "/v1.0/11111/groups/one/resume/"
+    invalid_methods = ("DELETE", "GET", "PUT")
+
+    def setUp(self):
+        """
+        Set the uuid of the group to "one"
+        """
+        super(GroupResumeTestCase, self).setUp()
+        self.mock_group = iMock(IScalingGroupState)
+        self.mock_store.get_scaling_group.return_value = self.mock_group
+        self.mock_group.uuid = "one"
+
+        resume_patch = mock.patch(
+            'otter.rest.groups.controller.resume_scaling_group',
+            return_value=defer.succeed(None))
+        self.mock_resume = resume_patch.start()
+        self.addCleanup(resume_patch.stop)
+
+        transaction_patch = mock.patch(
+            'otter.rest.decorators.generate_transaction_id',
+            return_value="transaction!")
+        transaction_patch.start()
+        self.addCleanup(transaction_patch.stop)
+
+    def test_resume(self):
+        """
+        Resume should call the controller's ``resume_scaling_group`` function
+        """
+        response_body = self.assert_status_code(204, method="POST")
+        self.assertEqual(response_body, "")
+
+        self.mock_resume.assert_called_once_with(mock.ANY, 'transaction!',
+                                                 self.mock_group)

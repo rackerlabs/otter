@@ -51,7 +51,9 @@ class NoSuchWebhookError(Exception):
 
 class IScalingGroupState(Interface):
     """
-    Represents an accessor for group state.
+    Represents an accessor for group state.  Note that none of these raise
+    :class:`NoSuchScalingGroupError` if this scaling group does not exist - the
+    check is expected to be performed elsewhere.
     """
 
     def add_server(state, name, instance_id, uri, pending_job_id, created=None):
@@ -103,6 +105,27 @@ class IScalingGroupState(Interface):
             should be a timestamp as produced by or parsed by
             :meth:`otter.util.timestamp` (which is a ISO8601 formatted
             UTC date/timestamp, with a 'T' separator and Zulu timezone format)
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+    def pause():
+        """
+        Updates the state so that the scaling group is paused.  This is an
+        idempotent change, if it's already paused, this does not raise an error.
+        (But perhaps it should not be re-paused, if that is an expensive
+        operation.)
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        """
+
+    def resume():
+        """
+        Updates the state so that the scaling group is paused.  This is an
+        idempotent change, if it's already unpaused, this does not raise an
+        error. (But perhaps it should not be re-resumed, if that is an expensive
+        operation.)
+
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """

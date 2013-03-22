@@ -66,7 +66,8 @@ class GenerateEntityLinksTestCase(TestCase):
 
 class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
     """
-    Tests for :class:`MockScalingGroup`
+    Tests for :class:`MockScalingGroup`'s ``IScalingGroupState`` interface
+    implementation.
     """
 
     def setUp(self):
@@ -153,6 +154,40 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
+    def test_pause(self):
+        """
+        Tests that pause sets the state to paused, returns None, and pausing
+        an already paused group does not raise an error.
+        """
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertFalse(result['paused'], "sanity check")
+
+        self.assertIsNone(self.assert_deferred_succeeded(self.state.pause()))
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertTrue(result['paused'], "Pausing should set paused to True")
+
+        self.assertIsNone(self.assert_deferred_succeeded(self.state.pause()))
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertTrue(result['paused'], "Pausing again should not fail")
+
+    def test_resume(self):
+        """
+        Tests that resume sets the state to unpaused, returns None, and resuming
+        an already resumed group does not raise an error.
+        """
+        self.state.paused = True
+
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertTrue(result['paused'], "sanity check")
+
+        self.assertIsNone(self.assert_deferred_succeeded(self.state.resume()))
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertFalse(result['paused'], "Resuming should set paused to False")
+
+        self.assertIsNone(self.assert_deferred_succeeded(self.state.resume()))
+        result = self.assert_deferred_succeeded(self.state.view_state())
+        self.assertFalse(result['paused'], "Resuming again should not fail")
 
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):

@@ -395,6 +395,20 @@ class MockScalingGroup:
         self.policy_touched[policy_id] = ts
         return defer.succeed(None)
 
+    def pause(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.pause`
+        """
+        self.paused = True
+        return defer.succeed(None)
+
+    def resume(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.resume`
+        """
+        self.paused = False
+        return defer.succeed(None)
+
 
 @implementer(IScalingGroupCollection)
 class MockScalingGroupCollection:

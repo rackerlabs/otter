@@ -425,7 +425,13 @@ PUT /{tenantId}/groups/{groupId}/launch
 < 204
 < Content-Type: application/json
 
+Pause all execution of scaling policies for this scaling group.
+POST /{tenantId}/groups/{groupId}/pause
+< 204
 
+Resume all execution of scaling policies for this scaling group.
+POST /{tenantId}/groups/{groupId}/resume
+< 204
 
 --
 Policies Resource
@@ -717,25 +723,3 @@ Delete a scaling policy webhook.
 If successful, no response body will be returned.
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
 < 204
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -3,7 +3,7 @@ Utilities for testing the REST API, including a way of mock requesting a
 response from the rest resource.
 """
 
-from collections import defaultdict, namedtuple
+from collections import namedtuple
 from urlparse import urlsplit
 
 from klein.test_resource import requestMock
@@ -63,12 +63,17 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     mock_request.code = 200
     mock_request.setHeader = mock.MagicMock(spec=())
 
+    # twisted request has a responseHeaders (outgoing headers) and
+    # requestHeaders (incoming headers, set by requestMock)
+    mock_request.responseHeaders = http.Headers()
+
     # if setHeader has been called a with unicode value, twisted will raise a
     # TypeError after the request has been closed and it is attemptig to write
     # to the network.  So just fail here for testing purposes
     def _twisted_compat(name, value):
         if not isinstance(name, str) or not isinstance(value, str):
             raise TypeError("Can only pass-through bytes on Python 2")
+        mock_request.responseHeaders.setRawHeaders(name, [value])
 
     mock_request.setHeader.side_effect = _twisted_compat
 
@@ -80,23 +85,17 @@ def request(root_resource, method, endpoint, headers=None, body=None):
             # kwargs are the first argument, not the second
             status_code = mock_request.setResponseCode.call_args[0][0]
 
-        headers = defaultdict(list)
-        for call in mock_request.setHeader.mock_calls:
-            # setHeader(name, value)
-            # a call in mock_calls is a tuple of (name, args, kwargs))
-            headers[call[1][0]].append(call[1][1])
-        headers = http.Headers(headers)
-
         # if the content-type has not been set, Twisted by default sets the
         # content-type to be whatever is in
         # twisted.web.server.Request.defaultContentType, so replicate that
         # functionality
-        if not (headers.hasHeader('Content-Type') or
+        if not (mock_request.responseHeaders.hasHeader('Content-Type') or
                 Request.defaultContentType is None):
-            headers.setRawHeaders('Content-Type', [Request.defaultContentType])
+            mock_request.responseHeaders.setRawHeaders(
+                'Content-Type', [Request.defaultContentType])
 
         response = mock.MagicMock(spec=['code', 'headers'], code=status_code,
-                                  headers=headers)
+                                  headers=mock_request.responseHeaders)
 
         # Annoying implementation detail: if the status code is one of the
         # status codes that should not have a body, twisted replaces the

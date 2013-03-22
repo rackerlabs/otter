@@ -156,47 +156,6 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         # there should be no scaling groups now
         self.assert_number_of_scaling_groups(0)
 
-    def test_ru_scaling_config(self):
-        """
-        Editing the config of a scaling group with a valid config returns with
-        a 204 no content.  The next attempt to view the scaling config should
-        return the new config.
-        """
-        # make sure there is a scaling group
-        path = self.create_and_view_scaling_group()
-        config_path = path + 'config/'
-        edited_config = {
-            'name': 'updated_config',
-            'cooldown': 5,
-            'minEntities': config()[1]['minEntities'] + 5,
-            'maxEntities': (config()[1]['maxEntities'] or 10) + 5,
-            'metadata': {
-                'anotherkey': 'anothervalue'
-            }
-        }
-
-        wrapper = self.assert_deferred_succeeded(
-            request(root, 'PUT', config_path, body=json.dumps(edited_config)))
-
-        self.assertEqual(wrapper.response.code, 204,
-                         "Edit failed: {0}".format(wrapper.content))
-        self.assertEqual(wrapper.content, "")
-
-        # now try to view again - the config should be the edited config
-        wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', config_path))
-        self.assertEqual(wrapper.response.code, 200)
-        self.assertEqual(json.loads(wrapper.content),
-                         {'groupConfiguration': edited_config})
-
-        # make sure the it is still not paused
-        wrapper = self.assert_deferred_succeeded(
-            request(root, 'GET', path + 'state/'))
-        self.assertEqual(wrapper.response.code, 200)
-
-        response = json.loads(wrapper.content)
-        self.assertTrue(not response['group']['paused'])
-
     def test_ru_launch_config(self):
         """
         Editing the launch config of a scaling group with a valid launch config
