@@ -726,6 +726,18 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
+    def pause(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.pause`
+        """
+        raise NotImplementedError()
+
+    def resume(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.resume`
+        """
+        raise NotImplementedError()
+
 
 @implementer(IScalingGroupCollection)
 class CassScalingGroupCollection:

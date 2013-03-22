@@ -122,10 +122,16 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
-    def test_update_group_config_success(self):
+    @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
+    @mock.patch('otter.rest.decorators.generate_transaction_id',
+                return_value="transaction!")
+    def test_update_group_config_success(self, mock_trans, mock_controller):
         """
-        If the update succeeds, the data is updated and a 204 is returned
+        If the update succeeds, the data is updated and a 204 is returned.
+        It does not wait for the result of calling ``obey_config_change``.
         """
+        mock_controller.obey_config_change.return_value = defer.succeed(
+            "this should not be the text that is returned as a body")
         self.mock_group.update_config.return_value = defer.succeed(None)
         request_body = {
             'name': 'blah',
@@ -137,8 +143,13 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method='PUT',
                                                 body=json.dumps(request_body))
         self.assertEqual(response_body, "")
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(request_body)
+
+        # first parameter is the log
+        mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction!", self.mock_group)
 
     def test_group_modify_bad_or_missing_input_400(self):
         """
