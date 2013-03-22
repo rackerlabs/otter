@@ -27,6 +27,30 @@ Storage model for state information:
 from otter.supervisor import execute_one_config
 
 
+def pause_scaling_group(log, transaction_id, scaling_group):
+    """
+    Pauses the scaling group, causing all scaling policy executions to be
+    rejected until unpaused.
+
+    :raises: :class:`NoSuchScalingGroup` if the scaling group does not exist.
+
+    :return: None
+    """
+    return None
+
+
+def resume_scaling_group(log, transaction_id, scaling_group):
+    """
+    Resumes the scaling group, causing all scaling policy executions to be
+    evaluated as normal again.
+
+    :raises: :class:`NoSuchScalingGroup` if the scaling group does not exist.
+
+    :return: None
+    """
+    return None
+
+
 def obey_config_change(log, transaction_id, scaling_group):
     """
     Checks to make sure, after a scaling policy config change, that
