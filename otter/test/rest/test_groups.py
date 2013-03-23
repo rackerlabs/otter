@@ -322,36 +322,44 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         the links reformatted so that they a list of dictionaries containing
         the attributes "id" and "links"
         """
-        def make_link(rel):
-            return {
-                "rel": "rel",
-                "href": "http://{0}".format(rel)
-            }
-
-        self.mock_group.view_state.return_value = defer.succeed({
+        data_from_model = {
             'active': {
-                "1": [make_link("rel")],
-                "2": [make_link("rel")]
+                's1': {'instanceId': '1', 'instanceUri': 'uri1', 'created': 't'},
+                's2': {'instanceId': '2', 'instanceUri': 'uri2', 'created': 't'},
+                's3': {'instanceId': '3', 'instanceUri': 'uri3', 'created': 't'}
             },
             'pending': {
-                "3": [make_link("rel")]
+                'j1': {'created': 't'},
+                'j2': {'created': 't'},
+                'j3': {'created': 't'}
             },
-            'steadyState': 5,
-            'paused': False
-        })
+            'paused': True,
+            'groupTouched': 'ts1',
+            'policyTouched': {
+                'p1': 'ts1',
+                'p1': 'ts2',
+                'p1': 'ts3',
+            }
+        }
 
+        self.mock_group.view_state.return_value = defer.succeed(data_from_model)
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
 
-        validate(resp, rest_schemas.group_state)
+        # so long as all the servers are in the list of active servers, it's
+        # fine.
+        resp['group']['active'].sort()
+
         self.assertEqual(resp, {"group": {
             'active': [
-                {'id': '1', 'links': [make_link("rel")]},
-                {'id': '2', 'links': [make_link("rel")]}
+                {'id': '1', 'links': [{'href': 'uri1', 'rel': 'self'}]},
+                {'id': '2', 'links': [{'href': 'uri2', 'rel': 'self'}]},
+                {'id': '3', 'links': [{'href': 'uri3', 'rel': 'self'}]}
             ],
-            'pending': [{'id': '3', 'links': [make_link("rel")]}],
-            'steadyState': 5,
-            'paused': False,
+            'numPending': 3,
+            'numActive': 3,
+            'steadyState': 6,
+            'paused': True,
             'id': "one",
             "links": [
                 {"href": "/v1.0/11111/groups/one/", "rel": "self"},
