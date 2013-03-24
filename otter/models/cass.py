@@ -12,6 +12,7 @@ from otter.models.interface import (
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 #from otter.controller import maybe_execute_scaling_policy
+from otter.util.timestamp import now
 
 from silverberg.client import ConsistencyLevel
 
@@ -51,11 +52,19 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
                'VALUES (:tenantId, :groupId, {name}, False)')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+_cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, '
+                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{{}}", '
+                           '"{{}}", "{{}}", False, False)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
 _cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
                          'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+_cql_add_server_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending)'
+                               ' VALUES(:tenantId, :groupId, :active:, :pending);')
+_cql_update_job_group_state = ('INSERT INTO {cf}("tenantId", "groupId", pending, "groupTouched", '
+                               '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                               ':policyTouched);')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -379,6 +388,55 @@ class CassScalingGroup(object):
                                      "groupId": self.uuid},
                                     get_consistency_level('view', 'partial'))
         d.addCallback(_do_state_lookup)
+        return d
+
+    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.add_server`
+        """
+        ts = created
+        if ts is None:
+            ts = now()
+
+        pending = state["pending"]
+        if pending_job_id in pending:
+            del pending[pending_job_id]
+
+        active = state["active"]
+        if not name in active:
+            active = {"instance_id": instance_id,
+                      "instance_uri": uri,
+                      "created": ts}
+
+        query = _cql_add_server_group_state.format(cf=self.state_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "active": _serial_json_data(active, 1),
+                                     "pending": _serial_json_data(pending, 1)},
+                                    get_consistency_level('update', 'state'))
+        return d
+
+    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
+                    timestamp=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
+        """
+        ts = timestamp
+        if ts is None:
+            ts = now()
+
+        policy_touched = state["policyTouched"]
+        policy_touched[policy_id] = ts
+
+        query = _cql_update_job_group_state.format(cf=self.state_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid,
+                                     "groupTouched": ts,
+                                     "policyTouched": _serial_json_data(policy_touched, 1),
+                                     "pending": _serial_json_data(job_dict, 1)},
+                                    get_consistency_level('update', 'state'))
         return d
 
     # TODO: There is no state yet, and updating the config should update the
@@ -713,19 +771,6 @@ class CassScalingGroup(object):
 
         return _jsonloads_data(results[0]['data'])
 
-    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.add_server`
-        """
-        raise NotImplementedError()
-
-    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
-                    timestamp=None):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
-        """
-        raise NotImplementedError()
-
     def pause(self):
         """
         see :meth:`otter.models.interface.IScalingGroupState.pause`
@@ -785,6 +830,7 @@ class CassScalingGroupCollection:
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
+        self.state_table = "group_state"
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
@@ -794,7 +840,8 @@ class CassScalingGroupCollection:
 
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),
-            _cql_insert.format(cf=self.launch_table, name=":launch")]
+            _cql_insert.format(cf=self.launch_table, name=":launch"),
+            _cql_create_group_state.format(cf=self.state_table)]
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,

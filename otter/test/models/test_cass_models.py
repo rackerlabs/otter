@@ -241,6 +241,123 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                              'policyTouched': {'F': 'R'},
                              'paused': False})
 
+    def test_state(self):
+        """
+        Test the normal use case..  update an empty group with a job,
+        move the server to fully operational.
+        """
+        fake_state = {'policyTouched': {}}
+
+        cass_response = _cassandrify_data([
+            {'active': '{}', 'pending': '{"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+             'groupTouched': '2012-12-25 00:00:00-06:39Z',
+             'policyTouched': '{"pol1": "2012-12-25 00:00:00-06:39Z"}', 'paused': False}])
+
+        cass_response2 = _cassandrify_data([
+            {'active': ('{"foo": {"instance_id": "frrr", "instance_uri": '
+                        '"uri", "created": "2012-12-25 00:00:00-06:39Z"}}'),
+             'pending': '{}',
+             'groupTouched': '2012-12-25 00:00:00-06:39Z',
+             'policyTouched': '{"pol1": "2012-12-25 00:00:00-06:39Z"}', 'paused': False}])
+
+        self.returns = [None, cass_response, None, cass_response2]
+
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        d = self.group.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        d = self.group.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.group.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
+    def test_state_bad_job_id(self):
+        """
+        Test that if we try to pass in a bad job ID it continues
+        """
+        fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
+
+        cass_response = _cassandrify_data([
+            {'active': ('{"foo": {"instance_id": "frrr", "instance_uri": "uri",'
+                        ' "created": "2012-12-25 00:00:00-06:39Z"}}'),
+             'pending': '{}',
+             'groupTouched': '2012-12-25 00:00:00-06:39Z',
+             'policyTouched': '{}', 'paused': False}])
+
+        self.returns = [None, cass_response, None]
+
+        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.group.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {},
+                                  'policyTouched': {}})
+
+    def test_state_bad_server(self):
+        """
+        Test that if we try to pass in a bad server it continues
+        """
+        fake_state = {'policyTouched': {}}
+
+        cass_response = _cassandrify_data([
+            {'pending': ('{"job1": {"created": "2012-12-25 00:00:00-06:39Z"}, '
+                         '"job2": {"created": "2012-12-25 00:00:00-06:39Z"}}'),
+             'groupTouched': '2012-12-25 00:00:00-06:39Z', 'active': '{}',
+             'policyTouched': '{"pol1": "2012-12-25 00:00:00-06:39Z"}', 'paused': False}])
+
+        cass_response2 = _cassandrify_data([
+            {'active': ('{"foo": {"instance_id": "frrr", "instance_uri": "uri", '
+                        '"created": "2012-12-25 00:00:00-06:39Z"}}'),
+             'pending': '{}',
+             'groupTouched': '2012-12-25 00:00:00-06:39Z',
+             'policyTouched': '{"pol1": "2012-12-25 00:00:00-06:39Z"}', 'paused': False}])
+
+        self.returns = [None, cass_response, None, None, cass_response2]
+
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"},
+                "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        d = self.group.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'},
+                                              'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        d = self.group.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.group.add_server(result, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        d = self.group.view_state()
+        result = self.assert_deferred_succeeded(d)
+        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
+                                                     'instance_uri': 'uri',
+                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'paused': False,
+                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                                  'pending': {},
+                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
     def test_view_config_bad_db_data(self):
         """
         Test what happens if you retrieve bad db config data, including None, rows
@@ -1240,7 +1357,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
-                       'APPLY BATCH;')
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) APPLY BATCH;')
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group(self.mock_log, '123', {}, {})
         self.assertEqual(self.assert_deferred_succeeded(d),
@@ -1265,6 +1384,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
@@ -1294,6 +1416,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
