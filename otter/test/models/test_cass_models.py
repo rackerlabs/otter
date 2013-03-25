@@ -265,6 +265,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
         d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
+                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                       ':policyTouched);')
+        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
+                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+                        'groupId': '12345678g',
+                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
         d = self.group.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {},
@@ -272,8 +283,26 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM '
+                       'group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       'deleted = False;')
+        expectedData = {'groupId': '12345678g',
+                        'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
         d = self.group.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"instance_id": "frrr", "_ver": 1, "instance_uri": "uri", '
+                                   '"created": "2012-12-25 00:00:00-06:39Z"}'),
+                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
         d = self.group.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
@@ -283,6 +312,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM '
+                       'group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'AND deleted = False;')
+        expectedData = {'groupId': '12345678g',
+                        'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
 
     def test_state_bad_job_id(self):
         """
@@ -301,6 +338,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"instance_id": "frrr", "_ver": 1, "instance_uri": "uri", '
+                                   '"created": "2012-12-25 00:00:00-06:39Z"}'),
+                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
         d = self.group.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
@@ -336,6 +381,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}
         d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
+                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                       ':policyTouched);')
+        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
+                        'pending': ('{"_ver": 1, "job2": {"created": "2012-12-25 00:00:00-06:39Z"}, '
+                                    '"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}'),
+                        'groupId': '12345678g',
+                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
         d = self.group.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {},
@@ -344,10 +400,33 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                   'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'},
                                               'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
+
         d = self.group.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"instance_id": "frrr", "_ver": 1, "instance_uri": "uri", '
+                                   '"created": "2012-12-25 00:00:00-06:39Z"}'),
+                        'groupId': '12345678g',
+                        'pending': '{"_ver": 1, "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+                        'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
         d = self.group.add_server(result, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"instance_id": "frrr", "_ver": 1, "instance_uri": "uri", '
+                                   '"created": "2012-12-25 00:00:00-06:39Z"}'),
+                        'groupId': '12345678g',
+                        'pending': '{"_ver": 1}',
+                        'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
         d = self.group.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
