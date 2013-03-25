@@ -5,11 +5,14 @@ from datetime import timedelta, datetime
 
 import mock
 
+from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter import controller
+from otter.json_schema import group_examples
+from otter.models.interface import IScalingGroup
 from otter.util.timestamp import MIN
-from otter.test.utils import patch
+from otter.test.utils import iMock, patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -218,3 +221,60 @@ class CheckCooldownsTestCase(TestCase):
         fake_state = {'groupTouched': MIN, 'policyTouched': {'pol': MIN}}
         self.assertFalse(controller.check_cooldowns(fake_state, fake_config,
                                                     fake_policy, 'pol'))
+
+
+def patch_controller(test_case, *names):
+    """
+    Patch attributes on the controller model
+    """
+    mocks = {}
+    for name in names:
+        the_patcher = mock.patch('otter.controller.{0}'.format(name))
+        mocks[name] = the_patcher.start()
+    test_case.addCleanup(the_patcher.stop)
+    return mocks
+
+
+class MaybeExecutePolicyTestCase(TestCase):
+    """
+    Tests for :func:`otter.controller.maybe_execute_scaling_policy`
+    """
+
+    def setUp(self):
+        """
+        Set up mocks
+        """
+        self.mocks = patch_controller(
+            self, 'supervisor', 'execute_launch_config', 'check_cooldowns')
+
+        self.mock_log = mock.MagicMock()
+        self.group_model = iMock(IScalingGroup)
+        self.group_model.view_config.return_value = defer.succeed(
+            group_examples.config()[0])
+        self.group_model.get_policy.return_value = defer.succeed({
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        })
+        self.group_model.view_state.return_value = defer.succeed({
+            "active": {},
+            "pending": {},
+            "groupTouched": None,
+            "policyTouched": {},
+            "paused": False
+        })
+
+    def test_maybe_execute_scaling_policy(self):
+        """
+        Tests the case where cooldowns are all fine and execute_launch_config
+        does not fail.  Return value should be whatever execute_launch_config
+        returns
+        """
+        self.mocks['check_cooldowns'].return_value = True
+        self.mocks['execute_launch_config'].return_value = defer.succeed(
+            'this should be returned')
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 1,
+                                                    self.group_model, 'pol1')
+        result = self.successResultOf(d)
+        self.assertEqual(result, 'this should be returned')
