@@ -17,6 +17,8 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
 from otter.models.interface import UnrecognizedCapabilityError
 
+from otter import controller
+
 
 def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
     """
@@ -297,11 +299,33 @@ def execute_webhook(request, log, capability_version, capability_hash):
     This returns a 202 in all cases except internal server error,
     and does not wait for execution to finish.
     """
-    d = get_store().execute_webhook_hash(log, capability_hash)
+    store = get_store()
 
-    def _log_unrecognized_cap(failure):
+    d = store.webhook_info_by_hash(log, capability_hash)
+
+    def lookup_group(info):
+        (tenant_id, group_id, _policy_id) = info
+        group = store.get_scaling_group(log, tenant_id, group_id)
+        return (info, group)
+
+    d.addCallback(lookup_group)
+
+    def lookup_policy((info, group)):
+        (_tenant_id, _group_id, policy_id) = info
+        return group.get_policy(policy_id).addCallback(lambda policy: (group, policy))
+
+    d.addCallback(lookup_policy)
+
+    def execute_policy((group, policy)):
+        controller.maybe_execute_scaling_policy(log, 'real-transaction-id', group, policy)
+
+    d.addCallback(execute_policy)
+
+    def log_unrecognized_cap(failure):
         exc = failure.trap(UnrecognizedCapabilityError)
         log.fields(capability_hash=capability_hash,
-                   capability_version=capability_version).warning(exc)
+                   capability_version=capability_version).warning(repr(exc))
 
-    d.addErrback(_log_unrecognized_cap)
+    d.addErrback(log_unrecognized_cap)
+
+    return d

@@ -123,7 +123,7 @@ def calculate_new_steady_state(log, state, policy):
     if "change" in policy:
         return (state['steadyState'] + policy["change"], policy["change"])
     else:
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 def find_server_to_evict(log, scaling_group):

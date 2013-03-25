@@ -871,9 +871,9 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def execute_webhook_hash(self, log, capability_hash):
+    def webhook_info_by_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
+        see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
 
         Note: We have to post-filter deleted items because of the way that Cassandra works
 
@@ -898,8 +898,7 @@ class CassScalingGroupCollection:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             if res['deleted'] is True:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
-            group = self.get_scaling_group(log, res['tenantId'], res['groupId'])
-            return group.execute_policy(res['policyId'])
+            return (res['tenantId'], res['groupId'], res['policyId'])
 
         query = _cql_find_webhook_token.format(cf=self.webhooks_table)
         d = self.connection.execute(query,

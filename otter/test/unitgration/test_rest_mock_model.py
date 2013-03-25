@@ -390,6 +390,10 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
                 tenant=self.tenant_id, group=self.group_id,
                 policy=self.policy_id))
 
+        controller_patcher = mock.patch('otter.rest.webhooks.controller')
+        self.mock_controller = controller_patcher.start()
+        self.addCleanup(controller_patcher.stop)
+
     def assert_number_of_webhooks(self, number):
         """
         Asserts that there are ``number`` number of scaling policies
