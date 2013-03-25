@@ -178,8 +178,8 @@ class IScalingGroup(Interface):
 
             {
               "active": {
-                "server_name": {
-                  "instanceId": "instance id",
+                "instance id": {
+                  "name": "server_name",
                   "instanceUri": "instance uri",
                   "created": "created timestamp"
                 },
@@ -187,7 +187,8 @@ class IScalingGroup(Interface):
               },
               "pending": {
                 "job_id": {
-                    "created": "created timestamp"
+                    "created": "created timestamp",
+                    "jobType": "create"
                 },
                   ...
               },
