@@ -87,7 +87,7 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         Test the normal use case..  update an empty group with a job,
         move the server to fully operational.
         """
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z", 'jobType': 'create'}}
         d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
@@ -95,15 +95,16 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assertEqual(result, {'active': {},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z',
+                                                       'jobType': 'create'}},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
         d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceUri': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},
@@ -117,9 +118,9 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceUri': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': None,
                                   'pending': {},
@@ -129,8 +130,8 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         """
         Test that if we try to pass in a bad server it continues
         """
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"},
-                "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z", 'jobType': 'create'},
+                "job2": {"created": "2012-12-25 00:00:00-06:39Z", 'jobType': 'create'}}
         d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
@@ -138,8 +139,10 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assertEqual(result, {'active': {},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'},
-                                              'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z',
+                                                       'jobType': 'create'},
+                                              'job2': {'created': '2012-12-25 00:00:00-06:39Z',
+                                                       'jobType': 'create'}},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
         d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
@@ -147,9 +150,9 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceUri': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},

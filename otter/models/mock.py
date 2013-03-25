@@ -375,10 +375,10 @@ class MockScalingGroup:
         if pending_job_id in self.pending_jobs:
             del self.pending_jobs[pending_job_id]
 
-        if not name in self.active_entities:
-            self.active_entities[name] = {"instance_id": instance_id,
-                                          "instance_uri": uri,
-                                          "created": ts}
+        if not instance_id in self.active_entities:
+            self.active_entities[instance_id] = {"name": name,
+                                                 "instanceUri": uri,
+                                                 "created": ts}
 
         return defer.succeed(None)
 
