@@ -556,18 +556,6 @@ class CassScalingGroup(object):
         d.addCallback(lambda _: None)
         return d
 
-    def execute_policy(self, policy_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
-        """
-        def _do_stuff(pol):
-            # Doing stuff will go here.
-            #maybe_execute_scaling_policy(self.log, None, self, pol)
-            return None
-
-        d = self.get_policy(policy_id)
-        d.addCallback(_do_stuff)
-
     def _naive_list_webhooks(self, policy_id):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_webhooks`, but gets

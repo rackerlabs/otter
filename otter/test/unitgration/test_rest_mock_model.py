@@ -204,6 +204,10 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
             tenant=self.tenant_id, group=self.group_id)
 
+        controller_patcher = mock.patch('otter.rest.policies.controller')
+        self.mock_controller = controller_patcher.start()
+        self.addCleanup(controller_patcher.stop)
+
     def assert_number_of_scaling_policies(self, number):
         """
         Asserts that there are ``number`` number of scaling policies

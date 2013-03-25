@@ -683,23 +683,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertIsNone(self.assert_deferred_succeeded(deferred))
         self.assertEqual(self.group.webhooks, {'2': {}})
 
-    def test_execute_policy_succeeds(self):
-        """
-        Executing a policy that exists should result in a deferred that fires
-        with None.
-        """
-        self.group.policies = {'2': {}}
-
-        deferred = self.group.execute_policy('2')
-        self.assertIsNone(self.assert_deferred_succeeded(deferred))
-
-    def test_execute_nonexistant_policy(self):
-        """
-        Executing a non-existant policy should fail with a NoSuchPolicyError.
-        """
-        deferred = self.group.execute_policy('2')
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
-
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):

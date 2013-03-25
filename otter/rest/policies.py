@@ -12,6 +12,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links
+from otter import controller
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
@@ -294,7 +295,12 @@ def execute_policy(request, log, tenantId, groupId, policyId):
 
         {}
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.execute_policy(policyId)
-    deferred.addCallback(lambda _: "{}")
+    group = get_store().get_scaling_group(log, tenantId, groupId)
+    deferred = group.get_policy(policyId)
+
+    def execute_policy(policy):
+        return controller.maybe_execute_scaling_policy(log, 'real-transaction-id', group, policy)
+
+    deferred.addCallback(execute_policy)
+    deferred.addCallback(lambda _: "{}")  # Return value TBD
     return deferred

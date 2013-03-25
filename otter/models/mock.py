@@ -263,15 +263,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def execute_policy(self, policy_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
-        """
-        if not policy_id in self.policies:
-            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
-                                                policy_id))
-        return defer.succeed(None)
-
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
