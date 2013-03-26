@@ -14,7 +14,7 @@ from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.application import app, get_store, get_autoscale_links
+from otter.rest.application import app, get_store, get_autoscale_links, transaction_id
 from otter.models.interface import UnrecognizedCapabilityError
 
 from otter import controller
@@ -317,7 +317,7 @@ def execute_webhook(request, log, capability_version, capability_hash):
     d.addCallback(lookup_policy)
 
     def execute_policy((group, policy)):
-        controller.maybe_execute_scaling_policy(log, 'real-transaction-id', group, policy)
+        controller.maybe_execute_scaling_policy(log, transaction_id(request), group, policy)
 
     d.addCallback(execute_policy)
 

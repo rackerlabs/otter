@@ -149,6 +149,19 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
     else:
         return url
 
+
+def transaction_id(request):
+    """
+    Extract the transaction id from the given request.
+
+    :param IRequest request: The request we are trying to get the
+        transaction id for.
+
+    :returns: A string transaction id.
+    """
+    return request.responseHeaders.getRawHeaders('X-Response-Id')[0]
+
+
 app = Klein()
 app.route = partial(app.route, strict_slashes=False)
 

@@ -247,6 +247,10 @@ class RestAPITestMixin(RequestTestMixin):
         self.mock_store = iMock(IScalingGroupCollection)
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
+        gti_patcher = mock.patch('otter.rest.decorators.generate_transaction_id')
+        self.mock_generate_transaction_id = gti_patcher.start()
+        self.mock_generate_transaction_id.return_value = 'transaction-id'
+        self.addCleanup(gti_patcher.stop)
 
         set_store(self.mock_store)
 

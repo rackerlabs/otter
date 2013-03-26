@@ -7,7 +7,8 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
-from otter.rest.application import get_autoscale_links, app
+from otter.rest.decorators import with_transaction_id
+from otter.rest.application import get_autoscale_links, app, transaction_id
 from otter.test.rest.request import RequestTestMixin
 
 
@@ -262,10 +263,34 @@ class RouteTests(RequestTestMixin, TestCase):
         requests = [0]
 
         @app.route('/foo/')
-        def _foo(request):
-            request.setHeader("X-Response-Id", "appease-the-test-harness")
+        @with_transaction_id()
+        def foo(request, log):
             requests[0] += 1
             return 'ok'
 
         self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
         self.assertEqual(requests[0], 1)
+
+
+class TransactionIdExtraction(RequestTestMixin, TestCase):
+    """
+    Test transaction_id extractor.
+    """
+    @mock.patch('otter.rest.decorators.generate_transaction_id')
+    def test_extract_transaction_id(self, generate_transaction_id):
+        """
+        transaction_id should return a string transaction id when
+        request has a transaction_id.
+        """
+        generate_transaction_id.return_value = 'transaction-id'
+
+        transaction_ids = []
+
+        @app.route('/foo')
+        @with_transaction_id()
+        def foo(request, log):
+            transaction_ids.append(transaction_id(request))
+            return 'ok'
+
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
+        self.assertEqual(transaction_ids[0], 'transaction-id')
