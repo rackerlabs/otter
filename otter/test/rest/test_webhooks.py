@@ -237,6 +237,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = controller_patcher.start()
         self.addCleanup(controller_patcher.stop)
 
+        self.mock_group.uuid = self.group_id
+
     def test_get_webhook_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -415,9 +417,13 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         Execute a webhook by hash.
         """
         policy = {}
+        config = {}
+        launch_config = {}
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
         self.mock_group.get_policy.return_value = defer.succeed(policy)
+        self.mock_group.view_config.return_value = defer.succeed(config)
+        self.mock_group.view_launch_config.return_value = defer.succeed(launch_config)
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
@@ -428,7 +434,11 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
-            self.mock_group,
+            self.tenant_id,
+            self.group_id,
+            config,
+            launch_config,
+            self.policy_id,
             policy
         )
 

@@ -75,12 +75,20 @@ def complete_pending_job(log, job_id, state):
     return True
 
 
-def maybe_execute_scaling_policy(log, transaction_id, scaling_group, policy):
+def maybe_execute_scaling_policy(
+        log,
+        transaction_id,
+        tenant_id,
+        scaling_group_id,
+        scaling_group_config,
+        launch_config,
+        policy_id,
+        policy):
     """
     Checks whether and how much a scaling policy can be executed.
 
     :param scaling_group: an IScalingGroup provider
-    :param policy_id: the policy id to execute
+    :param policy: the policy id to execute
 
     Current plan: If a user executes a policy, return whether or not it will be
     executed. If it is going to be executed, ????
