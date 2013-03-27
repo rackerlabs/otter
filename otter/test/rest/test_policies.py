@@ -136,6 +136,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
     Tests for ``/{tenantId}/groups/{groupId}/policies`` endpoint, which updates
     and views the policy part of a scaling group.
     """
+    tenant_id = '11111'
     endpoint = "/v1.0/11111/groups/1/policies/2/"
     invalid_methods = ("POST")
     policy_id = "2"
@@ -287,27 +288,26 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a policy.
         """
-        policy = {}
-        self.mock_group.get_policy.return_value = defer.succeed(policy)
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
 
         response_body = self.assert_status_code(202,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         self.assertEqual(response_body, "{}")
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
-        self.mock_group.get_policy.assert_called_once_with(self.policy_id)
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
+            self.tenant_id,
             self.mock_group,
-            policy
+            self.policy_id
         )
 
     def test_execute_policy_failure_404(self):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
-        self.mock_group.get_policy.return_value = defer.fail(NoSuchPolicyError('11111', '1', '2'))
+        self.mock_controller.maybe_execute_scaling_policy = defer.fail(NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404,
                                                 endpoint=self.endpoint + 'execute/',

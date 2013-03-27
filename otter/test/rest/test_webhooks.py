@@ -416,31 +416,20 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         Execute a webhook by hash.
         """
-        policy = {}
-        config = {}
-        launch_config = {}
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
-        self.mock_group.get_policy.return_value = defer.succeed(policy)
-        self.mock_group.view_config.return_value = defer.succeed(config)
-        self.mock_group.view_launch_config.return_value = defer.succeed(launch_config)
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, self.tenant_id, self.group_id)
-        self.mock_group.get_policy.assert_called_once_with(self.policy_id)
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
             self.tenant_id,
-            self.group_id,
             self.mock_group,
-            config,
-            launch_config,
-            self.policy_id,
-            policy
+            self.policy_id
         )
 
         self.assertEqual(response_body, '')

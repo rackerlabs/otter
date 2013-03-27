@@ -303,43 +303,15 @@ def execute_webhook(request, log, capability_version, capability_hash):
 
     d = store.webhook_info_by_hash(log, capability_hash)
 
-    def lookup_group(info):
-        (tenant_id, group_id, _policy_id) = info
+    def execute_policy((tenant_id, group_id, policy_id)):
         group = store.get_scaling_group(log, tenant_id, group_id)
-        return (info, group)
 
-    d.addCallback(lookup_group)
-
-    def lookup_config((info, group)):
-        return group.view_config().addCallback(lambda config: (info, group, config))
-
-    d.addCallback(lookup_config)
-
-    def lookup_launch_config((info, group, config)):
-        return group.view_launch_config().addCallback(
-            lambda launch_config: (info, group, config, launch_config))
-
-    d.addCallback(lookup_launch_config)
-
-    def lookup_policy((info, group, config, launch_config)):
-        (_tenant_id, _group_id, policy_id) = info
-        return group.get_policy(policy_id).addCallback(
-            lambda policy: (info, group, config, launch_config, policy))
-
-    d.addCallback(lookup_policy)
-
-    def execute_policy((info, group, config, launch_config, policy)):
-        (tenant_id, group_id, policy_id) = info
         controller.maybe_execute_scaling_policy(
             log,
             transaction_id(request),
             tenant_id,
-            group.uuid,
             group,
-            config,
-            launch_config,
             policy_id,
-            policy
         )
 
     d.addCallback(execute_policy)

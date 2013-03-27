@@ -296,11 +296,9 @@ def execute_policy(request, log, tenantId, groupId, policyId):
         {}
     """
     group = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = group.get_policy(policyId)
 
-    def execute_policy(policy):
-        return controller.maybe_execute_scaling_policy(log, transaction_id(request), group, policy)
+    d = controller.maybe_execute_scaling_policy(
+        log, transaction_id(request), tenantId, group, policyId)
 
-    deferred.addCallback(execute_policy)
-    deferred.addCallback(lambda _: "{}")  # Return value TBD
-    return deferred
+    d.addCallback(lambda _: "{}")  # Return value TBD
+    return d
