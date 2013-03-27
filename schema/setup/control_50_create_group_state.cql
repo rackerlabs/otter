@@ -17,7 +17,7 @@ USE @@KEYSPACE@@;
 
 -- active is the active list.
 -- format:
---   {"instanceid: {"name": "servername", instanceUri": uri, "created": date}}
+--   {"instanceid: {"name": "servername", instanceURI": uri, "created": date}}
 --
 -- pending is the pending list.
 -- format:

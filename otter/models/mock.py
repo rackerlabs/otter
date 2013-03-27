@@ -62,9 +62,9 @@ class MockScalingGroup:
         entities in this scaling group, in the following format::
 
             {
-                "server_name": {
-                    "instance_id": "instance_id"
-                    "instance_uri": "instance_uri",
+                "instance id": {
+                    "name": "sever name"
+                    "instanceURL": "instance URL",
                     "created": <timestamp_of_creation>
                 }, ...
             }
@@ -377,7 +377,7 @@ class MockScalingGroup:
 
         if not instance_id in self.active_entities:
             self.active_entities[instance_id] = {"name": name,
-                                                 "instanceUri": uri,
+                                                 "instanceURL": uri,
                                                  "created": ts}
 
         return defer.succeed(None)
