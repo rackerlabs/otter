@@ -80,6 +80,7 @@ def maybe_execute_scaling_policy(
         transaction_id,
         tenant_id,
         scaling_group_id,
+        scaling_group,
         scaling_group_config,
         launch_config,
         policy_id,

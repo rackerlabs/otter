@@ -335,6 +335,7 @@ def execute_webhook(request, log, capability_version, capability_hash):
             transaction_id(request),
             tenant_id,
             group.uuid,
+            group,
             config,
             launch_config,
             policy_id,

@@ -436,6 +436,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             'transaction-id',
             self.tenant_id,
             self.group_id,
+            self.mock_group,
             config,
             launch_config,
             self.policy_id,
