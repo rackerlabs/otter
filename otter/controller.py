@@ -33,12 +33,12 @@ from twisted.internet import defer
 from otter import supervisor
 
 
-class CannotExecutePolicyException(Exception):
+class CannotExecutePolicyError(Exception):
     """
     Exception to be raised when the policy cannot be executed
     """
     def __init__(self, tenant_id, group_id, policy_id, why):
-        super(CannotExecutePolicyException, self).__init__(
+        super(CannotExecutePolicyError, self).__init__(
             "Cannot execute scaling policy {p} for group {g} for tenant {t} because {w}"
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
@@ -132,16 +132,14 @@ def maybe_execute_scaling_policy(
         """
         state, config, policy = state_config_policy
 
-        if check_cooldowns(state, config, policy_id, log):
-            delta = 1  # TODO : actually calculate delta
-            # if "change" in policy:
-            #     return (state['steadyState'] + policy["change"], policy["change"])
-            return execute_launch_config(bound_log, transaction_id, state,
-                                         scaling_group, delta)
+        if check_cooldowns(state, config, policy, policy_id):
+            return execute_launch_config(
+                bound_log, transaction_id, state, scaling_group,
+                calculate_delta(state, config, policy))
 
-        raise CannotExecutePolicyException(scaling_group.tenant_id,
-                                           scaling_group.uuid, policy_id,
-                                           "Cooldowns not met.")
+        raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                       scaling_group.uuid, policy_id,
+                                       "Cooldowns not met.")
     # TODO: Lock group
     deferred = defer.gatherResults([
         scaling_group.view_state(),
@@ -233,14 +231,14 @@ def execute_launch_config(log, transaction_id, state, scaling_group, delta):
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'job_type': [create/delete]})``
+        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
         """
         jobs_dict = state['pending'].copy()
 
-        for job_id, job_blob in pending_results:
+        for job_id, job_info in pending_results:
             if job_id in state['pending']:
                 raise Exception('what????!!! {0} already exists'.format(job_id))
-            jobs_dict[job_id] = job_blob
+            jobs_dict[job_id] = job_info
 
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 

@@ -3,6 +3,7 @@ Tests for :mod:`otter.controller`
 """
 from datetime import timedelta, datetime
 
+import inspect
 import mock
 
 from twisted.internet import defer
@@ -12,7 +13,7 @@ from otter import controller
 from otter.json_schema import group_examples
 from otter.models.interface import IScalingGroup
 from otter.util.timestamp import MIN
-from otter.test.utils import iMock, patch
+from otter.test.utils import DeferredTestMixin, iMock, patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -223,58 +224,83 @@ class CheckCooldownsTestCase(TestCase):
                                                     fake_policy, 'pol'))
 
 
-def patch_controller(test_case, *names):
-    """
-    Patch attributes on the controller model
-    """
-    mocks = {}
-    for name in names:
-        the_patcher = mock.patch('otter.controller.{0}'.format(name))
-        mocks[name] = the_patcher.start()
-    test_case.addCleanup(the_patcher.stop)
-    return mocks
-
-
-class MaybeExecutePolicyTestCase(TestCase):
+class ControllerTestCase(DeferredTestMixin, TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
 
     def setUp(self):
         """
-        Set up mocks
+        Mock every method in the controller, and also the supervisor.
+        Individual tests can stop the patching for the method it is testing.
+
+        Also build a mock model that can be used for testing.
         """
-        self.mocks = patch_controller(
-            self, 'supervisor', 'execute_launch_config', 'check_cooldowns')
+        self.mocks = {}
+        methods = [name for name, func in
+                   inspect.getmembers(controller, inspect.isfunction)]
+        for thing in ['supervisor'] + methods:
+            self.mocks = patch(self, 'otter.controller.{0}'.format(thing))
 
         self.mock_log = mock.MagicMock()
-        self.group_model = iMock(IScalingGroup)
-        self.group_model.view_config.return_value = defer.succeed(
-            group_examples.config()[0])
-        self.group_model.get_policy.return_value = defer.succeed({
-            "name": "scale up by 10",
-            "change": 10,
-            "cooldown": 5
-        })
-        self.group_model.view_state.return_value = defer.succeed({
+
+        self.state = {
             "active": {},
             "pending": {},
             "groupTouched": None,
             "policyTouched": {},
             "paused": False
-        })
+        }
+        self.config = group_examples.config()[0]
+        self.policy = {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5
+        }
 
-    def test_maybe_execute_scaling_policy(self):
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        self.group.view_config.return_value = defer.succeed(self.config)
+        self.group.get_policy.return_value = defer.succeed(self.policy)
+        self.group.view_state.return_value = defer.succeed(self.state)
+
+    def test_maybe_execute_scaling_policy_success(self):
         """
-        Tests the case where cooldowns are all fine and execute_launch_config
-        does not fail.  Return value should be whatever execute_launch_config
-        returns
+        If all cooldowns are all fine and ``execute_launch_config`` does not fail,
+        Return value should be whatever ``execute_launch_config`` returns.
         """
+        self.patches['maybe_execute_scaling_policy'].stop()
+
+        self.mocks['calculate_delta'].return_value = 1
         self.mocks['check_cooldowns'].return_value = True
         self.mocks['execute_launch_config'].return_value = defer.succeed(
             'this should be returned')
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 1,
-                                                    self.group_model, 'pol1')
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, 'pol1')
+
         result = self.successResultOf(d)
         self.assertEqual(result, 'this should be returned')
+
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.state, self.config, self.policy, 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.state, self.config, self.policy)
+        self.mocks['execute_launch_config'].assert_called_once_with(
+            self.mock_log, 'transaction', self.state, self.group,
+            self.mocks['calculate_delta'].return_value)
+
+    def test_maybe_execute_scaling_policy_cooldown_failure(self):
+        """
+        If cooldowns are not fine, ``maybe_execute_scaling_policy`` raises a
+        ``CannotExecutePolicyError`` exception
+        """
+        self.patches['maybe_execute_scaling_policy'].stop()
+
+        self.mocks['calculate_delta'].return_value = 1
+        self.mocks['check_cooldowns'].return_value = False
+        self.mocks['execute_launch_config'].return_value = defer.succeed(
+            'this should NOT be returned')
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, 'pol1')
+        self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
