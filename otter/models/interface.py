@@ -187,8 +187,7 @@ class IScalingGroup(Interface):
               },
               "pending": {
                 "job_id": {
-                    "created": "timestamp when the job was created/started",
-                    "jobType": "create (or delete, possibly others)"
+                    "created": "timestamp when the job was created/started"
                 },
                   ...
               },

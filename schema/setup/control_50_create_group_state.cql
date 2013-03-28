@@ -21,7 +21,7 @@ USE @@KEYSPACE@@;
 --
 -- pending is the pending list.
 -- format:
---  {"jobid": {"created": date, "jobType": "create"}}
+--  {"jobid": {"created": date}}
 --
 -- groupTouched is a timestamp of the last time a scaling policy
 --  was executed in the group
