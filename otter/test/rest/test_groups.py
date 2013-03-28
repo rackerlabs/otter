@@ -393,12 +393,6 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         self.mock_pause = pause_patch.start()
         self.addCleanup(pause_patch.stop)
 
-        transaction_patch = mock.patch(
-            'otter.rest.decorators.generate_transaction_id',
-            return_value="transaction!")
-        transaction_patch.start()
-        self.addCleanup(transaction_patch.stop)
-
     def test_pause(self):
         """
         Pausing should call the controller's ``pause_scaling_group`` function
@@ -406,7 +400,7 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method="POST")
         self.assertEqual(response_body, "")
 
-        self.mock_pause.assert_called_once_with(mock.ANY, 'transaction!',
+        self.mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
                                                 self.mock_group)
 
 
@@ -432,12 +426,6 @@ class GroupResumeTestCase(RestAPITestMixin, TestCase):
         self.mock_resume = resume_patch.start()
         self.addCleanup(resume_patch.stop)
 
-        transaction_patch = mock.patch(
-            'otter.rest.decorators.generate_transaction_id',
-            return_value="transaction!")
-        transaction_patch.start()
-        self.addCleanup(transaction_patch.stop)
-
     def test_resume(self):
         """
         Resume should call the controller's ``resume_scaling_group`` function
@@ -445,5 +433,5 @@ class GroupResumeTestCase(RestAPITestMixin, TestCase):
         response_body = self.assert_status_code(204, method="POST")
         self.assertEqual(response_body, "")
 
-        self.mock_resume.assert_called_once_with(mock.ANY, 'transaction!',
+        self.mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
                                                  self.mock_group)
