@@ -101,9 +101,9 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceURL': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},
@@ -117,9 +117,9 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceURL': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': None,
                                   'pending': {},
@@ -147,9 +147,9 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'foo': {'instance_id': 'frrr',
-                                                     'instance_uri': 'uri',
-                                                     'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
+                                                      'instanceURL': 'uri',
+                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
                                   'pending': {},
