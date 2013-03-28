@@ -309,7 +309,6 @@ def execute_webhook(request, log, capability_version, capability_hash):
         controller.maybe_execute_scaling_policy(
             log,
             transaction_id(request),
-            tenant_id,
             group,
             policy_id,
         )

@@ -78,13 +78,11 @@ def complete_pending_job(log, job_id, state):
 def maybe_execute_scaling_policy(
         log,
         transaction_id,
-        tenant_id,
         scaling_group,
         policy_id):
     """
     Checks whether and how much a scaling policy can be executed.
 
-    :param tenant_id: the current tenant id
     :param scaling_group: an IScalingGroup provider
     :param policy_id: the policy id to execute
 

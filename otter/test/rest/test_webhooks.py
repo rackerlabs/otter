@@ -427,7 +427,6 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
-            self.tenant_id,
             self.mock_group,
             self.policy_id
         )

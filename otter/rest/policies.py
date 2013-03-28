@@ -298,7 +298,7 @@ def execute_policy(request, log, tenantId, groupId, policyId):
     group = get_store().get_scaling_group(log, tenantId, groupId)
 
     d = controller.maybe_execute_scaling_policy(
-        log, transaction_id(request), tenantId, group, policyId)
+        log, transaction_id(request), group, policyId)
 
     d.addCallback(lambda _: "{}")  # Return value TBD
     return d
