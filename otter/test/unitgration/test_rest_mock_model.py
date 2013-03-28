@@ -355,7 +355,9 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         Executing a non-existant scaling policy should result in a 404.
         """
 
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(NoSuchPolicyError('11111', '1', '2'))
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+            NoSuchPolicyError('11111', '1', '2'))
+
         wrapper = self.assert_deferred_succeeded(
             request(root, 'POST', self.policies_url + '1/execute/'))
         self.assertEqual(wrapper.response.code, 404,

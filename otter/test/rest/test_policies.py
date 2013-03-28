@@ -305,7 +305,8 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(NoSuchPolicyError('11111', '1', '2'))
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+            NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404,
                                                 endpoint=self.endpoint + 'execute/',
