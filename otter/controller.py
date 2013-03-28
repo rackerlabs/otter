@@ -26,6 +26,7 @@ Storage model for state information:
 
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.supervisor import execute_one_config
+from otter.util.timestamp import now, from_timestamp
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -105,7 +106,7 @@ def maybe_execute_scaling_policy(
     """
     # TODO: Lock group
     state = scaling_group.view_state()
-    if check_cooldowns(log, scaling_group, policy_id, "i got this data from the db"):
+    if check_cooldowns('fake', 'fake', 'fake', 'fake'):
         delta = calculate_delta("fake", "fake", "fake")
         execute_launch_config(log, transaction_id, state, scaling_group, delta)
         #record_policy_trigger_time(log, scaling_group, policy, time.time())
@@ -114,10 +115,33 @@ def maybe_execute_scaling_policy(
         #                            'i was rejected because...')
 
 
-def check_cooldowns(*args):
+def check_cooldowns(state, config, policy, policy_id):
     """
     Check the cooldowns -- needs further definition
+
+    :param dict state: the state dictionary
+    :param dict config: the config dictionary
+    :param dict policy: the policy dictionary
+
+    :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
+        otherwise
     """
+    # hack to get a timezone aware date-time object of the same timezone as
+    # gets returned by from_timestamp
+    this_now = from_timestamp(now())
+
+    # check policy cooldown and global cooldown and
+    timestamp_and_cooldowns = [
+        (state['policyTouched'].get(policy_id), policy['cooldown']),
+        (state['groupTouched'], config['cooldown']),
+    ]
+
+    for last_time, cooldown in timestamp_and_cooldowns:
+        if last_time is not None:
+            delta = this_now - from_timestamp(last_time)
+            if delta.total_seconds() < cooldown:
+                return False
+
     return True
 
 

@@ -1,11 +1,15 @@
 """
 Tests for :mod:`otter.controller`
 """
+from datetime import timedelta, datetime
+
 import mock
 
 from twisted.trial.unittest import TestCase
 
 from otter import controller
+from otter.util.timestamp import MIN
+from otter.test.utils import patch_testcase
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -135,3 +139,78 @@ class CalculateDeltaTestCase(TestCase):
         self.assertRaises(NotImplementedError,
                           controller.calculate_delta,
                           fake_state, fake_config, fake_policy)
+
+
+class CheckCooldownsTestCase(TestCase):
+    """
+    Tests for :func:`otter.controller.check_cooldowns`
+    """
+
+    def mock_now(self, seconds_after_min):
+        """
+        Set :func:`otter.util.timestamp.now` to return a timestamp that is
+        so many hours after `datetime.min`
+        """
+        fake_now = datetime.min + timedelta(seconds=seconds_after_min)
+        patch_testcase(self, 'now', 'otter.controller.now',
+                       return_value=(fake_now.isoformat() + 'Z'))
+
+    def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
+        """
+        If both the global cooldown and policy cooldown are sufficiently long
+        ago, ``check_cooldowns`` returns True.
+        """
+        self.mock_now(30)
+        fake_config = fake_policy = {'cooldown': 0}
+        fake_state = {'groupTouched': MIN, 'policyTouched': {'pol': MIN}}
+        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+                                                   fake_policy, 'pol'))
+
+    def test_check_cooldowns_global_cooldown_passes_policy_never_touched(self):
+        """
+        If the global cooldown was sufficiently long ago and the policy has
+        never been executed (hence there is no touched time for the policy),
+        ``check_cooldowns`` returns True.
+        """
+        self.mock_now(30)
+        fake_config = {'cooldown': 0}
+        fake_policy = {'cooldown': 10000000}
+        fake_state = {'groupTouched': MIN, 'policyTouched': {}}
+        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+                                                   fake_policy, 'pol'))
+
+    def test_check_cooldowns_no_policy_ever_executed(self):
+        """
+        If no policy has ever been executed (hence there is no global touch
+        time), ``check_cooldowns`` returns True.
+        """
+        self.mock_now(30)
+        fake_config = {'cooldown': 1000000000}
+        fake_policy = {'cooldown': 10000000}
+        fake_state = {'groupTouched': None, 'policyTouched': {}}
+        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+                                                   fake_policy, 'pol'))
+
+    def test_check_cooldowns_global_cooldown_fails(self):
+        """
+        If the last time a (any) policy was executed too recently,
+        ``check_cooldowns`` returns False.
+        """
+        self.mock_now(1)
+        fake_config = {'cooldown': 30}
+        fake_policy = {'cooldown': 1000000000}
+        fake_state = {'groupTouched': MIN, 'policyTouched': {}}
+        self.assertFalse(controller.check_cooldowns(fake_state, fake_config,
+                                                    fake_policy, 'pol'))
+
+    def test_check_cooldowns_policy_cooldown_fails(self):
+        """
+        If the last time THIS policy was executed too recently,
+        ``check_cooldowns`` returns False.
+        """
+        self.mock_now(1)
+        fake_config = {'cooldown': 1000000000}
+        fake_policy = {'cooldown': 30}
+        fake_state = {'groupTouched': MIN, 'policyTouched': {'pol': MIN}}
+        self.assertFalse(controller.check_cooldowns(fake_state, fake_config,
+                                                    fake_policy, 'pol'))

@@ -78,3 +78,19 @@ def iMock(iface, **kwargs):
     imock = mock.MagicMock(spec=iface.names(), **kwargs)
     directlyProvides(imock, iface)
     return imock
+
+
+def patch_testcase(test_case, name, to_be_patched, **kwargs):
+    """
+    Patches and starts a test case, and adds the patcher to the test case's
+    `self.patches`, and the mock to the test case's `self.mocks`
+    """
+    if getattr(test_case, 'patches', None) is None:
+        test_case.patches = {}
+    if getattr(test_case, 'mocks', None) is None:
+        test_case.mocks = {}
+
+    test_case.patches[name] = mock.patch(to_be_patched, **kwargs)
+    test_case.mocks[name] = test_case.patches[name].start()
+    if len(test_case.patches) == 1:  # only add this once
+        test_case.addCleanup(mock.patch.stopall)
