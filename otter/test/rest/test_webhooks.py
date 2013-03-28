@@ -227,6 +227,18 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
 
     invalid_methods = ("POST")
 
+    def setUp(self):
+        """
+        Set up webhook specific mocks.
+        """
+        super(OneWebhookTestCase, self).setUp()
+
+        controller_patcher = mock.patch('otter.rest.webhooks.controller')
+        self.mock_controller = controller_patcher.start()
+        self.addCleanup(controller_patcher.stop)
+
+        self.mock_group.uuid = self.group_id
+
     def test_get_webhook_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -404,10 +416,20 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         Execute a webhook by hash.
         """
-        self.mock_store.execute_webhook_hash.return_value = defer.succeed(None)
+        self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
+            (self.tenant_id, self.group_id, self.policy_id))
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
+
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, self.tenant_id, self.group_id)
+        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
+            mock.ANY,
+            'transaction-id',
+            self.mock_group,
+            self.policy_id
+        )
 
         self.assertEqual(response_body, '')
 
@@ -415,7 +437,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         Executing a webhook with an unknown hash should appear to succeed.
         """
-        self.mock_store.execute_webhook_hash.return_value = defer.fail(
+        self.mock_store.webhook_info_by_hash.return_value = defer.fail(
             UnrecognizedCapabilityError("11111", 1))
 
         response_body = self.assert_status_code(
@@ -428,6 +450,6 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         Executing a webhook should only surface 500 in the case of
         a synchronous exception and not specific codes.
         """
-        self.mock_store.execute_webhook_hash.return_value = ValueError('otters in pants')
+        self.mock_store.webhook_info_by_hash.return_value = defer.fail(ValueError('otters in pants'))
 
         self.assert_status_code(500, '/v1.0/execute/1/11111/', 'POST')

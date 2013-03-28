@@ -11,7 +11,7 @@ from otter.json_schema import group_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.application import app, get_store
+from otter.rest.application import app, get_store, transaction_id
 
 from otter import controller
 
@@ -82,8 +82,7 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
         # After the config has been updated, update the state, but we do not
         # need to wait on the result of updating the state.  So this callback
         # returns nothing.
-        transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
-        controller.obey_config_change(log, transaction_id, rec)
+        controller.obey_config_change(log, transaction_id(request), rec)
 
     rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.update_config(data).addCallback(_do_obey_config_change)

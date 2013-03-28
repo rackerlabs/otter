@@ -140,6 +140,16 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
     invalid_methods = ("POST")
     policy_id = "2"
 
+    def setUp(self):
+        """
+        Set up common policy mocks.
+        """
+        super(OnePolicyTestCase, self).setUp()
+
+        controller_patcher = mock.patch('otter.rest.policies.controller')
+        self.mock_controller = controller_patcher.start()
+        self.addCleanup(controller_patcher.stop)
+
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def test_get_policy(self, url_root):
         """
@@ -277,28 +287,38 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a policy.
         """
-        self.mock_group.execute_policy.return_value = defer.succeed(None)
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
 
         response_body = self.assert_status_code(202,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         self.assertEqual(response_body, "{}")
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
-        self.mock_group.execute_policy.assert_called_once_with(self.policy_id)
+        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
+            mock.ANY,
+            'transaction-id',
+            self.mock_group,
+            self.policy_id
+        )
 
     def test_execute_policy_failure_404(self):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
-        (self.mock_group.
-            execute_policy.
-            return_value) = defer.fail(NoSuchPolicyError('11111', '1', '2'))
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+            NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
 
-        self.mock_group.execute_policy.assert_called_once_with(self.policy_id)
+        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
+            mock.ANY,
+            'transaction-id',
+            self.mock_group,
+            self.policy_id
+        )
+
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)

@@ -15,6 +15,7 @@ import mock
 from urlparse import urlsplit
 
 from twisted.trial.unittest import TestCase
+from twisted.internet import defer
 
 from otter.json_schema.group_examples import config, launch_server_config, policy
 from otter.models.interface import (
@@ -204,6 +205,11 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
             tenant=self.tenant_id, group=self.group_id)
 
+        controller_patcher = mock.patch('otter.rest.policies.controller')
+        self.mock_controller = controller_patcher.start()
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
+        self.addCleanup(controller_patcher.stop)
+
     def assert_number_of_scaling_policies(self, number):
         """
         Asserts that there are ``number`` number of scaling policies
@@ -348,6 +354,10 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         Executing a non-existant scaling policy should result in a 404.
         """
+
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+            NoSuchPolicyError('11111', '1', '2'))
+
         wrapper = self.assert_deferred_succeeded(
             request(root, 'POST', self.policies_url + '1/execute/'))
         self.assertEqual(wrapper.response.code, 404,
@@ -389,6 +399,11 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
             '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks/'.format(
                 tenant=self.tenant_id, group=self.group_id,
                 policy=self.policy_id))
+
+        controller_patcher = mock.patch('otter.rest.webhooks.controller')
+        self.mock_controller = controller_patcher.start()
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
+        self.addCleanup(controller_patcher.stop)
 
     def assert_number_of_webhooks(self, number):
         """
