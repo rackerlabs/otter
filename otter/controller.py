@@ -122,15 +122,16 @@ def check_cooldowns(state, config, policy, policy_id):
     :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
+    :param str policy_id: the policy id that matches ``policy``
 
     :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
         otherwise
     """
     # hack to get a timezone aware date-time object of the same timezone as
-    # gets returned by from_timestamp
+    # gets returned by from_timestamp, because we cannot perform any math if
+    # one datetime object is timezone aware and the other is not
     this_now = from_timestamp(now())
 
-    # check policy cooldown and global cooldown and
     timestamp_and_cooldowns = [
         (state['policyTouched'].get(policy_id), policy['cooldown']),
         (state['groupTouched'], config['cooldown']),
