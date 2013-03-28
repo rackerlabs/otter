@@ -1482,7 +1482,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def test_webhook_hash(self):
         """
-        Test that you can execute a webhook hash
+        Test that you can get webhook info by hash.
         """
         self.returns = [_cassandrify_data([
             {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': False}]),
@@ -1491,9 +1491,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
-        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         r = self.assert_deferred_succeeded(d)
-        self.assertEqual(r, None)
+        self.assertEqual(r, ('123', 'group1', 'pol1'))
         self.connection.execute.assert_called_any(expectedCql,
                                                   expectedData,
                                                   ConsistencyLevel.TWO)
@@ -1513,7 +1513,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
-        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.assert_deferred_failed(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1529,7 +1529,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
-        d = self.collection.execute_webhook_hash(self.mock_log, 'x')
+        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.assert_deferred_failed(d, UnrecognizedCapabilityError)
 
         self.connection.execute.assert_called_once_with(expectedCql,

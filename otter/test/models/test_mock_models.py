@@ -683,23 +683,6 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertIsNone(self.assert_deferred_succeeded(deferred))
         self.assertEqual(self.group.webhooks, {'2': {}})
 
-    def test_execute_policy_succeeds(self):
-        """
-        Executing a policy that exists should result in a deferred that fires
-        with None.
-        """
-        self.group.policies = {'2': {}}
-
-        deferred = self.group.execute_policy('2')
-        self.assertIsNone(self.assert_deferred_succeeded(deferred))
-
-    def test_execute_nonexistant_policy(self):
-        """
-        Executing a non-existant policy should fail with a NoSuchPolicyError.
-        """
-        deferred = self.group.execute_policy('2')
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
-
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -818,9 +801,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
-    def test_webhook_execute(self, mock_generation):
+    def test_webhook_info_by_hash(self, mock_generation):
         """
-        Tests that we can execute a webhook given a capability token.
+        Tests that we can get info for a webhook given a capability token.
         """
         launch = {"launch": "config"}
         policy = {
@@ -841,12 +824,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
 
-        deferred = self.collection.execute_webhook_hash(self.mock_log, 'hash')
-        self.assert_deferred_succeeded(deferred)
+        deferred = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
+        webhook_info = self.assert_deferred_succeeded(deferred)
+        self.assertEqual(webhook_info, (self.tenant_id, group.uuid, pol_uuid))
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
-    def test_webhook_execute_no_hash(self, mock_generation):
+    def test_webhook_info_no_hash(self, mock_generation):
         """
         Tests that, given a bad capability token, we error out.
         """
@@ -869,7 +853,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
 
-        deferred = self.collection.execute_webhook_hash(self.mock_log, 'weasel')
+        deferred = self.collection.webhook_info_by_hash(self.mock_log, 'weasel')
         self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
 
     @mock.patch('otter.models.mock.generate_capability',
