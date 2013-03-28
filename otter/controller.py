@@ -117,7 +117,9 @@ def maybe_execute_scaling_policy(
 
 def check_cooldowns(state, config, policy, policy_id):
     """
-    Check the cooldowns -- needs further definition
+    Check the global cooldowns (when was the last time any policy was executed?)
+    and the policy specific cooldown (when was the last time THIS policy was
+    executed?)
 
     :param dict state: the state dictionary
     :param dict config: the config dictionary

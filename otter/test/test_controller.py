@@ -149,7 +149,8 @@ class CheckCooldownsTestCase(TestCase):
     def mock_now(self, seconds_after_min):
         """
         Set :func:`otter.util.timestamp.now` to return a timestamp that is
-        so many hours after `datetime.min`
+        so many seconds after `datetime.min`.  Tests using this should set
+        the last touched time to be MIN.
         """
         fake_now = datetime.min + timedelta(seconds=seconds_after_min)
         patch_testcase(self, 'now', 'otter.controller.now',
@@ -193,7 +194,7 @@ class CheckCooldownsTestCase(TestCase):
 
     def test_check_cooldowns_global_cooldown_fails(self):
         """
-        If the last time a (any) policy was executed too recently,
+        If the last time a (any) policy was executed is too recent,
         ``check_cooldowns`` returns False.
         """
         self.mock_now(1)
@@ -205,7 +206,7 @@ class CheckCooldownsTestCase(TestCase):
 
     def test_check_cooldowns_policy_cooldown_fails(self):
         """
-        If the last time THIS policy was executed too recently,
+        If the last time THIS policy was executed is too recent,
         ``check_cooldowns`` returns False.
         """
         self.mock_now(1)
