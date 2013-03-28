@@ -1183,6 +1183,46 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
         self.flushLoggedErrors(NoSuchWebhookError)
 
+    def test_view_manifest_success(self):
+        """
+        When viewing the manifest, if the group exists a dictionary with the
+        config, launch config, and scaling policies is returned.
+        """
+        self.group.view_config = mock.MagicMock(
+            return_value=defer.succeed('config'))
+        self.group.view_launch_config = mock.MagicMock(
+            return_value=defer.succeed('launch config'))
+        self.group._naive_list_policies = mock.MagicMock(
+            return_value=defer.succeed('policies'))
+
+        self.assertEqual(self.successResultOf(self.group.view_manifest()),
+                         {'groupConfiguration': 'config',
+                          'launchConfiguration': 'launch config',
+                          'scalingPolicies': 'policies'})
+        self.group.view_config.assert_called_once_with()
+        self.group.view_launch_config.assert_called_once_with()
+        self.group._naive_list_policies.assert_called_once_with()
+
+    def test_view_manifest_no_such_group(self):
+        """
+        When viewing the manifest, if the gropu doesn't exist (and hence there
+        is no config), the ``NoSuchScalingGroup`` error that is raised by
+        ``view_config`` is propagated up and viewing the launch config and the
+        policies is never done.
+        """
+        self.group.view_config = mock.MagicMock(
+            return_value=defer.fail(NoSuchScalingGroupError('1', '1')))
+        self.group.view_launch_config = mock.MagicMock(
+            return_value=defer.succeed('launch config'))
+        self.group._naive_list_policies = mock.MagicMock(
+            return_value=defer.succeed('policies'))
+
+        self.assert_deferred_failed(self.group.view_manifest(),
+                                    NoSuchScalingGroupError)
+        self.group.view_config.assert_called_once_with()
+        self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
+        self.assertEqual(len(self.group._naive_list_policies), 0)
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
