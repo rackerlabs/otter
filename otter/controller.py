@@ -39,7 +39,7 @@ class CannotExecutePolicyError(Exception):
     """
     def __init__(self, tenant_id, group_id, policy_id, why):
         super(CannotExecutePolicyError, self).__init__(
-            "Cannot execute scaling policy {p} for group {g} for tenant {t} because {w}"
+            "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
@@ -131,15 +131,18 @@ def maybe_execute_scaling_policy(
         state_config_policy should be returned by ``check_cooldowns``
         """
         state, config, policy = state_config_policy
+        error_msg = "Cooldowns not met."
 
         if check_cooldowns(state, config, policy, policy_id):
-            return execute_launch_config(
-                bound_log, transaction_id, state, scaling_group,
-                calculate_delta(state, config, policy))
+            delta = calculate_delta(state, config, policy)
+            if delta != 0:
+                return execute_launch_config(bound_log, transaction_id, state,
+                                             scaling_group, delta)
+            error_msg = "Policy execution would violate min/max constraints."
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
                                        scaling_group.uuid, policy_id,
-                                       "Cooldowns not met.")
+                                       error_msg)
     # TODO: Lock group
     deferred = defer.gatherResults([
         scaling_group.view_state(),
@@ -163,8 +166,7 @@ def check_cooldowns(state, config, policy, policy_id):
     :param dict policy: the policy dictionary
     :param str policy_id: the policy id that matches ``policy``
 
-    :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
-        otherwise
+    :return: C{int}
     """
     this_now = datetime.now(iso8601.iso8601.UTC)
 

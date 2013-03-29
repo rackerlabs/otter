@@ -3,14 +3,12 @@ Tests for :mod:`otter.controller`
 """
 from datetime import timedelta, datetime
 
-import inspect
 import mock
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter import controller
-from otter.json_schema import group_examples
 from otter.models.interface import IScalingGroup
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
@@ -224,7 +222,7 @@ class CheckCooldownsTestCase(TestCase):
                                                     fake_policy, 'pol'))
 
 
-class ControllerTestCase(DeferredTestMixin, TestCase):
+class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
@@ -236,42 +234,28 @@ class ControllerTestCase(DeferredTestMixin, TestCase):
 
         Also build a mock model that can be used for testing.
         """
-        self.mocks = {}
-        methods = [name for name, func in
-                   inspect.getmembers(controller, inspect.isfunction)]
-        for thing in ['supervisor'] + methods:
-            self.mocks = patch(self, 'otter.controller.{0}'.format(thing))
+        things_and_return_vals = {
+            'check_cooldowns': True,
+            'calculate_delta': 1,
+            'execute_launch_config': defer.succeed(None)
+        }
+        for thing, return_val in things_and_return_vals.iteritems():
+            self.mocks = patch(self, 'otter.controller.{0}'.format(thing),
+                               return_value=return_val)
 
         self.mock_log = mock.MagicMock()
 
-        self.state = {
-            "active": {},
-            "pending": {},
-            "groupTouched": None,
-            "policyTouched": {},
-            "paused": False
-        }
-        self.config = group_examples.config()[0]
-        self.policy = {
-            "name": "scale up by 10",
-            "change": 10,
-            "cooldown": 5
-        }
-
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
-        self.group.view_config.return_value = defer.succeed(self.config)
-        self.group.get_policy.return_value = defer.succeed(self.policy)
-        self.group.view_state.return_value = defer.succeed(self.state)
+        self.group.view_config.return_value = defer.succeed("config")
+        self.group.get_policy.return_value = defer.succeed("policy")
+        self.group.view_state.return_value = defer.succeed("state")
 
     def test_maybe_execute_scaling_policy_success(self):
         """
-        If all cooldowns are all fine and ``execute_launch_config`` does not fail,
-        Return value should be whatever ``execute_launch_config`` returns.
+        If all cooldowns are all fine, the delta is not zero, and
+        ``execute_launch_config`` does not fail, return value is whatever
+        ``execute_launch_config`` returns.
         """
-        self.patches['maybe_execute_scaling_policy'].stop()
-
-        self.mocks['calculate_delta'].return_value = 1
-        self.mocks['check_cooldowns'].return_value = True
         self.mocks['execute_launch_config'].return_value = defer.succeed(
             'this should be returned')
 
@@ -281,12 +265,10 @@ class ControllerTestCase(DeferredTestMixin, TestCase):
         result = self.successResultOf(d)
         self.assertEqual(result, 'this should be returned')
 
-        self.mocks['check_cooldowns'].assert_called_once_with(
-            self.state, self.config, self.policy, 'pol1')
-        self.mocks['calculate_delta'].assert_called_once_with(
-            self.state, self.config, self.policy)
+        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log, 'transaction', self.state, self.group,
+            self.mock_log, 'transaction', "state", self.group,
             self.mocks['calculate_delta'].return_value)
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
@@ -294,13 +276,31 @@ class ControllerTestCase(DeferredTestMixin, TestCase):
         If cooldowns are not fine, ``maybe_execute_scaling_policy`` raises a
         ``CannotExecutePolicyError`` exception
         """
-        self.patches['maybe_execute_scaling_policy'].stop()
-
-        self.mocks['calculate_delta'].return_value = 1
         self.mocks['check_cooldowns'].return_value = False
-        self.mocks['execute_launch_config'].return_value = defer.succeed(
-            'this should NOT be returned')
 
         d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
                                                     self.group, 'pol1')
-        self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        self.assertIn("Cooldowns not met", str(f.value))
+
+        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.assertEqual(len(self.mocks['calculate_delta'].mock_calls), 0)
+        self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+
+    def test_maybe_execute_scaling_policy_zero_delta(self):
+        """
+        If cooldowns are fine, but delta is zero,
+        ``maybe_execute_scaling_policy`` raises a ``CannotExecutePolicyError``
+        exception
+        """
+        self.mocks['calculate_delta'].return_value = 0
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, 'pol1')
+        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        self.assertIn("Policy execution would violate min/max constraints",
+                      str(f.value))
+
+        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
+        self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
