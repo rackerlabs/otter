@@ -326,7 +326,23 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
-        raise NotImplementedError()
+        def _get_launch_and_policies(the_config):
+            """
+            Now that we know the group exists, get the launch config and
+            policies
+            """
+            d = defer.gatherResults([
+                self.view_launch_config(), self._naive_list_policies()])
+
+            d.addCallback(lambda launch_and_policies: {
+                'groupConfiguration': the_config,
+                'launchConfiguration': launch_and_policies[0],
+                'scalingPolicies': launch_and_policies[1]
+            })
+
+            return d
+
+        return self.view_config().addCallback(_get_launch_and_policies)
 
     def view_config(self):
         """
