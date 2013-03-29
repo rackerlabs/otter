@@ -288,7 +288,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_state_bad_job_id(self):
         """
-        Test that if we try to pass in a bad job ID it continues
+        If we try to add a server with a job ID that does not exist, the server is
+        still added without error
         """
         fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
 
@@ -307,7 +308,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_state_bad_server(self):
         """
-        Test that if we try to add a server with two jobs, that it continues.
+        Test if we try to add a server that is already in existance that it is
+        still added without error
         """
 
         fake_state = {'active': {'foo': {'instance_id': 'frrr', 'instance_uri': 'uri',
