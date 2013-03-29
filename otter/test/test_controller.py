@@ -17,7 +17,7 @@ class CalculateDeltaTestCase(TestCase):
         """
         Set the max
         """
-        patcher = mock.patch.object(controller, 'MAX_ENTITIES', new=50)
+        patcher = mock.patch.object(controller, 'MAX_ENTITIES', new=10)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -30,7 +30,7 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 300}
-        fake_state = {'active': range(5), 'pending': []}
+        fake_state = {'active': dict.fromkeys(range(5)), 'pending': {}}
 
         self.assertEqual(5, controller.calculate_delta(fake_state, fake_config,
                                                        fake_policy))
@@ -44,7 +44,8 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': range(4), 'pending': range(4)}
+        fake_state = {'active': dict.fromkeys(range(4)),
+                      'pending': dict.fromkeys(range(4))}
 
         self.assertEqual(2, controller.calculate_delta(fake_state, fake_config,
                                                        fake_policy))
@@ -58,7 +59,8 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': range(5), 'pending': range(5)}
+        fake_state = {'active': dict.fromkeys(range(5)),
+                      'pending': dict.fromkeys(range(5))}
 
         self.assertEqual(0, controller.calculate_delta(fake_state, fake_config,
                                                        fake_policy))
@@ -72,7 +74,8 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': None}
-        fake_state = {'active': range(25), 'pending': range(25)}
+        fake_state = {'active': dict.fromkeys(range(5)),
+                      'pending': dict.fromkeys(range(5))}
 
         self.assertEqual(0, controller.calculate_delta(fake_state, fake_config,
                                                        fake_policy))
@@ -85,8 +88,8 @@ class CalculateDeltaTestCase(TestCase):
         then ``calculate_delta`` returns a delta that is just the policy change.
         """
         fake_policy = {'change': -5}
-        fake_config = {'minEntities': 0, 'maxEntities': 300}
-        fake_state = {'active': range(5), 'pending': range(15)}
+        fake_config = {'minEntities': 0, 'maxEntities': 30}
+        fake_state = {'active': dict.fromkeys(range(10)), 'pending': {}}
 
         self.assertEqual(-5, controller.calculate_delta(fake_state, fake_config,
                                                         fake_policy))
@@ -100,7 +103,8 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': -5}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
-        fake_state = {'active': range(4), 'pending': range(4)}
+        fake_state = {'active': dict.fromkeys(range(4)),
+                      'pending': dict.fromkeys(range(4))}
 
         self.assertEqual(-3, controller.calculate_delta(fake_state, fake_config,
                                                         fake_policy))
@@ -114,7 +118,7 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': -5}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
-        fake_state = {'active': range(5), 'pending': []}
+        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
 
         self.assertEqual(0, controller.calculate_delta(fake_state, fake_config,
                                                        fake_policy))
@@ -126,7 +130,7 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'changePercent': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': [], 'pending': []}
+        fake_state = {'active': {}, 'pending': {}}
 
         self.assertRaises(NotImplementedError,
                           controller.calculate_delta,
