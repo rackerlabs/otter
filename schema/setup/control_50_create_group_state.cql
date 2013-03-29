@@ -5,7 +5,7 @@ USE @@KEYSPACE@@;
 -- the data contained as JSON
 --
 -- In CQL3, the primary key is split such that the first part
--- ends up in the row key, the rest of the key ends up 
+-- ends up in the row key, the rest of the key ends up
 -- as a composite column key.
 --
 -- This does a good job of making things a bit more rational
@@ -17,12 +17,12 @@ USE @@KEYSPACE@@;
 
 -- active is the active list.
 -- format:
---   {"servername": {"instance": uri, "created": date}}
+--   {"instanceid: {"name": "servername", instanceURI": uri, "created": date}}
 --
 -- pending is the pending list.
 -- format:
 --  {"jobid": {"created": date}}
--- 
+--
 -- groupTouched is a timestamp of the last time a scaling policy
 --  was executed in the group
 --
@@ -31,8 +31,8 @@ USE @@KEYSPACE@@;
 
 CREATE COLUMNFAMILY group_state (
     "tenantId" ascii,
-    "groupId" ascii, 
-    active ascii, 
+    "groupId" ascii,
+    active ascii,
     pending ascii,
     "groupTouched" ascii,
     "policyTouched" ascii,
@@ -40,5 +40,5 @@ CREATE COLUMNFAMILY group_state (
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId")
     );
-    
+
 CREATE INDEX deleted_group_state ON group_state (deleted);
