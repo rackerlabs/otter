@@ -404,9 +404,9 @@ class CassScalingGroup(object):
 
         active = state["active"]
         if not name in active:
-            active = {"instance_id": instance_id,
-                      "instance_uri": uri,
-                      "created": ts}
+            active[name] = {"instance_id": instance_id,
+                            "instance_uri": uri,
+                            "created": ts}
 
         query = _cql_add_server_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
