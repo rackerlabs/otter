@@ -94,3 +94,7 @@ def patch_testcase(test_case, name, to_be_patched, **kwargs):
     test_case.mocks[name] = test_case.patches[name].start()
     if len(test_case.patches) == 1:  # only add this once
         test_case.addCleanup(mock.patch.stopall)
+        # clear out the mocks and patches so that the next time around stopping
+        # the patches will be added as a cleanup
+        test_case.addCleanup(test_case.patches.clear)
+        test_case.addCleanup(test_case.mocks.clear)
