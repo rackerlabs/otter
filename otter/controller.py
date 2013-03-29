@@ -24,6 +24,7 @@ Storage model for state information:
 
 """
 
+from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.supervisor import execute_one_config
 
 
@@ -105,7 +106,7 @@ def maybe_execute_scaling_policy(
     # TODO: Lock group
     state = scaling_group.view_state()
     if check_cooldowns(log, scaling_group, policy_id, "i got this data from the db"):
-        (new_state, delta) = calculate_new_steady_state(log, state, policy_id)
+        delta = calculate_delta("fake", "fake", "fake")
         execute_launch_config(log, transaction_id, state, scaling_group, delta)
         #record_policy_trigger_time(log, scaling_group, policy, time.time())
     #else:
@@ -120,12 +121,26 @@ def check_cooldowns(*args):
     return True
 
 
-def calculate_new_steady_state(log, state, policy):
+def calculate_delta(state, config, policy):
     """
-    Calculate new steady state size and delta
+    Calculate the desired change in the number of servers, keeping in mind the
+    minimum and maximum constraints.
+
+    :param dict state: the state dictionary
+    :param dict config: the config dictionary
+    :param dict policy: the policy dictionary
+
+    :return: C{int} representing the desired change - can be 0
     """
+    def constrain(desired):
+        max_entities = config['maxEntities']
+        if max_entities is None:
+            max_entities = MAX_ENTITIES
+        return max(min(desired, max_entities), config['minEntities'])
+
     if "change" in policy:
-        return (state['steadyState'] + policy["change"], policy["change"])
+        current = len(state['active']) + len(state['pending'])
+        return constrain(current + policy['change']) - current
     else:
         raise NotImplementedError()
 
