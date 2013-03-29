@@ -279,8 +279,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
                        'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"_ver": 1, "foo": {"instance_id": "frrr", "instance_uri": "uri", '
-                                   '"created": "2012-12-25 00:00:00-06:39Z"}}'),
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
+                                   '"instanceURL": "uri"}, "_ver": 1}'),
                         'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
         self.connection.execute.assert_called_with(expectedCql,
                                                    expectedData,
@@ -299,8 +299,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
                        'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"_ver": 1, "foo": {"instance_id": "frrr", "instance_uri": '
-                                   '"uri", "created": "2012-12-25 00:00:00-06:39Z"}}'),
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
+                                   '"instanceURL": "uri"}, "_ver": 1}'),
                         'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -312,7 +312,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         still added without error
         """
 
-        fake_state = {'active': {'foo': {'instance_id': 'frrr', 'instance_uri': 'uri',
+        fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
                                          'created': '2012-12-25 00:00:00-06:39Z'}},
                       'paused': False,
                       'groupTouched': '2012-12-25 00:00:00-06:39Z',
@@ -325,8 +325,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_succeeded(d)
         expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
                        'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"_ver": 1, "foo": {"instance_id": "frrr", "instance_uri": '
-                                   '"uri", "created": "2012-12-25 00:00:00-06:39Z"}}'),
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": '
+                                   '"foo", "instanceURL": "uri"}, "_ver": 1}'),
                         'groupId': '12345678g',
                         'pending': '{"_ver": 1}',
                         'tenantId': '11111'}
