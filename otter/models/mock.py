@@ -62,9 +62,9 @@ class MockScalingGroup:
         entities in this scaling group, in the following format::
 
             {
-                "server_name": {
-                    "instance_id": "instance_id"
-                    "instance_uri": "instance_uri",
+                "instance id": {
+                    "name": "sever name"
+                    "instanceURL": "instance URL",
                     "created": <timestamp_of_creation>
                 }, ...
             }
@@ -263,15 +263,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def execute_policy(self, policy_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
-        """
-        if not policy_id in self.policies:
-            return defer.fail(NoSuchPolicyError(self.tenant_id, self.uuid,
-                                                policy_id))
-        return defer.succeed(None)
-
     def list_webhooks(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
@@ -375,10 +366,10 @@ class MockScalingGroup:
         if pending_job_id in self.pending_jobs:
             del self.pending_jobs[pending_job_id]
 
-        if not name in self.active_entities:
-            self.active_entities[name] = {"instance_id": instance_id,
-                                          "instance_uri": uri,
-                                          "created": ts}
+        if not instance_id in self.active_entities:
+            self.active_entities[instance_id] = {"name": name,
+                                                 "instanceURL": uri,
+                                                 "created": ts}
 
         return defer.succeed(None)
 
@@ -459,9 +450,9 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, None)
 
-    def execute_webhook_hash(self, log, capability_hash):
+    def webhook_info_by_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
+        see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
         """
         for tenant_id in self.data:
             for group_id in self.data[tenant_id]:
@@ -469,6 +460,6 @@ class MockScalingGroupCollection:
                 for policy_id in webhooks:
                     for webhook_id in webhooks[policy_id]:
                         if webhooks[policy_id][webhook_id]['capability']['hash'] == capability_hash:
-                            return self.data[tenant_id][group_id].execute_policy(policy_id)
+                            return defer.succeed((tenant_id, group_id, policy_id))
 
         return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))

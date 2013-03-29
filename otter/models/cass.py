@@ -335,7 +335,23 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
-        raise NotImplementedError()
+        def _get_launch_and_policies(the_config):
+            """
+            Now that we know the group exists, get the launch config and
+            policies
+            """
+            d = defer.gatherResults([
+                self.view_launch_config(), self._naive_list_policies()])
+
+            d.addCallback(lambda launch_and_policies: {
+                'groupConfiguration': the_config,
+                'launchConfiguration': launch_and_policies[0],
+                'scalingPolicies': launch_and_policies[1]
+            })
+
+            return d
+
+        return self.view_config().addCallback(_get_launch_and_policies)
 
     def view_config(self):
         """
@@ -613,18 +629,6 @@ class CassScalingGroup(object):
             policy_id, get_consistency_level('delete', 'policy')))
         d.addCallback(lambda _: None)
         return d
-
-    def execute_policy(self, policy_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroup.execute_policy`
-        """
-        def _do_stuff(pol):
-            # Doing stuff will go here.
-            #maybe_execute_scaling_policy(self.log, None, self, pol)
-            return None
-
-        d = self.get_policy(policy_id)
-        d.addCallback(_do_stuff)
 
     def _naive_list_webhooks(self, policy_id):
         """
@@ -918,9 +922,9 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def execute_webhook_hash(self, log, capability_hash):
+    def webhook_info_by_hash(self, log, capability_hash):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.execute_webhook_hash`
+        see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
 
         Note: We have to post-filter deleted items because of the way that Cassandra works
 
@@ -945,8 +949,7 @@ class CassScalingGroupCollection:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             if res['deleted'] is True:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
-            group = self.get_scaling_group(log, res['tenantId'], res['groupId'])
-            return group.execute_policy(res['policyId'])
+            return (res['tenantId'], res['groupId'], res['policyId'])
 
         query = _cql_find_webhook_token.format(cf=self.webhooks_table)
         d = self.connection.execute(query,

@@ -75,7 +75,11 @@ def complete_pending_job(log, job_id, state):
     return True
 
 
-def maybe_execute_scaling_policy(log, transaction_id, scaling_group, policy):
+def maybe_execute_scaling_policy(
+        log,
+        transaction_id,
+        scaling_group,
+        policy_id):
     """
     Checks whether and how much a scaling policy can be executed.
 
@@ -100,8 +104,8 @@ def maybe_execute_scaling_policy(log, transaction_id, scaling_group, policy):
     """
     # TODO: Lock group
     state = scaling_group.view_state()
-    if check_cooldowns(log, scaling_group, policy, "i got this data from the db"):
-        (new_state, delta) = calculate_new_steady_state(log, state, policy)
+    if check_cooldowns(log, scaling_group, policy_id, "i got this data from the db"):
+        (new_state, delta) = calculate_new_steady_state(log, state, policy_id)
         execute_launch_config(log, transaction_id, state, scaling_group, delta)
         #record_policy_trigger_time(log, scaling_group, policy, time.time())
     #else:
@@ -123,7 +127,7 @@ def calculate_new_steady_state(log, state, policy):
     if "change" in policy:
         return (state['steadyState'] + policy["change"], policy["change"])
     else:
-        raise NotImplemented()
+        raise NotImplementedError()
 
 
 def find_server_to_evict(log, scaling_group):
