@@ -24,6 +24,8 @@ scaling group configuration, and policies.
 # Launch Schemas
 #
 
+MAX_ENTITIES = 25
+
 metadata = {
     "type": "object",
     "description": ("User-provided key-value metadata.  Both keys and "
@@ -159,7 +161,7 @@ config = {
             "description": ("Minimum number of entities in the scaling group. "
                             "This number must be an integer."),
             "minimum": 0,
-            "maximum": 25,
+            "maximum": MAX_ENTITIES,
             "required": True,
         },
         "maxEntities": {
@@ -168,7 +170,7 @@ config = {
                             "Defaults to null, meaning no maximum.  When "
                             "given, this number must be an integer."),
             "minimum": 0,
-            "maximum": 25,
+            "maximum": MAX_ENTITIES,
             "default": None
         },
         "metadata": metadata
