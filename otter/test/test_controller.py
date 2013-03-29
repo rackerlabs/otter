@@ -9,7 +9,7 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter import controller
-from otter.models.interface import IScalingGroup
+from otter.models.interface import IScalingGroup, NoSuchPolicyError
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
 
@@ -234,14 +234,16 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         Also build a mock model that can be used for testing.
         """
+        self.mocks = {}
         things_and_return_vals = {
             'check_cooldowns': True,
             'calculate_delta': 1,
             'execute_launch_config': defer.succeed(None)
         }
+
         for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks = patch(self, 'otter.controller.{0}'.format(thing),
-                               return_value=return_val)
+            self.mocks[thing] = patch(self, 'otter.controller.{0}'.format(thing),
+                                      return_value=return_val)
 
         self.mock_log = mock.MagicMock()
 
@@ -249,11 +251,29 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.group.view_config.return_value = defer.succeed("config")
         self.group.get_policy.return_value = defer.succeed("policy")
         self.group.view_state.return_value = defer.succeed("state")
+        self.group.view_launch_config.return_value = defer.succeed("launch")
+
+    def test_maybe_execute_scaling_policy_no_such_policy(self):
+        """
+        If there is no such scaling policy, the whole thing fails and
+        ``NoSuchScalingPolicy`` gets propagated up.  No other model access
+        happens, and the lock is still released.
+        """
+        self.group.get_policy.return_value = defer.fail(
+            NoSuchPolicyError('1', '1', '1'))
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, 'pol1')
+        self.assert_deferred_failed(d, NoSuchPolicyError)
+
+        self.assertEqual(len(self.group.view_config.mock_calls), 0)
+        self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
+        self.assertEqual(len(self.group.view_state.mock_calls), 0)
 
     def test_maybe_execute_scaling_policy_success(self):
         """
-        If all cooldowns are all fine, the delta is not zero, and
-        ``execute_launch_config`` does not fail, return value is whatever
+        If lock is acquired, all cooldowns are all fine, the delta is not zero,
+        and ``execute_launch_config`` does not fail, return value is whatever
         ``execute_launch_config`` returns.
         """
         self.mocks['execute_launch_config'].return_value = defer.succeed(
@@ -268,13 +288,13 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log, 'transaction', "state", self.group,
+            self.mock_log, 'transaction', "state", "launch", self.group,
             self.mocks['calculate_delta'].return_value)
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """
         If cooldowns are not fine, ``maybe_execute_scaling_policy`` raises a
-        ``CannotExecutePolicyError`` exception
+        ``CannotExecutePolicyError`` exception.  Release lock still happens.
         """
         self.mocks['check_cooldowns'].return_value = False
 
@@ -291,7 +311,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         If cooldowns are fine, but delta is zero,
         ``maybe_execute_scaling_policy`` raises a ``CannotExecutePolicyError``
-        exception
+        exception.  Release lock still happens.
         """
         self.mocks['calculate_delta'].return_value = 0
 

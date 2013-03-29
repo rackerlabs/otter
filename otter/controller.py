@@ -31,6 +31,7 @@ from otter.util.timestamp import from_timestamp
 
 from twisted.internet import defer
 from otter import supervisor
+from otter.util.deferredutils import unwrap_first_error
 
 
 class CannotExecutePolicyError(Exception):
@@ -126,33 +127,38 @@ def maybe_execute_scaling_policy(
     bound_log = log.fields(
         scaling_group=scaling_group.uuid, policy_id=policy_id)
 
-    def _plan_and_execute(state_config_policy):
+    # make sure that the policy (and the group) exists before doing anything else
+    deferred = scaling_group.get_policy(policy_id)
+
+    def _do_get_config_and_state(policy):
+        deferred = defer.gatherResults([
+            scaling_group.view_state(),
+            scaling_group.view_config(),
+            scaling_group.view_launch_config()
+        ])
+        return deferred.addCallback(lambda results: results + [policy])
+
+    deferred.addCallbacks(_do_get_config_and_state, unwrap_first_error)
+
+    def _do_maybe_execute(state_config_launch_policy):
         """
         state_config_policy should be returned by ``check_cooldowns``
         """
-        state, config, policy = state_config_policy
+        state, config, launch, policy = state_config_launch_policy
         error_msg = "Cooldowns not met."
 
         if check_cooldowns(state, config, policy, policy_id):
             delta = calculate_delta(state, config, policy)
             if delta != 0:
                 return execute_launch_config(bound_log, transaction_id, state,
-                                             scaling_group, delta)
+                                             launch, scaling_group, delta)
             error_msg = "Policy execution would violate min/max constraints."
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
                                        scaling_group.uuid, policy_id,
                                        error_msg)
-    # TODO: Lock group
-    deferred = defer.gatherResults([
-        scaling_group.view_state(),
-        scaling_group.view_config(),
-        scaling_group.get_policy(policy_id)
-    ])
 
-    deferred.addCallback(_plan_and_execute)
-    # TODO: unlock group
-    return deferred
+    return deferred.addCallback(_do_maybe_execute)
 
 
 def check_cooldowns(state, config, policy, policy_id):
@@ -222,14 +228,12 @@ def find_server_to_evict(log, state, delta):
     return []
 
 
-def execute_launch_config(log, transaction_id, state, scaling_group, delta):
+def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
 
     :return: Deferred
     """
-    launch_config = scaling_group.view_launch_config()
-
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
@@ -248,7 +252,7 @@ def execute_launch_config(log, transaction_id, state, scaling_group, delta):
         # TODO: uncancel delete instead of spinning up
         deferreds = [
             supervisor.execute_one_config(log, transaction_id,
-                                          scaling_group.uuid, launch_config)
+                                          scaling_group.uuid, launch)
             for i in range(abs(delta))
         ]
     else:
