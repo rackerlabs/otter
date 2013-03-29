@@ -1205,7 +1205,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_view_manifest_no_such_group(self):
         """
-        When viewing the manifest, if the gropu doesn't exist (and hence there
+        When viewing the manifest, if the group doesn't exist (and hence there
         is no config), the ``NoSuchScalingGroup`` error that is raised by
         ``view_config`` is propagated up and viewing the launch config and the
         policies is never done.
