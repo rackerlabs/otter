@@ -80,7 +80,7 @@ def iMock(iface, **kwargs):
     return imock
 
 
-def patch_testcase(testcase, *args, **kwargs):
+def patch(testcase, *args, **kwargs):
     """
     Patches and starts a test case, taking care of the cleanup.
     """

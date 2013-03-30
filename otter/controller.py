@@ -23,10 +23,12 @@ Storage model for state information:
  * last touched information for polciy
 
 """
+from datetime import datetime
+import iso8601
 
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.supervisor import execute_one_config
-from otter.util.timestamp import now, from_timestamp
+from otter.util.timestamp import from_timestamp
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -129,10 +131,7 @@ def check_cooldowns(state, config, policy, policy_id):
     :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
         otherwise
     """
-    # hack to get a timezone aware date-time object of the same timezone as
-    # gets returned by from_timestamp, because we cannot perform any math if
-    # one datetime object is timezone aware and the other is not
-    this_now = from_timestamp(now())
+    this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
         (state['policyTouched'].get(policy_id), policy['cooldown']),

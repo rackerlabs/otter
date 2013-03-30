@@ -9,7 +9,7 @@ from twisted.trial.unittest import TestCase
 
 from otter import controller
 from otter.util.timestamp import MIN
-from otter.test.utils import patch_testcase
+from otter.test.utils import patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -152,9 +152,12 @@ class CheckCooldownsTestCase(TestCase):
         so many seconds after `datetime.min`.  Tests using this should set
         the last touched time to be MIN.
         """
-        fake_now = datetime.min + timedelta(seconds=seconds_after_min)
-        self.now = patch_testcase(self, 'otter.controller.now',
-                                  return_value=(fake_now.isoformat() + 'Z'))
+        def _fake_now(timezone):
+            fake_datetime = datetime.min + timedelta(seconds=seconds_after_min)
+            return fake_datetime.replace(tzinfo=timezone)
+
+        self.datetime = patch(self, 'otter.controller.datetime', spec=['now'])
+        self.datetime.now.side_effect = _fake_now
 
     def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
         """
