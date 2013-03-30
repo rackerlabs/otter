@@ -153,8 +153,8 @@ class CheckCooldownsTestCase(TestCase):
         the last touched time to be MIN.
         """
         fake_now = datetime.min + timedelta(seconds=seconds_after_min)
-        patch_testcase(self, 'now', 'otter.controller.now',
-                       return_value=(fake_now.isoformat() + 'Z'))
+        self.now = patch_testcase(self, 'otter.controller.now',
+                                  return_value=(fake_now.isoformat() + 'Z'))
 
     def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
         """
