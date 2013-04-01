@@ -418,7 +418,7 @@ class CassScalingGroup(object):
 
         if not pending_job_id in pending:
             return defer.fail(Exception("Internal error: Pending job ID isn't in the list of pending jobs"))
-        if name in active:
+        if instance_id in active:
             return defer.fail(Exception("Internal error: Server is already active"))
 
         del pending[pending_job_id]
