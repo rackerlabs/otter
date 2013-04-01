@@ -297,7 +297,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called,False)
+        self.assertEqual(self.connection.execute.called, False)
 
     def test_state_bad_server(self):
         """
@@ -316,7 +316,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called,False)
+        self.assertEqual(self.connection.execute.called, False)
 
     def test_view_config_bad_db_data(self):
         """

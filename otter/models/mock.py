@@ -364,7 +364,8 @@ class MockScalingGroup:
         if ts is None:
             ts = now()
         if not pending_job_id in self.pending_jobs:
-            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of pending jobs"))
+            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of "
+                                        "pending jobs"))
         if instance_id in self.active_entities:
             return defer.fail(Exception("Internal error: Server is already active"))
 
