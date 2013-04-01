@@ -241,6 +241,99 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                              'policyTouched': {'F': 'R'},
                              'paused': False})
 
+    def test_state_update_jobs(self):
+        """
+        Test the normal use case..  update an empty group with a job,
+        move the server to fully operational.
+        """
+        fake_state = {'policyTouched': {}}
+
+        self.returns = [None, None]
+
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
+                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                       ':policyTouched);')
+        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
+                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+                        'groupId': '12345678g',
+                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_state_add_server(self):
+        """
+        Test the add server operation that moves a server from the job listing to
+        the active list
+        """
+        fake_state = {'active': {},
+                      'paused': False,
+                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                      'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
+
+        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
+                                   '"instanceURL": "uri"}, "_ver": 1}'),
+                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
+    def test_state_bad_job_id(self):
+        """
+        If we try to add a server with a job ID that does not exist, the server is
+        still added without error
+        """
+        fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
+
+        self.returns = [None]
+
+        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
+                                   '"instanceURL": "uri"}, "_ver": 1}'),
+                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_state_bad_server(self):
+        """
+        Test if we try to add a server that is already in existance that it is
+        still added without error
+        """
+
+        fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
+                                          'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'paused': False,
+                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                      'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
+
+        self.returns = [None]
+
+        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": '
+                                   '"foo", "instanceURL": "uri"}, "_ver": 1}'),
+                        'groupId': '12345678g',
+                        'pending': '{"_ver": 1}',
+                        'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
     def test_view_config_bad_db_data(self):
         """
         Test what happens if you retrieve bad db config data, including None, rows
@@ -1280,7 +1373,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
-                       'APPLY BATCH;')
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) APPLY BATCH;')
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group(self.mock_log, '123', {}, {})
         self.assertEqual(self.assert_deferred_succeeded(d),
@@ -1305,6 +1400,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
@@ -1334,6 +1432,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       'INSERT INTO group_state("tenantId", "groupId", active, pending, '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
+                       '"{}", "{}", False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
