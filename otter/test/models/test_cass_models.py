@@ -313,7 +313,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
 
         fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
-                                         'created': '2012-12-25 00:00:00-06:39Z'}},
+                                          'created': '2012-12-25 00:00:00-06:39Z'}},
                       'paused': False,
                       'groupTouched': '2012-12-25 00:00:00-06:39Z',
                       'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
