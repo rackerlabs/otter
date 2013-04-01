@@ -410,9 +410,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroupState.add_server`
         """
-        ts = created
-        if ts is None:
-            ts = now()
+        if created is None:
+            created = now()
 
         pending = state["pending"]
         if pending_job_id in pending:
@@ -422,7 +421,7 @@ class CassScalingGroup(object):
         if not name in active:
             active[instance_id] = {"name": name,
                                    "instanceURL": uri,
-                                   "created": ts}
+                                   "created": created}
 
         query = _cql_add_server_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
@@ -438,18 +437,17 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
         """
-        ts = timestamp
-        if ts is None:
-            ts = now()
+        if timestamp is None:
+            timestamp = now()
 
         policy_touched = state["policyTouched"]
-        policy_touched[policy_id] = ts
+        policy_touched[policy_id] = timestamp
 
         query = _cql_update_job_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
-                                     "groupTouched": ts,
+                                     "groupTouched": timestamp,
                                      "policyTouched": _serial_json_data(policy_touched, 1),
                                      "pending": _serial_json_data(job_dict, 1)},
                                     get_consistency_level('update', 'state'))
