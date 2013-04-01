@@ -114,12 +114,10 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         Test that if we try to pass in a bad job ID it continues
         """
         d = self.state.add_server({}, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
+        self.assert_deferred_failed(d, Exception)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
-                                                      'instanceURL': 'uri',
-                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
+        self.assertEqual(result, {'active': {},
                                   'paused': False,
                                   'groupTouched': None,
                                   'pending': {},
@@ -144,7 +142,7 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
         self.assert_deferred_succeeded(d)
         d = self.state.add_server(result, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
+        self.assert_deferred_failed(d, Exception)
         d = self.state.view_state()
         result = self.assert_deferred_succeeded(d)
         self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
@@ -152,7 +150,7 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                                       'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'paused': False,
                                   'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {},
+                                  'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
                                   'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
 
     def test_pause(self):

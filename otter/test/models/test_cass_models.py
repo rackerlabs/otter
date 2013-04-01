@@ -296,15 +296,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [None]
 
         d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
-                       'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
-                                   '"instanceURL": "uri"}, "_ver": 1}'),
-                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.assert_deferred_failed(d, Exception)
+        self.assertEqual(self.connection.execute.called, False)
 
     def test_state_bad_server(self):
         """
@@ -322,17 +315,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [None]
 
         d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
-                       'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": '
-                                   '"foo", "instanceURL": "uri"}, "_ver": 1}'),
-                        'groupId': '12345678g',
-                        'pending': '{"_ver": 1}',
-                        'tenantId': '11111'}
-        self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData,
-                                                   ConsistencyLevel.TWO)
+        self.assert_deferred_failed(d, Exception)
+        self.assertEqual(self.connection.execute.called, False)
 
     def test_view_config_bad_db_data(self):
         """
