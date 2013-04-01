@@ -370,10 +370,9 @@ class MockScalingGroup:
             return defer.fail(Exception("Internal error: Server is already active"))
 
         del self.pending_jobs[pending_job_id]
-        if not instance_id in self.active_entities:
-            self.active_entities[instance_id] = {"name": name,
-                                                 "instanceURL": uri,
-                                                 "created": ts}
+        self.active_entities[instance_id] = {"name": name,
+                                             "instanceURL": uri,
+                                             "created": ts}
 
         return defer.succeed(None)
 
