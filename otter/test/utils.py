@@ -78,3 +78,14 @@ def iMock(iface, **kwargs):
     imock = mock.MagicMock(spec=iface.names(), **kwargs)
     directlyProvides(imock, iface)
     return imock
+
+
+def patch(testcase, *args, **kwargs):
+    """
+    Patches and starts a test case, taking care of the cleanup.
+    """
+    if not getattr(testcase, '_stopallAdded', False):
+        testcase.addCleanup(mock.patch.stopall)
+        testcase._stopallAdded = True
+
+    return mock.patch(*args, **kwargs).start()
