@@ -249,10 +249,9 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
     if delta > 0:
-        # TODO: uncancel delete instead of spinning up
         deferreds = [
             supervisor.execute_one_config(log, transaction_id,
-                                          scaling_group.uuid, launch)
+                                          scaling_group, launch)
             for i in range(abs(delta))
         ]
     else:
