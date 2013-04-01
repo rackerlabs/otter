@@ -26,12 +26,12 @@ Storage model for state information:
 from datetime import datetime
 import iso8601
 
-from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.util.timestamp import from_timestamp
-
 from twisted.internet import defer
+
 from otter import supervisor
+from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
+from otter.util.timestamp import from_timestamp
 
 
 class CannotExecutePolicyError(Exception):
@@ -127,6 +127,7 @@ def maybe_execute_scaling_policy(
     bound_log = log.fields(
         scaling_group=scaling_group.uuid, policy_id=policy_id)
 
+    # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
     deferred = scaling_group.get_policy(policy_id)
 
