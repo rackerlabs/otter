@@ -414,14 +414,19 @@ class CassScalingGroup(object):
             created = now()
 
         pending = state["pending"]
-        if pending_job_id in pending:
-            del pending[pending_job_id]
-
         active = state["active"]
-        if not name in active:
-            active[instance_id] = {"name": name,
-                                   "instanceURL": uri,
-                                   "created": created}
+
+        if not pending_job_id in pending:
+            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of "
+                                        "pending jobs"))
+        if instance_id in active:
+            return defer.fail(Exception("Internal error: Server is already active"))
+
+        del pending[pending_job_id]
+
+        active[instance_id] = {"name": name,
+                               "instanceURL": uri,
+                               "created": created}
 
         query = _cql_add_server_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,

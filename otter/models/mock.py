@@ -363,13 +363,16 @@ class MockScalingGroup:
         ts = created
         if ts is None:
             ts = now()
-        if pending_job_id in self.pending_jobs:
-            del self.pending_jobs[pending_job_id]
+        if not pending_job_id in self.pending_jobs:
+            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of "
+                                        "pending jobs"))
+        if instance_id in self.active_entities:
+            return defer.fail(Exception("Internal error: Server is already active"))
 
-        if not instance_id in self.active_entities:
-            self.active_entities[instance_id] = {"name": name,
-                                                 "instanceURL": uri,
-                                                 "created": ts}
+        del self.pending_jobs[pending_job_id]
+        self.active_entities[instance_id] = {"name": name,
+                                             "instanceURL": uri,
+                                             "created": ts}
 
         return defer.succeed(None)
 
