@@ -49,12 +49,39 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class GroupNotEmptyError(Exception):
+    """
+    Error to be raised when attempting to delete group that still has entities
+    in it
+    """
+    def __init__(self, tenant_id, group_id):
+        super(GroupNotEmptyError, self).__init__(
+            "Group {g} for tenant {t} still has entities."
+            .format(t=tenant_id, g=group_id))
+
+
 class IScalingGroupState(Interface):
     """
     Represents an accessor for group state.  Note that none of these raise
     :class:`NoSuchScalingGroupError` if this scaling group does not exist - the
     check is expected to be performed elsewhere.
     """
+
+    def delete_group(state):
+        """
+        Deletes the scaling group if the state is empty.  This assumes that
+        the group exists, because otherwise how would the state have been
+        retrieved?
+
+        :param dict state: a dict, like you'd see returned from view_state,
+            containing the state of the group
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
+            doesn't exist for this tenant id
+        :raises: :class:`GroupNotEmptyError` if the scaling group cannot be
+            deleted (e.g. if the state is not empty)
+        """
 
     def add_server(state, name, instance_id, uri, pending_job_id, created=None):
         """
@@ -458,22 +485,6 @@ class IScalingGroupCollection(Interface):
 
         :return: uuid of the newly created scaling group
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
-        """
-
-    def delete_scaling_group(log, tenant_id, scaling_group_id):
-        """
-        Delete the scaling group
-
-        :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``str``
-
-        :param scaling_group_id: the uuid of the scaling group to delete
-        :type scaling_group_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
-            doesn't exist for this tenant id
         """
 
     def list_scaling_groups(log, tenant_id):

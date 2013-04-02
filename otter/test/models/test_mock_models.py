@@ -7,7 +7,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import (NoSuchScalingGroupError,
+from otter.models.interface import (GroupNotEmptyError, NoSuchScalingGroupError,
                                     NoSuchPolicyError, NoSuchWebhookError,
                                     UnrecognizedCapabilityError)
 
@@ -76,11 +76,14 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
+        self.collection = mock.MagicMock(spec=[], data={self.tenant_id: {}})
 
         # config, launch config, etc. policies don't matter
         self.state = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, 1, self.collection,
             {'config': {}, 'launch': {}, 'policies': {}})
+
+        self.collection.data[self.tenant_id][1] = self.state
 
     def test_state(self):
         """
@@ -187,6 +190,33 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.state.view_state())
         self.assertFalse(result['paused'], "Resuming again should not fail")
 
+    def test_delete_group_removes_self_from_collection_if_state_empty(self):
+        """
+        Deleting a scaling group succeeds if there are no active and pending
+        entities/jobs.
+        """
+        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
+                      self.state, "Sanity check")
+
+        d = self.state.delete_group({'active': [], 'pending': []})
+        self.assertEqual(None, self.successResultOf(d))
+
+        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 0)
+
+    def test_delete_scaling_group_fails_if_scaling_group_not_empty(self):
+        """
+        Deleting a scaling group that has active or pending jobs raises a
+        :class:`GroupNotEmptyError` exception
+        """
+        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
+                      self.state, "Sanity check")
+
+        self.assert_deferred_failed(
+            self.state.delete_group({'active': [1], 'pending': []}),
+            GroupNotEmptyError)
+
+        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 1)
+
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
@@ -199,6 +229,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
+        self.collection = mock.MagicMock()
+
         self.config = {
             'name': 'aname',
             'cooldown': 0,
@@ -221,8 +253,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "steadyState": 10,
             "cooldown": 3
         }]
+
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, 1, self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
@@ -368,7 +401,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         also is an empty dictionary
         """
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, 1, self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': None})
         self.assertEqual(self.validate_list_policies_return_value(), {})
@@ -754,7 +787,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result[0].uuid, uuid, "Group not added to collection")
 
         mock_sgrp.assert_called_once_with(
-            mock.ANY, self.tenant_id, uuid,
+            mock.ANY, self.tenant_id, uuid, self.collection,
             {'config': self.config, 'launch': launch, 'policies': policies})
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
@@ -768,34 +801,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
 
         mock_sgrp.assert_called_once_with(
-            mock.ANY, self.tenant_id, uuid,
+            mock.ANY, self.tenant_id, uuid, self.collection,
             {'config': self.config, 'launch': {}, 'policies': None})
-
-    def test_delete_removes_a_scaling_group(self):
-        """
-        Deleting a valid scaling group decreases the number of scaling groups
-        in the collection
-        """
-        uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(
-                self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
-
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        self.assertEqual(len(result), 1, "Group not added correctly")
-
-        self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.mock_log, self.tenant_id, uuid))
-
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        self.assertEqual(result, [], "Group not deleted from collection")
-
-    def test_delete_scaling_group_fails_if_scaling_group_does_not_exist(self):
-        """
-        Deleting a scaling group that doesn't exist raises a
-        :class:`NoSuchScalingGroupError` exception
-        """
-        deferred = self.collection.delete_scaling_group(self.mock_log, self.tenant_id, 1)
-        self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
