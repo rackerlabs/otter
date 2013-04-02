@@ -187,6 +187,7 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {},
                 "changePercent": {"required": True}
             },
             "additionalProperties": False
@@ -196,6 +197,7 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {},
                 "change": {"required": True}
             },
             "additionalProperties": False
@@ -205,6 +207,7 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {},
                 "steadyState": {"required": True}
             },
             "additionalProperties": False
