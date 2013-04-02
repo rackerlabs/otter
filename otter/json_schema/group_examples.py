@@ -109,16 +109,19 @@ def policy():
         {
             "name": "scale up by 10",
             "change": 10,
-            "cooldown": 5
+            "cooldown": 5,
+            "type": ""
         },
         {
             "name": 'scale down a 5.5 percent because of a tweet',
             "changePercent": -5.5,
-            "cooldown": 6
+            "cooldown": 6,
+            "type": ""
         },
         {
             "name": 'set number of servers to 10',
             "steadyState": 10,
-            "cooldown": 3
+            "cooldown": 3,
+            "type": ""
         }
     ]

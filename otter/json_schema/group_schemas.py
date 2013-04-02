@@ -187,7 +187,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
-                "type": {},
+                "type": {"type": "string",
+                         "required": True},
                 "changePercent": {"required": True}
             },
             "additionalProperties": False
@@ -197,7 +198,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
-                "type": {},
+                "type": {"type": "string",
+                         "required": True},
                 "change": {"required": True}
             },
             "additionalProperties": False
@@ -207,7 +209,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
-                "type": {},
+                "type": {"type": "string",
+                         "required": True},
                 "steadyState": {"required": True}
             },
             "additionalProperties": False
