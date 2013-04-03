@@ -21,7 +21,7 @@ from otter.models.interface import IScalingGroupState, NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import iMock
+from otter.test.utils import iMock, patch
 
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
@@ -199,6 +199,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         super(OneGroupTestCase, self).setUp()
         self.mock_group.uuid = "one"
 
+        self.mock_delete = patch(self, 'otter.controller.delete_scaling_group',
+                                 return_value=defer.succeed(None))
+
     def test_view_manifest_404(self):
         """
         Viewing the manifest of a non-existant group fails with a 404.
@@ -261,23 +264,19 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         """
         Deleting an existing group succeeds with a 204.
         """
-        self.mock_store.delete_scaling_group.return_value = defer.succeed(None)
-
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
-        self.mock_store.delete_scaling_group.assert_called_once_with(
-            mock.ANY, '11111', 'one')
+        self.mock_delete.assert_called_once_with(mock.ANY, self.mock_group)
 
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
         """
-        self.mock_store.delete_scaling_group.return_value = defer.fail(
+        self.mock_delete.return_value = defer.fail(
             NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
-        self.mock_store.delete_scaling_group.assert_called_once_with(
-            mock.ANY, '11111', 'one')
+        self.mock_delete.assert_called_once_with(mock.ANY, self.mock_group)
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
@@ -387,11 +386,10 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.return_value = self.mock_group
         self.mock_group.uuid = "one"
 
-        pause_patch = mock.patch(
+        self.mock_pause = patch(
+            self,
             'otter.rest.groups.controller.pause_scaling_group',
             return_value=defer.succeed(None))
-        self.mock_pause = pause_patch.start()
-        self.addCleanup(pause_patch.stop)
 
     def test_pause(self):
         """
@@ -420,11 +418,10 @@ class GroupResumeTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.return_value = self.mock_group
         self.mock_group.uuid = "one"
 
-        resume_patch = mock.patch(
+        self.mock_resume = patch(
+            self,
             'otter.rest.groups.controller.resume_scaling_group',
             return_value=defer.succeed(None))
-        self.mock_resume = resume_patch.start()
-        self.addCleanup(resume_patch.stop)
 
     def test_resume(self):
         """
