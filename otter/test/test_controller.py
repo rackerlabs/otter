@@ -9,9 +9,33 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter import controller
-from otter.models.interface import IScalingGroup, NoSuchPolicyError
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupState, NoSuchPolicyError)
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
+
+
+class DeleteScalingGroupTestCase(TestCase):
+    """
+    Tests for :func:`otter.controller.delete_scaling_group`
+    """
+    def setUp(self):
+        """
+        Patch the scaling group
+        """
+        self.group = iMock(IScalingGroup, IScalingGroupState)
+        self.group.view_state.return_value = defer.succeed("state!")
+        self.group.delete_group.return_value = defer.succeed("delete!")
+
+    def test_calls_view_state_delete_group(self):
+        """
+        ``delete_scaling_group`` calls ``delete_group`` with the results of
+        ``view_state``, and returns the result of ``delete_group``
+        """
+        r = self.successResultOf(
+            controller.delete_scaling_group(mock.MagicMock(), self.group))
+        self.assertEqual('delete!', r)
+        self.group.delete_group.assert_called_once_with('state!')
 
 
 class CalculateDeltaTestCase(TestCase):
