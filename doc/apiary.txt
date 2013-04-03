@@ -98,17 +98,20 @@ POST /{tenantId}/groups
         {
             "name": "scale up by 10",
             "change": 10,
-            "cooldown": 5
+            "cooldown": 5,
+            "type": "default"
         },
         {
             "name": 'scale down 5.5 percent',
             "changePercent": -5.5,
-            "cooldown": 6
+            "cooldown": 6,
+            "type": "default"
         },
         {
             "name": 'set number of servers to 10',
             "steadyState": 10,
-            "cooldown": 3
+            "cooldown": 3,
+            "type": "default"
         }
     ]
 }
@@ -191,7 +194,8 @@ GET /{tenantId}/groups/{groupId}
                 ],
                 "name": "scale up by 10",
                 "change": 10,
-                "cooldown": 5
+                "cooldown": 5,
+                "type": "default"
             }
             {
                 "id": "{policyId2}",
@@ -207,7 +211,8 @@ GET /{tenantId}/groups/{groupId}
                 ],
                 "name": 'scale down 5.5 percent',
                 "changePercent": -5.5,
-                "cooldown": 6
+                "cooldown": 6,
+                "type": "default"
             },
             {
                 "id": "{policyId3}",
@@ -223,7 +228,8 @@ GET /{tenantId}/groups/{groupId}
                 ],
                 "name": 'set number of servers to 10',
                 "steadyState": 10,
-                "cooldown": 3
+                "cooldown": 3,
+                "type": "default"
             }
         ]
     }
@@ -440,7 +446,8 @@ GET /{tenantId}/groups/{groupId}/policies
             "data": {
                 "name": "scale up by one server",
                 "change": 1,
-                "cooldown": 150
+                "cooldown": 150,
+                "type": "default"
             },
             "links": [
                 {
@@ -458,7 +465,8 @@ GET /{tenantId}/groups/{groupId}/policies
             "data": {
                 "name": "scale up ten percent",
                 "changePercent": 10,
-                "cooldown": 150
+                "cooldown": 150,
+                "type": "default"
             },
             "links": [
                 {
@@ -476,7 +484,8 @@ GET /{tenantId}/groups/{groupId}/policies
             "data": {
                 "name": "scale down one server",
                 "change": -1,
-                "cooldown": 150
+                "cooldown": 150,
+                "type": "default"
             },
             "links": [
                 {
@@ -494,7 +503,8 @@ GET /{tenantId}/groups/{groupId}/policies
             "data": {
                 "name": "scale down ten percent",
                 "changePercent": -10,
-                "cooldown": 150
+                "cooldown": 150,
+                "type": "default"
             },
             "links": [
                 {
@@ -521,12 +531,14 @@ POST /{tenantId}/groups/{groupId}/policies
     {
         "name": "scale up by one server",
         "change": 1,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "default"
     },
     {
         "name": 'scale down a 5.5 percent because of a tweet',
         "changePercent": -5.5,
-        "cooldown": 6
+        "cooldown": 6,
+        "type": "default"
     }
 ]
 < 201
@@ -547,7 +559,8 @@ POST /{tenantId}/groups/{groupId}/policies
             ],
             "name": "scale up by one server",
             "change": 1,
-            "cooldown": 150
+            "cooldown": 150,
+            "type": "default"
         },
         {
             "id": {policyId2},
@@ -563,7 +576,8 @@ POST /{tenantId}/groups/{groupId}/policies
             ],
             "name": 'scale down a 5.5 percent because of a tweet',
             "changePercent": -5.5,
-            "cooldown": 6
+            "cooldown": 6,
+            "type": "default"
         }
     ]
 }
@@ -590,7 +604,8 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}
         ],
         "name": "scale up by one server",
         "change": 1,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "default"
     }
 }
 

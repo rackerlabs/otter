@@ -281,7 +281,7 @@ class ScalingPolicyTestCase(TestCase):
             "name": "aname",
             "steadyState": -1,
             "cooldown": 5,
-            "type": "ff"
+            "type": "default"
         }
         self.assertRaisesRegexp(
             ValidationError, 'minimum',
@@ -297,7 +297,7 @@ class ScalingPolicyTestCase(TestCase):
             "name": "aname",
             "change": 5,
             "cooldown": 5,
-            "type": "ff",
+            "type": "default",
             "poofy": False
         }
         self.assertRaisesRegexp(
@@ -312,7 +312,7 @@ class ScalingPolicyTestCase(TestCase):
             "name": "",
             "change": 10,
             "cooldown": 5,
-            "type": "ff"
+            "type": "default"
         }
         for invalid_name in ('', ' ', '    '):
             invalid['name'] = invalid_name
