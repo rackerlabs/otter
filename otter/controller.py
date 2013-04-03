@@ -106,11 +106,12 @@ def maybe_execute_scaling_policy(
 
 
     """
+    bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
     # TODO: Lock group
     state = scaling_group.view_state()
     if check_cooldowns('fake', 'fake', 'fake', 'fake'):
         delta = calculate_delta("fake", "fake", "fake")
-        execute_launch_config(log, transaction_id, state, scaling_group, delta)
+        execute_launch_config(bound_log, transaction_id, state, scaling_group, delta)
         #record_policy_trigger_time(log, scaling_group, policy, time.time())
     #else:
         #record_policy_decision_time(log, scaling_group, policy, time.time(),
