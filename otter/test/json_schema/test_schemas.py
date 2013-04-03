@@ -281,7 +281,7 @@ class ScalingPolicyTestCase(TestCase):
             "name": "aname",
             "steadyState": -1,
             "cooldown": 5,
-            "type": "default"
+            "type": "webhook"
         }
         self.assertRaisesRegexp(
             ValidationError, 'minimum',
@@ -290,15 +290,45 @@ class ScalingPolicyTestCase(TestCase):
     def test_no_other_properties_valid(self):
         """
         Scaling policy can only have the following properties: name,
-        change/changePercent, cooldown, and capabilityUrls.  Any other property
-        results in an error.
+        change/changePercent, cooldown, type, and capabilityUrls.  Any
+        other property results in an error.
         """
         invalid = {
             "name": "aname",
             "change": 5,
             "cooldown": 5,
-            "type": "default",
+            "type": "webhook",
             "poofy": False
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'not of type',
+            validate, invalid, group_schemas.policy)
+
+    def test_type_set(self):
+        """
+        Scaling policy can only have the following properties: name,
+        change/changePercent, cooldown, type, and capabilityUrls.  Ensure
+        that if the type is not present, that's an error.
+        """
+        invalid = {
+            "name": "aname",
+            "change": 5,
+            "cooldown": 5
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'not of type',
+            validate, invalid, group_schemas.policy)
+
+    def test_type_valid(self):
+        """
+        Scaling policy have a type value that has enum validation.
+        Make sure it works.
+        """
+        invalid = {
+            "name": "aname",
+            "change": 5,
+            "cooldown": 5,
+            "type": "blah"
         }
         self.assertRaisesRegexp(
             ValidationError, 'not of type',
@@ -312,7 +342,7 @@ class ScalingPolicyTestCase(TestCase):
             "name": "",
             "change": 10,
             "cooldown": 5,
-            "type": "default"
+            "type": "webhook"
         }
         for invalid_name in ('', ' ', '    '):
             invalid['name'] = invalid_name
