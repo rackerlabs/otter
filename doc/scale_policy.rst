@@ -7,7 +7,8 @@ Scale Policy Schema
     {
         "name": "scale up by one server",
         "change": 1,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "webhook"
     }
 
 **Document type: scale_up_by_percent_policy**::
@@ -15,7 +16,8 @@ Scale Policy Schema
     {
         "name": "scale up one percent",
         "changePercent": 10,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "webhook"
     }
 
 **Document type: scale_down_policy**::
@@ -23,7 +25,8 @@ Scale Policy Schema
     {
         "name": "scale down one server",
         "change": -1,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "webhook"
     }
 
 **Document type: scale_down_by_percent_policy**::
@@ -31,5 +34,6 @@ Scale Policy Schema
     {
         "name": "scale down one percent",
         "changePercent": -10,
-        "cooldown": 150
+        "cooldown": 150,
+        "type": "webhook"
     }

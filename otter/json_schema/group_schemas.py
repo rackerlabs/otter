@@ -187,6 +187,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {"enum": ["webhook"],
+                         "required": True},
                 "changePercent": {"required": True}
             },
             "additionalProperties": False
@@ -196,6 +198,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {"enum": ["webhook"],
+                         "required": True},
                 "change": {"required": True}
             },
             "additionalProperties": False
@@ -205,6 +209,8 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
+                "type": {"enum": ["webhook"],
+                         "required": True},
                 "steadyState": {"required": True}
             },
             "additionalProperties": False
