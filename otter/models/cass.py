@@ -53,8 +53,8 @@ _cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
 _cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, '
-                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{{}}", '
-                           '"{{}}", "{{}}", False, False)')
+                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{{}}\', '
+                           '\'{{}}\', \'{{}}\', False, False)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
