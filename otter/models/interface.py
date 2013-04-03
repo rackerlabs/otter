@@ -456,8 +456,10 @@ class IScalingGroupCollection(Interface):
             :data:`otter.json_schema.scaling_group.scaling_policy`
         :type data: ``list`` of ``dict``
 
-        :return: uuid of the newly created scaling group
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with `str`
+        :return: a dictionary corresponding to the JSON schema at
+            :data:``otter.json_schema.model_schemas.view_manifest``, except that
+            it also has the key `id`
+        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
 
     def delete_scaling_group(log, tenant_id, scaling_group_id):
