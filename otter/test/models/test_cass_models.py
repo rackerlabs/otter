@@ -1358,8 +1358,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
-                       '"{}", "{}", False, False) APPLY BATCH;')
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False, False) APPLY BATCH;')
         self.mock_key.return_value = '12345678'
         d = self.collection.create_scaling_group(self.mock_log, '123', {}, {})
         self.assertEqual(self.assert_deferred_succeeded(d),
@@ -1385,8 +1385,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
-                       '"{}", "{}", False, False) '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
@@ -1417,8 +1417,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, "{}", '
-                       '"{}", "{}", False, False) '
+                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
