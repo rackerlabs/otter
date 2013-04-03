@@ -19,6 +19,8 @@ from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
 
+from otter.test.utils import patch
+
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 
@@ -89,9 +91,19 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         Create a mock group
         """
         self.tenant_id = '11111'
-        self.group_id = '12345789g'
+        self.group_id = '12345678g'
         self.mock_log = mock.MagicMock()
         self.connection = mock.MagicMock(spec=['execute'])
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
 
         # config, launch config, etc. doesn't matter, only policies
         self.policies = [{
@@ -101,6 +113,86 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         }]
         self.state = CassScalingGroup(
             self.mock_log, self.tenant_id, self.group_id, self.connection)
+
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
+
+    def test_state_update_jobs(self):
+        """
+        Test the normal use case..  update an empty group with a job,
+        move the server to fully operational.
+        """
+        fake_state = {'policyTouched': {}}
+
+        self.returns = [None, None]
+
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.state.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
+                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                       ':policyTouched);')
+        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
+                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+                        'groupId': '12345678g',
+                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_state_add_server(self):
+        """
+        Test the add server operation that moves a server from the job listing to
+        the active list
+        """
+        fake_state = {'active': {},
+                      'paused': False,
+                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                      'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
+
+        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
+                       'VALUES(:tenantId, :groupId, :active:, :pending);')
+        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
+                                   '"instanceURL": "uri"}, "_ver": 1}'),
+                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   expectedData,
+                                                   ConsistencyLevel.TWO)
+
+    def test_state_bad_job_id(self):
+        """
+        If we try to add a server with a job ID that does not exist, the server is
+        still added without error
+        """
+        fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
+
+        self.returns = [None]
+
+        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_failed(d, Exception)
+        self.assertEqual(self.connection.execute.called, False)
+
+    def test_state_bad_server(self):
+        """
+        Test if we try to add a server that is already in existance that it is
+        still added without error
+        """
+
+        fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
+                                          'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'paused': False,
+                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
+                      'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
+                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
+
+        self.returns = [None]
+
+        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
+        self.assert_deferred_failed(d, Exception)
+        self.assertEqual(self.connection.execute.called, False)
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
@@ -146,23 +238,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.mock_log = mock.MagicMock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id, '12345678g',
                                       self.connection)
-        self.hashkey_patch = mock.patch(
-            'otter.models.cass.generate_key_str')
-        self.mock_key = self.hashkey_patch.start()
-        self.mock_key.return_value = '12345678'
-        self.addCleanup(self.hashkey_patch.stop)
 
-        self.capability_patch = mock.patch(
-            'otter.models.cass.generate_capability',
-            return_value=('ver', 'hash'))
-        self.mock_capability = self.capability_patch.start()
-        self.addCleanup(self.capability_patch.stop)
+        self.mock_key = patch(self, 'otter.models.cass.generate_key_str',
+                              return_value='12345678')
+        self.mock_capability = patch(self, 'otter.models.cass.generate_capability',
+                                     return_value=('ver', 'hash'))
 
-        self.consistency_level_patch = mock.patch(
-            'otter.models.cass.get_consistency_level',
-            return_value=ConsistencyLevel.TWO)
-        self.consistency_level_patch.start()
-        self.addCleanup(self.consistency_level_patch.stop)
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
 
     def _test_view_things_errors(self, callback_to_test, *args, **kwargs):
         """
@@ -240,83 +323,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                              'pending': {'F': 'R'},
                              'policyTouched': {'F': 'R'},
                              'paused': False})
-
-    def test_state_update_jobs(self):
-        """
-        Test the normal use case..  update an empty group with a job,
-        move the server to fully operational.
-        """
-        fake_state = {'policyTouched': {}}
-
-        self.returns = [None, None]
-
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
-        d = self.group.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
-                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
-                       ':policyTouched);')
-        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
-                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
-                        'groupId': '12345678g',
-                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
-    def test_state_add_server(self):
-        """
-        Test the add server operation that moves a server from the job listing to
-        the active list
-        """
-        fake_state = {'active': {},
-                      'paused': False,
-                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                      'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
-
-        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
-                       'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
-                                   '"instanceURL": "uri"}, "_ver": 1}'),
-                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
-        self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData,
-                                                   ConsistencyLevel.TWO)
-
-    def test_state_bad_job_id(self):
-        """
-        If we try to add a server with a job ID that does not exist, the server is
-        still added without error
-        """
-        fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
-
-        self.returns = [None]
-
-        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called, False)
-
-    def test_state_bad_server(self):
-        """
-        Test if we try to add a server that is already in existance that it is
-        still added without error
-        """
-
-        fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
-                                          'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'paused': False,
-                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                      'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
-
-        self.returns = [None]
-
-        d = self.group.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called, False)
 
     def test_view_config_bad_db_data(self):
         """
