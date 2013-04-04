@@ -299,7 +299,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                               "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log.fields.return_value,
+            self.mock_log.fields.return_value.fields.return_value,
             'transaction', "state", "launch", self.group,
             self.mocks['calculate_delta'].return_value)
 

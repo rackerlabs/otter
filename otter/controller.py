@@ -150,9 +150,10 @@ def maybe_execute_scaling_policy(
 
         if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(state, config, policy)
-            bound_log.fields(delta=delta).info("cooldowns checked")
+            execute_bound_log = bound_log.fields(server_delta=delta)
+            execute_bound_log.info("cooldowns checked, executing launch configs")
             if delta != 0:
-                return execute_launch_config(bound_log, transaction_id, state,
+                return execute_launch_config(execute_bound_log, transaction_id, state,
                                              launch, scaling_group, delta)
             error_msg = "Policy execution would violate min/max constraints."
 
@@ -187,7 +188,8 @@ def check_cooldowns(log, state, config, policy, policy_id):
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
-                log.fields(delta=delta.total_seconds(), cooldown=cooldown).info("cooldown not reached")
+                log.fields(time_since_last_touched=delta.total_seconds(),
+                           cooldown_seconds=cooldown).info("cooldown not reached")
                 return False
 
     return True
@@ -237,6 +239,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
 
     :return: Deferred
     """
+
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
