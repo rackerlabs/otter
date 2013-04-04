@@ -5,6 +5,7 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.json_schema.group_examples import launch_server_config
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
 from otter.models.interface import (NoSuchScalingGroupError,
@@ -15,6 +16,8 @@ from otter.test.models.test_interface import (
     IScalingGroupStateProviderMixin,
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
+
+from otter.test.utils import patch
 
 
 class GenerateEntityLinksTestCase(TestCase):
@@ -699,7 +702,16 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'maxEntities': 10,
             'metadata': {}
         }
+        self.launch = launch_server_config()[1]
         self.mock_log = mock.MagicMock()
+
+        self.counter = 0
+
+        def generate_uuid():
+            self.counter += 1
+            return self.counter
+
+        patch(self, 'otter.models.mock.uuid4', side_effect=generate_uuid)
 
     def test_list_scaling_groups_is_empty_if_new_tenant_id(self):
         """
@@ -723,39 +735,43 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Creation of a scaling group with a 'config' parameter creates a
         scaling group with the specified configuration.
         """
-        launch = {"launch": "config"}
-        policies = {
-            "f236a93f-a46d-455c-9403-f26838011522": {
+        policies = [
+            {
                 "name": "scale up by 10",
                 "change": 10,
                 "cooldown": 5
             },
-            "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
+            {
                 "name": "scale down a 5.5 percent because of a tweet",
                 "changePercent": -5.5,
                 "cooldown": 6
             },
-            "228dbf91-7b15-4d21-8de2-fa584f01a440": {
+            {
                 "name": "set number of servers to 10",
                 "steadyState": 10,
                 "cooldown": 3
             }
-        }
+        ]
         self.assertEqual(self.validate_list_return_value(
                          self.mock_log, self.
                          tenant_id), [],
                          "Should start off with zero groups")
-        uuid = self.assert_deferred_succeeded(
-            self.collection.create_scaling_group(
-                self.mock_log, self.tenant_id, self.config, launch, policies))
+        manifest = self.validate_create_return_value(
+            self.mock_log, self.tenant_id, self.config, self.launch, policies)
+        self.assertEqual(manifest, {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': dict(zip(('2', '3', '4'), policies)),
+            'id': '1'
+        })
 
         result = self.validate_list_return_value(self.mock_log, self.tenant_id)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].uuid, uuid, "Group not added to collection")
+        self.assertEqual(result[0].uuid, '1', "Group not added to collection")
 
         mock_sgrp.assert_called_once_with(
-            mock.ANY, self.tenant_id, uuid,
-            {'config': self.config, 'launch': launch, 'policies': policies})
+            mock.ANY, self.tenant_id, '1',
+            {'config': self.config, 'launch': self.launch, 'policies': policies})
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):
@@ -763,9 +779,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Creating a scaling group with all arguments except policies passes None
         as policies to the MockScalingGroup.
         """
-        uuid = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
+        uuid = manifest['id']
 
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, uuid,
@@ -776,9 +793,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Deleting a valid scaling group decreases the number of scaling groups
         in the collection
         """
-        uuid = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
+        uuid = manifest['id']
 
         result = self.validate_list_return_value(self.mock_log, self.tenant_id)
         self.assertEqual(len(result), 1, "Group not added correctly")
@@ -908,9 +926,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Getting valid scaling group returns a MockScalingGroup whose methods
         work.
         """
-        uuid = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
+        uuid = manifest['id']
 
         succeeded_deferreds = self._call_all_methods_on_group(uuid)
         for deferred in succeeded_deferreds:

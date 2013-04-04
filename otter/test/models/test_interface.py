@@ -166,6 +166,19 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         """
         verifyObject(IScalingGroupCollection, self.collection)
 
+    def validate_create_return_value(self, *args, **kwargs):
+        """
+        Calls ``create_scaling_Group()``, and validates that it returns a
+        dictionary containing relevant configuration values, as specified
+        by :data:`model_schemas.create_group`
+
+        :return: the return value of ``create_scaling_group()``
+        """
+        result = self.successResultOf(
+            self.collection.create_scaling_group(*args, **kwargs))
+        validate(result, model_schemas.create_group)
+        return result
+
     def validate_list_return_value(self, *args, **kwargs):
         """
         Calls ``list_scaling_groups()`` and validates that it returns a list

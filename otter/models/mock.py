@@ -426,7 +426,11 @@ class MockScalingGroupCollection:
             log, tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
 
-        return defer.succeed(uuid)
+        def _add_id(dictionary):
+            dictionary['id'] = uuid
+            return dictionary
+
+        return self.data[tenant][uuid].view_manifest().addCallback(_add_id)
 
     def delete_scaling_group(self, log, tenant, uuid):
         """

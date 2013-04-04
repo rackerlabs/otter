@@ -42,6 +42,11 @@ view_manifest = {
     "additionalProperties": False
 }
 
+create_group = deepcopy(view_manifest)
+create_group['properties']['id'] = {
+    "type": "string",
+    "required": True
+}
 
 # example:
 # {
