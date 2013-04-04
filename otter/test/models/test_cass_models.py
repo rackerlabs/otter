@@ -6,6 +6,8 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.json_schema import group_examples
+
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
@@ -79,6 +81,10 @@ def _cassandrify_data(list_of_dicts):
             })
         results.append({'cols': columns, 'key': ''})
     return _de_identify(results)
+
+
+def _sorted_order_json_dumps(dictionary, ver=None):
+    return json.dumps(dictionary, sort_keys=False)
 
 
 class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
@@ -1338,16 +1344,23 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'maxEntities': 10,
             'metadata': {}
         })
-        self.hashkey_patch = mock.patch(
-            'otter.models.cass.generate_key_str')
-        self.mock_key = self.hashkey_patch.start()
-        self.addCleanup(self.hashkey_patch.stop)
+        self.launch = _de_identify(group_examples.launch_server_config()[0])
 
-        self.consistency_level_patch = mock.patch(
-            'otter.models.cass.get_consistency_level',
-            return_value=ConsistencyLevel.TWO)
-        self.consistency_level_patch.start()
-        self.addCleanup(self.consistency_level_patch.stop)
+        self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
+        self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
+                                 side_effect=_sorted_order_json_dumps)
+
+    def assert_serialized(self, num):
+        """
+        Ensure that any data is serialized with a version of 1 ``num`` number
+        of times
+        """
+        for call in self.mock_serial.mock_calls:
+            self.assertEqual(call, mock.call(mock.ANY, 1))
+
+        self.assertEqual(len(self.mock_serial.mock_calls), num)
 
     def test_create(self):
         """
@@ -1355,8 +1368,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         returned
         """
         expectedData = {
-            'scaling': '{"_ver": 1}',
-            'launch': '{"_ver": 1}',
+            'scaling': _sorted_order_json_dumps(self.config),
+            'launch': _sorted_order_json_dumps(self.launch),
             'groupId': '12345678',
             'tenantId': '123'}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
@@ -1367,25 +1380,34 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
                        '\'{}\', \'{}\', False, False) APPLY BATCH;')
         self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group(self.mock_log, '123', {}, {})
-        self.assertEqual(self.assert_deferred_succeeded(d),
-                         self.mock_key.return_value)
+
+        result = self.validate_create_return_value(self.mock_log, '123',
+                                                   self.config, self.launch)
+        self.assertEqual(result, {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': {},
+            'id': self.mock_key.return_value
+        })
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assert_serialized(2)
 
-    def test_create_policy(self):
+    def test_create_with_policy(self):
         """
         Test that you can create a scaling group with a single policy, and if
         successful the group ID is returned
         """
+        policy = group_examples.policy()[0]
+
         expectedData = {
-            'scaling': '{"_ver": 1}',
-            'launch': '{"_ver": 1}',
+            'scaling': _sorted_order_json_dumps(self.config),
+            'launch': _sorted_order_json_dumps(self.launch),
             'groupId': '12345678',
             'tenantId': '123',
             'policy0Id': '12345678',
-            'policy0': '{"_ver": 1}'}
+            'policy0': _sorted_order_json_dumps(policy)}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
@@ -1397,27 +1419,37 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group(self.mock_log, '123', {}, {}, [{}])
-        self.assertEqual(self.assert_deferred_succeeded(d),
-                         self.mock_key.return_value)
+        policy = group_examples.policy()[0]
+        result = self.validate_create_return_value(self.mock_log, '123',
+                                                   self.config, self.launch,
+                                                   [policy])
+        self.assertEqual(result, {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': {self.mock_key.return_value: policy},
+            'id': self.mock_key.return_value
+        })
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assert_serialized(3)
 
-    def test_create_policy_multiple(self):
+    def test_create_with_policy_multiple(self):
         """
         Test that you can create a scaling group with multiple policies, and if
         successful the group ID is returned
         """
+        policies = group_examples.policy()[:2]
+
         expectedData = {
-            'scaling': '{"_ver": 1}',
-            'launch': '{"_ver": 1}',
-            'groupId': '12345678',
+            'scaling': _sorted_order_json_dumps(self.config),
+            'launch': _sorted_order_json_dumps(self.launch),
+            'groupId': '1',
             'tenantId': '123',
-            'policy0Id': '12345678',
-            'policy0': '{"_ver": 1}',
-            'policy1Id': '12345678',
-            'policy1': '{"_ver": 1}'}
+            'policy0Id': '2',
+            'policy0': _sorted_order_json_dumps(policies[0]),
+            'policy1Id': '3',
+            'policy1': _sorted_order_json_dumps(policies[1])}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
@@ -1430,13 +1462,27 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
                        'VALUES (:tenantId, :groupId, :policy1Id, :policy1, False) '
                        'APPLY BATCH;')
-        self.mock_key.return_value = '12345678'
-        d = self.collection.create_scaling_group(self.mock_log, '123', {}, {}, [{}, {}])
-        self.assertEqual(self.assert_deferred_succeeded(d),
-                         self.mock_key.return_value)
+
+        counter = [0]
+
+        def mock_key_gen(*args, **kwargs):
+            counter[0] += 1
+            return str(counter[0])
+
+        self.mock_key.side_effect = mock_key_gen
+        result = self.validate_create_return_value(self.mock_log, '123',
+                                                   self.config, self.launch,
+                                                   policies)
+        self.assertEqual(result, {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': dict(zip(('2', '3'), policies)),
+            'id': '1'
+        })
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assert_serialized(4)
 
     def test_list(self):
         """
