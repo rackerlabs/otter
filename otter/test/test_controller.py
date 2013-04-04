@@ -285,10 +285,15 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         result = self.successResultOf(d)
         self.assertEqual(result, 'this should be returned')
 
+        # log should have been updated
+        self.mock_log.fields.assert_called_once_with(
+            scaling_group=self.group.uuid, policy_id='pol1')
+
         self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log, 'transaction', "state", "launch", self.group,
+            self.mock_log.fields.return_value,
+            'transaction', "state", "launch", self.group,
             self.mocks['calculate_delta'].return_value)
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
