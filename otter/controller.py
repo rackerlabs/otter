@@ -26,9 +26,22 @@ Storage model for state information:
 from datetime import datetime
 import iso8601
 
+from twisted.internet import defer
+
+from otter import supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.supervisor import execute_one_config
+from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+
+
+class CannotExecutePolicyError(Exception):
+    """
+    Exception to be raised when the policy cannot be executed
+    """
+    def __init__(self, tenant_id, group_id, policy_id, why):
+        super(CannotExecutePolicyError, self).__init__(
+            "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
+            .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -93,7 +106,12 @@ def maybe_execute_scaling_policy(
     Current plan: If a user executes a policy, return whether or not it will be
     executed. If it is going to be executed, ????
 
-    :return: a ``Deferred`` that fires with the audit log ID of this job
+    :return: a ``Deferred`` that fires with None
+
+    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
+    :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
+
     :raises: Some exception about why you don't want to execute the policy. This
     Exception should also have an audit log id
 
@@ -107,15 +125,40 @@ def maybe_execute_scaling_policy(
 
     """
     bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
-    # TODO: Lock group
-    state = scaling_group.view_state()
-    if check_cooldowns('fake', 'fake', 'fake', 'fake'):
-        delta = calculate_delta("fake", "fake", "fake")
-        execute_launch_config(bound_log, transaction_id, state, scaling_group, delta)
-        #record_policy_trigger_time(log, scaling_group, policy, time.time())
-    #else:
-        #record_policy_decision_time(log, scaling_group, policy, time.time(),
-        #                            'i was rejected because...')
+
+    # TODO: locking
+    # make sure that the policy (and the group) exists before doing anything else
+    deferred = scaling_group.get_policy(policy_id)
+
+    def _do_get_config_and_state(policy):
+        deferred = defer.gatherResults([
+            scaling_group.view_state(),
+            scaling_group.view_config(),
+            scaling_group.view_launch_config()
+        ])
+        return deferred.addCallback(lambda results: results + [policy])
+
+    deferred.addCallbacks(_do_get_config_and_state, unwrap_first_error)
+
+    def _do_maybe_execute(state_config_launch_policy):
+        """
+        state_config_policy should be returned by ``check_cooldowns``
+        """
+        state, config, launch, policy = state_config_launch_policy
+        error_msg = "Cooldowns not met."
+
+        if check_cooldowns(state, config, policy, policy_id):
+            delta = calculate_delta(state, config, policy)
+            if delta != 0:
+                return execute_launch_config(bound_log, transaction_id, state,
+                                             launch, scaling_group, delta)
+            error_msg = "Policy execution would violate min/max constraints."
+
+        raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                       scaling_group.uuid, policy_id,
+                                       error_msg)
+
+    return deferred.addCallback(_do_maybe_execute)
 
 
 def check_cooldowns(state, config, policy, policy_id):
@@ -129,8 +172,7 @@ def check_cooldowns(state, config, policy, policy_id):
     :param dict policy: the policy dictionary
     :param str policy_id: the policy id that matches ``policy``
 
-    :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
-        otherwise
+    :return: C{int}
     """
     this_now = datetime.now(iso8601.iso8601.UTC)
 
@@ -172,19 +214,56 @@ def calculate_delta(state, config, policy):
         raise NotImplementedError()
 
 
-def find_server_to_evict(log, scaling_group):
+def find_pending_jobs_to_cancel(log, state, delta):
+    """
+    Identify some jobs to cancel (usually for a scale down event)
+    """
+    return []
+
+
+def find_server_to_evict(log, state, delta):
     """
     Find the server most appropriate to evict from the scaling group
     """
-    return None
+    return []
 
 
-def execute_launch_config(log, transaction_id, state, scaling_group, delta):
+def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
+
+    :return: Deferred
     """
-    launch_config = scaling_group.view_launch_config()
-    # Evicting servers cherfully ignored
-    for i in range(abs(delta)):
-        state['pending'].append(execute_one_config(log, transaction_id,
-                                scaling_group.uuid, launch_config))
+    def _update_state(pending_results):
+        """
+        :param pending_results: ``list`` of tuples of
+        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
+        """
+        jobs_dict = state['pending'].copy()
+
+        for job_id, job_info in pending_results:
+            if job_id in state['pending']:
+                raise Exception('what????!!! {0} already exists'.format(job_id))
+            jobs_dict[job_id] = job_info
+
+        return scaling_group.update_jobs(state, jobs_dict, transaction_id)
+
+    if delta > 0:
+        deferreds = [
+            supervisor.execute_one_config(log, transaction_id,
+                                          scaling_group, launch)
+            for i in range(abs(delta))
+        ]
+    else:
+        deferreds = [supervisor.cancel_job(log, transaction_id, scaling_group, job_id)
+                     for job_id in find_pending_jobs_to_cancel(log, state, delta)]
+
+        if len(deferreds) < delta:
+            deferreds.extend([
+                supervisor.evict_server(log, transaction_id, scaling_group, server_id)
+                for server_id in find_server_to_evict(log, state, delta - len(deferreds))
+            ])
+
+    pendings_deferred = defer.gatherResults(deferreds)
+    pendings_deferred.addCallback(_update_state)
+    return pendings_deferred
