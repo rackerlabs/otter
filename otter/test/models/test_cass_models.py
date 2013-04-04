@@ -11,7 +11,8 @@ from otter.json_schema import group_examples
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
-    CassBadDataError)
+    CassBadDataError,
+    serial_json_data)
 
 from otter.models.interface import (NoSuchScalingGroupError, NoSuchPolicyError,
                                     NoSuchWebhookError, UnrecognizedCapabilityError)
@@ -83,8 +84,17 @@ def _cassandrify_data(list_of_dicts):
     return _de_identify(results)
 
 
-def _sorted_order_json_dumps(dictionary, ver=None):
-    return json.dumps(dictionary, sort_keys=False)
+class SerialJsonDataTestCase(TestCase):
+    """
+    Serializing json data to be put into cassandra should append a version
+    """
+    def test_adds_version_that_is_provided(self):
+        """
+        The key "_ver" is be added to whatever dictionary is there with the
+        value being whatever is provided
+        """
+        self.assertEqual(serial_json_data({}, 'version'),
+                         json.dumps({'_ver': 'version'}))
 
 
 class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
@@ -1350,7 +1360,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
         self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
-                                 side_effect=_sorted_order_json_dumps)
+                                 side_effect=lambda *args: args[0])  # passthrough
 
     def assert_serialized(self, num):
         """
@@ -1368,8 +1378,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         returned
         """
         expectedData = {
-            'scaling': _sorted_order_json_dumps(self.config),
-            'launch': _sorted_order_json_dumps(self.launch),
+            'scaling': self.config,
+            'launch': self.launch,
             'groupId': '12345678',
             'tenantId': '123'}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
@@ -1402,12 +1412,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         policy = group_examples.policy()[0]
 
         expectedData = {
-            'scaling': _sorted_order_json_dumps(self.config),
-            'launch': _sorted_order_json_dumps(self.launch),
+            'scaling': self.config,
+            'launch': self.launch,
             'groupId': '12345678',
             'tenantId': '123',
             'policy0Id': '12345678',
-            'policy0': _sorted_order_json_dumps(policy)}
+            'policy0': policy}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
@@ -1442,14 +1452,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         policies = group_examples.policy()[:2]
 
         expectedData = {
-            'scaling': _sorted_order_json_dumps(self.config),
-            'launch': _sorted_order_json_dumps(self.launch),
+            'scaling': self.config,
+            'launch': self.launch,
             'groupId': '1',
             'tenantId': '123',
             'policy0Id': '2',
-            'policy0': _sorted_order_json_dumps(policies[0]),
+            'policy0': policies[0],
             'policy1Id': '3',
-            'policy1': _sorted_order_json_dumps(policies[1])}
+            'policy1': policies[1]}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
