@@ -125,6 +125,7 @@ def maybe_execute_scaling_policy(
 
     """
     bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log.info("beginning to execute scaling policy")
 
     # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
@@ -147,10 +148,12 @@ def maybe_execute_scaling_policy(
         state, config, launch, policy = state_config_launch_policy
         error_msg = "Cooldowns not met."
 
-        if check_cooldowns(state, config, policy, policy_id):
+        if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(state, config, policy)
+            execute_bound_log = bound_log.fields(server_delta=delta)
+            execute_bound_log.info("cooldowns checked, executing launch configs")
             if delta != 0:
-                return execute_launch_config(bound_log, transaction_id, state,
+                return execute_launch_config(execute_bound_log, transaction_id, state,
                                              launch, scaling_group, delta)
             error_msg = "Policy execution would violate min/max constraints."
 
@@ -161,7 +164,7 @@ def maybe_execute_scaling_policy(
     return deferred.addCallback(_do_maybe_execute)
 
 
-def check_cooldowns(state, config, policy, policy_id):
+def check_cooldowns(log, state, config, policy, policy_id):
     """
     Check the global cooldowns (when was the last time any policy was executed?)
     and the policy specific cooldown (when was the last time THIS policy was
@@ -177,14 +180,17 @@ def check_cooldowns(state, config, policy, policy_id):
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state['policyTouched'].get(policy_id), policy['cooldown']),
-        (state['groupTouched'], config['cooldown']),
+        (state['policyTouched'].get(policy_id), policy['cooldown'], 'policy'),
+        (state['groupTouched'], config['cooldown'], 'group'),
     ]
 
-    for last_time, cooldown in timestamp_and_cooldowns:
+    for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
+                log.fields(time_since_last_touched=delta.total_seconds(),
+                           cooldown_type=cooldown_type,
+                           cooldown_seconds=cooldown).info("cooldown not reached")
                 return False
 
     return True
@@ -234,6 +240,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
 
     :return: Deferred
     """
+
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
