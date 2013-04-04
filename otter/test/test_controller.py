@@ -148,6 +148,12 @@ class CheckCooldownsTestCase(TestCase):
     Tests for :func:`otter.controller.check_cooldowns`
     """
 
+    def setUp(self):
+        """
+        Generate a mock log
+        """
+        self.mock_log = mock.MagicMock()
+
     def mock_now(self, seconds_after_min):
         """
         Set :func:`otter.util.timestamp.now` to return a timestamp that is
@@ -169,7 +175,7 @@ class CheckCooldownsTestCase(TestCase):
         self.mock_now(30)
         fake_config = fake_policy = {'cooldown': 0}
         fake_state = {'groupTouched': MIN, 'policyTouched': {'pol': MIN}}
-        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                    fake_policy, 'pol'))
 
     def test_check_cooldowns_global_cooldown_passes_policy_never_touched(self):
@@ -182,7 +188,7 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 0}
         fake_policy = {'cooldown': 10000000}
         fake_state = {'groupTouched': MIN, 'policyTouched': {}}
-        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                    fake_policy, 'pol'))
 
     def test_check_cooldowns_no_policy_ever_executed(self):
@@ -194,7 +200,7 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 1000000000}
         fake_policy = {'cooldown': 10000000}
         fake_state = {'groupTouched': None, 'policyTouched': {}}
-        self.assertTrue(controller.check_cooldowns(fake_state, fake_config,
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                    fake_policy, 'pol'))
 
     def test_check_cooldowns_global_cooldown_fails(self):
@@ -206,7 +212,7 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 30}
         fake_policy = {'cooldown': 1000000000}
         fake_state = {'groupTouched': MIN, 'policyTouched': {}}
-        self.assertFalse(controller.check_cooldowns(fake_state, fake_config,
+        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                     fake_policy, 'pol'))
 
     def test_check_cooldowns_policy_cooldown_fails(self):
@@ -218,7 +224,7 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 1000000000}
         fake_policy = {'cooldown': 30}
         fake_state = {'groupTouched': MIN, 'policyTouched': {'pol': MIN}}
-        self.assertFalse(controller.check_cooldowns(fake_state, fake_config,
+        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                     fake_policy, 'pol'))
 
 
@@ -289,10 +295,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_log.fields.assert_called_once_with(
             scaling_group=self.group.uuid, policy_id='pol1')
 
-        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
+                                                              "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log.fields.return_value,
+            self.mock_log.fields.return_value.fields.return_value,
             'transaction', "state", "launch", self.group,
             self.mocks['calculate_delta'].return_value)
 
@@ -308,7 +315,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
-        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
+                                                              "config", "policy", 'pol1')
         self.assertEqual(len(self.mocks['calculate_delta'].mock_calls), 0)
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
 
@@ -326,6 +334,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertIn("Policy execution would violate min/max constraints",
                       str(f.value))
 
-        self.mocks['check_cooldowns'].assert_called_once_with("state", "config", "policy", 'pol1')
+        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
+                                                              "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with("state", "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
