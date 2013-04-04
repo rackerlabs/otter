@@ -227,7 +227,8 @@ def create_new_scaling_group(request, log, tenantId, data):
         }
 
     """
-    def send_redirect(uuid, data):
+    def send_redirect(result, data):
+        uuid = result['id']
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
         wrapped = {
