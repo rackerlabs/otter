@@ -213,23 +213,12 @@ create_group_request_examples = [
     }
 ]
 
-# The response for create group looks almost exactly like the request, except
-# that it is wrapped in an extra dictionary with the "group" key and has
-create_group_response = _openstackify_schema("group", create_group_request,
-                                             include_id=True)
-create_group_response["description"] = "Schema of the create group response."
-
-
-# ----- schemas for viewing configs
-view_config = _openstackify_schema("groupConfiguration", config)
-view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
-
-
-# ----- schemas for manifest viewing
-view_manifest_response = _openstackify_schema("group", {
+# the response from creating a group and the response for viewing the manifest
+# is exactly the same.
+create_and_manifest_response = _openstackify_schema("group", {
     "type": "object",
     "description": ("Schema of the JSON used to display the scaling group's "
-                    "manifested view."),
+                    "manifested view, which is also returned by create group."),
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
@@ -237,6 +226,11 @@ view_manifest_response = _openstackify_schema("group", {
     },
     "additionalProperties": False
 }, include_id=True)
+
+
+# ----- schemas for viewing configs
+view_config = _openstackify_schema("groupConfiguration", config)
+view_launch_config = _openstackify_schema("launchConfiguration", launch_config)
 
 
 # ----- schemas for viewing webhooks
