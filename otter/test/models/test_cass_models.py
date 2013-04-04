@@ -1,6 +1,7 @@
 """
 Tests for :mod:`otter.models.mock`
 """
+from collections import namedtuple
 import json
 import mock
 
@@ -1324,6 +1325,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(len(self.group._naive_list_policies), 0)
 
 
+# wrapper for serialization mocking - 'serialized' things will just be wrapped
+# with this
+_S = namedtuple('_S', ['thing'])
+
+
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
     """
@@ -1360,17 +1366,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
-        self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
-                                 side_effect=lambda *args: args[0])  # passthrough
 
-    def assert_serialized(self, *args):
-        """
-        Ensure that the args were all serialized with a version of 1, in any
-        order
-        """
-        self.mock_serial.assert_has_calls([mock.call(arg, 1) for arg in args],
-                                          any_order=True)
-        self.assertEqual(len(self.mock_serial.mock_calls), len(args))
+        # 'serializing' something just wraps it with a _S
+        self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
+                                 side_effect=lambda *args: _S(args[0]))
 
     def test_create(self):
         """
@@ -1378,8 +1377,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         returned
         """
         expectedData = {
-            'scaling': self.config,
-            'launch': self.launch,
+            'scaling': _S(self.config),
+            'launch': _S(self.launch),
             'groupId': '12345678',
             'tenantId': '123'}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
@@ -1402,7 +1401,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(self.config, self.launch)
 
     def test_create_with_policy(self):
         """
@@ -1412,12 +1410,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         policy = group_examples.policy()[0]
 
         expectedData = {
-            'scaling': self.config,
-            'launch': self.launch,
+            'scaling': _S(self.config),
+            'launch': _S(self.launch),
             'groupId': '12345678',
             'tenantId': '123',
             'policy0Id': '12345678',
-            'policy0': policy}
+            'policy0': _S(policy)}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
@@ -1442,7 +1440,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(self.config, self.launch, policy)
 
     def test_create_with_policy_multiple(self):
         """
@@ -1452,14 +1449,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         policies = group_examples.policy()[:2]
 
         expectedData = {
-            'scaling': self.config,
-            'launch': self.launch,
+            'scaling': _S(self.config),
+            'launch': _S(self.launch),
             'groupId': '1',
             'tenantId': '123',
             'policy0Id': '2',
-            'policy0': policies[0],
+            'policy0': _S(policies[0]),
             'policy1Id': '3',
-            'policy1': policies[1]}
+            'policy1': _S(policies[1])}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
                        '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
                        ':scaling, False) INSERT INTO launch_config("tenantId", '
@@ -1492,7 +1489,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(self.config, self.launch, *policies)
 
     def test_list(self):
         """
