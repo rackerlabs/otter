@@ -124,8 +124,7 @@ def maybe_execute_scaling_policy(
 
 
     """
-    bound_log = log.fields(
-        scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
 
     # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
