@@ -350,7 +350,8 @@ class CassScalingGroup(object):
             d.addCallback(lambda launch_and_policies: {
                 'groupConfiguration': the_config,
                 'launchConfiguration': launch_and_policies[0],
-                'scalingPolicies': launch_and_policies[1]
+                'scalingPolicies': launch_and_policies[1],
+                'id': self.uuid
             })
 
             return d

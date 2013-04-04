@@ -234,13 +234,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.tenant_id = '11111'
         self.config = _de_identify({
-            'name': '',
+            'name': 'a',
             'cooldown': 0,
             'minEntities': 0
         })
         # this is the config with all the default vals
         self.output_config = _de_identify({
-            'name': '',
+            'name': 'a',
             'cooldown': 0,
             'minEntities': 0,
             'maxEntities': None,
@@ -1288,16 +1288,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         config, launch config, and scaling policies is returned.
         """
         self.group.view_config = mock.MagicMock(
-            return_value=defer.succeed('config'))
+            return_value=defer.succeed(self.config))
         self.group.view_launch_config = mock.MagicMock(
-            return_value=defer.succeed('launch config'))
+            return_value=defer.succeed(self.launch_config))
         self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed('policies'))
+            return_value=defer.succeed({}))
 
-        self.assertEqual(self.successResultOf(self.group.view_manifest()),
-                         {'groupConfiguration': 'config',
-                          'launchConfiguration': 'launch config',
-                          'scalingPolicies': 'policies'})
+        self.assertEqual(self.validate_view_manifest_return_value(),
+                         {'groupConfiguration': self.config,
+                          'launchConfiguration': self.launch_config,
+                          'scalingPolicies': {},
+                          'id': "12345678g"})
         self.group.view_config.assert_called_once_with()
         self.group.view_launch_config.assert_called_once_with()
         self.group._naive_list_policies.assert_called_once_with()

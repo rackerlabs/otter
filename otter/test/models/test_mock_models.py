@@ -225,7 +225,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "cooldown": 3
         }]
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, '1',
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
@@ -238,6 +238,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result['groupConfiguration'], self.output_config)
         self.assertEqual(result['launchConfiguration'], self.launch_config)
         self.assertEqual(result['scalingPolicies'].values(), self.policies)
+        self.assertEqual(result['id'], '1')
 
     def test_default_view_config_has_all_info(self):
         """
@@ -371,7 +372,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         also is an empty dictionary
         """
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, '1',
             {'config': self.config, 'launch': self.launch_config,
              'policies': None})
         self.assertEqual(self.validate_list_policies_return_value(), {})

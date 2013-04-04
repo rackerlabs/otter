@@ -243,7 +243,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         manifest = {
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': {"5": policy_examples()[0]}
+            'scalingPolicies': {"5": policy_examples()[0]},
+            'id': 'one'
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 

@@ -133,7 +133,8 @@ class MockScalingGroup:
         return defer.succeed({
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': self.policies
+            'scalingPolicies': self.policies,
+            'id': self.uuid
         })
 
     def view_config(self):
@@ -426,11 +427,7 @@ class MockScalingGroupCollection:
             log, tenant, uuid,
             {'config': config, 'launch': launch, 'policies': policies})
 
-        def _add_id(dictionary):
-            dictionary['id'] = uuid
-            return dictionary
-
-        return self.data[tenant][uuid].view_manifest().addCallback(_add_id)
+        return self.data[tenant][uuid].view_manifest()
 
     def delete_scaling_group(self, log, tenant, uuid):
         """
