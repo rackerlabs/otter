@@ -1363,15 +1363,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
                                  side_effect=lambda *args: args[0])  # passthrough
 
-    def assert_serialized(self, num):
+    def assert_serialized(self, *args):
         """
-        Ensure that any data is serialized with a version of 1 ``num`` number
-        of times
+        Ensure that the args were all serialized with a version of 1, in any
+        order
         """
-        for call in self.mock_serial.mock_calls:
-            self.assertEqual(call, mock.call(mock.ANY, 1))
-
-        self.assertEqual(len(self.mock_serial.mock_calls), num)
+        self.mock_serial.assert_has_calls([mock.call(arg, 1) for arg in args],
+                                          any_order=True)
+        self.assertEqual(len(self.mock_serial.mock_calls), len(args))
 
     def test_create(self):
         """
@@ -1403,7 +1402,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(2)
+        self.assert_serialized(self.config, self.launch)
 
     def test_create_with_policy(self):
         """
@@ -1443,7 +1442,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(3)
+        self.assert_serialized(self.config, self.launch, policy)
 
     def test_create_with_policy_multiple(self):
         """
@@ -1493,7 +1492,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assert_serialized(4)
+        self.assert_serialized(self.config, self.launch, *policies)
 
     def test_list(self):
         """
