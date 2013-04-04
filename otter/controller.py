@@ -125,6 +125,7 @@ def maybe_execute_scaling_policy(
 
     """
     bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log.info("beginning to execute scaling policy")
 
     # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
@@ -147,8 +148,9 @@ def maybe_execute_scaling_policy(
         state, config, launch, policy = state_config_launch_policy
         error_msg = "Cooldowns not met."
 
-        if check_cooldowns(state, config, policy, policy_id):
+        if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(state, config, policy)
+            bound_log.fields(delta=delta).info("cooldowns checked")
             if delta != 0:
                 return execute_launch_config(bound_log, transaction_id, state,
                                              launch, scaling_group, delta)
@@ -161,7 +163,7 @@ def maybe_execute_scaling_policy(
     return deferred.addCallback(_do_maybe_execute)
 
 
-def check_cooldowns(state, config, policy, policy_id):
+def check_cooldowns(log, state, config, policy, policy_id):
     """
     Check the global cooldowns (when was the last time any policy was executed?)
     and the policy specific cooldown (when was the last time THIS policy was
@@ -185,6 +187,7 @@ def check_cooldowns(state, config, policy, policy_id):
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
+                log.fields(delta=delta.total_seconds(), cooldown=cooldown).info("cooldown not reached")
                 return False
 
     return True
