@@ -180,15 +180,16 @@ def check_cooldowns(log, state, config, policy, policy_id):
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state['policyTouched'].get(policy_id), policy['cooldown']),
-        (state['groupTouched'], config['cooldown']),
+        (state['policyTouched'].get(policy_id), policy['cooldown'], 'policy'),
+        (state['groupTouched'], config['cooldown'], 'group'),
     ]
 
-    for last_time, cooldown in timestamp_and_cooldowns:
+    for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
                 log.fields(time_since_last_touched=delta.total_seconds(),
+                           cooldown_type=cooldown_type,
                            cooldown_seconds=cooldown).info("cooldown not reached")
                 return False
 
