@@ -100,6 +100,7 @@ def maybe_execute_scaling_policy(
     """
     Checks whether and how much a scaling policy can be executed.
 
+    :param log: A twiggy bound log for logging
     :param scaling_group: an IScalingGroup provider
     :param policy_id: the policy id to execute
 
@@ -149,12 +150,13 @@ def maybe_execute_scaling_policy(
         error_msg = "Cooldowns not met."
 
         if check_cooldowns(bound_log, state, config, policy, policy_id):
-            delta = calculate_delta(state, config, policy)
+            delta = calculate_delta(bound_log, state, config, policy)
             execute_bound_log = bound_log.fields(server_delta=delta)
-            execute_bound_log.info("cooldowns checked, executing launch configs")
             if delta != 0:
+                execute_bound_log.info("cooldowns checked, executing launch configs")
                 return execute_launch_config(execute_bound_log, transaction_id, state,
                                              launch, scaling_group, delta)
+            execute_bound_log.info("cooldowns checked, no change in servers")
             error_msg = "Policy execution would violate min/max constraints."
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
@@ -170,6 +172,7 @@ def check_cooldowns(log, state, config, policy, policy_id):
     and the policy specific cooldown (when was the last time THIS policy was
     executed?)
 
+    :param log: A twiggy bound log for logging
     :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
@@ -196,11 +199,12 @@ def check_cooldowns(log, state, config, policy, policy_id):
     return True
 
 
-def calculate_delta(state, config, policy):
+def calculate_delta(log, state, config, policy):
     """
     Calculate the desired change in the number of servers, keeping in mind the
     minimum and maximum constraints.
 
+    :param log: A twiggy bound log for logging
     :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
@@ -211,6 +215,9 @@ def calculate_delta(state, config, policy):
         max_entities = config['maxEntities']
         if max_entities is None:
             max_entities = MAX_ENTITIES
+        log.fields(desired_change=desired, max_entities=max_entities,
+                   min_entities=config['minEntities'], active=len(state['active']),
+                   pending=len(state['pending'])).info("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
     if "change" in policy:
@@ -246,6 +253,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         :param pending_results: ``list`` of tuples of
         ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
         """
+        log.info('updating state')
         jobs_dict = state['pending'].copy()
 
         for job_id, job_info in pending_results:
