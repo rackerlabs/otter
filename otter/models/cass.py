@@ -424,6 +424,9 @@ class CassScalingGroup(object):
 
         del pending[pending_job_id]
 
+        self.log.fields(name=name, instance_id=instance_id, uri=uri, pending_job_id=pending_job_id,
+                        timestamp=created).info("adding server to database")
+
         active[instance_id] = {"name": name,
                                "instanceURL": uri,
                                "created": created}
@@ -445,8 +448,12 @@ class CassScalingGroup(object):
         if timestamp is None:
             timestamp = now()
 
+        self.log.fields(new_jobs=job_dict, policy_id=policy_id,
+                        timestamp=timestamp).info("updating jobs")
+
         policy_touched = state["policyTouched"]
-        policy_touched[policy_id] = timestamp
+        if policy_id is not None:
+            policy_touched[policy_id] = timestamp
 
         query = _cql_update_job_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
