@@ -254,11 +254,25 @@ def create_new_scaling_group(request, log, tenantId, data):
                 },
                 "scalingPolicies": [
                     {
+                        "id": "{policyId1}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
+                            "rel": "self"
+                          }
+                        ],
                         "name": "scale up by 10",
                         "change": 10,
                         "cooldown": 5
                     }
                     {
+                        "id": "{policyId2}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
+                            "rel": "self"
+                          }
+                        ],
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
