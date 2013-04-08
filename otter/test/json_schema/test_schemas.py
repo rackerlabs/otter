@@ -256,35 +256,19 @@ class ScalingPolicyTestCase(TestCase):
         for example in group_examples.policy():
             validate(example, group_schemas.policy)
 
-    def test_either_change_or_changePercent_or_steadyState(self):
+    def test_either_change_or_changePercent(self):
         """
-        A scaling policy can have the attribute "change" or "changePercent" or
-        "steadyState", but not any combination thereof
-        """
-        one_only = ("change", "changePercent", "steadyState")
-        for combination in ((0, 1), (0, 2), (1, 2), (0, 1, 2)):
-            invalid = {
-                "name": "meh",
-                "cooldown": 5,
-            }
-            for index in combination:
-                invalid[one_only[index]] = 5
-            self.assertRaisesRegexp(
-                ValidationError, 'not of type',
-                validate, invalid, group_schemas.policy)
-
-    def test_set_steady_state_must_not_be_negative(self):
-        """
-        Cannot set the steady state to a negative number
+        A scaling policy can have the attribute "change" or "changePercent",
+        but not both
         """
         invalid = {
-            "name": "aname",
-            "steadyState": -1,
+            "name": "meh",
             "cooldown": 5,
-            "type": "webhook"
+            "change": 5,
+            "changePercent": 2
         }
         self.assertRaisesRegexp(
-            ValidationError, 'minimum',
+            ValidationError, 'not of type',
             validate, invalid, group_schemas.policy)
 
     def test_no_other_properties_valid(self):
@@ -301,7 +285,7 @@ class ScalingPolicyTestCase(TestCase):
             "poofy": False
         }
         self.assertRaisesRegexp(
-            ValidationError, 'not of type',
+            ValidationError, 'Additional properties are not allowed',
             validate, invalid, group_schemas.policy)
 
     def test_type_set(self):
@@ -316,7 +300,7 @@ class ScalingPolicyTestCase(TestCase):
             "cooldown": 5
         }
         self.assertRaisesRegexp(
-            ValidationError, 'not of type',
+            ValidationError, "'type' is a required property",
             validate, invalid, group_schemas.policy)
 
     def test_type_valid(self):
@@ -331,7 +315,7 @@ class ScalingPolicyTestCase(TestCase):
             "type": "blah"
         }
         self.assertRaisesRegexp(
-            ValidationError, 'not of type',
+            ValidationError, 'is not one of',
             validate, invalid, group_schemas.policy)
 
     def test_invalid_name_does_not_validate(self):

@@ -108,7 +108,7 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         # config, launch config, etc. doesn't matter, only policies
         self.policies = [{
             "name": "set number of servers to 10",
-            "steadyState": 10,
+            "change": 10,
             "cooldown": 3
         }]
         self.state = CassScalingGroup(
