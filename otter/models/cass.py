@@ -321,7 +321,7 @@ class CassScalingGroup(object):
         """
         Creates a CassScalingGroup object.
         """
-        self.log = log.name(self.__class__.__name__)
+        self.log = log.name(self.__class__.__name__).fields(tenant_id=tenant_id, scaling_group_id=uuid)
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
@@ -868,8 +868,7 @@ class CassScalingGroupCollection:
         """
         scaling_group_id = generate_key_str('scalinggroup')
 
-        log = log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
-        log.info("Creating scaling group")
+        log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id).info("Creating scaling group")
 
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),
@@ -897,8 +896,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
         """
 
-        log = log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
-        log.info("Deleting scaling group")
+        log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id).info("Deleting scaling group")
 
         consistency = get_consistency_level('delete', 'group')
 
@@ -937,8 +935,6 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
         """
-        log = log.fields(tenant_id=tenant_id)
-
         def _build_cass_groups(group_ids):
             return [CassScalingGroup(log, tenant_id, group_id, self.connection)
                     for group_id in group_ids]
@@ -954,7 +950,6 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
-        log = log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
