@@ -391,7 +391,8 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
             group.create_policies([{
                 "name": 'set number of servers to 10',
                 "change": 10,
-                "cooldown": 3
+                "cooldown": 3,
+                "type": "webhook"
             }])).keys()[0]
         set_store(store)
 

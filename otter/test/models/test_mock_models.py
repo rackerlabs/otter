@@ -437,7 +437,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         update_data = {
             "name": "Otters are not good pets",
             "change": 1234,
-            "cooldown": 555
+            "cooldown": 555,
+            "type": "webhook"
         }
         self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
         result = self.assert_deferred_succeeded(
@@ -451,7 +452,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         update_data = {
             "name": "puppies are good pets",
             "change": 1234,
-            "cooldown": 555
+            "cooldown": 555,
+            "type": "webhook"
         }
         deferred = self.group.update_policy("puppies", update_data)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
