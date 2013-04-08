@@ -142,9 +142,8 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
 
     def test_state_update_jobs_no_pol(self):
         """
-        Test the normal use case..  update an empty group with a job,
-        move the server to fully operational.  Make sure it works without
-        a scaling policy.
+        Update an empty group with a job, move the server to fully
+        operational.  Make sure it works without a scaling policy.
         """
         fake_state = {'policyTouched': {}}
 
