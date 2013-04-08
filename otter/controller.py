@@ -32,6 +32,7 @@ from otter import supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+from otter.auth import authenticate_tenant
 
 
 class CannotExecutePolicyError(Exception):
@@ -248,28 +249,26 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         """
         jobs_dict = state['pending'].copy()
 
-        for job_id, job_info in pending_results:
-            if job_id in state['pending']:
-                raise Exception('what????!!! {0} already exists'.format(job_id))
+        for job_id, completion_deferred, job_info in pending_results:
+            assert job_id not in state['pending'], "Job already exists: {0}".format(job_id)
             jobs_dict[job_id] = job_info
+
+            # XXX: Simplest thing that could possibly work.
+            completion_deferred.addCallbacks(
+                lambda _: complete_pending_job(log, job_id, True),  # XXX: True?
+                lambda _: complete_pending_job(log, job_id, False))  # XXX: False?
 
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
     if delta > 0:
         deferreds = [
-            supervisor.execute_one_config(log, transaction_id,
-                                          scaling_group, launch)
+            supervisor.execute_config(log, transaction_id,
+                                      authenticate_tenant,
+                                      scaling_group, launch)
             for i in range(abs(delta))
         ]
     else:
-        deferreds = [supervisor.cancel_job(log, transaction_id, scaling_group, job_id)
-                     for job_id in find_pending_jobs_to_cancel(log, state, delta)]
-
-        if len(deferreds) < delta:
-            deferreds.extend([
-                supervisor.evict_server(log, transaction_id, scaling_group, server_id)
-                for server_id in find_server_to_evict(log, state, delta - len(deferreds))
-            ])
+        raise NotImplementedError()
 
     pendings_deferred = defer.gatherResults(deferreds)
     pendings_deferred.addCallback(_update_state)
