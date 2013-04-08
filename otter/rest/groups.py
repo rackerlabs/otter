@@ -142,11 +142,6 @@ def create_new_scaling_group(request, log, tenantId, data):
                     "name": 'scale down 5.5 percent',
                     "changePercent": -5.5,
                     "cooldown": 6
-                },
-                {
-                    "name": 'set number of servers to 10',
-                    "steadyState": 10,
-                    "cooldown": 3
                 }
             ]
         }
@@ -216,11 +211,6 @@ def create_new_scaling_group(request, log, tenantId, data):
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
-                    },
-                    {
-                        "name": 'set number of servers to 10',
-                        "steadyState": 10,
-                        "cooldown": 3
                     }
                 ]
             }
@@ -331,18 +321,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
-                    },
-                    {
-                        "id": "{policyId3}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": 'set number of servers to 10',
-                        "steadyState": 10,
-                        "cooldown": 3
                     }
                 ]
             }
