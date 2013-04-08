@@ -140,6 +140,29 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+    def test_state_update_jobs_no_pol(self):
+        """
+        Update an empty group with a job, move the server to fully
+        operational.  Make sure it works without a scaling policy.
+        """
+        fake_state = {'policyTouched': {}}
+
+        self.returns = [None, None]
+
+        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
+        d = self.state.update_jobs(fake_state, jobs, "trans1", None, "2012-12-25 00:00:00-06:39Z")
+        self.assert_deferred_succeeded(d)
+        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
+                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
+                       ':policyTouched);')
+        expectedData = {'policyTouched': '{"_ver": 1}',
+                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
+                        'groupId': '12345678g',
+                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
     def test_state_add_server(self):
         """
         Test the add server operation that moves a server from the job listing to
