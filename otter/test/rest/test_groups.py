@@ -17,7 +17,8 @@ from otter.json_schema.group_examples import (
 
 from otter.json_schema import rest_schemas
 
-from otter.models.interface import IScalingGroupState, NoSuchScalingGroupError
+from otter.models.interface import (
+    GroupNotEmptyError, IScalingGroupState, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
@@ -281,6 +282,20 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_group_delete_409(self):
+        """
+        Deleting a non-empty group fails with a 409.
+        """
+        self.mock_delete.return_value = defer.fail(
+            GroupNotEmptyError('11111', '1'))
+
+        response_body = self.assert_status_code(409, method="DELETE")
+        self.mock_delete.assert_called_once_with(mock.ANY, self.mock_group)
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'GroupNotEmptyError')
+        self.flushLoggedErrors(GroupNotEmptyError)
 
 
 class GroupStateTestCase(RestAPITestMixin, TestCase):
