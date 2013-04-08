@@ -187,8 +187,7 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
-                "type": {"enum": ["webhook"],
-                         "required": True},
+                "type": {},
                 "changePercent": {"required": True}
             },
             "additionalProperties": False
@@ -198,8 +197,7 @@ policy = {
             "properties": {
                 "name": {},
                 "cooldown": {},
-                "type": {"enum": ["webhook"],
-                         "required": True},
+                "type": {},
                 "change": {"required": True}
             },
             "additionalProperties": False
@@ -247,6 +245,10 @@ policy = {
                 "scaling policy can be executed again.  This cooldown period "
                 "does not affect the global scaling group cooldown."),
             "minimum": 0,
+            "required": True
+        },
+        "type": {
+            "enum": ["webhook"],
             "required": True
         }
     },
