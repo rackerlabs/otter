@@ -62,20 +62,13 @@ class GroupNotEmptyError(Exception):
 
 class IScalingGroupState(Interface):
     """
-    Represents an accessor for group state.  Note that none of these raise
-    :class:`NoSuchScalingGroupError` if this scaling group does not exist - the
-    check is expected to be performed elsewhere.
+    Represents an accessor for group state.
     """
 
-    def delete_group(state):
+    def delete_group():
         """
-        Deletes the scaling group if the state is empty.  This assumes that
-        the group exists, because otherwise how would the state have been
-        retrieved?
-
-        :param dict state: a dict, like you'd see returned from view_state,
-            containing the state of the group
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+        Deletes the scaling group if the state is empty.  This method should
+        handle its own locking, if required.
 
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
@@ -86,7 +79,9 @@ class IScalingGroupState(Interface):
     def add_server(state, name, instance_id, uri, pending_job_id, created=None):
         """
         Takes information about an active server and adds it to the store of
-        active servers.
+        active servers.  Note that this does not raise
+        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
+        the check is expected to be performed elsewhere.
 
         :param dict state: a dict, like you'd see returned from view_state,
             containing the state of the group
@@ -106,7 +101,9 @@ class IScalingGroupState(Interface):
     def update_jobs(state, job_dict, transaction_id, policy_id=None, timestamp=None):
         """
         Update jobs with the jobs dict, which should contain all outstanding
-        jobs in the group, not just new jobs.
+        jobs in the group, not just new jobs.  Note this does not raise
+        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
+        the check is expected to be performed elsewhere.
 
         If the jobs changed as a result of hte policy, modify the touched times
         for the given policy (and the group at large).
@@ -152,7 +149,6 @@ class IScalingGroupState(Interface):
         idempotent change, if it's already unpaused, this does not raise an
         error. (But perhaps it should not be re-resumed, if that is an expensive
         operation.)
-
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
