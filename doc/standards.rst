@@ -43,6 +43,17 @@ variables, parameters, and return values in a docstring.
 To check your docstring formatting, please use `make apidoc` to see if there are any Sphinx build
 errors.
 
+Documenting Exceptions
+**********************
+
+Note that since we are using Twisted, the ``:raises:`` keyword implies an asynchronous exception if
+the return value is a ``Deferred``. If possible exceptions should be asynchronous in an asynchronous
+function.  If the function has a mix of asynchronous and synchronous, the synchronous exceptions should
+be explicitly called out.
+
+Test Docstrings
+***************
+
 Test docstrings should be stated in a present tense, in the active voice, as opposed to a
 `conditional perfect <https://en.wikipedia.org/wiki/Conditional_perfect>`_, passive
 voice construction like this sentence.
