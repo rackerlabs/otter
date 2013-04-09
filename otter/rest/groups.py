@@ -5,6 +5,8 @@ Autoscale REST endpoints having to do with a group or collection of groups
 
 import json
 
+from twisted.internet import defer
+
 from otter.json_schema.rest_schemas import create_group_request
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
@@ -20,7 +22,7 @@ from otter import controller
 @succeeds_with(200)
 def list_all_scaling_groups(request, log, tenantId):
     """
-    Lists all the autoscaling groups per for a given tenant ID.
+    Lists all the autoscaling groups and their states per for a given tenant ID.
 
     Example response::
 
@@ -33,7 +35,12 @@ def list_all_scaling_groups(request, log, tenantId):
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
                 "rel": "self"
               }
-            ]
+            ],
+            "active": [],
+            "numActive": 0,
+            "numPending": 1,
+            "steadyState": 1,
+            "paused": false
           },
           {
             "id": "{groupId2}"
@@ -42,27 +49,46 @@ def list_all_scaling_groups(request, log, tenantId):
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
                 "rel": "self"
               }
-            ]
+            ],
+            "active": [],
+            "numActive": 0,
+            "numPending": 2,
+            "steadyState": 2,
+            "paused": false
           }
         ],
         "groups_links": []
       }
+
+    TODO:
     """
-    def format_list(groups):
-        # if this list of groups is ever too large, or getting the link
-        # becomes a more time consuming task, perhaps this map should be done
-        # cooperatively
+    def format_list(group_states):
+        groups = []
+        for group, state in group_states:
+            groups.append({
+                'id': group.uuid,
+                'links': get_autoscale_links(tenantId, group.uuid),
+                'active': state['active'],
+                'active_num': len(state['active']),
+                'pending_num': len(state['pending']),
+                'steadyState': len(state['active']) + len(state['pending']),
+                'paused': state['paused']
+            })
         return {
-            "groups": [
-                {
-                    'id': group.uuid,
-                    'links': get_autoscale_links(tenantId, group.uuid)
-                } for group in groups
-            ],
+            "groups": groups,
             "groups_links": []
         }
 
+    # This is TERRIBLE.  If there are a lot of groups this will be a lot of DB
+    # hits.  But the models should change soon, for other reasons too, so
+    # leaving this for now.
+    def get_states(groups):
+        d = defer.gatherResults([g.view_state() for g in groups])
+        d.addCallback(lambda states: zip(groups, states))
+        return d
+
     deferred = get_store().list_scaling_groups(log, tenantId)
+    deferred.addCallback(get_states)
     deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred

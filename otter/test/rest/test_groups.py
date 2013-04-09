@@ -17,7 +17,8 @@ from otter.json_schema.group_examples import (
 
 from otter.json_schema import rest_schemas
 
-from otter.models.interface import IScalingGroupState, NoSuchScalingGroupError
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupState, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
@@ -68,16 +69,27 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_groups_response)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
-    def test_returned_group_list_gets_translated(self, mock_url):
+    def test_returned_group_list_has_state_and_ids_and_links(self, mock_url):
         """
-        Test that the scaling groups list gets translated into a list of
-        scaling group ids and links.
+        ``list_all_scaling_groups`` translates a list of IScalingGroup to a
+        list of states that also have group ids and links, if there are no
+        errors
         """
-        # return two mock scaling group objects
-        self.mock_store.list_scaling_groups.return_value = defer.succeed([
-            mock.MagicMock(spec=['uuid'], uuid="1"),
-            mock.MagicMock(spec=['uuid'], uuid="2")
-        ])
+        fake_state = {
+            "active": [],
+            "pending": [],
+            "paused": False,
+            "groupTouched": None,
+            "policyTouched": {}
+        }
+        mock_groups = [
+            iMock(IScalingGroup, uuid="1"),
+            iMock(IScalingGroup, uuid="2")
+        ]
+        self.mock_store.list_scaling_groups.return_value = defer.succeed(mock_groups)
+        for group in mock_groups:
+            group.view_state.return_value = defer.succeed(fake_state.copy())
+
         body = self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
 
@@ -89,13 +101,23 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                     'id': '1',
                     'links': [
                         {"href": '/v1.0/11111/groups/1/', "rel": "self"},
-                    ]
+                    ],
+                    "active": [],
+                    "active_num": 0,
+                    "pending_num": 0,
+                    "paused": False,
+                    "steadyState": 0
                 },
                 {
                     'id': '2',
                     'links': [
                         {"href": '/v1.0/11111/groups/2/', "rel": "self"},
-                    ]
+                    ],
+                    "active": [],
+                    "active_num": 0,
+                    "pending_num": 0,
+                    "paused": False,
+                    "steadyState": 0
                 }
             ],
             "groups_links": []
