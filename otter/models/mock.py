@@ -81,10 +81,12 @@ class MockScalingGroup:
 
     :type pending_jobs: ``dict`` of ``dict``
 
-    :ivar paused: whether the scaling is currently running, or paused
+    :ivar paused: whether to allow new scaling activity (such as policy
+        executions) - if ``True`` (paused), then no new activity can occur.
+        If ``False`` (not paused), then scaling proceeds as normal.
     :type paused: ``bool``
 
-    :ivar collection: a :class:`MockScalingGroupCollection`
+    :ivar _collection: a :class:`MockScalingGroupCollection`
     """
     def __init__(self, log, tenant_id, uuid, collection, creation=None):
         """
@@ -103,7 +105,7 @@ class MockScalingGroup:
         self.group_touched = None
         self.paused = False
 
-        self.collection = collection
+        self._collection = collection
 
         if creation is not None:
             self.error = None
@@ -414,8 +416,8 @@ class MockScalingGroup:
         if len(state['active']) + len(state['pending']) > 0:
             return defer.fail(GroupNotEmptyError(self.tenant_id, self.uuid))
 
-        collection = self.collection
-        self.collection = None  # lose this reference
+        collection = self._collection
+        self._collection = None  # lose this reference
         del collection.data[self.tenant_id][self.uuid]
 
         return defer.succeed(None)
