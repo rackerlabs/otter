@@ -124,7 +124,7 @@ list_groups_response = _openstackify_schema("groups", _list_of_links,
 group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
-        'steadyState': {
+        'desiredCapacity': {
             'type': 'integer',
             'minimum': 0,
             'required': True
