@@ -205,8 +205,8 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
 
     def test_delete_scaling_group_fails_if_scaling_group_not_empty(self):
         """
-        Deleting a scaling group that has active or pending jobs raises a
-        :class:`GroupNotEmptyError` exception
+        Deleting a scaling group that has active or pending jobs errbacks with
+        a :class:`GroupNotEmptyError`
         """
         self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
                       self.state, "Sanity check")

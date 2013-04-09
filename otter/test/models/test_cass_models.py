@@ -225,8 +225,8 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                                   mock_naive_list_policy,
                                                   mock_naive_del_policy):
         """
-        If the scaling group is not empty, :class:`GroupNotEmptyError` is
-        raised
+        ``delete_group`` errbacks with :class:`GroupNotEmptyError` if scaling
+        group state is not empty
         """
         self.assert_deferred_failed(
             self.state.delete_group({'active': [1], 'pending': []}),
@@ -249,8 +249,9 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                                       mock_naive_list_policy,
                                                       mock_naive_del_policy):
         """
-        If the scaling group is empty, deletes scaling group and all of its
-        policies and webhooks.  Use naive calls all the way down.
+        ``delete_group`` deletes config, launch config, state, and the group's
+        policies and webhooks if the scaling group is empty.
+        It uses naive calls all the way down.
         """
         # we mock out delete policy, since that is already tested separately
 
@@ -292,8 +293,9 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                                                          mock_naive_list_policy,
                                                          mock_naive_del_policy):
         """
-        If the scaling group is empty but no scaling policies exist, deletes
-        only the configs and state.  ``_naive_delete_policy`` is not called.
+        ``delete_group`` deletes only the config, launch config and state if
+        the scaling group is empty but no policies exist.
+        ``_naive_delete_policy`` is not called.
         """
         self.returns = [None]
         result = self.successResultOf(
