@@ -64,7 +64,8 @@ class RunningCassandraCluster(object):
     This simply creates and destroys keyspaces in a blocking manner, since
     nothing can be done until the keyspace is created anyway.  Future possible
     enhancements:
-        - support returning deferreds instead.
+
+    * support returning deferreds instead.
 
     :ivar host: the host to connect to (defaults to localhost)
     :type host: ``str``
@@ -82,10 +83,11 @@ class RunningCassandraCluster(object):
     :type initialize_cql: ``callable``
 
     TODO: a resource that starts cassandra processes if none are running, but:
-    - how to tell if an already-running cassandra cluster is running
+
+    * how to tell if an already-running cassandra cluster is running
         on the ports that you want?  e.g. if you can't connect, how do you tell
         whether the existing cluster is broken or if one needs to be started
-    - re-generating the cassandra.yaml file to run on different ports and also
+    * re-generating the cassandra.yaml file to run on different ports and also
         to write to a different data directory, so it doesn't clobber any
         already-running ones.
 
