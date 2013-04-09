@@ -8,17 +8,15 @@ model object (group config change, scaling policy execution), and receives
 events from the supervisor (job completed)
 
 TODO:
- * Migrate over to new storage model for state information
  * Lock yak shaving
- * cooldown
  * Eviction policy
 
 Storage model for state information:
  * active list
-  * Instance URI
-  * Created time
+    * Instance URI
+    * Created time
  * pending list
-  * Job ID
+    * Job ID
  * last touched information for group
  * last touched information for polciy
 
@@ -114,16 +112,7 @@ def maybe_execute_scaling_policy(
     :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
 
     :raises: Some exception about why you don't want to execute the policy. This
-    Exception should also have an audit log id
-
-    policy example:
-           {
-                "name": "scale up by 10",
-                "change": 10,
-                "cooldown": 5
-            },
-
-
+        Exception should also have an audit log id
     """
     bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
     bound_log.info("beginning to execute scaling policy")

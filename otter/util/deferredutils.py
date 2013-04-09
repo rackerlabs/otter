@@ -7,8 +7,8 @@ from twisted.internet import defer
 
 def unwrap_first_error(possible_first_error):
     """
-    Failures returned by :method:`defer.gatherResults` are failures that wrap
-    a defer.FirstError, which wraps the inner failure.
+    Failures returned by :meth:`defer.gatherResults` are failures that wrap
+    a :class:`defer.FirstError`, which wraps the inner failure.
 
     Checks failure to see if it is a defer.FirstError.  If it is, recursively
     gets the underlying failure that it wraps (in case it is a first error
@@ -18,8 +18,7 @@ def unwrap_first_error(possible_first_error):
         :class:`defer.FirstError`
     :type possible_first_error: :class:`Failure`
 
-    :return: :class:`Failure` that is under any/all the
-        :class:`defer.FirstError`s
+    :return: :class:`Failure` that is under any/all the :class:`defer.FirstError`
     """
     if possible_first_error.check(defer.FirstError):
         return unwrap_first_error(possible_first_error.value.subFailure)
