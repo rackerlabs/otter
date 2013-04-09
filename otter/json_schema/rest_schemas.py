@@ -114,11 +114,6 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
 group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
-        'desiredCapacity': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        },
         'paused': {
             'type': 'boolean',
             'required': True
@@ -129,16 +124,21 @@ group_state = _openstackify_schema("group", {
             'uniqueItems': True,
             'required': True
         },
-        'active_num': {
+        'activeCapacity': {
             'type': 'integer',
             'minimum': 0,
             'required': True
         },
-        'pending_num': {
+        'pendingCapacity': {
             'type': 'integer',
             'minimum': 0,
             'required': True
         },
+        'desiredCapacity': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        }
     },
     'additionalProperties': False
 }, include_id=True)

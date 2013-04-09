@@ -103,10 +103,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                         {"href": '/v1.0/11111/groups/1/', "rel": "self"},
                     ],
                     "active": [],
-                    "active_num": 0,
-                    "pending_num": 0,
-                    "paused": False,
-                    "steadyState": 0
+                    "activeCapacity": 0,
+                    "pendingCapacity": 0,
+                    "desiredCapacity": 0,
+                    "paused": False
                 },
                 {
                     'id': '2',
@@ -114,10 +114,10 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                         {"href": '/v1.0/11111/groups/2/', "rel": "self"},
                     ],
                     "active": [],
-                    "active_num": 0,
-                    "pending_num": 0,
-                    "paused": False,
-                    "steadyState": 0
+                    "activeCapacity": 0,
+                    "pendingCapacity": 0,
+                    "desiredCapacity": 0,
+                    "paused": False
                 }
             ],
             "groups_links": []
@@ -378,8 +378,8 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
                 {'id': '2', 'links': [{'href': 'uri2', 'rel': 'self'}]},
                 {'id': '3', 'links': [{'href': 'uri3', 'rel': 'self'}]}
             ],
-            'numPending': 3,
-            'numActive': 3,
+            'activeCapacity': 3,
+            'pendingCapacity': 3,
             'desiredCapacity': 6,
             'paused': True,
             'id': "one",

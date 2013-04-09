@@ -37,9 +37,9 @@ def list_all_scaling_groups(request, log, tenantId):
               }
             ],
             "active": [],
-            "numActive": 0,
-            "numPending": 1,
-            "steadyState": 1,
+            "activeCapacity": 0,
+            "pendingCapacity": 1,
+            "desiredCapacity": 1,
             "paused": false
           },
           {
@@ -51,9 +51,9 @@ def list_all_scaling_groups(request, log, tenantId):
               }
             ],
             "active": [],
-            "numActive": 0,
-            "numPending": 2,
-            "steadyState": 2,
+            "activeCapacity": 0,
+            "pendingCapacity": 2,
+            "desiredCapacity": 2,
             "paused": false
           }
         ],
@@ -69,9 +69,9 @@ def list_all_scaling_groups(request, log, tenantId):
                 'id': group.uuid,
                 'links': get_autoscale_links(tenantId, group.uuid),
                 'active': state['active'],
-                'active_num': len(state['active']),
-                'pending_num': len(state['pending']),
-                'steadyState': len(state['active']) + len(state['pending']),
+                'activeCapacity': len(state['active']),
+                'pendingCapacity': len(state['pending']),
+                'desiredCapacity': len(state['active']) + len(state['pending']),
                 'paused': state['paused']
             })
         return {
@@ -432,8 +432,8 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                 ]
               }
             ],
-            "numActive": 2,
-            "numPending": 2,
+            "activeCapacity": 2,
+            "pendingCapacity": 2,
             "desiredCapacity": 4,
             "paused": false
           }
@@ -441,12 +441,12 @@ def get_scaling_group_state(request, log, tenantId, groupId):
     """
     def reformat_active_and_pending(state_blob):
         response_dict = {
-            'numActive': len(state_blob['active']),
-            'numPending': len(state_blob['pending']),
-            'paused': state_blob['paused']
+            'activeCapacity': len(state_blob['active']),
+            'pendingCapacity': len(state_blob['pending']),
+            'desiredCapacity': len(state_blob['active']) + len(state_blob['pending']),
+            'paused': state_blob['paused'],
+
         }
-        response_dict['desiredCapacity'] = (
-            response_dict['numActive'] + response_dict['numPending'])
 
         response_dict['active'] = [
             {
