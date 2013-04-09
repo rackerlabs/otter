@@ -408,7 +408,7 @@ def get_scaling_group_state(request, log, tenantId, groupId):
             ],
             "numActive": 2,
             "numPending": 2,
-            "steadyState": 4,
+            "desiredCapacity": 4,
             "paused": false
           }
         }
@@ -419,7 +419,7 @@ def get_scaling_group_state(request, log, tenantId, groupId):
             'numPending': len(state_blob['pending']),
             'paused': state_blob['paused']
         }
-        response_dict['steadyState'] = (
+        response_dict['desiredCapacity'] = (
             response_dict['numActive'] + response_dict['numPending'])
 
         response_dict['active'] = [
