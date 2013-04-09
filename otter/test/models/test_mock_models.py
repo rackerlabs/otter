@@ -5,6 +5,7 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.json_schema import group_examples
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
 from otter.models.interface import (NoSuchScalingGroupError,
@@ -216,11 +217,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = [{
-            "name": "set number of servers to 10",
-            "steadyState": 10,
-            "cooldown": 3
-        }]
+        self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
             self.mock_log, self.tenant_id, 1,
             {'config': self.config, 'launch': self.launch_config,
@@ -347,14 +344,16 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         create_response = self.validate_create_policies_return_value([
             {
-                "name": "set number of servers to 3000",
-                "steadyState": 3000,
-                "cooldown": 300
+                "name": "scale down by 20",
+                "change": -20,
+                "cooldown": 300,
+                "type": "webhook"
             },
             {
                 "name": 'scale down 10 percent',
                 "changePercent": -10,
-                "cooldown": 200
+                "cooldown": 200,
+                "type": "webhook"
             }
         ])
         list_result = self.assert_deferred_succeeded(self.group.list_policies())
@@ -437,8 +436,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         uuid = policy_list.keys()[0]
         update_data = {
             "name": "Otters are not good pets",
-            "steadyState": 1234,
-            "cooldown": 555
+            "change": 1234,
+            "cooldown": 555,
+            "type": "webhook"
         }
         self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
         result = self.assert_deferred_succeeded(
@@ -451,8 +451,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         update_data = {
             "name": "puppies are good pets",
-            "steadyState": 1234,
-            "cooldown": 555
+            "change": 1234,
+            "cooldown": 555,
+            "type": "webhook"
         }
         deferred = self.group.update_policy("puppies", update_data)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
@@ -724,23 +725,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         scaling group with the specified configuration.
         """
         launch = {"launch": "config"}
-        policies = {
-            "f236a93f-a46d-455c-9403-f26838011522": {
-                "name": "scale up by 10",
-                "change": 10,
-                "cooldown": 5
-            },
-            "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
-                "name": "scale down a 5.5 percent because of a tweet",
-                "changePercent": -5.5,
-                "cooldown": 6
-            },
-            "228dbf91-7b15-4d21-8de2-fa584f01a440": {
-                "name": "set number of servers to 10",
-                "steadyState": 10,
-                "cooldown": 3
-            }
-        }
+        policies = group_examples.policy()
         self.assertEqual(self.validate_list_return_value(
                          self.mock_log, self.
                          tenant_id), [],
