@@ -258,7 +258,7 @@ GET /{tenantId}/groups/{groupId}/state
         ],
         "numActive": 2,
         "numPending": 2,
-        "steadyState": 4,
+        "desiredCapacity": 4,
         "paused": false
     }
 }
