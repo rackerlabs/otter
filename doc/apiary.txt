@@ -106,12 +106,6 @@ POST /{tenantId}/groups
             "changePercent": -5.5,
             "cooldown": 6,
             "type": "webhook"
-        },
-        {
-            "name": 'set number of servers to 10',
-            "steadyState": 10,
-            "cooldown": 3,
-            "type": "webhook"
         }
     ]
 }
@@ -213,23 +207,6 @@ GET /{tenantId}/groups/{groupId}
                 "changePercent": -5.5,
                 "cooldown": 6,
                 "type": "webhook"
-            },
-            {
-                "id": "{policyId3}",
-                "links": [
-                  {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "self"
-                  },
-                  {
-                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "bookmark"
-                  }
-                ],
-                "name": 'set number of servers to 10',
-                "steadyState": 10,
-                "cooldown": 3,
-                "type": "webhook"
             }
         ]
     }
@@ -281,7 +258,7 @@ GET /{tenantId}/groups/{groupId}/state
         ],
         "numActive": 2,
         "numPending": 2,
-        "steadyState": 4,
+        "desiredCapacity": 4,
         "paused": false
     }
 }

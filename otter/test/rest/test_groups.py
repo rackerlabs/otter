@@ -380,7 +380,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
             ],
             'numPending': 3,
             'numActive': 3,
-            'steadyState': 6,
+            'desiredCapacity': 6,
             'paused': True,
             'id': "one",
             "links": [

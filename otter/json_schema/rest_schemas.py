@@ -114,7 +114,7 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
 group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
-        'steadyState': {
+        'desiredCapacity': {
             'type': 'integer',
             'minimum': 0,
             'required': True
