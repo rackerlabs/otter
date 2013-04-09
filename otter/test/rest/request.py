@@ -17,7 +17,7 @@ from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.rest.application import root, set_store
-from otter.test.utils import iMock, DeferredTestMixin, patch
+from otter.test.utils import iMock, DeferredTestMixin
 
 
 def _render(resource, request):
@@ -248,9 +248,10 @@ class RestAPITestMixin(RequestTestMixin):
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
 
-        self.mock_generate_transaction_id = patch(
-            self, 'otter.rest.decorators.generate_transaction_id',
-            return_value='transaction-id')
+        gti_patcher = mock.patch('otter.rest.decorators.generate_transaction_id')
+        self.mock_generate_transaction_id = gti_patcher.start()
+        self.mock_generate_transaction_id.return_value = 'transaction-id'
+        self.addCleanup(gti_patcher.stop)
 
         set_store(self.mock_store)
 
