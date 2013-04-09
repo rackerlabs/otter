@@ -6,6 +6,8 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.json_schema import group_examples
+
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
@@ -107,11 +109,8 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.connection.execute.side_effect = _responses
 
         # config, launch config, etc. doesn't matter, only policies
-        self.policies = [{
-            "name": "set number of servers to 10",
-            "steadyState": 10,
-            "cooldown": 3
-        }]
+        self.policies = group_examples.policy()[:1]
+
         self.state = CassScalingGroup(
             self.mock_log, self.tenant_id, self.group_id, self.connection)
 

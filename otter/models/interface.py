@@ -199,7 +199,7 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        :return: the state information for the group, which looks like::
+        State information looks like::
 
             {
               "active": {
@@ -224,6 +224,7 @@ class IScalingGroup(Interface):
               "paused": false
             }
 
+        :return: the state information
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
