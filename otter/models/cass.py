@@ -834,13 +834,9 @@ class CassScalingGroup(object):
             return b.execute(self.connection)
 
         def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
-            if len(policy_dict) == 0:
-                return
-
-            deferreds = []
-            for policy_id in policy_dict:
-                deferreds.append(self._naive_delete_policy(policy_id, consistency))
-            return defer.gatherResults(deferreds)
+            return defer.gatherResults([
+                self._naive_delete_policy(policy_id, consistency)
+                for policy_id in policy_dict])
 
         d = defer.gatherResults([
             _delete_configs_and_state(),
