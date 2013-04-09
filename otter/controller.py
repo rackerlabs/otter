@@ -44,17 +44,6 @@ class CannotExecutePolicyError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
-def delete_scaling_group(log, scaling_group):
-    """
-    Deletes the scaling group if the state is empty
-
-    :raises: :class:`NoSuchScalingGroup` if the scaling group does not exist.
-    """
-    #TODO: acquire lock
-    return scaling_group.view_state().addCallback(scaling_group.delete_group)
-    #TODO: release lock
-
-
 def pause_scaling_group(log, transaction_id, scaling_group):
     """
     Pauses the scaling group, causing all scaling policy executions to be
