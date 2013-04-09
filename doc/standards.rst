@@ -43,6 +43,11 @@ variables, parameters, and return values in a docstring.
 To check your docstring formatting, please use `make apidoc` to see if there are any Sphinx build
 errors.
 
+Note that since we are using Twisted, the ``:raises:`` keyword implies an asynchronous exception if
+the return value is a ``Deferred``. If possible exceptions should be asynchronous in an asynchronous
+function.  If the function has a mix of asynchronous and synchronous, the synchronous exceptions should
+be explicitly called out.
+
 ----
 Pep8
 ----
