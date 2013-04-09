@@ -409,11 +409,14 @@ class MockScalingGroup:
         self.paused = False
         return defer.succeed(None)
 
-    def delete_group(self, state):
+    def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroupState.delete_group`
         """
-        if len(state['active']) + len(state['pending']) > 0:
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if len(self.pending_jobs) + len(self.active_entities) > 0:
             return defer.fail(GroupNotEmptyError(self.tenant_id, self.uuid))
 
         collection = self._collection

@@ -198,7 +198,10 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
                       self.state, "Sanity check")
 
-        d = self.state.delete_group({'active': [], 'pending': []})
+        self.state.active_entities = []
+        self.state.pending_jobs = []
+
+        d = self.state.delete_group()
         self.assertEqual(None, self.successResultOf(d))
 
         self.assertEqual(len(self.collection.data[self.state.tenant_id]), 0)
@@ -211,9 +214,11 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
                       self.state, "Sanity check")
 
-        self.assert_deferred_failed(
-            self.state.delete_group({'active': [1], 'pending': []}),
-            GroupNotEmptyError)
+        self.state.active_entities = [1]
+        self.state.pending_jobs = []
+
+        self.assert_deferred_failed(self.state.delete_group(),
+                                    GroupNotEmptyError)
 
         self.assertEqual(len(self.collection.data[self.state.tenant_id]), 1)
 
@@ -873,7 +878,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        group.active_entities = ["1"]
         group.policies = {'1': {}, '2': {}, '3': {}}
         group.webhooks = {'1': {}, '2': {}, '3': {'3x': {}}}
 
@@ -907,7 +911,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.create_webhooks('2', [{}, {}]),
             group.get_webhook('3', '3x'),
             group.update_webhook('3', '3x', {'name': 'hat'}),
-            group.delete_webhook('3', '3x')
+            group.delete_webhook('3', '3x'),
+            group.delete_group()
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):

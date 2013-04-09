@@ -221,18 +221,19 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
                 return_value=defer.succeed(None))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
-    def test_delete_non_empty_scaling_group_fails(self,
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state',
+                return_value=defer.succeed({'active': [1], 'pending': []}))
+    def test_delete_non_empty_scaling_group_fails(self, mock_view_state,
                                                   mock_naive_list_policy,
                                                   mock_naive_del_policy):
         """
         ``delete_group`` errbacks with :class:`GroupNotEmptyError` if scaling
         group state is not empty
         """
-        self.assert_deferred_failed(
-            self.state.delete_group({'active': [1], 'pending': []}),
-            GroupNotEmptyError)
+        self.assert_deferred_failed(self.state.delete_group(), GroupNotEmptyError)
 
-        # nothing else called
+        # nothing else called except view
+        self.assertTrue(mock_view_state.called)
         self.assertFalse(mock_naive_list_policy.called)
         self.assertFalse(mock_naive_del_policy.called)
         self.assertFalse(self.connection.execute.called)
@@ -245,7 +246,10 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                 return_value=defer.succeed({'policy1': {}, 'policy2': {}}))
     @mock.patch('otter.models.cass.CassScalingGroup.list_policies')
     @mock.patch('otter.models.cass.CassScalingGroup.delete_policy')
-    def test_delete_empty_scaling_group_with_policies(self, mock_del, mock_list,
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state',
+                return_value=defer.succeed({'active': [], 'pending': []}))
+    def test_delete_empty_scaling_group_with_policies(self, mock_view_state,
+                                                      mock_del, mock_list,
                                                       mock_naive_list_policy,
                                                       mock_naive_del_policy):
         """
@@ -256,8 +260,7 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         # we mock out delete policy, since that is already tested separately
 
         self.returns = [None]
-        result = self.successResultOf(
-            self.state.delete_group({'active': [], 'pending': {}}))
+        result = self.successResultOf(self.state.delete_group())
         self.assertIsNone(result)  # delete returns None
 
         # naive_list_policies called before naive_delete_policy called
@@ -289,7 +292,9 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
                 return_value=defer.succeed(None))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
                 return_value=defer.succeed({}))
-    def test_delete_empty_scaling_group_with_no_policies(self,
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state',
+                return_value=defer.succeed({'active': [], 'pending': []}))
+    def test_delete_empty_scaling_group_with_no_policies(self, mock_view_state,
                                                          mock_naive_list_policy,
                                                          mock_naive_del_policy):
         """
@@ -298,8 +303,7 @@ class CassScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         ``_naive_delete_policy`` is not called.
         """
         self.returns = [None]
-        result = self.successResultOf(
-            self.state.delete_group({'active': [], 'pending': []}))
+        result = self.successResultOf(self.state.delete_group())
         self.assertIsNone(result)  # delete returns None
 
         # naive_list_policies called before delete policy called

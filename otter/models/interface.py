@@ -70,6 +70,8 @@ class IScalingGroupState(Interface):
         Deletes the scaling group if the state is empty.  This method should
         handle its own locking, if required.
 
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
         :raises: :class:`NoSuchScalingGroupError` if the scaling group id
             doesn't exist for this tenant id
         :raises: :class:`GroupNotEmptyError` if the scaling group cannot be

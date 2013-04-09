@@ -813,36 +813,44 @@ class CassScalingGroup(object):
         """
         raise NotImplementedError()
 
-    def delete_group(self, state):
+    def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroupState.delete_group`
+
+        TODO: locking!!
         """
-        if len(state['active']) + len(state['pending']) > 0:
-            return defer.fail(GroupNotEmptyError(self.tenant_id, self.uuid))
+        d = self.view_state()
 
-        consistency = get_consistency_level('delete', 'group')
+        def _maybe_delete(state):
+            if len(state['active']) + len(state['pending']) > 0:
+                raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
-        def _delete_configs_and_state():
-            queries = [
-                _cql_delete.format(cf=self.config_table),
-                _cql_delete.format(cf=self.launch_table),
-                _cql_delete.format(cf=self.state_table)
-            ]
-            b = Batch(queries,
-                      {"tenantId": self.tenant_id, "groupId": self.uuid},
-                      consistency=consistency)
-            return b.execute(self.connection)
+            consistency = get_consistency_level('delete', 'group')
 
-        def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
+            def _delete_configs_and_state():
+                queries = [
+                    _cql_delete.format(cf=self.config_table),
+                    _cql_delete.format(cf=self.launch_table),
+                    _cql_delete.format(cf=self.state_table)
+                ]
+                b = Batch(queries,
+                          {"tenantId": self.tenant_id, "groupId": self.uuid},
+                          consistency=consistency)
+                return b.execute(self.connection)
+
+            def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
+                return defer.gatherResults([
+                    self._naive_delete_policy(policy_id, consistency)
+                    for policy_id in policy_dict])
+
             return defer.gatherResults([
-                self._naive_delete_policy(policy_id, consistency)
-                for policy_id in policy_dict])
+                _delete_configs_and_state(),
+                self._naive_list_policies().addCallback(_delete_policies)
+            ])
 
-        d = defer.gatherResults([
-            _delete_configs_and_state(),
-            self._naive_list_policies().addCallback(_delete_policies)
-        ])
+        d.addCallback(_maybe_delete)
         d.addCallback(lambda _: None)
+
         return d
 
 
