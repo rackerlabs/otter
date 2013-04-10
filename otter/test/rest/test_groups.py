@@ -86,45 +86,6 @@ class FormatterHelpers(TestCase):
             ]
         })
 
-    def test_format_state_dict_no_active_or_pending(self):
-        """
-        :func:`otter.rest.groups.format_state_dict` transforms a state
-        dictionary as returned by the model and transforms it into the state
-        dictionary that is returned by the rest API (minus extra stuff like
-        wrapping it in an extra dictionary with the keyword 'group', etc.)
-
-        When there are no active servers, this dictionary includes an empty list
-        for active servers.
-        """
-        translated = format_state_dict({
-            'active': {},
-            'pending': {
-                'j1': {'created': 't'}
-            },
-            'paused': True,
-            'groupTouched': 'ts1',
-            'policyTouched': {
-                'p1': 'ts1',
-                'p1': 'ts2',
-                'p1': 'ts3',
-            }
-        }, '11111', 'one')
-
-        # sort so it can be compared
-        translated['active'].sort(key=lambda x: x['id'])
-
-        self.assertEqual(translated, {
-            'active': [],
-            'activeCapacity': 0,
-            'pendingCapacity': 1,
-            'desiredCapacity': 1,
-            'paused': True,
-            'id': "one",
-            "links": [
-                {"href": "/v1.0/11111/groups/one/", "rel": "self"},
-            ]
-        })
-
 
 class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     """
