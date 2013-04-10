@@ -82,7 +82,7 @@ def obey_config_change(log, transaction_id, scaling_group):
     print state
 
 
-def complete_pending_job(log, job_id, state):
+def _complete_pending_job(log, job_id, state):
     """
     Updates the state with a pending job, mark it as completed
 
@@ -255,8 +255,8 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
 
             # XXX: Simplest thing that could possibly work.
             completion_deferred.addCallbacks(
-                lambda _: complete_pending_job(log, job_id, True),  # XXX: True?
-                lambda _: complete_pending_job(log, job_id, False))  # XXX: False?
+                lambda _: _complete_pending_job(log, job_id, True),  # XXX: True?
+                lambda _: _complete_pending_job(log, job_id, False))  # XXX: False?
 
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
