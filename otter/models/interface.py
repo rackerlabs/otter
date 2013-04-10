@@ -161,6 +161,7 @@ class IScalingGroup(Interface):
     Scaling group record
     """
     uuid = Attribute("UUID of the scaling group - immutable.")
+    tenant_id = Attribute("Rackspace Tenant ID of the owner of this group.")
 
     def view_manifest():
         """
