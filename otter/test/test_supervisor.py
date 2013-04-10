@@ -46,7 +46,7 @@ class SupervisorExecuteTests(TestCase):
 
     def test_execute_config_auths(self):
         """
-        execute_config should ask the provided authentication function for
+        execute_config asks the provided authentication function for
         credentials for the tenant_id that owns the group.
         """
         execute_config(self.log, 'transaction-id', self.auth_function,
