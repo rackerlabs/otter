@@ -18,7 +18,8 @@ from otter.json_schema.group_examples import (
 from otter.json_schema import rest_schemas
 
 from otter.models.interface import (
-    IScalingGroup, IScalingGroupState, NoSuchScalingGroupError)
+    GroupNotEmptyError, IScalingGroup, IScalingGroupState,
+    NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError
 
 from otter.rest.groups import format_state_dict
@@ -340,27 +341,45 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         """
         Deleting an existing group succeeds with a 204.
         """
-        self.mock_store.delete_scaling_group.return_value = defer.succeed(None)
+        self.mock_group.delete_group.return_value = defer.succeed(None)
 
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
-        self.mock_store.delete_scaling_group.assert_called_once_with(
+        self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
+        self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
         """
-        self.mock_store.delete_scaling_group.return_value = defer.fail(
+        self.mock_group.delete_group.return_value = defer.fail(
             NoSuchScalingGroupError('11111', '1'))
 
         response_body = self.assert_status_code(404, method="DELETE")
-        self.mock_store.delete_scaling_group.assert_called_once_with(
+        self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
+        self.mock_group.delete_group.assert_called_once_with()
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
+
+    def test_group_delete_409(self):
+        """
+        Deleting a non-empty group fails with a 409.
+        """
+        self.mock_group.delete_group.return_value = defer.fail(
+            GroupNotEmptyError('11111', '1'))
+
+        response_body = self.assert_status_code(409, method="DELETE")
+        self.mock_store.get_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', 'one')
+        self.mock_group.delete_group.assert_called_once_with()
+
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'GroupNotEmptyError')
+        self.flushLoggedErrors(GroupNotEmptyError)
 
 
 class GroupStateTestCase(RestAPITestMixin, TestCase):

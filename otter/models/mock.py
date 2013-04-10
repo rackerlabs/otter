@@ -11,7 +11,7 @@ from zope.interface import implementer
 from twisted.internet import defer
 
 from otter.models.interface import (
-    IScalingGroup, IScalingGroupState, IScalingGroupCollection,
+    GroupNotEmptyError, IScalingGroup, IScalingGroupState, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
@@ -81,10 +81,14 @@ class MockScalingGroup:
 
     :type pending_jobs: ``dict`` of ``dict``
 
-    :ivar paused: whether the scaling is currently running, or paused
-    :type entities: ``bool``
+    :ivar paused: whether to allow new scaling activity (such as policy
+        executions) - if ``True`` (paused), then no new activity can occur.
+        If ``False`` (not paused), then scaling proceeds as normal.
+    :type paused: ``bool``
+
+    :ivar _collection: a :class:`MockScalingGroupCollection`
     """
-    def __init__(self, log, tenant_id, uuid, creation=None):
+    def __init__(self, log, tenant_id, uuid, collection, creation=None):
         """
         Creates a MockScalingGroup object.  If the actual scaling group should
         be created, a creation argument is provided containing the config, the
@@ -100,6 +104,8 @@ class MockScalingGroup:
         self.policy_touched = {}
         self.group_touched = None
         self.paused = False
+
+        self._collection = collection
 
         if creation is not None:
             self.error = None
@@ -403,6 +409,22 @@ class MockScalingGroup:
         self.paused = False
         return defer.succeed(None)
 
+    def delete_group(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.delete_group`
+        """
+        if self.error is not None:
+            return defer.fail(self.error)
+
+        if len(self.pending_jobs) + len(self.active_entities) > 0:
+            return defer.fail(GroupNotEmptyError(self.tenant_id, self.uuid))
+
+        collection = self._collection
+        self._collection = None  # lose this reference
+        del collection.data[self.tenant_id][self.uuid]
+
+        return defer.succeed(None)
+
 
 @implementer(IScalingGroupCollection)
 class MockScalingGroupCollection:
@@ -423,19 +445,10 @@ class MockScalingGroupCollection:
         """
         uuid = str(uuid4())
         self.data[tenant][uuid] = MockScalingGroup(
-            log, tenant, uuid,
+            log, tenant, uuid, self,
             {'config': config, 'launch': launch, 'policies': policies})
 
         return defer.succeed(uuid)
-
-    def delete_scaling_group(self, log, tenant, uuid):
-        """
-        see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
-        """
-        if (tenant not in self.data or uuid not in self.data[tenant]):
-            return defer.fail(NoSuchScalingGroupError(tenant, uuid))
-        del self.data[tenant][uuid]
-        return defer.succeed(None)
 
     def list_scaling_groups(self, log, tenant):
         """
@@ -451,7 +464,7 @@ class MockScalingGroupCollection:
 
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
-        return result or MockScalingGroup(log, tenant, uuid, None)
+        return result or MockScalingGroup(log, tenant, uuid, self, None)
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

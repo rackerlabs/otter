@@ -5,7 +5,9 @@ Errors mapped to http status codes in the rest module
 from jsonschema import ValidationError
 
 from otter.models.interface import (
-    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError)
+    GroupNotEmptyError, NoSuchScalingGroupError,
+    NoSuchPolicyError, NoSuchWebhookError)
+
 from otter.rest.decorators import InvalidJsonError
 
 
@@ -14,5 +16,6 @@ exception_codes = {
     InvalidJsonError: 400,
     NoSuchScalingGroupError: 404,
     NoSuchPolicyError: 404,
-    NoSuchWebhookError: 404
+    NoSuchWebhookError: 404,
+    GroupNotEmptyError: 409
 }

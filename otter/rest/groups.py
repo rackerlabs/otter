@@ -408,7 +408,7 @@ def delete_scaling_group(request, log, tenantId, groupId):
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
     """
-    return get_store().delete_scaling_group(log, tenantId, groupId)
+    return get_store().get_scaling_group(log, tenantId, groupId).delete_group()
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state/',
