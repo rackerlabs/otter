@@ -1,8 +1,7 @@
 """
-The Otter Supervisor marhsals an arbitrary number of workers to
-execute a launch config and bring up a server, reporting back
-to the controller when the task completes.
+The Otter Supervisor manages a number of workers to execute a launch config.
 """
+
 from twisted.internet.defer import Deferred, succeed
 from otter.util.hashkey import generate_job_id
 
