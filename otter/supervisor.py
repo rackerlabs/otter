@@ -38,7 +38,7 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
 
     d = auth_function(scaling_group.tenant_id)
 
-    def launch_server((auth_token, service_catalog)):
+    def when_authenticated((auth_token, service_catalog)):
         log.info("Executing launch config.")
         return launch_server_v1.launch_server(
             'ORD',  # TODO: Get the region probably from the config or something.
@@ -47,14 +47,13 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
             auth_token,
             launch_config['args'])
 
-    d.addCallback(launch_server)
+    d.addCallback(when_authenticated)
 
-    def complete_job_id(result):
+    def when_launch_server_completed(result):
         log.info("Done executing launch config.")
         # XXX: Meaningful return value?
 
-    d.addCallback(complete_job_id)
-    d.addCallbacks(completion_d.callback,
-                   completion_d.errback)
+    d.addCallback(when_launch_server_completed)
+    d.chainDeferred(completion_d)
 
     return succeed((job_id, completion_d, {}))
