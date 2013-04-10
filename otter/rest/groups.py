@@ -16,6 +16,38 @@ from otter.rest.application import app, get_autoscale_links, get_store
 from otter import controller
 
 
+def format_state_dict(state_dict, tenant_id, group_id):
+    """
+    Takes a state returned by the model and reformats it to be returned as a
+    response.
+
+    :param dict state_dict: the state, as returned by
+        :meth:`otter.models.interface.IScalingGroup.view_state`
+    :param str tenant_id: the tenant ID for the group that has this state
+    :param str group_id: the group ID for the group that has this state
+
+    :return: a ``dict`` that looks like what should be respond by the API
+        response when getting state
+    """
+    return {
+        'activeCapacity': len(state_dict['active']),
+        'pendingCapacity': len(state_dict['pending']),
+        'desiredCapacity': len(state_dict['active']) + len(state_dict['pending']),
+        'paused': state_dict['paused'],
+        'id': group_id,
+        'links': get_autoscale_links(tenant_id, group_id),
+        'active': [
+            {
+                'id': server_blob['instanceId'],
+                'links': [{
+                    'href': server_blob['instanceUri'],
+                    'rel': 'self'
+                }]
+            } for key, server_blob in state_dict['active'].iteritems()
+        ]
+    }
+
+
 @app.route('/<string:tenantId>/groups/',  methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
@@ -63,19 +95,11 @@ def list_all_scaling_groups(request, log, tenantId):
     TODO:
     """
     def format_list(group_states):
-        groups = []
-        for group, state in group_states:
-            groups.append({
-                'id': group.uuid,
-                'links': get_autoscale_links(tenantId, group.uuid),
-                'active': state['active'],
-                'activeCapacity': len(state['active']),
-                'pendingCapacity': len(state['pending']),
-                'desiredCapacity': len(state['active']) + len(state['pending']),
-                'paused': state['paused']
-            })
         return {
-            "groups": groups,
+            "groups": [
+                format_state_dict(state, group.tenant_id, group.uuid)
+                for group, state in group_states
+            ],
             "groups_links": []
         }
 
@@ -439,31 +463,12 @@ def get_scaling_group_state(request, log, tenantId, groupId):
           }
         }
     """
-    def reformat_active_and_pending(state_blob):
-        response_dict = {
-            'activeCapacity': len(state_blob['active']),
-            'pendingCapacity': len(state_blob['pending']),
-            'desiredCapacity': len(state_blob['active']) + len(state_blob['pending']),
-            'paused': state_blob['paused'],
-
-        }
-
-        response_dict['active'] = [
-            {
-                'id': server_blob['instanceId'],
-                'links': [{
-                    'href': server_blob['instanceUri'],
-                    'rel': 'self'
-                }]
-            } for key, server_blob in state_blob['active'].iteritems()]
-
-        response_dict["id"] = groupId
-        response_dict["links"] = get_autoscale_links(tenantId, groupId)
-        return {"group": response_dict}
+    def _format_and_stackify(state_dict):
+        return {"group": format_state_dict(state_dict, tenantId, groupId)}
 
     group = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = group.view_state()
-    deferred.addCallback(reformat_active_and_pending)
+    deferred.addCallback(_format_and_stackify)
     deferred.addCallback(json.dumps)
     return deferred
 
