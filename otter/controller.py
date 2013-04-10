@@ -8,17 +8,15 @@ model object (group config change, scaling policy execution), and receives
 events from the supervisor (job completed)
 
 TODO:
- * Migrate over to new storage model for state information
  * Lock yak shaving
- * cooldown
  * Eviction policy
 
 Storage model for state information:
  * active list
-  * Instance URI
-  * Created time
+    * Instance URI
+    * Created time
  * pending list
-  * Job ID
+    * Job ID
  * last touched information for group
  * last touched information for polciy
 
@@ -26,9 +24,22 @@ Storage model for state information:
 from datetime import datetime
 import iso8601
 
+from twisted.internet import defer
+
+from otter import supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.supervisor import execute_one_config
+from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+
+
+class CannotExecutePolicyError(Exception):
+    """
+    Exception to be raised when the policy cannot be executed
+    """
+    def __init__(self, tenant_id, group_id, policy_id, why):
+        super(CannotExecutePolicyError, self).__init__(
+            "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
+            .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -87,71 +98,102 @@ def maybe_execute_scaling_policy(
     """
     Checks whether and how much a scaling policy can be executed.
 
+    :param log: A twiggy bound log for logging
     :param scaling_group: an IScalingGroup provider
     :param policy_id: the policy id to execute
 
     Current plan: If a user executes a policy, return whether or not it will be
     executed. If it is going to be executed, ????
 
-    :return: a ``Deferred`` that fires with the audit log ID of this job
+    :return: a ``Deferred`` that fires with None
+
+    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
+    :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
+
     :raises: Some exception about why you don't want to execute the policy. This
-    Exception should also have an audit log id
-
-    policy example:
-           {
-                "name": "scale up by 10",
-                "change": 10,
-                "cooldown": 5
-            },
-
-
+        Exception should also have an audit log id
     """
-    # TODO: Lock group
-    state = scaling_group.view_state()
-    if check_cooldowns('fake', 'fake', 'fake', 'fake'):
-        delta = calculate_delta("fake", "fake", "fake")
-        execute_launch_config(log, transaction_id, state, scaling_group, delta)
-        #record_policy_trigger_time(log, scaling_group, policy, time.time())
-    #else:
-        #record_policy_decision_time(log, scaling_group, policy, time.time(),
-        #                            'i was rejected because...')
+    bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log.info("beginning to execute scaling policy")
+
+    # TODO: locking
+    # make sure that the policy (and the group) exists before doing anything else
+    deferred = scaling_group.get_policy(policy_id)
+
+    def _do_get_config_and_state(policy):
+        deferred = defer.gatherResults([
+            scaling_group.view_state(),
+            scaling_group.view_config(),
+            scaling_group.view_launch_config()
+        ])
+        return deferred.addCallback(lambda results: results + [policy])
+
+    deferred.addCallbacks(_do_get_config_and_state, unwrap_first_error)
+
+    def _do_maybe_execute(state_config_launch_policy):
+        """
+        state_config_policy should be returned by ``check_cooldowns``
+        """
+        state, config, launch, policy = state_config_launch_policy
+        error_msg = "Cooldowns not met."
+
+        if check_cooldowns(bound_log, state, config, policy, policy_id):
+            delta = calculate_delta(bound_log, state, config, policy)
+            execute_bound_log = bound_log.fields(server_delta=delta)
+            if delta != 0:
+                execute_bound_log.info("cooldowns checked, executing launch configs")
+                return execute_launch_config(execute_bound_log, transaction_id, state,
+                                             launch, scaling_group, delta)
+            execute_bound_log.info("cooldowns checked, no change in servers")
+            error_msg = "Policy execution would violate min/max constraints."
+
+        raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                       scaling_group.uuid, policy_id,
+                                       error_msg)
+
+    return deferred.addCallback(_do_maybe_execute)
 
 
-def check_cooldowns(state, config, policy, policy_id):
+def check_cooldowns(log, state, config, policy, policy_id):
     """
     Check the global cooldowns (when was the last time any policy was executed?)
     and the policy specific cooldown (when was the last time THIS policy was
     executed?)
 
+    :param log: A twiggy bound log for logging
     :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
     :param str policy_id: the policy id that matches ``policy``
 
-    :return: ``True`` if the policy does not run afoul any cooldowns, ``False``
-        otherwise
+    :return: C{int}
     """
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state['policyTouched'].get(policy_id), policy['cooldown']),
-        (state['groupTouched'], config['cooldown']),
+        (state['policyTouched'].get(policy_id), policy['cooldown'], 'policy'),
+        (state['groupTouched'], config['cooldown'], 'group'),
     ]
 
-    for last_time, cooldown in timestamp_and_cooldowns:
+    for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
+                log.fields(time_since_last_touched=delta.total_seconds(),
+                           cooldown_type=cooldown_type,
+                           cooldown_seconds=cooldown).info("cooldown not reached")
                 return False
 
     return True
 
 
-def calculate_delta(state, config, policy):
+def calculate_delta(log, state, config, policy):
     """
     Calculate the desired change in the number of servers, keeping in mind the
     minimum and maximum constraints.
 
+    :param log: A twiggy bound log for logging
     :param dict state: the state dictionary
     :param dict config: the config dictionary
     :param dict policy: the policy dictionary
@@ -162,6 +204,9 @@ def calculate_delta(state, config, policy):
         max_entities = config['maxEntities']
         if max_entities is None:
             max_entities = MAX_ENTITIES
+        log.fields(desired_change=desired, max_entities=max_entities,
+                   min_entities=config['minEntities'], active=len(state['active']),
+                   pending=len(state['pending'])).info("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
     if "change" in policy:
@@ -171,19 +216,58 @@ def calculate_delta(state, config, policy):
         raise NotImplementedError()
 
 
-def find_server_to_evict(log, scaling_group):
+def find_pending_jobs_to_cancel(log, state, delta):
+    """
+    Identify some jobs to cancel (usually for a scale down event)
+    """
+    return []
+
+
+def find_server_to_evict(log, state, delta):
     """
     Find the server most appropriate to evict from the scaling group
     """
-    return None
+    return []
 
 
-def execute_launch_config(log, transaction_id, state, scaling_group, delta):
+def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
     Execute a launch config some number of times.
+
+    :return: Deferred
     """
-    launch_config = scaling_group.view_launch_config()
-    # Evicting servers cherfully ignored
-    for i in range(abs(delta)):
-        state['pending'].append(execute_one_config(log, transaction_id,
-                                scaling_group.uuid, launch_config))
+
+    def _update_state(pending_results):
+        """
+        :param pending_results: ``list`` of tuples of
+        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
+        """
+        log.info('updating state')
+        jobs_dict = state['pending'].copy()
+
+        for job_id, job_info in pending_results:
+            if job_id in state['pending']:
+                raise Exception('what????!!! {0} already exists'.format(job_id))
+            jobs_dict[job_id] = job_info
+
+        return scaling_group.update_jobs(state, jobs_dict, transaction_id)
+
+    if delta > 0:
+        deferreds = [
+            supervisor.execute_one_config(log, transaction_id,
+                                          scaling_group, launch)
+            for i in range(abs(delta))
+        ]
+    else:
+        deferreds = [supervisor.cancel_job(log, transaction_id, scaling_group, job_id)
+                     for job_id in find_pending_jobs_to_cancel(log, state, delta)]
+
+        if len(deferreds) < delta:
+            deferreds.extend([
+                supervisor.evict_server(log, transaction_id, scaling_group, server_id)
+                for server_id in find_server_to_evict(log, state, delta - len(deferreds))
+            ])
+
+    pendings_deferred = defer.gatherResults(deferreds)
+    pendings_deferred.addCallback(_update_state)
+    return pendings_deferred

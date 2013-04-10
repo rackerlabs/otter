@@ -51,13 +51,6 @@ _link_objects = {
     'additionalProperties': False
 }
 
-_list_of_links = {
-    'type': 'array',
-    'items': _link_objects,
-    'uniqueItems': True,
-    'required': True
-}
-
 
 def _openstackify_schema(key, schema, include_id=False, paginated=False):
     """
@@ -118,26 +111,47 @@ def _openstackify_schema(key, schema, include_id=False, paginated=False):
 
 # ----------- endpoint request and response schemas and examples ---------
 
-list_groups_response = _openstackify_schema("groups", _list_of_links,
-                                            paginated=True)
-
 group_state = _openstackify_schema("group", {
     'type': 'object',
     'properties': {
-        'steadyState': {
-            'type': 'integer',
-            'minimum': 0,
-            'required': True
-        },
         'paused': {
             'type': 'boolean',
             'required': True
         },
-        'active': _list_of_links,
-        'pending': _list_of_links
+        'active': {
+            'type': 'array',
+            'items': _link_objects,
+            'uniqueItems': True,
+            'required': True
+        },
+        'activeCapacity': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        },
+        'pendingCapacity': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        },
+        'desiredCapacity': {
+            'type': 'integer',
+            'minimum': 0,
+            'required': True
+        }
     },
     'additionalProperties': False
 }, include_id=True)
+
+_list_of_states = {
+    'type': 'array',
+    'description': "Lists of states with ids and links",
+    'required': True,
+    'uniqueItems': True,
+    'items': deepcopy(group_state)['properties']['group']
+}
+list_groups_response = _openstackify_schema("groups", _list_of_states,
+                                            paginated=True)
 
 
 # ----- schemas for viewing policies

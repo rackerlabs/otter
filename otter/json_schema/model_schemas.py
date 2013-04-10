@@ -57,21 +57,12 @@ manifest = {
 #         "name": "scale down a 5.5 percent because of a tweet",
 #         "changePercent": -5.5,
 #         "cooldown": 6
-#     },
-#     "228dbf91-7b15-4d21-8de2-fa584f01a440": {
-#         "name": "set number of servers to 10",
-#         "steadyState": 10,
-#         "cooldown": 3
 #     }
-# }
+#}
 policy_list = {
     "type": "object",
     "patternProperties": {
-        "^\S+$": {
-            "type": "object",
-            "required": True,
-            "items": [group_schemas.policy]
-        }
+        "^\S+$": group_schemas.policy
     },
     "required": False,
     "additionalProperties": False

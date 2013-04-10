@@ -5,6 +5,8 @@ Autoscale REST endpoints having to do with a group or collection of groups
 
 import json
 
+from twisted.internet import defer
+
 from otter.json_schema.rest_schemas import create_group_request
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
@@ -14,13 +16,45 @@ from otter.rest.application import app, get_autoscale_links, get_store
 from otter import controller
 
 
+def format_state_dict(state_dict, tenant_id, group_id):
+    """
+    Takes a state returned by the model and reformats it to be returned as a
+    response.
+
+    :param dict state_dict: the state, as returned by
+        :meth:`otter.models.interface.IScalingGroup.view_state`
+    :param str tenant_id: the tenant ID for the group that has this state
+    :param str group_id: the group ID for the group that has this state
+
+    :return: a ``dict`` that looks like what should be respond by the API
+        response when getting state
+    """
+    return {
+        'activeCapacity': len(state_dict['active']),
+        'pendingCapacity': len(state_dict['pending']),
+        'desiredCapacity': len(state_dict['active']) + len(state_dict['pending']),
+        'paused': state_dict['paused'],
+        'id': group_id,
+        'links': get_autoscale_links(tenant_id, group_id),
+        'active': [
+            {
+                'id': server_blob['instanceId'],
+                'links': [{
+                    'href': server_blob['instanceUri'],
+                    'rel': 'self'
+                }]
+            } for key, server_blob in state_dict['active'].iteritems()
+        ]
+    }
+
+
 @app.route('/<string:tenantId>/groups/',  methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
 def list_all_scaling_groups(request, log, tenantId):
     """
-    Lists all the autoscaling groups per for a given tenant ID.
+    Lists all the autoscaling groups and their states per for a given tenant ID.
 
     Example response::
 
@@ -33,7 +67,12 @@ def list_all_scaling_groups(request, log, tenantId):
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
                 "rel": "self"
               }
-            ]
+            ],
+            "active": [],
+            "activeCapacity": 0,
+            "pendingCapacity": 1,
+            "desiredCapacity": 1,
+            "paused": false
           },
           {
             "id": "{groupId2}"
@@ -42,27 +81,38 @@ def list_all_scaling_groups(request, log, tenantId):
                 "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
                 "rel": "self"
               }
-            ]
+            ],
+            "active": [],
+            "activeCapacity": 0,
+            "pendingCapacity": 2,
+            "desiredCapacity": 2,
+            "paused": false
           }
         ],
         "groups_links": []
       }
+
+    TODO:
     """
-    def format_list(groups):
-        # if this list of groups is ever too large, or getting the link
-        # becomes a more time consuming task, perhaps this map should be done
-        # cooperatively
+    def format_list(group_states):
         return {
             "groups": [
-                {
-                    'id': group.uuid,
-                    'links': get_autoscale_links(tenantId, group.uuid)
-                } for group in groups
+                format_state_dict(state, group.tenant_id, group.uuid)
+                for group, state in group_states
             ],
             "groups_links": []
         }
 
+    # This is TERRIBLE.  If there are a lot of groups this will be a lot of DB
+    # hits.  But the models should change soon, for other reasons too, so
+    # leaving this for now.
+    def get_states(groups):
+        d = defer.gatherResults([g.view_state() for g in groups])
+        d.addCallback(lambda states: zip(groups, states))
+        return d
+
     deferred = get_store().list_scaling_groups(log, tenantId)
+    deferred.addCallback(get_states)
     deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred
@@ -142,11 +192,6 @@ def create_new_scaling_group(request, log, tenantId, data):
                     "name": 'scale down 5.5 percent',
                     "changePercent": -5.5,
                     "cooldown": 6
-                },
-                {
-                    "name": 'set number of servers to 10',
-                    "steadyState": 10,
-                    "cooldown": 3
                 }
             ]
         }
@@ -216,11 +261,6 @@ def create_new_scaling_group(request, log, tenantId, data):
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
-                    },
-                    {
-                        "name": 'set number of servers to 10',
-                        "steadyState": 10,
-                        "cooldown": 3
                     }
                 ]
             }
@@ -332,18 +372,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
-                    },
-                    {
-                        "id": "{policyId3}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": 'set number of servers to 10',
-                        "steadyState": 10,
-                        "cooldown": 3
                     }
                 ]
             }
@@ -380,7 +408,7 @@ def delete_scaling_group(request, log, tenantId, groupId):
     Delete a scaling group if there are no entities belonging to the scaling
     group.  If successful, no response body will be returned.
     """
-    return get_store().delete_scaling_group(log, tenantId, groupId)
+    return get_store().get_scaling_group(log, tenantId, groupId).delete_group()
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/state/',
@@ -428,38 +456,19 @@ def get_scaling_group_state(request, log, tenantId, groupId):
                 ]
               }
             ],
-            "numActive": 2,
-            "numPending": 2,
-            "steadyState": 4,
+            "activeCapacity": 2,
+            "pendingCapacity": 2,
+            "desiredCapacity": 4,
             "paused": false
           }
         }
     """
-    def reformat_active_and_pending(state_blob):
-        response_dict = {
-            'numActive': len(state_blob['active']),
-            'numPending': len(state_blob['pending']),
-            'paused': state_blob['paused']
-        }
-        response_dict['steadyState'] = (
-            response_dict['numActive'] + response_dict['numPending'])
-
-        response_dict['active'] = [
-            {
-                'id': server_blob['instanceId'],
-                'links': [{
-                    'href': server_blob['instanceUri'],
-                    'rel': 'self'
-                }]
-            } for key, server_blob in state_blob['active'].iteritems()]
-
-        response_dict["id"] = groupId
-        response_dict["links"] = get_autoscale_links(tenantId, groupId)
-        return {"group": response_dict}
+    def _format_and_stackify(state_dict):
+        return {"group": format_state_dict(state_dict, tenantId, groupId)}
 
     group = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = group.view_state()
-    deferred.addCallback(reformat_active_and_pending)
+    deferred.addCallback(_format_and_stackify)
     deferred.addCallback(json.dumps)
     return deferred
 

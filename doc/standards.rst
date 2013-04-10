@@ -43,6 +43,48 @@ variables, parameters, and return values in a docstring.
 To check your docstring formatting, please use `make apidoc` to see if there are any Sphinx build
 errors.
 
+Documenting Exceptions
+**********************
+
+Note that since we are using Twisted, the ``:raises:`` keyword implies an asynchronous exception if
+the return value is a ``Deferred``. If possible exceptions should be asynchronous in an asynchronous
+function.  If the function has a mix of asynchronous and synchronous, the synchronous exceptions should
+be explicitly called out.
+
+Test Docstrings
+***************
+
+Test docstrings should be stated in a present tense, in the active voice, as opposed to a
+`conditional perfect <https://en.wikipedia.org/wiki/Conditional_perfect>`_, passive
+voice construction like this sentence.
+
+From `this post <https://plus.google.com/115348217455779620753/posts/YA3ThKWhSAj>`_ on good test case
+docstrings:
+
+#. Write the first docstring that comes to mind. It will almost certainly be::
+
+    """Test that input is parsed correctly."""
+
+#. Get rid of "Test that" or "Check that". We know it's a test::
+
+    """Input should be parsed correctly."""
+
+#. Seriously?! Why'd you have to go and add "should"? It's a test, it's all about "should"::
+
+    """Input is parsed correctly."""
+
+#. "Correctly", "properly", and "as we expect" are all redundant. Axe them too::
+
+    """Input is parsed."""
+
+#. Look at what's left. Is it saying anything at all? If so, great. If not, consider adding something specific about the test behaviour and perhaps even why it's desirable behaviour to have::
+
+    """
+    Input is parsed into an immutable dict according to the config
+    schema, so we get config info without worrying about input
+    validation all the time.
+    """
+
 ----
 Pep8
 ----

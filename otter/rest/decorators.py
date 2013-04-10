@@ -9,28 +9,8 @@ import jsonschema
 
 from twisted.internet import defer
 from otter.util.hashkey import generate_transaction_id
+from otter.util.deferredutils import unwrap_first_error
 from otter.log import log
-
-
-def _get_real_failure(possible_first_error):
-    """
-    Failures returned by :method:`defer.gatherResults` are failures that wrap
-    a defer.FirstError, which wraps the inner failure.
-
-    Checks failure to see if it is a defer.FirstError.  If it is, recursively
-    gets the underlying failure that it wraps (in case it is a first error
-    wrapping a first error, etc.)
-
-    :param possible_first_error: a failure that may wrap a
-        :class:`defer.FirstError`
-    :type possible_first_error: :class:`Failure`
-
-    :return: :class:`Failure` that is under any/all the
-        :class:`defer.FirstError`s
-    """
-    if possible_first_error.check(defer.FirstError):
-        return _get_real_failure(possible_first_error.value.subFailure)
-    return possible_first_error  # not a defer.FirstError
 
 
 def _escape_python_formats(str):
@@ -50,7 +30,7 @@ def fails_with(mapping):
         def _(request, bound_log, *args, **kwargs):
 
             def _fail(failure, request):
-                failure = _get_real_failure(failure)
+                failure = unwrap_first_error(failure)
                 code = 500
                 if failure.type in mapping:
                     code = mapping[failure.type]

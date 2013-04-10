@@ -392,8 +392,9 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         self.policy_id = self.assert_deferred_succeeded(
             group.create_policies([{
                 "name": 'set number of servers to 10',
-                "steadyState": 10,
-                "cooldown": 3
+                "change": 10,
+                "cooldown": 3,
+                "type": "webhook"
             }])).keys()[0]
         set_store(store)
 
@@ -488,7 +489,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         self.assertIn('id', updated)
         self.assertIn('links', updated)
         for link in updated["links"]:
-            if link['rel'] in ('self', 'bookmark'):
+            if link['rel'] == 'self':
                 self.assertIn(_strip_base_url(link["href"]), path)
             else:
                 self.assertEqual(link['rel'], 'capability')

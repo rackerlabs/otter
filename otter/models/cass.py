@@ -6,9 +6,9 @@ from zope.interface import implementer
 from twisted.internet import defer
 
 from otter.models.interface import (
-    IScalingGroupState, IScalingGroup, IScalingGroupCollection,
-    NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
-    UnrecognizedCapabilityError)
+    GroupNotEmptyError, IScalingGroupState, IScalingGroup,
+    IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
+    NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 #from otter.controller import maybe_execute_scaling_policy
@@ -325,7 +325,7 @@ class CassScalingGroup(object):
         """
         Creates a CassScalingGroup object.
         """
-        self.log = log.name(self.__class__.__name__)
+        self.log = log.name(self.__class__.__name__).fields(tenant_id=tenant_id, scaling_group_id=uuid)
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
@@ -429,6 +429,9 @@ class CassScalingGroup(object):
 
         del pending[pending_job_id]
 
+        self.log.fields(name=name, instance_id=instance_id, uri=uri, pending_job_id=pending_job_id,
+                        timestamp=created).info("Adding server to database")
+
         active[instance_id] = {"name": name,
                                "instanceURL": uri,
                                "created": created}
@@ -450,8 +453,12 @@ class CassScalingGroup(object):
         if timestamp is None:
             timestamp = now()
 
+        self.log.fields(new_jobs=job_dict, policy_id=policy_id,
+                        timestamp=timestamp).info("Updating jobs")
+
         policy_touched = state["policyTouched"]
-        policy_touched[policy_id] = timestamp
+        if policy_id is not None:
+            policy_touched[policy_id] = timestamp
 
         query = _cql_update_job_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
@@ -469,6 +476,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
+        self.log.fields(updated_config=data).info("Updating config")
+
         def _do_update_config(lastRev):
             queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
 
@@ -486,6 +495,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
+        self.log.fields(updated_launch_config=data).info("Updating launch config")
+
         def _do_update_launch(lastRev):
             queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
 
@@ -553,6 +564,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_policies`
         """
+        self.log.fields(policies=data).info("Creating policies")
+
         def _do_create_pol(lastRev):
             queries = []
             cqldata = {"tenantId": self.tenant_id,
@@ -575,6 +588,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
+        self.log.fields(updated_policy=data, policy_id=policy_id).info("Updating policy")
+
         def _do_update_launch(lastRev):
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
@@ -632,6 +647,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
+        self.log.fields(policy_id=policy_id).info("Deleting policy")
         d = self.get_policy(policy_id)
         d.addCallback(lambda _: self._naive_delete_policy(
             policy_id, get_consistency_level('delete', 'policy')))
@@ -682,6 +698,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
+        self.log.fields(policy_id=policy_id, webhook=data).info("Creating webhooks")
+
         def _do_create(lastRev):
             queries = []
             cql_params = {"tenantId": self.tenant_id,
@@ -730,6 +748,9 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
+        self.log.fields(policy_id=policy_id, webhook_id=webhook_id,
+                        webhook=data).info("Updating webhook")
+
         def _update_data(lastRev):
             data.setdefault('metadata', {})
             query = _cql_update_webhook.format(cf=self.webhooks_table)
@@ -749,6 +770,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_webhook`
         """
+        self.log.fields(policy_id=policy_id, webhook_id=webhook_id).info("Deleting webhook")
+
         def _do_delete(lastRev):
             query = _cql_delete_webhook.format(
                 cf=self.webhooks_table, name="webhookId")
@@ -794,6 +817,46 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroupState.resume`
         """
         raise NotImplementedError()
+
+    def delete_group(self):
+        """
+        see :meth:`otter.models.interface.IScalingGroupState.delete_group`
+
+        TODO: locking!!
+        """
+        d = self.view_state()
+
+        def _maybe_delete(state):
+            if len(state['active']) + len(state['pending']) > 0:
+                raise GroupNotEmptyError(self.tenant_id, self.uuid)
+
+            consistency = get_consistency_level('delete', 'group')
+
+            def _delete_configs_and_state():
+                queries = [
+                    _cql_delete.format(cf=self.config_table),
+                    _cql_delete.format(cf=self.launch_table),
+                    _cql_delete.format(cf=self.state_table)
+                ]
+                b = Batch(queries,
+                          {"tenantId": self.tenant_id, "groupId": self.uuid},
+                          consistency=consistency)
+                return b.execute(self.connection)
+
+            def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
+                return defer.gatherResults([
+                    self._naive_delete_policy(policy_id, consistency)
+                    for policy_id in policy_dict])
+
+            return defer.gatherResults([
+                _delete_configs_and_state(),
+                self._naive_list_policies().addCallback(_delete_policies)
+            ])
+
+        d.addCallback(_maybe_delete)
+        d.addCallback(lambda _: None)
+
+        return d
 
 
 @implementer(IScalingGroupCollection)
@@ -850,6 +913,8 @@ class CassScalingGroupCollection:
         """
         scaling_group_id = generate_key_str('scalinggroup')
 
+        log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id).info("Creating scaling group")
+
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),
             _cql_insert.format(cf=self.launch_table, name=":launch"),
@@ -875,43 +940,6 @@ class CassScalingGroupCollection:
             'id': scaling_group_id
         })
         return d
-
-    def delete_scaling_group(self, log, tenant_id, scaling_group_id):
-        """
-        see :meth:`otter.models.interface.IScalingGroupCollection.delete_scaling_group`
-        """
-        consistency = get_consistency_level('delete', 'group')
-
-        def _delete_configs():
-            queries = [
-                _cql_delete.format(cf=self.config_table),
-                _cql_delete.format(cf=self.launch_table),
-            ]
-            b = Batch(queries,
-                      {"tenantId": tenant_id, "groupId": scaling_group_id},
-                      consistency=consistency)
-            return b.execute(self.connection)
-
-        def _delete_policies(policy_dict, group):  # CassScalingGroup.list_policies
-            if len(policy_dict) == 0:
-                return
-
-            deferreds = []
-            for policy_id in policy_dict:
-                deferreds.append(group._naive_delete_policy(policy_id, consistency))
-            return defer.gatherResults(deferreds)
-
-        def _delete_it(lastRev, group):
-            d = defer.gatherResults([
-                _delete_configs(),
-                group._naive_list_policies().addCallback(_delete_policies, group)
-            ])
-            d.addCallback(lambda _: None)
-            return d
-
-        group = self.get_scaling_group(log, tenant_id, scaling_group_id)
-        d = group.view_config()  # ensure that it's actually there
-        return d.addCallback(_delete_it, group)  # only delete if it exists
 
     def list_scaling_groups(self, log, tenant_id):
         """

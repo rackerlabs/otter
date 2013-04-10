@@ -61,7 +61,7 @@ def fixture(fixture_name):
     )).read()
 
 
-def iMock(iface, **kwargs):
+def iMock(*ifaces, **kwargs):
     """
     Creates a mock object that provides a particular interface.
 
@@ -75,8 +75,10 @@ def iMock(iface, **kwargs):
     if 'spec' in kwargs:
         del kwargs['spec']
 
-    imock = mock.MagicMock(spec=iface.names(), **kwargs)
-    directlyProvides(imock, iface)
+    all_names = [name for iface in ifaces for name in iface.names()]
+
+    imock = mock.MagicMock(spec=all_names, **kwargs)
+    directlyProvides(imock, *ifaces)
     return imock
 
 

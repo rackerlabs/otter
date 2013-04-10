@@ -5,10 +5,10 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema.group_examples import launch_server_config
+from otter.json_schema import group_examples
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import (NoSuchScalingGroupError,
+from otter.models.interface import (GroupNotEmptyError, NoSuchScalingGroupError,
                                     NoSuchPolicyError, NoSuchWebhookError,
                                     UnrecognizedCapabilityError)
 
@@ -79,11 +79,14 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
+        self.collection = mock.MagicMock(spec=[], data={self.tenant_id: {}})
 
         # config, launch config, etc. policies don't matter
         self.state = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1,
+            self.mock_log, self.tenant_id, 1, self.collection,
             {'config': {}, 'launch': {}, 'policies': {}})
+
+        self.collection.data[self.tenant_id][1] = self.state
 
     def test_state(self):
         """
@@ -190,6 +193,38 @@ class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.state.view_state())
         self.assertFalse(result['paused'], "Resuming again should not fail")
 
+    def test_delete_group_removes_self_from_collection_if_state_empty(self):
+        """
+        Deleting a scaling group succeeds if there are no active and pending
+        entities/jobs.
+        """
+        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
+                      self.state, "Sanity check")
+
+        self.state.active_entities = []
+        self.state.pending_jobs = []
+
+        d = self.state.delete_group()
+        self.assertEqual(None, self.successResultOf(d))
+
+        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 0)
+
+    def test_delete_scaling_group_fails_if_scaling_group_not_empty(self):
+        """
+        Deleting a scaling group that has active or pending jobs errbacks with
+        a :class:`GroupNotEmptyError`
+        """
+        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
+                      self.state, "Sanity check")
+
+        self.state.active_entities = [1]
+        self.state.pending_jobs = []
+
+        self.assert_deferred_failed(self.state.delete_group(),
+                                    GroupNotEmptyError)
+
+        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 1)
+
 
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
@@ -202,6 +237,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
+        self.collection = mock.MagicMock()
+
         self.config = {
             'name': 'aname',
             'cooldown': 0,
@@ -219,13 +256,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"these are": "some args"}}
         }
-        self.policies = [{
-            "name": "set number of servers to 10",
-            "steadyState": 10,
-            "cooldown": 3
-        }]
+        self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, '1',
+            self.mock_log, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
@@ -351,14 +384,16 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         create_response = self.validate_create_policies_return_value([
             {
-                "name": "set number of servers to 3000",
-                "steadyState": 3000,
-                "cooldown": 300
+                "name": "scale down by 20",
+                "change": -20,
+                "cooldown": 300,
+                "type": "webhook"
             },
             {
                 "name": 'scale down 10 percent',
                 "changePercent": -10,
-                "cooldown": 200
+                "cooldown": 200,
+                "type": "webhook"
             }
         ])
         list_result = self.assert_deferred_succeeded(self.group.list_policies())
@@ -372,7 +407,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         also is an empty dictionary
         """
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, '1',
+            self.mock_log, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': None})
         self.assertEqual(self.validate_list_policies_return_value(), {})
@@ -441,8 +476,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         uuid = policy_list.keys()[0]
         update_data = {
             "name": "Otters are not good pets",
-            "steadyState": 1234,
-            "cooldown": 555
+            "change": 1234,
+            "cooldown": 555,
+            "type": "webhook"
         }
         self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
         result = self.assert_deferred_succeeded(
@@ -455,8 +491,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         update_data = {
             "name": "puppies are good pets",
-            "steadyState": 1234,
-            "cooldown": 555
+            "change": 1234,
+            "cooldown": 555,
+            "type": "webhook"
         }
         deferred = self.group.update_policy("puppies", update_data)
         self.assert_deferred_failed(deferred, NoSuchPolicyError)
@@ -703,7 +740,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'maxEntities': 10,
             'metadata': {}
         }
-        self.launch = launch_server_config()[1]
+        self.launch = group_examples.launch_server_config()[1]
         self.mock_log = mock.MagicMock()
 
         self.counter = 0
@@ -736,23 +773,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Creation of a scaling group with a 'config' parameter creates a
         scaling group with the specified configuration.
         """
-        policies = [
-            {
-                "name": "scale up by 10",
-                "change": 10,
-                "cooldown": 5
-            },
-            {
-                "name": "scale down a 5.5 percent because of a tweet",
-                "changePercent": -5.5,
-                "cooldown": 6
-            },
-            {
-                "name": "set number of servers to 10",
-                "steadyState": 10,
-                "cooldown": 3
-            }
-        ]
+        policies = group_examples.policy()
         self.assertEqual(self.validate_list_return_value(
                          self.mock_log, self.
                          tenant_id), [],
@@ -771,7 +792,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result[0].uuid, '1', "Group not added to collection")
 
         mock_sgrp.assert_called_once_with(
-            mock.ANY, self.tenant_id, '1',
+            mock.ANY, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch, 'policies': policies})
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
@@ -786,35 +807,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         uuid = manifest['id']
 
         mock_sgrp.assert_called_once_with(
-            mock.ANY, self.tenant_id, uuid,
+            mock.ANY, self.tenant_id, uuid, self.collection,
             {'config': self.config, 'launch': {}, 'policies': None})
-
-    def test_delete_removes_a_scaling_group(self):
-        """
-        Deleting a valid scaling group decreases the number of scaling groups
-        in the collection
-        """
-        manifest = self.successResultOf(
-            self.collection.create_scaling_group(
-                self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
-        uuid = manifest['id']
-
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        self.assertEqual(len(result), 1, "Group not added correctly")
-
-        self.assert_deferred_succeeded(
-            self.collection.delete_scaling_group(self.mock_log, self.tenant_id, uuid))
-
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        self.assertEqual(result, [], "Group not deleted from collection")
-
-    def test_delete_scaling_group_fails_if_scaling_group_does_not_exist(self):
-        """
-        Deleting a scaling group that doesn't exist raises a
-        :class:`NoSuchScalingGroupError` exception
-        """
-        deferred = self.collection.delete_scaling_group(self.mock_log, self.tenant_id, 1)
-        self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
@@ -885,7 +879,6 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(group, MockScalingGroup),
                         "group is {0!r}".format(group))
 
-        group.active_entities = ["1"]
         group.policies = {'1': {}, '2': {}, '3': {}}
         group.webhooks = {'1': {}, '2': {}, '3': {'3x': {}}}
 
@@ -919,7 +912,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.create_webhooks('2', [{}, {}]),
             group.get_webhook('3', '3x'),
             group.update_webhook('3', '3x', {'name': 'hat'}),
-            group.delete_webhook('3', '3x')
+            group.delete_webhook('3', '3x'),
+            group.delete_group()
         ]
 
     def test_get_scaling_group_returns_mock_scaling_group(self):

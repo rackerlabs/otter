@@ -49,17 +49,41 @@ class NoSuchWebhookError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
 
 
+class GroupNotEmptyError(Exception):
+    """
+    Error to be raised when attempting to delete group that still has entities
+    in it
+    """
+    def __init__(self, tenant_id, group_id):
+        super(GroupNotEmptyError, self).__init__(
+            "Group {g} for tenant {t} still has entities."
+            .format(t=tenant_id, g=group_id))
+
+
 class IScalingGroupState(Interface):
     """
-    Represents an accessor for group state.  Note that none of these raise
-    :class:`NoSuchScalingGroupError` if this scaling group does not exist - the
-    check is expected to be performed elsewhere.
+    Represents an accessor for group state.
     """
+
+    def delete_group():
+        """
+        Deletes the scaling group if the state is empty.  This method should
+        handle its own locking, if required.
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
+            doesn't exist for this tenant id
+        :raises: :class:`GroupNotEmptyError` if the scaling group cannot be
+            deleted (e.g. if the state is not empty)
+        """
 
     def add_server(state, name, instance_id, uri, pending_job_id, created=None):
         """
         Takes information about an active server and adds it to the store of
-        active servers.
+        active servers.  Note that this does not raise
+        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
+        the check is expected to be performed elsewhere.
 
         :param dict state: a dict, like you'd see returned from view_state,
             containing the state of the group
@@ -79,7 +103,9 @@ class IScalingGroupState(Interface):
     def update_jobs(state, job_dict, transaction_id, policy_id=None, timestamp=None):
         """
         Update jobs with the jobs dict, which should contain all outstanding
-        jobs in the group, not just new jobs.
+        jobs in the group, not just new jobs.  Note this does not raise
+        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
+        the check is expected to be performed elsewhere.
 
         If the jobs changed as a result of hte policy, modify the touched times
         for the given policy (and the group at large).
@@ -125,7 +151,6 @@ class IScalingGroupState(Interface):
         idempotent change, if it's already unpaused, this does not raise an
         error. (But perhaps it should not be re-resumed, if that is an expensive
         operation.)
-
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
         """
@@ -174,7 +199,7 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        :return: the state information for the group, which looks like::
+        State information looks like::
 
             {
               "active": {
@@ -199,6 +224,7 @@ class IScalingGroup(Interface):
               "paused": false
             }
 
+        :return: the state information
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
@@ -460,22 +486,6 @@ class IScalingGroupCollection(Interface):
             :data:``otter.json_schema.model_schemas.view_manifest``, except that
             it also has the key `id`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
-        """
-
-    def delete_scaling_group(log, tenant_id, scaling_group_id):
-        """
-        Delete the scaling group
-
-        :param tenant_id: the tenant ID of the scaling groups
-        :type tenant_id: ``str``
-
-        :param scaling_group_id: the uuid of the scaling group to delete
-        :type scaling_group_id: ``str``
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
-            doesn't exist for this tenant id
         """
 
     def list_scaling_groups(log, tenant_id):
