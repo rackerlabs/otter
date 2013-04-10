@@ -487,7 +487,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         self.assertIn('id', updated)
         self.assertIn('links', updated)
         for link in updated["links"]:
-            if link['rel'] in ('self', 'bookmark'):
+            if link['rel'] == 'self':
                 self.assertIn(_strip_base_url(link["href"]), path)
             else:
                 self.assertEqual(link['rel'], 'capability')

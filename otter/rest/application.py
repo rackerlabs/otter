@@ -69,10 +69,6 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
           {
             "href": <url with api version>,
             "rel": "self"
-          },
-          {
-            "href": <url without api version>,
-            "rel": "bookmark"
           }
         ]
 
