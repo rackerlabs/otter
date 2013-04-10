@@ -355,6 +355,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     """
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
     d = treq.delete(path, headers=auth_headers(auth_token))
+    d.addCallback(check_success, [200, 202])
     d.addCallback(lambda _: None)
     return d
 

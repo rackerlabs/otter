@@ -324,7 +324,10 @@ class LoadBalancersTests(TestCase):
         remove_from_load_balancer makes a DELETE request against the
         URL represting the load balancer node.
         """
-        self.treq.delete.return_value = succeed(None)
+        response = mock.Mock()
+        response.code = 200
+
+        self.treq.delete.return_value = succeed(response)
 
         d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
         self.assertEqual(self.successResultOf(d), None)
@@ -332,6 +335,22 @@ class LoadBalancersTests(TestCase):
         self.treq.delete.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes/1',
             headers=expected_headers)
+
+    def test_remove_from_load_balancer_propagates_api_failure(self):
+        """
+        remove_from_load_balancer will propagate API failures.
+        """
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.delete.return_value = succeed(response)
+        self.treq.content.return_value = succeed(error_body)
+
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345',
+'1')
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(APIError))
+        self.assertEqual(failure.value.code, 500)
 
 
 class ServerTests(TestCase):
