@@ -212,10 +212,6 @@ def get_policy(request, log, tenantId, groupId, policyId):
                     {
                         "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}/"
                         "rel": "self"
-                    },
-                    {
-                        "href": "{url_root}/010101/groups/{groupId}/policy/{policyId}/"
-                        "rel": "bookmark"
                     }
                 ],
                 "name": "scale up by one server",
