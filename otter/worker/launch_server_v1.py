@@ -200,11 +200,17 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :param list lb_configs: List of lb_config dictionaries.
     :param str ip_address: IP address of the node to add to the load balancer.
 
-    :return: Deferred that fires with the Add Node load balancer response
-        for each lb_config in lb_configs or errbacks on the first error.
+    :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
+        Add Node response.
     """
     return gatherResults([
-        add_to_load_balancer(endpoint, auth_token, lb_config, ip_address)
+        add_to_load_balancer(
+            endpoint,
+            auth_token,
+            lb_config,
+            ip_address).addCallback(
+                lambda response: (lb_config['loadBalancerId'], response))
+
         for lb_config in lb_configs
     ], consumeErrors=True)
 

@@ -295,10 +295,13 @@ class LoadBalancersTests(TestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
-        def _succeed(*args, **kwargs):
-            return succeed(True)
+        def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
+            # Include the ID and port in the response so that we can verify
+            # that add_to_load_balancers associates the response with the correct
+            # load balancer.
+            return succeed((lb_config['loadBalancerId'], lb_config['port']))
 
-        add_to_load_balancer.side_effect = _succeed
+        add_to_load_balancer.side_effect = _add_to_load_balancer
 
         d = add_to_load_balancers('http://url/', 'my-auth-token',
                                   [{'loadBalancerId': '12345',
@@ -309,7 +312,8 @@ class LoadBalancersTests(TestCase):
 
         results = self.successResultOf(d)
 
-        self.assertEqual(results, [True, True])
+        self.assertEqual(sorted(results), [('12345', ('12345', 80)),
+                                           ('54321', ('54321', 81))])
 
 
 class ServerTests(TestCase):
