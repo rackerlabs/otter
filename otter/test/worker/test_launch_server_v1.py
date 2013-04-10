@@ -22,8 +22,12 @@ from otter.worker.launch_server_v1 import (
     wait_for_status,
     create_server,
     launch_server,
-    prepare_launch_config
+    prepare_launch_config,
+    delete_server,
+    remove_from_load_balancer
 )
+
+from otter.test.utils import patch
 
 
 fake_service_catalog = [
@@ -315,6 +319,20 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(sorted(results), [('12345', ('12345', 80)),
                                            ('54321', ('54321', 81))])
 
+    def test_remove_from_load_balancer(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node.
+        """
+        self.treq.delete.return_value = succeed(None)
+
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
+        self.assertEqual(self.successResultOf(d), None)
+
+        self.treq.delete.assert_called_once_with(
+            'http://url/loadbalancers/12345/nodes/1',
+            headers=expected_headers)
+
 
 class ServerTests(TestCase):
     """
@@ -449,7 +467,21 @@ class ServerTests(TestCase):
         adds the server's first private IPv4 address to any load balancers.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': []}
+                         'loadBalancers': [
+                             {'loadBalancerId': '12345', 'port': 80},
+                             {'loadBalancerId': '54321', 'port': 81}
+                         ]}
+
+        load_balancer_metadata = {
+            'rax:auto_scaling_server_name': 'as000000',
+            'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}
+
+        prepared_load_balancers = [
+            {'loadBalancerId': '12345', 'port': 80,
+             'metadata': load_balancer_metadata},
+            {'loadBalancerId': '54321', 'port': 81,
+             'metadata': load_balancer_metadata}
+        ]
 
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
@@ -464,7 +496,10 @@ class ServerTests(TestCase):
 
         wait_for_status.return_value = succeed(server_details)
 
-        add_to_load_balancers.return_value = succeed([])
+        add_to_load_balancers.return_value = succeed([
+            ('12345', ('10.0.0.1', 80)),
+            ('54321', ('10.0.0.1', 81))
+        ])
 
         d = launch_server('DFW',
                           self.scaling_group,
@@ -472,7 +507,12 @@ class ServerTests(TestCase):
                           'my-auth-token',
                           launch_config)
 
-        self.successResultOf(d)  # TODO: Currently the return value is not significant.
+        result = self.successResultOf(d)
+        self.assertEqual(
+            result,
+            (server_details, [
+                ('12345', ('10.0.0.1', 80)),
+                ('54321', ('10.0.0.1', 81))]))
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
@@ -484,7 +524,7 @@ class ServerTests(TestCase):
                                                 'ACTIVE')
 
         add_to_load_balancers.assert_called_once_with(
-            'http://dfw.lbaas/', 'my-auth-token', [], '10.0.0.1')
+            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers, '10.0.0.1')
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -674,3 +714,53 @@ class ConfigPreparationTests(TestCase):
         launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
 
         self.assertNotIdentical(test_config, launch_config)
+
+
+# An instance associated with a single load balancer.
+instance_details = (
+    {'server': {'id': 'a'}},
+    [('12345', {'nodes': [{'id': '1'}]}),
+     ('54321', {'nodes': [{'id': '2'}]})])
+
+
+class DeleteServerTests(TestCase):
+    """
+    Test the delete server worker.
+    """
+    def setUp(self):
+        """
+        Set up some mocks.
+        """
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_deletes_load_balancer_node(self, remove_from_load_balancer):
+        """
+        delete_server removes the nodes specified in instance details from
+        the associated load balancers.
+        """
+        remove_from_load_balancer.return_value = succeed(None)
+
+        d = delete_server(None, None, fake_service_catalog, 'my-auth-token', instance_details)
+        self.successResultOf(d)
+
+        remove_from_load_balancer.has_calls([
+            mock.call('http://dfw.lbaas/', 'my-auth-token', '12345', '1'),
+            mock.call('http://dfw.lbaas/', 'my-auth-token', '54321', '2')
+        ], any_order=True)
+
+        self.assertEqual(remove_from_load_balancer.call_count, 2)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server(self, remove_from_load_balancer):
+        """
+        delete_server performs a DELETE request against the instance URL based
+        on the information in instance_details.
+        """
+        remove_from_load_balancer.return_value = succeed(None)
+
+        d = delete_server(None, None, fake_service_catalog, 'my-auth-token', instance_details)
+        self.successResultOf(d)
+
+        self.treq.delete.assert_called_once_with(
+            'http://dfw.openstack/servers/a', headers=expected_headers)
