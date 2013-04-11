@@ -749,7 +749,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             self.counter += 1
             return self.counter
 
-        patch(self, 'otter.models.mock.uuid4', side_effect=generate_uuid)
+        self.mock_uuid = patch(self, 'otter.models.mock.uuid4',
+                               side_effect=generate_uuid)
 
     def test_list_scaling_groups_is_empty_if_new_tenant_id(self):
         """
@@ -773,17 +774,20 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Creation of a scaling group with a 'config' parameter creates a
         scaling group with the specified configuration.
         """
-        policies = group_examples.policy()
+        policies = group_examples.policy()[:2]
         self.assertEqual(self.validate_list_return_value(
                          self.mock_log, self.
                          tenant_id), [],
                          "Should start off with zero groups")
         manifest = self.validate_create_return_value(
             self.mock_log, self.tenant_id, self.config, self.launch, policies)
+
+        self.assertEqual(self.mock_uuid.call_count, 3)  # 1 group, 3 policies
+
         self.assertEqual(manifest, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3', '4'), policies)),
+            'scalingPolicies': dict(zip(('2', '3'), policies)),
             'id': '1'
         })
 
@@ -804,7 +808,11 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
+
+        self.assertEqual(self.mock_uuid.call_count, 1)
+
         uuid = manifest['id']
+        self.assertEqual(uuid, '1')
 
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, uuid, self.collection,
