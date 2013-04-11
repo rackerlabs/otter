@@ -24,7 +24,8 @@ from otter.worker.launch_server_v1 import (
     launch_server,
     prepare_launch_config,
     delete_server,
-    remove_from_load_balancer
+    remove_from_load_balancer,
+    public_endpoint_url
 )
 
 from otter.test.utils import patch
@@ -155,6 +156,15 @@ class UtilityTests(TestCase):
                              'cloudServersOpenStack',
                              'DFW')),
             [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
+
+    def test_public_endpoint_url(self):
+        """
+        public_endpoint_url returns the first publicURL for the named service
+        in a specific region.
+        """
+        self.assertEqual(
+            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack', 'DFW'),
+            'http://dfw.openstack/')
 
 
 expected_headers = {

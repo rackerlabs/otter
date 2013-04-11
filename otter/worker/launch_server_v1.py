@@ -237,6 +237,19 @@ def endpoints(service_catalog, service_name, region):
             yield endpoint
 
 
+def public_endpoint_url(service_catalog, service_name, region):
+    """
+    Return the first publicURL for a given service in a given region.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: URL as a string.
+    """
+    return list(endpoints(service_catalog, service_name, region))[0]['publicURL']
+
+
 def private_ip_addresses(server):
     """
     Get all private IPv4 addresses from the addresses section of a server.
@@ -306,15 +319,8 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudLoadBalancers',
-        region=region))[0]['publicURL']
-
-    server_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudServersOpenStack',
-        region=region))[0]['publicURL']
+    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
+    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
 
     lb_config = launch_config.get('loadBalancers', [])
 
@@ -383,17 +389,8 @@ def delete_server(region, scaling_group, service_catalog, auth_token, instance_d
 
     :return: TODO
     """
-    # TODO: Extract Method
-    lb_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudLoadBalancers',
-        region=region))[0]['publicURL']
-
-    # TODO: Extract Method
-    server_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudServersOpenStack',
-        region=region))[0]['publicURL']
+    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
+    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
 
     (server_details, loadbalancer_details) = instance_details
 
