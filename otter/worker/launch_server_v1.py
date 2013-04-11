@@ -405,7 +405,7 @@ def delete_server(region, scaling_group, service_catalog, auth_token, instance_d
     def when_removed_from_loadbalancers(_ignore):
         return treq.delete(
             append_segments(server_endpoint, 'servers', server_details['server']['id']),
-            headers=auth_headers(auth_token))
+            headers=auth_headers(auth_token)).addCallback(check_success, [204])
 
     d.addCallback(when_removed_from_loadbalancers)
     return d

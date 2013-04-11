@@ -748,3 +748,22 @@ class DeleteServerTests(TestCase):
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.code, 500)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_propagates_delete_server_api_failures(self, remove_from_load_balancer):
+        """
+        delete_server fails with an APIError if deleting the server fails.
+        """
+
+        remove_from_load_balancer.return_value = succeed(None)
+
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.delete.return_value = succeed(response)
+        self.treq.content.return_value = succeed(error_body)
+
+        d = delete_server('DFW', None, fake_service_catalog, 'my-auth-token', instance_details)
+        failure = self.failureResultOf(d)
+
+        self.assertEqual(failure.value.code, 500)
