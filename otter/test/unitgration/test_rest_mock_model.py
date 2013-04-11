@@ -197,9 +197,10 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         store = MockScalingGroupCollection()
         self.mock_log = mock.MagicMock()
-        self.group_id = self.assert_deferred_succeeded(
+        manifest = self.assert_deferred_succeeded(
             store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
+        self.group_id = manifest['id']
         set_store(store)
 
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
@@ -381,10 +382,11 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         self.mock_log = mock.MagicMock()
         store = MockScalingGroupCollection()
-        self.group_id = self.assert_deferred_succeeded(
+        manifest = self.assert_deferred_succeeded(
             store.create_scaling_group(self.mock_log, self.tenant_id,
                                        config()[0],
                                        launch_server_config()[0]))
+        self.group_id = manifest['id']
         group = store.get_scaling_group(self.mock_log,
                                         self.tenant_id, self.group_id)
         self.policy_id = self.assert_deferred_succeeded(
