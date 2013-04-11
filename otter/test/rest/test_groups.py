@@ -186,7 +186,12 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Checks that the serialization checks and rejects unserializable
         data
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+        self.mock_store.create_scaling_group.return_value = defer.succeed({
+            'groupConfiguration': 'config',
+            'launchConfiguration': 'launch',
+            'scalingPolicies': {},
+            'id': '1'
+        })
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
 
@@ -196,7 +201,12 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         an empty schema is bad.
         """
 
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+        self.mock_store.create_scaling_group.return_value = defer.succeed({
+            'groupConfiguration': 'config',
+            'launchConfiguration': 'launch',
+            'scalingPolicies': {},
+            'id': '1'
+        })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
 
@@ -209,7 +219,16 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Tries to create a scaling group with the given request body (which
         should succeed) - and test the response
         """
-        self.mock_store.create_scaling_group.return_value = defer.succeed("1")
+        policies = request_body.get('scalingPolicies', [])
+        policy_dict = dict(zip([str(i) for i in range(len(policies))],
+                               policies))
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed({
+            'groupConfiguration': request_body['groupConfiguration'],
+            'launchConfiguration': request_body['launchConfiguration'],
+            'scalingPolicies': policy_dict,
+            'id': '1'
+        })
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
         self.mock_store.create_scaling_group.assert_called_once_with(
@@ -304,7 +323,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         manifest = {
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': {"5": policy_examples()[0]}
+            'scalingPolicies': {"5": policy_examples()[0]},
+            'id': 'one'
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 

@@ -55,20 +55,20 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         Calls ``view_manifest()``, and validates that it returns a
         dictionary containing relevant configuration values, as specified
-        by :data:`create_group`
+        by :data:`model_schemas.manifest`
 
         :return: the return value of ``view_manifest()``
         """
         result = self.assert_deferred_succeeded(
             self.group.view_manifest(*args, **kwargs))
-        validate(result, model_schemas.view_manifest)
+        validate(result, model_schemas.manifest)
         return result
 
     def validate_view_config_return_value(self, *args, **kwargs):
         """
         Calls ``view_config()``, and validates that it returns a config
         dictionary containing relevant configuration values, as specified by
-        the :data:`config`
+        the :data:`model_schemas.group_config`
 
         :return: the return value of ``view_config()``
         """
@@ -165,6 +165,19 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         :class:`otter.scaling_groups_interface.IScalingGroup`.
         """
         verifyObject(IScalingGroupCollection, self.collection)
+
+    def validate_create_return_value(self, *args, **kwargs):
+        """
+        Calls ``create_scaling_Group()``, and validates that it returns a
+        dictionary containing relevant configuration values, as specified
+        by :data:`model_schemas.manifest`
+
+        :return: the return value of ``create_scaling_group()``
+        """
+        result = self.successResultOf(
+            self.collection.create_scaling_group(*args, **kwargs))
+        validate(result, model_schemas.manifest)
+        return result
 
     def validate_list_return_value(self, *args, **kwargs):
         """

@@ -267,7 +267,8 @@ def create_new_scaling_group(request, log, tenantId, data):
         }
 
     """
-    def send_redirect(uuid, data):
+    def send_redirect(result, data):
+        uuid = result['id']
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
         wrapped = {
@@ -377,7 +378,6 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
         }
     """
     def openstack_formatting(data, uuid):
-        data["id"] = uuid
         data["links"] = get_autoscale_links(tenantId, uuid)
 
         policies = []
