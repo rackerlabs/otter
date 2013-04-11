@@ -139,7 +139,8 @@ class MockScalingGroup:
         return defer.succeed({
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': self.policies
+            'scalingPolicies': self.policies,
+            'id': self.uuid
         })
 
     def view_config(self):
@@ -448,7 +449,7 @@ class MockScalingGroupCollection:
             log, tenant, uuid, self,
             {'config': config, 'launch': launch, 'policies': policies})
 
-        return defer.succeed(uuid)
+        return self.data[tenant][uuid].view_manifest()
 
     def list_scaling_groups(self, log, tenant):
         """

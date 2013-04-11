@@ -19,11 +19,15 @@ for property_name in group_config['properties']:
     group_config['properties'][property_name]['required'] = True
 
 
-# view manifest returns a dictionary with keys being the ids
-view_manifest = {
+# create group and view manifest returns a dictionary with keys being the ids
+manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
+        "id": {
+            "type": "string",
+            "required": True
+        },
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": {
@@ -41,7 +45,6 @@ view_manifest = {
     },
     "additionalProperties": False
 }
-
 
 # example:
 # {

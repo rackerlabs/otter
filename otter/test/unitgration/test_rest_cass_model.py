@@ -203,8 +203,8 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         self._config = config()[0]
         self._launch = launch_server_config()[0]
 
-        def _set_group_id(group_id):
-            self.group_id = group_id
+        def _set_group_id(manifest):
+            self.group_id = manifest['id']
             self.policies_url = (
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
