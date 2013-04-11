@@ -347,8 +347,7 @@ class LoadBalancersTests(TestCase):
         self.treq.delete.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345',
-'1')
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
         self.assertEqual(failure.value.code, 500)
