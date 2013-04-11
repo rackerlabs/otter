@@ -407,7 +407,7 @@ def delete_server(region, scaling_group, service_catalog, auth_token, instance_d
 
     d = gatherResults(
         [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
-         for (loadbalancer_id, node_id) in node_info])
+         for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
         return treq.delete(

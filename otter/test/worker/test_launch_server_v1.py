@@ -28,6 +28,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 from otter.test.utils import patch
+from otter.util.deferredutils import unwrap_first_error
 
 
 fake_service_catalog = [
@@ -783,3 +784,16 @@ class DeleteServerTests(TestCase):
 
         self.treq.delete.assert_called_once_with(
             'http://dfw.openstack/servers/a', headers=expected_headers)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_propagates_loadbalancer_failures(self, remove_from_load_balancer):
+        """
+        delete_server propagates any errors from removing server from load
+        balancers
+        """
+        remove_from_load_balancer.return_value = fail(APIError(500, ''))
+
+        d = delete_server(None, None, fake_service_catalog, 'my-auth-token', instance_details)
+        failure = unwrap_first_error(self.failureResultOf(d))
+
+        self.assertEqual(failure.value.code, 500)
