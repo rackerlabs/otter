@@ -216,26 +216,22 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     ], consumeErrors=True)
 
 
-def endpoints(service_catalog, service_name=None, service_type=None, region=None):
+def endpoints(service_catalog, service_name, region):
     """
     Search a service catalog for matching endpoints.
 
     :param list service_catalog: List of services.
     :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
-    :param str service_type: Type of service. Example: 'compute'
     :param str region: Region of service.  Example: 'ORD'
 
     :return: Iterable of endpoints.
     """
     for service in service_catalog:
-        if service_type and service_type != service['type']:
-            continue
-
-        if service_name and service_name != service['name']:
+        if service_name != service['name']:
             continue
 
         for endpoint in service['endpoints']:
-            if region and endpoint['region'] != region:
+            if region != endpoint['region']:
                 continue
 
             yield endpoint
