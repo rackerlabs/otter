@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-Loads cql into Cassandra
+Gather the current statistics on what's in the database
 """
 
 import argparse
