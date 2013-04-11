@@ -13,7 +13,7 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     CassBadDataError,
-    serial_json_data)
+    serialize_json_data)
 
 from otter.models.interface import (
     GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -95,7 +95,7 @@ class SerialJsonDataTestCase(TestCase):
         The key "_ver" is be added to whatever dictionary is there with the
         value being whatever is provided
         """
-        self.assertEqual(serial_json_data({}, 'version'),
+        self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
 
 
@@ -1481,7 +1481,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
               return_value=ConsistencyLevel.TWO)
 
         # 'serializing' something just wraps it with a _S
-        self.mock_serial = patch(self, 'otter.models.cass.serial_json_data',
+        self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
 
     def test_create(self):

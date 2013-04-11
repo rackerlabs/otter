@@ -27,7 +27,7 @@ class CassBadDataError(Exception):
     pass
 
 
-def serial_json_data(data, ver):
+def serialize_json_data(data, ver):
     """
     Serialize json data to cassandra by adding a version and dumping it to a
     string
@@ -143,7 +143,7 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
             polId = generate_key_str('policy')
             queries.append(_cql_insert_policy.format(cf=policies_table,
                                                      name=':' + polname))
-            data[polname] = serial_json_data(policies[i], 1)
+            data[polname] = serialize_json_data(policies[i], 1)
             data[polname + "Id"] = polId
             outpolicies[polId] = policies[i]
 
@@ -185,10 +185,10 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         bare_webhooks[i].setdefault('metadata', {})
         version, cap_hash = generate_capability()
 
-        cql_parameters[name] = serial_json_data(webhook, 1)
+        cql_parameters[name] = serialize_json_data(webhook, 1)
         cql_parameters['{0}Id'.format(name)] = webhook_id
         cql_parameters['{0}Key'.format(name)] = cap_hash
-        cql_parameters['{0}Capability'.format(name)] = serial_json_data(
+        cql_parameters['{0}Capability'.format(name)] = serialize_json_data(
             {version: cap_hash}, 1)
 
         output[webhook_id] = webhook.copy()
@@ -440,8 +440,8 @@ class CassScalingGroup(object):
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
-                                     "active": serial_json_data(active, 1),
-                                     "pending": serial_json_data(pending, 1)},
+                                     "active": serialize_json_data(active, 1),
+                                     "pending": serialize_json_data(pending, 1)},
                                     get_consistency_level('update', 'state'))
         return d
 
@@ -465,8 +465,8 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid,
                                      "groupTouched": timestamp,
-                                     "policyTouched": serial_json_data(policy_touched, 1),
-                                     "pending": serial_json_data(job_dict, 1)},
+                                     "policyTouched": serialize_json_data(policy_touched, 1),
+                                     "pending": serialize_json_data(job_dict, 1)},
                                     get_consistency_level('update', 'state'))
         return d
 
@@ -483,7 +483,7 @@ class CassScalingGroup(object):
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "scaling": serial_json_data(data, 1)},
+                                "scaling": serialize_json_data(data, 1)},
                       consistency=get_consistency_level('update', 'partial'))
             return b.execute(self.connection)
 
@@ -502,7 +502,7 @@ class CassScalingGroup(object):
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
-                                "launch": serial_json_data(data, 1)},
+                                "launch": serialize_json_data(data, 1)},
                       consistency=get_consistency_level('update', 'partial'))
             d = b.execute(self.connection)
             return d
@@ -596,7 +596,7 @@ class CassScalingGroup(object):
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id,
-                                "policy": serial_json_data(data, 1)},
+                                "policy": serialize_json_data(data, 1)},
                       consistency=get_consistency_level('update', 'policy'))
             d = b.execute(self.connection)
             return d
@@ -760,7 +760,7 @@ class CassScalingGroup(object):
                  "groupId": self.uuid,
                  "policyId": policy_id,
                  "webhookId": webhook_id,
-                 "data": serial_json_data(data, 1)},
+                 "data": serialize_json_data(data, 1)},
                 get_consistency_level('update', 'webhook'))
 
         d = self.get_webhook(policy_id, webhook_id)
@@ -922,8 +922,8 @@ class CassScalingGroupCollection:
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
-                "scaling": serial_json_data(config, 1),
-                "launch": serial_json_data(launch, 1),
+                "scaling": serialize_json_data(config, 1),
+                "launch": serialize_json_data(launch, 1),
                 }
 
         outpolicies = {}
