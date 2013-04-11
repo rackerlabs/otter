@@ -8,6 +8,6 @@ lxml==3.0.1
 treq==0.1.0
 silverberg==0.0.5
 pyOpenSSL==0.13
-twiggy==0.4.0
+twiggy==0.4.4
 twixxy==0.1.1
 jsonfig==0.1.1
