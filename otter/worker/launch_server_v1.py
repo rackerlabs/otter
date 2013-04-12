@@ -365,15 +365,13 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     return d
 
 
-def delete_server(region, scaling_group, service_catalog, auth_token, instance_details):
+def delete_server(region, service_catalog, auth_token, instance_details):
     """
     Delete the server specified by instance_details.
 
     TODO: Load balancer draining.
 
     :param str region: A rackspace region as found in the service catalog.
-    :param IScalingGroup scaling_group: The scaling group to add the launched
-        server to.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
     :param tuple instance_details: A 2-tuple of server details and a list of

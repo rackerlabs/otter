@@ -712,7 +712,7 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = succeed(None)
 
-        d = delete_server('DFW', None, fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
         self.successResultOf(d)
 
         remove_from_load_balancer.has_calls([
@@ -730,7 +730,7 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = succeed(None)
 
-        d = delete_server('DFW', None, fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
@@ -744,7 +744,7 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = fail(APIError(500, ''))
 
-        d = delete_server('DFW', None, fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.code, 500)
@@ -763,7 +763,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = delete_server('DFW', None, fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = self.failureResultOf(d)
 
         self.assertEqual(failure.value.code, 500)
