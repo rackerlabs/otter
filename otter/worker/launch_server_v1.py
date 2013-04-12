@@ -350,7 +350,10 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     """
     Remove a node from a load balancer.
 
-    TODO: params
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param str loadbalancer_id: The ID for a cloud loadbalancer.
+    :param str node_id: The ID for a node in that cloudloadbalancer.
 
     :returns: A Deferred that fires with None if the operation completed successfully,
         or errbacks with an APIError.
