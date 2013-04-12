@@ -226,9 +226,9 @@ class LoadBalancersTests(TestCase):
 
         self.treq.json_content.assert_called_once_with(response)
 
-    def test_add_to_load_balancer_propogates_api_failure(self):
+    def test_add_to_load_balancer_propagates_api_failure(self):
         """
-        add_to_load_balancer will propogate API failures.
+        add_to_load_balancer will propagate API failures.
         """
         response = mock.Mock()
         response.code = 500
@@ -342,9 +342,9 @@ class ServerTests(TestCase):
 
         self.assertEqual(results, self.treq.json_content.return_value)
 
-    def test_server_details_propogates_api_failure(self):
+    def test_server_details_propagates_api_failure(self):
         """
-        server_details will propogate API failures.
+        server_details will propagate API failures.
         """
         response = mock.Mock()
         response.code = 500
@@ -380,9 +380,9 @@ class ServerTests(TestCase):
 
         self.assertEqual(result, self.treq.json_content.return_value)
 
-    def test_create_server_propogates_api_failure(self):
+    def test_create_server_propagates_api_failure(self):
         """
-        create_server will propogate API failures.
+        create_server will propagate API failures.
         """
         response = mock.Mock()
         response.code = 500
@@ -500,10 +500,10 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server_propogates_create_server_errors(
+    def test_launch_server_propagates_create_server_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
         """
-        launch_server will propogate any errors from create_server.
+        launch_server will propagate any errors from create_server.
         """
         create_server.return_value = fail(APIError(500, "Oh noes"))
 
@@ -522,10 +522,10 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server_propogates_wait_for_status_errors(
+    def test_launch_server_propagates_wait_for_status_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
         """
-        launch_server will propogate any errors from wait_for_status.
+        launch_server will propagate any errors from wait_for_status.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
@@ -554,10 +554,10 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server_propogates_add_to_load_balancers_errors(
+    def test_launch_server_propagates_add_to_load_balancers_errors(
             self, wait_for_status, create_server, add_to_load_balancers):
         """
-        launch_server will propogate any errors from add_to_load_balancers.
+        launch_server will propagate any errors from add_to_load_balancers.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
