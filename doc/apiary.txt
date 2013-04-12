@@ -1,4 +1,4 @@
-HOST: http://autoscaling.api.rackspacecloud.com/
+HOST: http://{region}.autoscale.api.rackspacecloud.com/
 
 --- otter-apiary ---
 ---
@@ -19,7 +19,7 @@ GET /{tenantId}/groups
             "id": "{groupId1}"
             "links": [
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
+                    "href": "{url_root}/v1.0/010101/groups/{groupId1}"
                     "rel": "self"
                 }
             ],
@@ -33,7 +33,7 @@ GET /{tenantId}/groups
             "id": "{groupId2}"
             "links": [
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
+                    "href": "{url_root}/v1.0/010101/groups/{groupId2}",
                     "rel": "self"
                 }
             ],
@@ -119,11 +119,11 @@ POST /{tenantId}/groups
         "id": "{groupId}",
         "links": [
           {
-            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+            "href": "{url_root}/v1.0/010101/groups/{groupId}"
             "rel": "self"
           },
           {
-            "href": "https://dfw.autoscale.api.rackspacecloud.com/010101/groups/{groupId}"
+            "href": "{url_root}/010101/groups/{groupId}"
             "rel": "bookmark"
           }
         ],
@@ -219,7 +219,7 @@ GET /{tenantId}/groups/{groupId}
         "id": "{groupId}",
         "links": [
           {
-            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}"
+            "href": "{url_root}/v1.0/010101/groups/{groupId}"
             "rel": "self"
           }
         ],
@@ -486,7 +486,7 @@ POST /{tenantId}/groups/{groupId}/resume
 
 --
 Policies Resource
-The following section of resources iAutoscale REST endpoints having to do with creating/reading/updating/deleting
+Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the scaling policies associated with a particular scaling group.
 
 (/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
@@ -660,6 +660,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
 
 Execute a scaling policy. If successful, a response body will be returned. (TBD)
 POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
+> Accepts: application/json
 < 202
 < Content-Type: application/json
 {}}
