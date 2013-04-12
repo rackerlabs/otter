@@ -219,38 +219,49 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Tries to create a scaling group with the given request body (which
         should succeed) - and test the response
         """
+        config = request_body['groupConfiguration']
+        launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
-        policy_dict = dict(zip([str(i) for i in range(len(policies))],
-                               policies))
 
-        self.mock_store.create_scaling_group.return_value = defer.succeed({
-            'groupConfiguration': request_body['groupConfiguration'],
-            'launchConfiguration': request_body['launchConfiguration'],
-            'scalingPolicies': policy_dict,
+        rval = {
+            'groupConfiguration': config,
+            'launchConfiguration': launch,
+            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
+                                        [p.copy() for p in policies])),
             'id': '1'
-        })
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
-        self.mock_store.create_scaling_group.assert_called_once_with(
-            mock.ANY, '11111',
-            request_body['groupConfiguration'],
-            request_body['launchConfiguration'],
-            request_body.get('scalingPolicies', None)
-        )
-        resp = json.loads(response_body)
-        validate(resp, rest_schemas.create_group_response)
 
-        expected = {
-            "id": "1",
-            "links": [
-                {"href": "/v1.0/11111/groups/1/", "rel": "self"},
-            ],
-            'groupConfiguration': request_body['groupConfiguration'],
-            'launchConfiguration': request_body['launchConfiguration']
-        }
-        if 'scalingPolicies' in request_body:
-            expected['scalingPolicies'] = request_body['scalingPolicies']
-        self.assertEqual(resp, {"group": expected})
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', config, launch, policies or None)
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_and_manifest_response)
+
+        # compare the policies separately, because they have links and may be
+        # in a different order
+        resp_policies = resp['group'].pop('scalingPolicies')
+
+        self.assertEqual(resp, {
+            'group': {
+                'groupConfiguration': config,
+                'launchConfiguration': launch,
+                'id': '1',
+                'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
+            }
+        })
+
+        resp_policies.sort(key=lambda dictionary: dictionary['id'])
+        for pol in resp_policies:
+            self.assertEqual(pol.pop('links'), [{
+                "href": "/v1.0/11111/groups/1/policies/{0}/".format(pol.pop('id')),
+                "rel": "self"
+            }])
+        self.assertEqual(resp_policies, policies)
 
     def test_group_create_one_policy(self):
         """
@@ -330,7 +341,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
-        validate(resp, rest_schemas.view_manifest_response)
+        validate(resp, rest_schemas.create_and_manifest_response)
 
         expected_policy = policy_examples()[0]
         expected_policy.update({
