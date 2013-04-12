@@ -17,6 +17,7 @@ initiating a launch_server job.
 """
 
 import json
+import itertools
 from copy import deepcopy
 
 from twisted.internet.defer import Deferred, gatherResults
@@ -200,38 +201,53 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :param list lb_configs: List of lb_config dictionaries.
     :param str ip_address: IP address of the node to add to the load balancer.
 
-    :return: Deferred that fires with the Add Node load balancer response
-        for each lb_config in lb_configs or errbacks on the first error.
+    :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
+        Add Node response.
     """
     return gatherResults([
-        add_to_load_balancer(endpoint, auth_token, lb_config, ip_address)
+        add_to_load_balancer(
+            endpoint,
+            auth_token,
+            lb_config,
+            ip_address).addCallback(
+                lambda response: (lb_config['loadBalancerId'], response))
+
         for lb_config in lb_configs
     ], consumeErrors=True)
 
 
-def endpoints(service_catalog, service_name=None, service_type=None, region=None):
+def endpoints(service_catalog, service_name, region):
     """
     Search a service catalog for matching endpoints.
 
     :param list service_catalog: List of services.
     :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
-    :param str service_type: Type of service. Example: 'compute'
     :param str region: Region of service.  Example: 'ORD'
 
     :return: Iterable of endpoints.
     """
     for service in service_catalog:
-        if service_type and service_type != service['type']:
-            continue
-
-        if service_name and service_name != service['name']:
+        if service_name != service['name']:
             continue
 
         for endpoint in service['endpoints']:
-            if region and endpoint['region'] != region:
+            if region != endpoint['region']:
                 continue
 
             yield endpoint
+
+
+def public_endpoint_url(service_catalog, service_name, region):
+    """
+    Return the first publicURL for a given service in a given region.
+
+    :param list service_catalog: List of services.
+    :param str service_name: Name of service.  Example: 'cloudServersOpenStack'
+    :param str region: Region of service.  Example: 'ORD'
+
+    :return: URL as a string.
+    """
+    return list(endpoints(service_catalog, service_name, region))[0]['publicURL']
 
 
 def private_ip_addresses(server):
@@ -290,31 +306,21 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
 
+    :param str region: A rackspace region as found in the service catalog.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
-    :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
 
-    :return: Deferred that fires when the server is "launched" based on the
-        given configuration.
-
-    TODO: Figure out if the return value is significant other than for
-        communicating failure.
+    :return: Deferred that fires with a 2-tuple of server details and the
+        list of load balancer responses from add_to_load_balancers.
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudLoadBalancers',
-        region=region))[0]['publicURL']
-
-    server_endpoint = list(endpoints(
-        service_catalog,
-        service_name='cloudServersOpenStack',
-        region=region))[0]['publicURL']
+    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
+    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
 
     lb_config = launch_config.get('loadBalancers', [])
 
@@ -333,8 +339,74 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
     def _add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
-        lbd.addCallback(lambda _: server)
+        lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
     d.addCallback(_add_lb)
+    return d
+
+
+def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
+    """
+    Remove a node from a load balancer.
+
+    :param str endpoint: Load balancer endpoint URI.
+    :param str auth_token: Keystone Auth Token.
+    :param str loadbalancer_id: The ID for a cloud loadbalancer.
+    :param str node_id: The ID for a node in that cloudloadbalancer.
+
+    :returns: A Deferred that fires with None if the operation completed successfully,
+        or errbacks with an APIError.
+    """
+    path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
+    d = treq.delete(path, headers=auth_headers(auth_token))
+    d.addCallback(check_success, [200, 202])
+    d.addCallback(lambda _: None)
+    return d
+
+
+def delete_server(region, service_catalog, auth_token, instance_details):
+    """
+    Delete the server specified by instance_details.
+
+    TODO: Load balancer draining.
+
+    :param str region: A rackspace region as found in the service catalog.
+    :param list service_catalog: A list of services as returned by the auth apis.
+    :param str auth_token: The user's auth token.
+    :param tuple instance_details: A 2-tuple of server details and a list of
+        load balancer Add Node responses.
+
+        Example::
+
+        ({'server':
+            {'id': 1,
+             'ip_addresses': ...,
+             'imageRef': ...}},
+         [('12345',
+           {'nodes': [{'id': 'a', 'address': ... }]}),
+          ('54321',
+           {'nodes': [{'id': 'b', 'address': ... }]})])
+
+    :return: TODO
+    """
+    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
+    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
+
+    (server_details, loadbalancer_details) = instance_details
+
+    node_info = itertools.chain(
+        *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
+          for (loadbalancer_id, node_details) in loadbalancer_details])
+
+    d = gatherResults(
+        [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
+         for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
+
+    def when_removed_from_loadbalancers(_ignore):
+        return treq.delete(
+            append_segments(server_endpoint, 'servers', server_details['server']['id']),
+            headers=auth_headers(auth_token)).addCallback(check_success, [204])
+
+    d.addCallback(when_removed_from_loadbalancers)
     return d

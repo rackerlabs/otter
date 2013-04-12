@@ -22,8 +22,14 @@ from otter.worker.launch_server_v1 import (
     wait_for_status,
     create_server,
     launch_server,
-    prepare_launch_config
+    prepare_launch_config,
+    delete_server,
+    remove_from_load_balancer,
+    public_endpoint_url
 )
+
+from otter.test.utils import patch
+from otter.util.deferredutils import unwrap_first_error
 
 
 fake_service_catalog = [
@@ -143,71 +149,22 @@ class UtilityTests(TestCase):
 
     def test_endpoints(self):
         """
-        endpoints will return all endpoints with no arguments.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog)),
-            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
-                    {'region': 'ORD', 'publicURL': 'http://ord.openstack/'},
-                    {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}]))
-
-    def test_endpoints_limit_region(self):
-        """
-        endpoints will return all endpoints that have the specified region.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog, region='DFW')),
-            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
-                    {'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}]))
-
-    def test_endpoints_limit_type(self):
-        """
-        endpoints will return all endpoints that have the specified type.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog, service_type='lb')),
-            [{'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}])
-
-    def test_endpoints_limit_name(self):
-        """
-        endpoints will return only the named endpoints.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog, service_name='cloudLoadBalancers')),
-            [{'region': 'DFW', 'publicURL': 'http://dfw.lbaas/'}])
-
-    def test_endpoints_region_and_name(self):
-        """
         endpoints will return only the named endpoint in a specific region.
         """
         self.assertEqual(
             sorted(endpoints(fake_service_catalog,
-                             service_name='cloudServersOpenStack',
-                             region='DFW')),
+                             'cloudServersOpenStack',
+                             'DFW')),
             [{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'}])
 
-    def test_endpoints_region_and_type(self):
+    def test_public_endpoint_url(self):
         """
-        endpoints will return only the endpoints of the specified type,
-        in the specified region.
-        """
-        self.assertEqual(
-            sorted(endpoints(fake_service_catalog,
-                             service_type='compute',
-                             region='ORD')),
-            [{'region': 'ORD', 'publicURL': 'http://ord.openstack/'}])
-
-    def test_endpoints_name_and_type(self):
-        """
-        endpoints will return only the endpoints of the specified name
-        and type.
+        public_endpoint_url returns the first publicURL for the named service
+        in a specific region.
         """
         self.assertEqual(
-            sorted(endpoints(fake_service_catalog,
-                             service_type='compute',
-                             service_name='cloudServersOpenStack')),
-            sorted([{'region': 'DFW', 'publicURL': 'http://dfw.openstack/'},
-                    {'region': 'ORD', 'publicURL': 'http://ord.openstack/'}]))
+            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack', 'DFW'),
+            'http://dfw.openstack/')
 
 
 expected_headers = {
@@ -246,7 +203,7 @@ class LoadBalancersTests(TestCase):
         self.treq.json_content.return_value = succeed(content)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': '12345',
+                                 {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1')
 
@@ -281,7 +238,7 @@ class LoadBalancersTests(TestCase):
         self.treq.content.return_value = succeed(error_body)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': '12345',
+                                 {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1')
 
@@ -295,21 +252,57 @@ class LoadBalancersTests(TestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
-        def _succeed(*args, **kwargs):
-            return succeed(True)
+        def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
+            # Include the ID and port in the response so that we can verify
+            # that add_to_load_balancers associates the response with the correct
+            # load balancer.
+            return succeed((lb_config['loadBalancerId'], lb_config['port']))
 
-        add_to_load_balancer.side_effect = _succeed
+        add_to_load_balancer.side_effect = _add_to_load_balancer
 
         d = add_to_load_balancers('http://url/', 'my-auth-token',
-                                  [{'loadBalancerId': '12345',
+                                  [{'loadBalancerId': 12345,
                                     'port': 80},
-                                   {'loadBalancerId': '54321',
+                                   {'loadBalancerId': 54321,
                                     'port': 81}],
                                   '192.168.1.1')
 
         results = self.successResultOf(d)
 
-        self.assertEqual(results, [True, True])
+        self.assertEqual(sorted(results), [(12345, (12345, 80)),
+                                           (54321, (54321, 81))])
+
+    def test_remove_from_load_balancer(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node.
+        """
+        response = mock.Mock()
+        response.code = 200
+
+        self.treq.delete.return_value = succeed(response)
+
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', 12345, 1)
+        self.assertEqual(self.successResultOf(d), None)
+
+        self.treq.delete.assert_called_once_with(
+            'http://url/loadbalancers/12345/nodes/1',
+            headers=expected_headers)
+
+    def test_remove_from_load_balancer_propagates_api_failure(self):
+        """
+        remove_from_load_balancer will propagate API failures.
+        """
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.delete.return_value = succeed(response)
+        self.treq.content.return_value = succeed(error_body)
+
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(APIError))
+        self.assertEqual(failure.value.code, 500)
 
 
 class ServerTests(TestCase):
@@ -445,7 +438,21 @@ class ServerTests(TestCase):
         adds the server's first private IPv4 address to any load balancers.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': []}
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        load_balancer_metadata = {
+            'rax:auto_scaling_server_name': 'as000000',
+            'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}
+
+        prepared_load_balancers = [
+            {'loadBalancerId': 12345, 'port': 80,
+             'metadata': load_balancer_metadata},
+            {'loadBalancerId': 54321, 'port': 81,
+             'metadata': load_balancer_metadata}
+        ]
 
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
@@ -460,7 +467,10 @@ class ServerTests(TestCase):
 
         wait_for_status.return_value = succeed(server_details)
 
-        add_to_load_balancers.return_value = succeed([])
+        add_to_load_balancers.return_value = succeed([
+            (12345, ('10.0.0.1', 80)),
+            (54321, ('10.0.0.1', 81))
+        ])
 
         d = launch_server('DFW',
                           self.scaling_group,
@@ -468,7 +478,12 @@ class ServerTests(TestCase):
                           'my-auth-token',
                           launch_config)
 
-        self.successResultOf(d)  # TODO: Currently the return value is not significant.
+        result = self.successResultOf(d)
+        self.assertEqual(
+            result,
+            (server_details, [
+                (12345, ('10.0.0.1', 80)),
+                (54321, ('10.0.0.1', 81))]))
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
@@ -480,7 +495,7 @@ class ServerTests(TestCase):
                                                 'ACTIVE')
 
         add_to_load_balancers.assert_called_once_with(
-            'http://dfw.lbaas/', 'my-auth-token', [], '10.0.0.1')
+            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers, '10.0.0.1')
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -670,3 +685,85 @@ class ConfigPreparationTests(TestCase):
         launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
 
         self.assertNotIdentical(test_config, launch_config)
+
+
+# An instance associated with a single load balancer.
+instance_details = (
+    {'server': {'id': 'a'}},
+    [(12345, {'nodes': [{'id': 1}]}),
+     (54321, {'nodes': [{'id': 2}]})])
+
+
+class DeleteServerTests(TestCase):
+    """
+    Test the delete server worker.
+    """
+    def setUp(self):
+        """
+        Set up some mocks.
+        """
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_deletes_load_balancer_node(self, remove_from_load_balancer):
+        """
+        delete_server removes the nodes specified in instance details from
+        the associated load balancers.
+        """
+        remove_from_load_balancer.return_value = succeed(None)
+
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        self.successResultOf(d)
+
+        remove_from_load_balancer.has_calls([
+            mock.call('http://dfw.lbaas/', 'my-auth-token', 12345, 1),
+            mock.call('http://dfw.lbaas/', 'my-auth-token', 54321, 2)
+        ], any_order=True)
+
+        self.assertEqual(remove_from_load_balancer.call_count, 2)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server(self, remove_from_load_balancer):
+        """
+        delete_server performs a DELETE request against the instance URL based
+        on the information in instance_details.
+        """
+        remove_from_load_balancer.return_value = succeed(None)
+
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        self.successResultOf(d)
+
+        self.treq.delete.assert_called_once_with(
+            'http://dfw.openstack/servers/a', headers=expected_headers)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_propagates_loadbalancer_failures(self, remove_from_load_balancer):
+        """
+        delete_server propagates any errors from removing server from load
+        balancers
+        """
+        remove_from_load_balancer.return_value = fail(APIError(500, ''))
+
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        failure = unwrap_first_error(self.failureResultOf(d))
+
+        self.assertEqual(failure.value.code, 500)
+
+    @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
+    def test_delete_server_propagates_delete_server_api_failures(self, remove_from_load_balancer):
+        """
+        delete_server fails with an APIError if deleting the server fails.
+        """
+
+        remove_from_load_balancer.return_value = succeed(None)
+
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.delete.return_value = succeed(response)
+        self.treq.content.return_value = succeed(error_body)
+
+        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        failure = self.failureResultOf(d)
+
+        self.assertEqual(failure.value.code, 500)
