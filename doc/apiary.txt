@@ -1,4 +1,4 @@
-HOST: http://{region}.autoscale.api.rackspacecloud.com/
+HOST: https://{region}.autoscale.api.rackspacecloud.com/
 
 --- otter-apiary ---
 ---
@@ -45,7 +45,6 @@ GET /{tenantId}/groups
         }
     ],
     "groups_links": []
-
 }
 
 
