@@ -136,8 +136,8 @@ def create_new_scaling_group(request, log, tenantId, data):
     """
     Create a new scaling group, given the general scaling group configuration,
     launch configuration, and optional scaling policies.  This data provided
-    in the request body in JSON format. If successful, no response body will
-    be returned.
+    in the request body in JSON format. If successful, the created group in JSON 
+    format containing id and links is returned.
 
     Example request body containing some scaling policies::
 
