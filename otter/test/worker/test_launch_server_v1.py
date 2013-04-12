@@ -203,7 +203,7 @@ class LoadBalancersTests(TestCase):
         self.treq.json_content.return_value = succeed(content)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': '12345',
+                                 {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1')
 
@@ -238,7 +238,7 @@ class LoadBalancersTests(TestCase):
         self.treq.content.return_value = succeed(error_body)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': '12345',
+                                 {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1')
 
@@ -261,16 +261,16 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
         d = add_to_load_balancers('http://url/', 'my-auth-token',
-                                  [{'loadBalancerId': '12345',
+                                  [{'loadBalancerId': 12345,
                                     'port': 80},
-                                   {'loadBalancerId': '54321',
+                                   {'loadBalancerId': 54321,
                                     'port': 81}],
                                   '192.168.1.1')
 
         results = self.successResultOf(d)
 
-        self.assertEqual(sorted(results), [('12345', ('12345', 80)),
-                                           ('54321', ('54321', 81))])
+        self.assertEqual(sorted(results), [(12345, (12345, 80)),
+                                           (54321, (54321, 81))])
 
     def test_remove_from_load_balancer(self):
         """
@@ -282,7 +282,7 @@ class LoadBalancersTests(TestCase):
 
         self.treq.delete.return_value = succeed(response)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
+        d = remove_from_load_balancer('http://url/', 'my-auth-token', 12345, 1)
         self.assertEqual(self.successResultOf(d), None)
 
         self.treq.delete.assert_called_once_with(
@@ -439,8 +439,8 @@ class ServerTests(TestCase):
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': [
-                             {'loadBalancerId': '12345', 'port': 80},
-                             {'loadBalancerId': '54321', 'port': 81}
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
                          ]}
 
         load_balancer_metadata = {
@@ -448,9 +448,9 @@ class ServerTests(TestCase):
             'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}
 
         prepared_load_balancers = [
-            {'loadBalancerId': '12345', 'port': 80,
+            {'loadBalancerId': 12345, 'port': 80,
              'metadata': load_balancer_metadata},
-            {'loadBalancerId': '54321', 'port': 81,
+            {'loadBalancerId': 54321, 'port': 81,
              'metadata': load_balancer_metadata}
         ]
 
@@ -468,8 +468,8 @@ class ServerTests(TestCase):
         wait_for_status.return_value = succeed(server_details)
 
         add_to_load_balancers.return_value = succeed([
-            ('12345', ('10.0.0.1', 80)),
-            ('54321', ('10.0.0.1', 81))
+            (12345, ('10.0.0.1', 80)),
+            (54321, ('10.0.0.1', 81))
         ])
 
         d = launch_server('DFW',
@@ -482,8 +482,8 @@ class ServerTests(TestCase):
         self.assertEqual(
             result,
             (server_details, [
-                ('12345', ('10.0.0.1', 80)),
-                ('54321', ('10.0.0.1', 81))]))
+                (12345, ('10.0.0.1', 80)),
+                (54321, ('10.0.0.1', 81))]))
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
@@ -690,8 +690,8 @@ class ConfigPreparationTests(TestCase):
 # An instance associated with a single load balancer.
 instance_details = (
     {'server': {'id': 'a'}},
-    [('12345', {'nodes': [{'id': '1'}]}),
-     ('54321', {'nodes': [{'id': '2'}]})])
+    [(12345, {'nodes': [{'id': 1}]}),
+     (54321, {'nodes': [{'id': 2}]})])
 
 
 class DeleteServerTests(TestCase):
@@ -716,8 +716,8 @@ class DeleteServerTests(TestCase):
         self.successResultOf(d)
 
         remove_from_load_balancer.has_calls([
-            mock.call('http://dfw.lbaas/', 'my-auth-token', '12345', '1'),
-            mock.call('http://dfw.lbaas/', 'my-auth-token', '54321', '2')
+            mock.call('http://dfw.lbaas/', 'my-auth-token', 12345, 1),
+            mock.call('http://dfw.lbaas/', 'my-auth-token', 54321, 2)
         ], any_order=True)
 
         self.assertEqual(remove_from_load_balancer.call_count, 2)
