@@ -66,14 +66,10 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         """
         Creates a scaling group and returns the path.
         """
-        def _check_create_body(wrapper):
+        def _check_create_response(wrapper):
+            # the body is probably verified by the unit tests - check the
+            # header and status code
             self.assert_response(wrapper, 201, "Create failed.")
-            response = json.loads(wrapper.content)
-            for key in request_body:
-                self.assertEqual(response["group"][key], request_body[key])
-            for key in ("id", "links"):
-                self.assertTrue(key in response["group"])
-
             # now make sure the Location header points to something good!
             return path_only(self.get_location_header(wrapper))
 
@@ -84,7 +80,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         }
         deferred = request(
             root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body))
-        deferred.addCallback(_check_create_body)
+        deferred.addCallback(_check_create_response)
         return deferred
 
     # this is not a defer.inlineCallbacks because checking the state and the

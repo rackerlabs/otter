@@ -7,13 +7,14 @@ import json
 
 from twisted.internet import defer
 
+from otter import controller
+
 from otter.json_schema.rest_schemas import create_group_request
+from otter.rest.application import app, get_autoscale_links, get_store
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.application import app, get_autoscale_links, get_store
-
-from otter import controller
+from otter.rest.policies import policy_dict_to_list
 
 
 def format_state_dict(state_dict, tenant_id, group_id):
@@ -253,11 +254,25 @@ def create_new_scaling_group(request, log, tenantId, data):
                 },
                 "scalingPolicies": [
                     {
+                        "id": "{policyId1}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
+                            "rel": "self"
+                          }
+                        ],
                         "name": "scale up by 10",
                         "change": 10,
                         "cooldown": 5
                     }
                     {
+                        "id": "{policyId2}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
+                            "rel": "self"
+                          }
+                        ],
                         "name": 'scale down 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
@@ -271,12 +286,10 @@ def create_new_scaling_group(request, log, tenantId, data):
         uuid = result['id']
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
-        wrapped = {
-            "id": uuid,
-            "links": get_autoscale_links(tenantId, uuid)
-        }
-        wrapped.update(data)
-        return {"group": wrapped}
+        result["links"] = get_autoscale_links(tenantId, uuid)
+        result["scalingPolicies"] = policy_dict_to_list(
+            result["scalingPolicies"], tenantId, uuid)
+        return {"group": result}
 
     deferred = get_store().create_scaling_group(
         log, tenantId, data['groupConfiguration'], data['launchConfiguration'],
@@ -419,9 +432,8 @@ def delete_scaling_group(request, log, tenantId, groupId):
 def get_scaling_group_state(request, log, tenantId, groupId):
     """
     Get the current state of the scaling group, including the current set of
-    active entities, the current set of pending entities, the desired number
-    of entities, the current desired number of steady state servers.  This
-    data is returned in the body of the response in JSON format.
+    active entities, number of pending entities, and the desired number
+    of entities.  This data is returned in the body of the response in JSON format.
 
     There is no guarantee about the sort order of the list of active entities.
 

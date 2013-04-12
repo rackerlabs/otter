@@ -15,6 +15,21 @@ from otter.rest.application import (app, get_store, get_autoscale_links, transac
 from otter import controller
 
 
+def policy_dict_to_list(policy_dict, tenantId, groupId):
+    """
+    Takes dictionary of policies mapping policy ids to the policy blobs, and
+    transforms them into a list of dictionaries that contain the keys 'id' and
+    'links'.
+    """
+    policy_list = []
+    for policy_uuid, policy_item in policy_dict.iteritems():
+        policy_item['id'] = policy_uuid
+        policy_item['links'] = get_autoscale_links(
+            tenantId, groupId, policy_uuid)
+        policy_list.append(policy_item)
+    return policy_list
+
+
 @app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
            methods=['GET'])
 @with_transaction_id()
@@ -90,15 +105,8 @@ def list_policies(request, log, tenantId, groupId):
         }
     """
     def format_policies(policy_dict):
-        policy_list = []
-        for policy_uuid, policy_item in policy_dict.iteritems():
-            policy_item['id'] = policy_uuid
-            policy_item['links'] = get_autoscale_links(
-                tenantId, groupId, policy_uuid)
-            policy_list.append(policy_item)
-
         return {
-            'policies': policy_list,
+            'policies': policy_dict_to_list(policy_dict, tenantId, groupId),
             "policies_links": []
         }
 
