@@ -432,9 +432,8 @@ def delete_scaling_group(request, log, tenantId, groupId):
 def get_scaling_group_state(request, log, tenantId, groupId):
     """
     Get the current state of the scaling group, including the current set of
-    active entities, the current set of pending entities, the desired number
-    of entities, the current desired number of steady state servers.  This
-    data is returned in the body of the response in JSON format.
+    active entities, number of pending entities, and the desired number
+    of entities.  This data is returned in the body of the response in JSON format.
 
     There is no guarantee about the sort order of the list of active entities.
 

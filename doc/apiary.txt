@@ -202,23 +202,6 @@ POST /{tenantId}/groups
                 "changePercent": -5.5,
                 "cooldown": 6,
                 "type": "webhook"
-            },
-            {
-                "id": "{policyId3}",
-                "links": [
-                  {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "self"
-                  },
-                  {
-                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "bookmark"
-                  }
-                ],
-                "name": 'set number of servers to 10',
-                "steadyState": 10,
-                "cooldown": 3,
-                "type": "webhook"
             }
         ]
     }
@@ -321,9 +304,8 @@ DELETE /{tenantId}/groups/{groupId}
 
 
 Get the current state of the scaling group, including the current set of
-active entities, the current set of pending entities, the desired number
-of entities, the current desired number of steady state servers.  This
-data is returned in the body of the response in JSON format.
+active entities, the number of pending entities, the and the desired number
+of entities.  This data is returned in the body of the response in JSON format.
 GET /{tenantId}/groups/{groupId}/state
 < 200
 < Content-Type: application/json
