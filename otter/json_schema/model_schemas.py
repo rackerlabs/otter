@@ -54,7 +54,7 @@ manifest = {
 #         "cooldown": 5
 #     },
 #     "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
-#         "name": "scale down a 5.5 percent because of a tweet",
+#         "name": "scale down by 5.5 percent",
 #         "changePercent": -5.5,
 #         "cooldown": 6
 #     }
