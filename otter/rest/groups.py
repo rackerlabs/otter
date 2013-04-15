@@ -190,7 +190,7 @@ def create_new_scaling_group(request, log, tenantId, data):
                     "cooldown": 5
                 },
                 {
-                    "name": 'scale down 5.5 percent',
+                    "name": 'scale down by 5.5 percent',
                     "changePercent": -5.5,
                     "cooldown": 6
                 }
@@ -273,7 +273,7 @@ def create_new_scaling_group(request, log, tenantId, data):
                             "rel": "self"
                           }
                         ],
-                        "name": 'scale down 5.5 percent',
+                        "name": 'scale down by 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
                     }
@@ -382,7 +382,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                             "rel": "self"
                           }
                         ],
-                        "name": 'scale down 5.5 percent',
+                        "name": 'scale down by 5.5 percent',
                         "changePercent": -5.5,
                         "cooldown": 6
                     }

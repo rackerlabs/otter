@@ -139,7 +139,7 @@ def create_policies(request, log, tenantId, groupId, data):
                 "cooldown": 150
             },
             {
-                "name": 'scale down 5.5 percent',
+                "name": 'scale down by 5.5 percent',
                 "changePercent": -5.5,
                 "cooldown": 6
             }
@@ -169,7 +169,7 @@ def create_policies(request, log, tenantId, groupId, data):
                             "rel": "self"
                         }
                     ],
-                    "name": 'scale down 5.5 percent',
+                    "name": 'scale down by 5.5 percent',
                     "changePercent": -5.5,
                     "cooldown": 6
                 }
