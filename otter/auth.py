@@ -38,7 +38,6 @@ class ImpersonationAuthenticator(object):
         d = authenticate_user(self._identity_url,
                               self._service_user,
                               self._service_api_key)
-        d.addCallback(_print)
         d.addCallback(extract_token)
 
         def find_user(impersonator_token):
@@ -51,14 +50,22 @@ class ImpersonationAuthenticator(object):
         d.addCallback(find_user)
 
         def impersonate((impersonator_token, user)):
-            return impersonate_user(self._internal_url,
-                                    impersonator_token,
-                                    user)
+            iud = impersonate_user(self._internal_url,
+                                   impersonator_token,
+                                   user)
+            iud.addCallback(extract_token)
+            iud.addCallback(lambda token: (impersonator_token, token))
+            return iud
 
         d.addCallback(impersonate)
-        d.addCallback(_print)
-        d.addCallback(extract_token)
-        d.addErrback(_printf)
+
+        def endpoints((impersonator_token, token)):
+            scd = service_catalog(self._internal_url, impersonator_token, token)
+            scd.addCallback(lambda catalog: (token, catalog.get('endpoints', [])))
+            return scd
+
+        d.addCallback(endpoints)
+
         return d
 
 
@@ -67,7 +74,6 @@ def extract_token(resp):
 
 
 def _printf(failure):
-    import pdb; pdb.set_trace()
     print failure.value
 
 
@@ -75,6 +81,16 @@ def _print(r):
     import pprint
     pprint.pprint(r)
     return r
+
+
+def service_catalog(auth_endpoint, impersonator_token, auth_token):
+    d = treq.get(auth_endpoint + '/tokens/' + auth_token + '/endpoints',
+                 headers={'accept': ['application/json'],
+                          'content-type': ['application/json'],
+                          'x-auth-token': [impersonator_token]})
+
+    d.addCallback(treq.json_content)
+    return d
 
 
 def lookup_user(auth_endpoint, auth_token, tenant_id):
@@ -134,7 +150,7 @@ if __name__ == '__main__':
         ia = ImpersonationAuthenticator(username, api_key, identity_url=staging,
                                         internal_url=staging)
 
-        r = yield ia.impersonate_tenant(416511)
+        r = yield ia.token_for_tenant('5821004')
         _print(r)
 
     react(main, sys.argv[1:])
