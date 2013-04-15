@@ -14,8 +14,9 @@ from twisted.application.service import MultiService
 from twisted.web.server import Site
 
 from otter.rest.application import root, set_store
-from otter.models.cass import CassScalingGroupCollection
+from otter.util.config import set_config_data, config_value
 
+from otter.models.cass import CassScalingGroupCollection
 from silverberg.cluster import RoundRobinCassandraCluster
 
 
@@ -53,14 +54,16 @@ def makeService(config):
     """
     Set up the otter-api service.
     """
-    if not config.get('mock', False):
+    set_config_data(config)
+
+    if not config_value('mock'):
         seed_endpoints = [
             clientFromString(reactor, str(host))
-            for host in config['cassandra']['seed_hosts']]
+            for host in config_value('cassandra.seed_hosts')]
 
         cassandra_cluster = RoundRobinCassandraCluster(
             seed_endpoints,
-            config['cassandra']['keyspace'])
+            config_value('cassandra.keyspace'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
@@ -69,7 +72,7 @@ def makeService(config):
     site = Site(root)
     site.displayTracebacks = False
 
-    api_service = service(str(config['port']), site)
+    api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
 
     return s
