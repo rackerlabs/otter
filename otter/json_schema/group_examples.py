@@ -113,7 +113,7 @@ def policy():
             "type": "webhook"
         },
         {
-            "name": 'scale down a 5.5 percent because of a tweet',
+            "name": 'scale down 5.5 percent',
             "changePercent": -5.5,
             "cooldown": 6,
             "type": "webhook"
