@@ -30,7 +30,7 @@ def config_value(name):
         value = config.get(part)
 
         if isinstance(value, dict) and parts:
-                config = value
-                value = None
+            config = value
+            value = None
 
     return value

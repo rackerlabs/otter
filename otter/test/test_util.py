@@ -163,7 +163,7 @@ class ConfigTest(TestCase):
         """
         self.assertEqual(config.config_value('baz.bax'), 'quux')
 
-    def test_non_existant_value(self):
+    def test_non_existent_value(self):
         """
         config_value will return None if the path does not exist in the
         nested dictionaries.
