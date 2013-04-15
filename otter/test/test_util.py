@@ -8,7 +8,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.util.http import append_segments
 from otter.util.hashkey import generate_capability
-from otter.util import timestamp
+from otter.util import timestamp, config
 
 
 class HTTPUtilityTests(TestCase):
@@ -136,3 +136,36 @@ class TimestampTests(TestCase):
         # the parsed timezone is not None.  Then replace with None to compare.
         self.assertTrue(parsed.tzinfo is not None)
         self.assertEqual(parsed.replace(tzinfo=None), datetime.min)
+
+
+class ConfigTest(TestCase):
+    """
+    Test the simple configuration API.
+    """
+    def setUp(self):
+        """
+        Set up a basic configuration dictionary.
+        """
+        config.set_config_data({
+            'foo': 'bar',
+            'baz': {'bax': 'quux'}
+        })
+
+    def test_top_level_value(self):
+        """
+        config_value returns the value stored at the top level key.
+        """
+        self.assertEqual(config.config_value('foo'), 'bar')
+
+    def test_nested_value(self):
+        """
+        config_value returns the value stored at a . separated path.
+        """
+        self.assertEqual(config.config_value('baz.bax'), 'quux')
+
+    def test_non_existent_value(self):
+        """
+        config_value will return None if the path does not exist in the
+        nested dictionaries.
+        """
+        self.assertIdentical(config.config_value('baz.blah'), None)
