@@ -296,7 +296,9 @@ GET /{tenantId}/groups/{groupId}
 
 
 Delete a scaling group if there are no entities belonging to the scaling
-group.  If successful, no response body will be returned.
+group.  If successful, no response body will be returned.  If there are
+pending or active entities, a 409 will be returned.
+
 DELETE /{tenantId}/groups/{groupId}
 < 204
 < Content-Type: application/json
@@ -645,9 +647,10 @@ If successful, no response body will be returned.
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
 > Accepts: application/json
 {
-    "name": "scale up by two servers",
-    "change": 2,
-    "cooldown": 150
+    "name": 'scale down a 5.5 percent because of a tweet',
+    "changePercent": -5.5,
+    "cooldown": 6,
+    "type": "webhook"
 }
 < 204
 
@@ -675,45 +678,108 @@ policy.
 /tenantId/groups/groupId/policy/policyId/webhook/webhookId)
 --
 
-Get a mapping of IDs to their respective scaling policy webhooks.
-Each webhook has a name, url, and cooldown.
+Get a list of webhooks and their IDs.
 This data is returned in the body of the response in JSON format.
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
 < 200
 < Content-Type: application/json
 {
-    "42fa3cb-bfb0-44c0-85fa-3cfbcbe5c257": {
-        "name": "pagerduty",
-        "URL":
-            "autoscale.api.rackspacecloud.com/v1.0/action/
-            d0f4c14c48ad4837905ea7520cc4af700f6433ce0985e6bb87b6b461
-            7cb944abf814bd53964ddbf55b41e5812b3afe90890c0a4db75cb043
-            67e139fd62eab2e1",
-        "cooldown": 150
-    },
-    "b556078a-8c29-4129-9411-72580ffd0ba0": {
-        "name": "maas",
-        "URL":
-            "autoscale.api.rackspacecloud.com/v1.0/action/
-            db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
-            d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
-            f1e4df963414dbfe",
-        "cooldown": 150
-    }
+    "webhooks": [
+        {
+            "id":"{webhookId1}",
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            },
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash1}/,
+                    "rel": "capability"
+                }
+            ]
+        },
+        {
+            "id":"{webhookId2}",
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Bob"
+            },
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash2}/,
+                    "rel": "capability"
+                }
+            ]
+        }
+    ],
+    "webhooks_links": []
 }
 
 
-Create a new scaling policy webhook. Scaling policies must include a name
-and cooldown.
-The response header will point to the generated policy webhook resource.
+Create one or more new scaling policy webhooks. Webhooks must have a name.
+If successful, the created response body will contain the IDs and links to the
+newly created webhooks.
 This data provided in the request body in JSON format.
 POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
 > Accepts: application/json
-{
-    "name": "the best webhook ever",
-    "cooldown": 150
-}
+[
+    {
+        "name": "alice",
+        "metadata": {
+            "notes": "this is for Alice"
+        }
+    },
+    {
+        "name": "bob"
+    }
+]
 < 201
+< Content-Type: application/json
+{
+    "webhooks": [
+        {
+            "id":"{webhookId1}",
+            "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            },
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash1}/,
+                    "rel": "capability"
+                }
+            ]
+        },
+        {
+            "id":"{webhookId2}",
+            "name": "bob",
+            "metadata": {},
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash2}/,
+                    "rel": "capability"
+                }
+            ]
+        }
+    ]
+}
+
 
 
 Get information about a specific scaling policy webhook.
@@ -723,13 +789,21 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
 < 200
 < Content-Type: application/json
 {
-    "name": "pagerduty",
-    "URL":
-        "autoscale.api.rackspacecloud.com/v1.0/action/
-        db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
-        d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
-        f1e4df963414dbfe",
-    "cooldown": 150
+    "webhook": {
+        "id":"{webhookId}",
+        "name": "webhook name",
+        "metadata": {},
+        "links": [
+            {
+                "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/",
+                "rel": "self"
+            },
+            {
+                "href": ".../execute/1/{capability_hash2},
+                "rel": "capability"
+            }
+        ]
+    }
 }
 
 
@@ -740,13 +814,10 @@ If successful, no response body will be returned.
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
 > Accepts: application/json
 {
-    "name": "something completely different",
-    "URL":
-        "autoscale.api.rackspacecloud.com/v1.0/action/
-        db48c04dc6a93f7507b78a0dc37a535fa1f06e1a45ba138d30e3d4b4
-        d8addce944e11b6cbc3134af0d203058a40bd239766f97dbcbca5dff
-        f1e4df963414dbfe",
-    "cooldown": 777
+    "name": "alice",
+    "metadata": {
+        "notes": "this is for Alice"
+    }
 }
 < 204
 
