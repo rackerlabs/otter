@@ -985,9 +985,10 @@ class CassScalingGroupCollection:
         the row instead of the index that picks out what has not been deleted.
         """
         def _do_webhook_lookup(webhook_rec):
-            res = _unwrap_one_row(webhook_rec)
-            if res is None:
+            res = _jsonize_cassandra_data(webhook_rec)
+            if len(res) == 0:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
+            res = res[0]
             if res['deleted'] is True:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             return (res['tenantId'], res['groupId'], res['policyId'])
