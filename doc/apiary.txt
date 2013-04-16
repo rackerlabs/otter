@@ -783,7 +783,6 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
 
 
 Get information about a specific scaling policy webhook.
-Each webhook has a name, url, and cooldown.
 This data is returned in the body of the response in JSON format.
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
 < 200

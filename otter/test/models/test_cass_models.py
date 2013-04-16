@@ -1705,7 +1705,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         Test that a bad webhook will fail predictably
         """
-        self.returns = [None]
+        self.returns = [[]]
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
