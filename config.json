@@ -2,5 +2,9 @@
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter"
+    },
+    "identity": {
+        "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
+        "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
     }
 }
