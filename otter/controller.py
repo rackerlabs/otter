@@ -215,6 +215,7 @@ def calculate_delta(log, state, config, policy):
     if "change" in policy:
         change = policy['change']
     elif "changePercent" in policy:
+        percentage = policy["changePercent"]
         with localcontext() as lc:
             lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
             change = int((current * (Decimal(percentage) / 100)).to_integral_value())
