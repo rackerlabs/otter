@@ -5,6 +5,9 @@ Functions for resolving authentication information.
 import json
 import treq
 
+from otter.util.config import config_value
+from otter.util.http import headers, check_success
+
 
 def authenticate_tenant(tenant_id):
     """
@@ -17,17 +20,12 @@ def authenticate_tenant(tenant_id):
     raise NotImplementedError()
 
 
-DEFAULT_INTERNAL_IDENTITY_API_URL = 'https://identity-internal.api.rackspacecloud.com/v2.0'
-DEFAULT_IDENTITY_API_URL = 'https://identity.api.rackspacecloud.com/v2.0'
-
-
 class ImpersonationAuthenticator(object):
-    def __init__(self, service_user, service_api_key,
-                 identity_url=None, internal_url=None):
+    def __init__(self, service_user, service_api_key, url, admin_url):
         self._service_user = service_user
         self._service_api_key = service_api_key
-        self._identity_url = identity_url or DEFAULT_IDENTITY_API_URL
-        self._internal_url = internal_url or DEFAULT_INTERNAL_IDENTITY_API_URL
+        self._url = url
+        self._admin_url = admin_url
 
     def token_for_tenant(self, tenant_id):
         """
@@ -35,14 +33,14 @@ class ImpersonationAuthenticator(object):
         :returns: a deferred that fires with a 2-tuple of auth-token and
             service catalog.
         """
-        d = authenticate_user(self._identity_url,
+        d = authenticate_user(self._url,
                               self._service_user,
                               self._service_api_key)
         d.addCallback(extract_token)
 
         def find_user(impersonator_token):
             return lookup_user(
-                self._internal_url,
+                self._admin_url,
                 impersonator_token,
                 tenant_id).addCallback(
                     lambda users: (impersonator_token, users['users'][0]['username']))
@@ -50,7 +48,7 @@ class ImpersonationAuthenticator(object):
         d.addCallback(find_user)
 
         def impersonate((impersonator_token, user)):
-            iud = impersonate_user(self._internal_url,
+            iud = impersonate_user(self._admin_url,
                                    impersonator_token,
                                    user)
             iud.addCallback(extract_token)
@@ -60,7 +58,7 @@ class ImpersonationAuthenticator(object):
         d.addCallback(impersonate)
 
         def endpoints((impersonator_token, token)):
-            scd = service_catalog(self._internal_url, impersonator_token, token)
+            scd = service_catalog(self._admin_url, impersonator_token, token)
             scd.addCallback(lambda catalog: (token, catalog.get('endpoints', [])))
             return scd
 
@@ -73,22 +71,10 @@ def extract_token(resp):
     return resp['access']['token']['id'].encode('ascii')
 
 
-def _printf(failure):
-    print failure.value
-
-
-def _print(r):
-    import pprint
-    pprint.pprint(r)
-    return r
-
-
 def service_catalog(auth_endpoint, impersonator_token, auth_token):
     d = treq.get(auth_endpoint + '/tokens/' + auth_token + '/endpoints',
-                 headers={'accept': ['application/json'],
-                          'content-type': ['application/json'],
-                          'x-auth-token': [impersonator_token]})
-
+                 headers=headers(impersonator_token))
+    d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
 
@@ -96,10 +82,8 @@ def service_catalog(auth_endpoint, impersonator_token, auth_token):
 def lookup_user(auth_endpoint, auth_token, tenant_id):
     d = treq.get(
         auth_endpoint + '/tenants/' + str(tenant_id) + '/users',
-        headers={'accept': ['application/json'],
-                 'content-type': ['application/json'],
-                 'x-auth-token': [auth_token]})
-
+        headers=headers(auth_token))
+    d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
 
@@ -118,6 +102,7 @@ def authenticate_user(auth_endpoint, username, password):
             }),
         headers={'accept': ['application/json'],
                  'content-type': ['application/json']})
+    d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
 
@@ -131,26 +116,29 @@ def impersonate_user(auth_endpoint, impersonater_token, username, expires_in=108
                 "expire-in-seconds": expires_in
             }
         }),
-        headers={'accept': ['application/json'],
-                 'content-type': ['application/json'],
-                 'X-Auth-Token': [impersonater_token]})
+        headers=headers(impersonater_token))
+    d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
 
 
 if __name__ == '__main__':
     import sys
+    import pprint
+    import jsonfig
 
     from twisted.internet.task import react
     from twisted.internet.defer import inlineCallbacks
+    from otter.util.config import set_config_data
+    set_config_data(jsonfig.from_path('config.json'))
 
     @inlineCallbacks
     def main(reactor, username, api_key):
-        staging = 'https://staging.identity.api.rackspacecloud.com/v2.0'
-        ia = ImpersonationAuthenticator(username, api_key, identity_url=staging,
-                                        internal_url=staging)
+        ia = ImpersonationAuthenticator(username, api_key,
+                                        url=config_value('identity.url').encode('ascii'),
+                                        admin_url=config_value('identity.admin_url').encode('ascii'))
 
         r = yield ia.token_for_tenant('5821004')
-        _print(r)
+        pprint.pprint(r)
 
     react(main, sys.argv[1:])
