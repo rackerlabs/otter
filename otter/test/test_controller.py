@@ -218,7 +218,7 @@ class CalculateDeltaTestCase(TestCase):
         and the current active + pending is at the min already,
         then ``calculate_delta`` returns 0.
         """
-        fake_policy = {'change': -50}
+        fake_policy = {'changePercent': -50}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
         fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
 

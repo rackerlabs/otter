@@ -211,18 +211,13 @@ def calculate_delta(log, state, config, policy):
                    pending=len(state['pending'])).info("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
-    def percent_number(current, percentage):
-        "Return the number of servers w.r.t to change percentage"
-        with localcontext() as lc:
-            lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
-            return int((current * (Decimal(percentage) / 100))
-                       .to_integral_value())
-
     current = len(state['active']) + len(state['pending'])
     if "change" in policy:
         change = policy['change']
     elif "changePercent" in policy:
-        change = percent_number(current, policy["changePercent"])
+        with localcontext() as lc:
+            lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
+            change = int((current * (Decimal(percentage) / 100)).to_integral_value())
     else:
         raise NotImplementedError()
 
