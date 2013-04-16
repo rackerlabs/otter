@@ -1,15 +1,13 @@
 """
-Test to make sure repose is set up correctly to auth against an identity server
+Basic test to make sure repose is set up mostly correctly to auth against an
+identity server, and that webhooks do not need authorization
 """
-from __future__ import print_function
-
 from argparse import ArgumentParser
 import json
-import sys
 
 import treq
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer, task
 
 from otter.util.http import append_segments
 from otter.util.deferredutils import unwrap_first_error
@@ -43,7 +41,7 @@ def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_headers):
     """
     Try to get groups, which returns with a 200 because it is authenticated.
     """
-    d = treq.get('http://localhost:8080/v1.0/5821004/groups/',
+    d = treq.get(append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups'),
                  headers=auth_headers)
 
     def check_200(response):
@@ -116,17 +114,7 @@ def run_authorized_tests(token_and_tenant, args):
         consumeErrors=True)
 
 
-def fail_test(failure):
-    """
-    Print the actual failure traceback and exit with 1
-    """
-    failure = unwrap_first_error(failure)
-    print(failure.getTraceback())
-    reactor.stop()
-    sys.exit(1)
-
-
-def run_all_tests(args):
+def run_all_tests(_, args):
     """
     Run the authenticated and unauthenticated tests
     """
@@ -134,9 +122,8 @@ def run_all_tests(args):
         [get_token_and_tenant(args.identity, args.username, args.apikey).addCallback(
             run_authorized_tests, args),
          test_webhook_doesnt_need_authentication(args.repose)])
-    d.addCallback(lambda _: reactor.stop())
-    d.addErrback(fail_test)
-    reactor.run()
+    d.addErrback(unwrap_first_error)  # get the actual error returned
+    return d
 
 
 def cli():
@@ -159,7 +146,8 @@ def cli():
         '--identity-endpoint', type=str, dest='identity',
         help='URL of identity service: default {0}'.format(default_identity),
         default=default_identity)
-    return run_all_tests(parser.parse_args())
+
+    task.react(run_all_tests, [parser.parse_args()])
 
 
 cli()
