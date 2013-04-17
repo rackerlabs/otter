@@ -150,7 +150,7 @@ General test guidelines
 #. Test modules, classes, and methods should also all have docstrings explaining the test.
 #. Each test method should try to limit the scope of testing (like how experiments should only test 1
    variable at a time)
-#. Each test assertion should follow the convention of (observed, expected).
+#. Each test's equality assertions should follow the convention of (observed, expected).
 
 ------------------
 Mocking guidelines
