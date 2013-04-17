@@ -117,5 +117,11 @@ def policy():
             "changePercent": -5.5,
             "cooldown": 6,
             "type": "webhook"
+        },
+        {
+            "name": 'set number of servers to 10',
+            "steadyState": 10,
+            "cooldown": 3,
+            "type": "webhook"
         }
     ]

@@ -201,6 +201,17 @@ policy = {
                 "change": {"required": True}
             },
             "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "type": {"enum": ["webhook"],
+                         "required": True},
+                "steadyState": {"required": True}
+            },
+            "additionalProperties": False
         }
     ],
     "description": (
@@ -238,6 +249,14 @@ policy = {
                 "-0.5 servers, the actual number of servers that will be "
                 "shut down is 1.")
         },
+        "steadyState": {
+            "type": "integer",
+            "description": (
+                "How many servers there should be in the steady state (an "
+                "absolute number, rather than a delta from the current "
+                "number of servers)."),
+            "minimum": 0
+        },
         "cooldown": {
             "type": "number",
             "description": (
@@ -251,8 +270,7 @@ policy = {
             "enum": ["webhook"],
             "required": True
         }
-    },
-    "additionalProperties": False
+    }
 }
 
 
