@@ -23,6 +23,7 @@ Storage model for state information:
 """
 from datetime import datetime
 import iso8601
+from decimal import Decimal, localcontext, ROUND_HALF_UP, ROUND_HALF_DOWN
 
 from twisted.internet import defer
 
@@ -210,11 +211,18 @@ def calculate_delta(log, state, config, policy):
                    pending=len(state['pending'])).info("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
+    current = len(state['active']) + len(state['pending'])
     if "change" in policy:
-        current = len(state['active']) + len(state['pending'])
-        return constrain(current + policy['change']) - current
+        change = policy['change']
+    elif "changePercent" in policy:
+        percentage = policy["changePercent"]
+        with localcontext() as lc:
+            lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
+            change = int((current * (Decimal(percentage) / 100)).to_integral_value())
     else:
         raise NotImplementedError()
+
+    return constrain(current + change) - current
 
 
 def find_pending_jobs_to_cancel(log, state, delta):
