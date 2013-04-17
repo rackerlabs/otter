@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Basic test to make sure repose is set up mostly correctly to auth against an
 identity server, and that webhooks do not need authorization
