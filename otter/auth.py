@@ -154,7 +154,7 @@ def authenticate_user(auth_endpoint, username, password):
     return d
 
 
-def impersonate_user(auth_endpoint, impersonater_token, username, expires_in=10800):
+def impersonate_user(auth_endpoint, impersonater_token, username, expire_in=10800):
     """
     Acquire an auth-token for a user via impersonation.
 
@@ -162,7 +162,7 @@ def impersonate_user(auth_endpoint, impersonater_token, username, expires_in=108
     :param str impersonater_token: Auth token that has the appropriate
         permissions to impersonate other users.
     :param str username: Username to impersonate.
-    :param str expires_in: Number of seconds for which the token will be valid.
+    :param str expire_in: Number of seconds for which the token will be valid.
 
     :return: Decoded JSON as dict.
     """
@@ -172,7 +172,7 @@ def impersonate_user(auth_endpoint, impersonater_token, username, expires_in=108
         json.dumps({
             "RAX-AUTH:impersonation": {
                 "user": {"username": username},
-                "expire-in-seconds": expires_in
+                "expire-in-seconds": expire_in
             }
         }),
         headers=headers(impersonater_token))
