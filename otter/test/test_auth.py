@@ -282,7 +282,8 @@ class ImpersonatingAuthenticatorTests(TestCase):
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
 
-        self.endpoints_for_token.assert_called_once_with(self.admin_url, 'auth-token', 'impersonation_token')
+        self.endpoints_for_token.assert_called_once_with(
+            self.admin_url, 'auth-token', 'impersonation_token')
 
     def test_authenticate_tenant_returns_impersonation_token_and_endpoint_list(self):
         """
@@ -379,9 +380,8 @@ class AuthenticateTenantTests(TestCase):
         authenticate_tenant returns tokens and endpoints from the authenticator's
         method.
         """
-        self.ia.return_value.authenticate_tenant.return_value = succeed(('impersonation_token', [{'name': 'anEndpoint'}]))
+        self.ia.return_value.authenticate_tenant.return_value = succeed(
+            ('impersonation_token', [{'name': 'anEndpoint'}]))
 
         result = self.successResultOf(authenticate_tenant(111111))
         self.assertEqual(result, ('impersonation_token', [{'name': 'anEndpoint'}]))
-
-
