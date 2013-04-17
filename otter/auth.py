@@ -1,5 +1,38 @@
 """
 Functions for interacting with the authentication API.
+
+This module is primarily concerned with with impersonating customer accounts
+and accessing the service catalog for those accounts to inform the worker
+components about the location of API endpoints in a general way.
+
+The current workflow for impersonating a customer is as follows:
+
+#. Authenticate as our service account (username: autoscale)
+#. Given a tenant ID
+ #. Find a user for that tenant ID.
+    NOTE: Currently tenants only have a single user.  In a multi-user future,
+    we'll need to find a user that has the appropriate capabilities to execute
+    the scaling policy, so the ability create/destroy servers and add/remove
+    nodes from load balancers.  This will require getting the list of users,
+    and for each user requesting their roles.
+
+    In a good multi-user future tenants that wish to use autoscaling
+    should just give the appropriate roles to an autoscale user. Instead of
+    requiring impersonation.
+
+ #. Impersonate the user by name.
+ #. Retrieve a service catalog (the list of API endpoitns) for the user by
+    token ID.
+
+The implemented workflow uses only v2.0 APIs and so it makes some assumptions
+about the featureset of the world.  It currently chooses the first (and only)
+user for a tenant and impersonates them.  There is a mosso API in Identity Admin
+v1.1 that can give you a single (probably default) user for a given tenant but
+it is not currently being used.
+
+This API also currently makes use of features of the Identity Admin v2.0 API
+that are only availabe in staging (listing users for a tenant, and endpoints for
+a token.)
 """
 
 import json
