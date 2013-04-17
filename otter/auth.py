@@ -58,12 +58,12 @@ def authenticate_tenant(tenant_id):
 
 class _ImpersonatingAuthenticator(object):
     """
-    An authentication handler that first uses a service account to authenticate
+    An authentication handler that first uses a identity admin account to authenticate
     and then impersonates the desired tenant_id.
     """
-    def __init__(self, service_user, service_password, url, admin_url):
-        self._service_user = service_user
-        self._service_password = service_password
+    def __init__(self, identity_admin_user, identity_admin_password, url, admin_url):
+        self._identity_admin_user = identity_admin_user
+        self._identity_admin_password = identity_admin_password
 
         # XXX: TODO: This is not the correct way to deal with unicode URLs.
         # Maybe append_segments should support it better.
@@ -77,25 +77,25 @@ class _ImpersonatingAuthenticator(object):
             service catalog.
         """
         d = authenticate_user(self._url,
-                              self._service_user,
-                              self._service_password)
+                              self._identity_admin_user,
+                              self._identity_admin_password)
         d.addCallback(extract_token)
 
-        def find_user(impersonator_token):
+        def find_user(identity_admin_token):
             return users_for_tenant(
                 self._admin_url,
-                impersonator_token,
+                identity_admin_token,
                 tenant_id).addCallback(
-                    lambda users: (impersonator_token, users['users'][0]['username']))
+                    lambda users: (identity_admin_token, users['users'][0]['username']))
 
         d.addCallback(find_user)
 
-        def impersonate((impersonator_token, user)):
+        def impersonate((identity_admin_token, user)):
             iud = impersonate_user(self._admin_url,
-                                   impersonator_token,
+                                   identity_admin_token,
                                    user)
             iud.addCallback(extract_token)
-            iud.addCallback(lambda token: (impersonator_token, token))
+            iud.addCallback(lambda token: (identity_admin_token, token))
             return iud
 
         d.addCallback(impersonate)
@@ -187,12 +187,12 @@ def authenticate_user(auth_endpoint, username, password):
     return d
 
 
-def impersonate_user(auth_endpoint, impersonater_token, username, expire_in=10800):
+def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10800):
     """
     Acquire an auth-token for a user via impersonation.
 
     :param str auth_endpoint: Identity API endpoint URL.
-    :param str impersonater_token: Auth token that has the appropriate
+    :param str identity_admin_token: Auth token that has the appropriate
         permissions to impersonate other users.
     :param str username: Username to impersonate.
     :param str expire_in: Number of seconds for which the token will be valid.
@@ -208,7 +208,7 @@ def impersonate_user(auth_endpoint, impersonater_token, username, expire_in=1080
                 "expire-in-seconds": expire_in
             }
         }),
-        headers=headers(impersonater_token))
+        headers=headers(identity_admin_token))
     d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
