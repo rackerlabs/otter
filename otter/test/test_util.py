@@ -96,34 +96,41 @@ class HTTPUtilityTests(TestCase):
         self.assertEqual(f.value.code, 404)
         self.assertEqual(f.value.body, 'Not Found.')
 
-    def test_auth_headers_content_type(self):
+    def test_headers_content_type(self):
         """
-        auth_headers will use a json content-type.
+        headers will use a json content-type.
         """
         self.assertEqual(
             headers('any')['content-type'], ['application/json'])
 
-    def test_auth_headers_accept(self):
+    def test_headers_accept(self):
         """
-        auth_headers will use a json accept header.
+        headers will use a json accept header.
         """
         self.assertEqual(
             headers('any')['accept'], ['application/json'])
 
-    def test_auth_headers_sets_auth_token(self):
+    def test_headers_sets_auth_token(self):
         """
-        auth_headers will set the X-Auth-Token header based on it's auth_token
+        headers will set the X-Auth-Token header based on it's auth_token
         argument.
         """
         self.assertEqual(
             headers('my-auth-token')['x-auth-token'], ['my-auth-token'])
 
-    def test_auth_headers_can_be_http_headers(self):
+    def test_headers_can_be_http_headers(self):
         """
-        auth_headers will produce a result that can be passed to
+        headers will produce a result that can be passed to
         twisted.web.http_headers.Headers.
         """
         self.assertIsInstance(Headers(headers('my-auth-token')), Headers)
+
+    def test_headers_optional_auth_token(self):
+        """
+        headers will produce a dictionary without the x-auth-token header if no
+        auth token is given.
+        """
+        self.assertNotIn('x-auth-token', headers())
 
 
 class CapabilityTests(TestCase):

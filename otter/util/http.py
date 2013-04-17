@@ -68,13 +68,17 @@ def check_success(response, success_codes):
     return response
 
 
-def headers(auth_token):
+def headers(auth_token=None):
     """
     Generate an appropriate set of headers given an auth_token.
 
-    :param str auth_token: The auth_token.
+    :param str auth_token: The auth_token or None.
     :return: A dict of common headers.
     """
-    return {'content-type': ['application/json'],
-            'accept': ['application/json'],
-            'x-auth-token': [auth_token]}
+    h = {'content-type': ['application/json'],
+         'accept': ['application/json']}
+
+    if auth_token is not None:
+        h['x-auth-token'] = [auth_token]
+
+    return h

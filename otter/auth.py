@@ -132,7 +132,6 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
 
     :return: decoded JSON response as dict.
     """
-
     d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
                  headers=headers(identity_admin_token))
     d.addCallback(check_success, [200, 203])
@@ -180,8 +179,7 @@ def authenticate_user(auth_endpoint, username, password):
                     }
                 }
             }),
-        headers={'accept': ['application/json'],
-                 'content-type': ['application/json']})
+        headers=headers())
     d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
@@ -199,7 +197,6 @@ def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10
 
     :return: Decoded JSON as dict.
     """
-
     d = treq.post(
         append_segments(auth_endpoint, 'RAX-AUTH', 'impersonation-tokens'),
         json.dumps({
