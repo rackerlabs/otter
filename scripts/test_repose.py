@@ -4,18 +4,63 @@ identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
 import json
+from urlparse import urlparse
 
 import treq
 
-from twisted.internet import defer, task
+from twisted.internet import defer, error, task
 
 from otter.util.http import append_segments
 from otter.util.deferredutils import unwrap_first_error
+
 
 default_identity = "https://staging.identity.api.rackspacecloud.com/v2.0/"
 
 content_type = {'content-type': ['application/json'],
                 'accept': ['application/json']}
+
+
+def wrap_connection_timeout(failure, url):
+    """
+    Connection timeouts aren't useful becuase they don't contain the netloc
+    that is timing out, so wrap the error.
+    """
+    if failure.check(error.TimeoutError):
+        raise Exception('Timed out trying to hit {0}'.format(
+            urlparse(url).netloc))
+    return failure
+
+
+def check_status_cb(purpose, expected=200):
+    """
+    Get a callback that can be used to check the status of a response and
+    print a nice error message.
+    """
+    def check_status(response):
+        if response.code != expected:
+            raise Exception(
+                "{p} should result in a {e}.  Got {r} instead.".format(
+                    p=purpose, e=expected, r=response.code))
+    return check_status
+
+
+def request(url, method='GET', data=None, auth_token=None):
+    """
+    Makes a treq GET request with the given method and URL.  For headers, takes
+    the content type headers and possibly adds an auth token bit, if provided.
+
+    Also checks that the status is the expected status, and wraps any timeouts
+    to have a more useful error message.
+    """
+    if auth_token is None:
+        headers = content_type
+    else:
+        headers = content_type.copy()
+        headers['x-auth-token'] = [auth_token]
+
+    d = treq.request(method, url, headers=headers, data=data)
+    d.addErrback(wrap_connection_timeout, url)
+    return d
 
 
 def test_webhook_doesnt_need_authentication(repose_endpoint):
@@ -24,56 +69,51 @@ def test_webhook_doesnt_need_authentication(repose_endpoint):
     webhook doesn't exist, a 202 is returned.  But a 4XX certainly shouldn't
     be returned.
     """
-    d = treq.post(
-        append_segments(repose_endpoint, 'v1.0', 'execute', '1', 'random'),
-        headers=content_type)
-
-    def check_202(response):
-        if response.code != 202:
-            raise Exception(
-                ("Executing a webhook without authentication should result "
-                 "in a 202.  Got {0} instead.").format(response.code))
-
-    return d.addCallback(check_202)
+    url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', 'random')
+    d = request(url, method='POST')
+    d.addCallback(check_status_cb('Executing a webhook without authentication',
+                                  expected=202))
+    return d
 
 
-def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_headers):
+def test_list_groups_unauthenticated(repose_endpoint, tenant_id):
+    """
+    Try to get groups, which returns with a 401 because it is unauthenticated
+    """
+    url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
+    d = request(url)
+    d.addCallback(check_status_cb("Listing groups with authentication",
+                                  expected=401))
+    return d
+
+
+def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
     """
     Try to get groups, which returns with a 200 because it is authenticated.
     """
-    d = treq.get(append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups'),
-                 headers=auth_headers)
-
-    def check_200(response):
-        if response.code != 200:
-            raise Exception(
-                ("Listing groups with authentication should result in a 200."
-                 "Got {0} instead.").format(response.code))
-
-    return d.addCallback(check_200)
+    url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
+    d = request(url, auth_token=auth_token)
+    d.addCallback(check_status_cb("Listing groups with authentication"))
+    return d
 
 
-def test_random_url_not_authenticated(repose_endpoint, tenant_id, auth_headers):
+def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
     """
     Try to get some other URL at a different version, which returns with a 401
     because it is neither in the repose client-auth authenticated regex nor is
     it in the repose client-auth whitelist regex.
     """
-    d = treq.get(append_segments(repose_endpoint, 'v10.6', tenant_id, 'groups'),
-                 headers=auth_headers)
-
-    def check_401(response):
-        if response.code != 401:
-            raise Exception(
-                ("Hitting an invalid URL should result in a 401."
-                 "Got {0} instead.").format(response.code))
-
-    return d.addCallback(check_401)
+    url = append_segments(repose_endpoint, 'v10.6', tenant_id, 'groups')
+    d = request(url, auth_token=auth_token)
+    d.addCallback(check_status_cb("Hitting an invalid url even with authentication",
+                                  expected=401))
+    return d
 
 
-def get_token_and_tenant(identity_endpoint, username, api_key):
+def get_user_info(identity_endpoint, username, api_key):
     """
-    Hit auth manually to get a valid auth token with which to test repose
+    Hit auth manually to get a valid auth token (and the tenant ID) with which
+    to test repose
     """
     data = {
         "auth": {
@@ -84,8 +124,8 @@ def get_token_and_tenant(identity_endpoint, username, api_key):
         }
     }
 
-    d = treq.post(append_segments(identity_endpoint, 'tokens'),
-                  headers=content_type, data=json.dumps(data))
+    url = append_segments(identity_endpoint, 'tokens')
+    d = request(url, method='POST', data=json.dumps(data))
 
     def extract_token_and_tenant(response):
         if response.code == 200:
@@ -97,31 +137,30 @@ def get_token_and_tenant(identity_endpoint, username, api_key):
             return contents
         raise Exception('User {0} unauthorized.'.format(username))
 
-    return d.addCallback(extract_token_and_tenant)
+    d.addCallback(extract_token_and_tenant)
+    return d
 
 
-def run_authorized_tests(token_and_tenant, args):
+def run_tests(_, args):
     """
-    Run the tests that require the user to be authenticated
+    Run the authenticated and unauthenticated tests.
     """
-    auth_token, tenant_id = token_and_tenant
-    headers = content_type.copy()
-    headers['x-auth-token'] = [auth_token]
 
-    return defer.gatherResults(
-        # [test_random_url_not_authenticated(args.repose, tenant_id, headers),
-        [test_list_groups_authenticated(args.repose, tenant_id, headers)],
-        consumeErrors=True)
+    def _do_tests(token_and_tenant):
+        """
+        Run the tests that require the user to be authenticated
+        """
+        auth_token, tenant_id = token_and_tenant
 
+        return defer.gatherResults(
+            [test_random_url_authenticated(args.repose, tenant_id, auth_token),
+             test_list_groups_authenticated(args.repose, tenant_id, auth_token),
+             test_list_groups_unauthenticated(args.repose, tenant_id),
+             test_webhook_doesnt_need_authentication(args.repose)],
+            consumeErrors=True)
 
-def run_all_tests(_, args):
-    """
-    Run the authenticated and unauthenticated tests
-    """
-    d = defer.gatherResults(
-        [get_token_and_tenant(args.identity, args.username, args.apikey).addCallback(
-            run_authorized_tests, args),
-         test_webhook_doesnt_need_authentication(args.repose)])
+    d = get_user_info(args.identity, args.username, args.apikey)
+    d.addCallback(_do_tests)
     d.addErrback(unwrap_first_error)  # get the actual error returned
     return d
 
@@ -147,7 +186,7 @@ def cli():
         help='URL of identity service: default {0}'.format(default_identity),
         default=default_identity)
 
-    task.react(run_all_tests, [parser.parse_args()])
+    task.react(run_tests, [parser.parse_args()])
 
 
 cli()
