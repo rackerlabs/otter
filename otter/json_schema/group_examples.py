@@ -120,7 +120,7 @@ def policy():
         },
         {
             "name": 'set number of servers to 10',
-            "steadyState": 10,
+            "desiredCapacity": 10,
             "cooldown": 3,
             "type": "webhook"
         }

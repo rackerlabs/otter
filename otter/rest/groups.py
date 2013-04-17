@@ -196,7 +196,7 @@ def create_new_scaling_group(request, log, tenantId, data):
                 },
                 {
                     "name": 'set number of servers to 10',
-                    "steadyState": 10,
+                    "desiredCapacity": 10,
                     "cooldown": 3
                 }
             ]
@@ -284,7 +284,7 @@ def create_new_scaling_group(request, log, tenantId, data):
                     },
                     {
                         "name": 'set number of servers to 10',
-                        "steadyState": 10,
+                        "desiredCapacity": 10,
                         "cooldown": 3
                     }
                 ]
@@ -405,7 +405,7 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
                           }
                         ],
                         "name": 'set number of servers to 10',
-                        "steadyState": 10,
+                        "desiredCapacity": 10,
                         "cooldown": 3
                     }
                 ]
