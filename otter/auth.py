@@ -20,7 +20,7 @@ def authenticate_tenant(tenant_id):
                                      config_value('identity.password'),
                                      config_value('identity.url'),
                                      config_value('identity.admin_url'))
-    return ia.token_for_tenant(tenant_id)
+    return ia.authenticate_tenant(tenant_id)
 
 
 class _ImpersonatingAuthenticator(object):
@@ -37,7 +37,7 @@ class _ImpersonatingAuthenticator(object):
         self._url = url.encode('ascii')
         self._admin_url = admin_url.encode('ascii')
 
-    def token_for_tenant(self, tenant_id):
+    def authenticate_tenant(self, tenant_id):
         """
         :param tenant_id: The keystone tenant_id we wish to impersonate.
         :returns: a deferred that fires with a 2-tuple of auth-token and
@@ -179,27 +179,3 @@ def impersonate_user(auth_endpoint, impersonater_token, username, expire_in=1080
     d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
-
-
-if __name__ == '__main__':
-    import sys
-    import pprint
-    import jsonfig
-
-    from twisted.internet.task import react
-    from twisted.internet.defer import inlineCallbacks
-
-    from otter.util.config import set_config_data
-
-    set_config_data(jsonfig.from_path('config.json'))
-
-    @inlineCallbacks
-    def main(reactor, username, password):
-        ia = _ImpersonatingAuthenticator(username, password,
-                                         config_value('identity.url'),
-                                         config_value('identity.admin_url'))
-
-        r = yield ia.token_for_tenant('5821004')
-        pprint.pprint(r)
-
-    react(main, sys.argv[1:])
