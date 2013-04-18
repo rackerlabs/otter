@@ -264,7 +264,7 @@ class CalculateDeltaTestCase(TestCase):
         fake_state = {'active': dict.fromkeys(range(5)), 'pending': {}}
 
         self.assertEqual(20, controller.calculate_delta(self.mock_log, fake_state, fake_config,
-                                                       fake_policy))
+                                                        fake_policy))
 
     def test_desired_positive_change_will_hit_max(self):
         """
