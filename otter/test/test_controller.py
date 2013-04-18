@@ -512,7 +512,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
     def test_positive_delta_excute_config_failures_propagated(self):
         """
         ``execute_launch_config`` fails if ``execute_config`` fails for any one
-        case
+        case, and propagates the first ``execute_config`` error.
         """
         class ExecuteException(Exception):
             pass
