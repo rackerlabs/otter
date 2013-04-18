@@ -25,59 +25,8 @@ from twisted.internet.task import LoopingCall
 
 import treq
 
-from otter.util.http import append_segments
+from otter.util.http import append_segments, headers, check_success
 from otter.util.hashkey import generate_server_name
-
-
-class APIError(Exception):
-    """
-    An error raised when a non-success response is returned by the API.
-
-    :param int code: HTTP Response code for this error.
-    :param str body: HTTP Response body for this error or None.
-    """
-    def __init__(self, code, body):
-        Exception.__init__(
-            self,
-            'API Error code={0!r}, body={1!r}'.format(code, body))
-
-        self.code = code
-        self.body = body
-
-
-def check_success(response, success_codes):
-    """
-    Convert an HTTP response to an appropriate APIError if
-    the response code does not match an expected success code.
-
-    This is intended to be used as a callback for a deferred that fires with
-    an IResponse provider.
-
-    :param IResponse response: The response to check.
-    :param list success_codes: A list of int HTTP response codes that indicate
-        "success".
-
-    :return: response or a deferred that errbacks with an APIError.
-    """
-    def _raise_api_error(body):
-        raise APIError(response.code, body)
-
-    if response.code not in success_codes:
-        return treq.content(response).addCallback(_raise_api_error)
-
-    return response
-
-
-def auth_headers(auth_token):
-    """
-    Generate an appropriate set of headers given an auth_token.
-
-    :param str auth_token: The auth_token.
-    :return: A dict of common headers.
-    """
-    return {'content-type': ['application/json'],
-            'accept': ['application/json'],
-            'x-auth-token': [auth_token]}
 
 
 def server_details(server_endpoint, auth_token, server_id):
@@ -93,7 +42,7 @@ def server_details(server_endpoint, auth_token, server_id):
     :return: A dict of the server details.
     """
     d = treq.get(append_segments(server_endpoint, 'servers', server_id),
-                 headers=auth_headers(auth_token))
+                 headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
     return d.addCallback(treq.json_content)
 
@@ -156,7 +105,7 @@ def create_server(server_endpoint, auth_token, server_config):
     :return: Deferred that fires with the CreateServer response as a dict.
     """
     d = treq.post(append_segments(server_endpoint, 'servers'),
-                  headers=auth_headers(auth_token),
+                  headers=headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
     return d.addCallback(treq.json_content)
@@ -182,7 +131,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
 
     d = treq.post(path,
-                  headers=auth_headers(auth_token),
+                  headers=headers(auth_token),
                   data=json.dumps({"nodes": [{"address": ip_address,
                                               "port": port,
                                               "condition": "ENABLED",
@@ -359,7 +308,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
         or errbacks with an APIError.
     """
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
-    d = treq.delete(path, headers=auth_headers(auth_token))
+    d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
     d.addCallback(lambda _: None)
     return d
@@ -406,7 +355,7 @@ def delete_server(region, service_catalog, auth_token, instance_details):
     def when_removed_from_loadbalancers(_ignore):
         return treq.delete(
             append_segments(server_endpoint, 'servers', server_details['server']['id']),
-            headers=auth_headers(auth_token)).addCallback(check_success, [204])
+            headers=headers(auth_token)).addCallback(check_success, [204])
 
     d.addCallback(when_removed_from_loadbalancers)
     return d

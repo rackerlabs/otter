@@ -5,16 +5,26 @@ from datetime import datetime
 import mock
 
 from twisted.trial.unittest import TestCase
+from twisted.internet.defer import succeed
+from twisted.web.http_headers import Headers
 
-from otter.util.http import append_segments
+from otter.util.http import append_segments, APIError, check_success, headers
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
+
+from otter.test.utils import patch
 
 
 class HTTPUtilityTests(TestCase):
     """
     Tests for ``otter.util.http``
     """
+    def setUp(self):
+        """
+        set up test dependencies for utilities.
+        """
+        self.treq = patch(self, 'otter.util.http.treq')
+
     def test_append_segments(self):
         """
         append_segments will append an arbitrary number of path segments to
@@ -48,6 +58,79 @@ class HTTPUtilityTests(TestCase):
             append_segments('http://example.com', 'foo bar'),
             'http://example.com/foo%20bar'
         )
+
+    def test_api_error(self):
+        """
+        An APIError will be instantiated with an HTTP Code and an HTTP response
+        body and will expose these in public attributes and have a reasonable
+        string representation.
+        """
+        e = APIError(404, "Not Found.")
+
+        self.assertEqual(e.code, 404)
+        self.assertEqual(e.body, "Not Found.")
+        self.assertEqual(str(e), "API Error code=404, body='Not Found.'")
+
+    def test_check_success(self):
+        """
+        check_success will return the response if the response.code is in success_codes.
+        """
+        response = mock.Mock()
+        response.code = 201
+
+        self.assertEqual(check_success(response, [200, 201]), response)
+
+    def test_check_success_non_success_code(self):
+        """
+        check_success will return a deferred that errbacks with an APIError
+        if the response.code is not in success_codes.
+        """
+        response = mock.Mock()
+        response.code = 404
+        self.treq.content.return_value = succeed('Not Found.')
+
+        d = check_success(response, [200, 201])
+        f = self.failureResultOf(d)
+
+        self.assertTrue(f.check(APIError))
+        self.assertEqual(f.value.code, 404)
+        self.assertEqual(f.value.body, 'Not Found.')
+
+    def test_headers_content_type(self):
+        """
+        headers will use a json content-type.
+        """
+        self.assertEqual(
+            headers('any')['content-type'], ['application/json'])
+
+    def test_headers_accept(self):
+        """
+        headers will use a json accept header.
+        """
+        self.assertEqual(
+            headers('any')['accept'], ['application/json'])
+
+    def test_headers_sets_auth_token(self):
+        """
+        headers will set the X-Auth-Token header based on it's auth_token
+        argument.
+        """
+        self.assertEqual(
+            headers('my-auth-token')['x-auth-token'], ['my-auth-token'])
+
+    def test_headers_can_be_http_headers(self):
+        """
+        headers will produce a result that can be passed to
+        twisted.web.http_headers.Headers.
+        """
+        self.assertIsInstance(Headers(headers('my-auth-token')), Headers)
+
+    def test_headers_optional_auth_token(self):
+        """
+        headers will produce a dictionary without the x-auth-token header if no
+        auth token is given.
+        """
+        self.assertNotIn('x-auth-token', headers())
 
 
 class CapabilityTests(TestCase):
