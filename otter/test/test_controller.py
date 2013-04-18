@@ -530,6 +530,16 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(ExecuteException))
 
+    def test_negative_delta_not_implemented(self):
+        """
+        ``execute_launch_config`` raises ``NotImplementedError`` if the delta
+        is not positive
+        """
+        self.assertRaises(
+            NotImplementedError,
+            controller.execute_launch_config,
+            self.log, '1', self.fake_state, 'launch', self.group, -5)
+
     def test_assertion_error_when_adding_already_exiting_job(self):
         """
         If there is already a job in ``pending`` with the same ID,
