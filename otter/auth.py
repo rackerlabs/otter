@@ -100,8 +100,8 @@ class _ImpersonatingAuthenticator(object):
 
         d.addCallback(impersonate)
 
-        def endpoints((impersonator_token, token)):
-            scd = endpoints_for_token(self._admin_url, impersonator_token, token)
+        def endpoints((identity_admin_token, token)):
+            scd = endpoints_for_token(self._admin_url, identity_admin_token, token)
             scd.addCallback(lambda catalog: (token, catalog.get('endpoints', [])))
             return scd
 
