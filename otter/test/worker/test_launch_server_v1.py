@@ -8,12 +8,8 @@ import json
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail
 from twisted.internet.task import Clock
-from twisted.web.http_headers import Headers
 
 from otter.worker.launch_server_v1 import (
-    APIError,
-    check_success,
-    auth_headers,
     private_ip_addresses,
     endpoints,
     add_to_load_balancer,
@@ -29,6 +25,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 from otter.test.utils import patch
+from otter.util.http import APIError
 from otter.util.deferredutils import unwrap_first_error
 
 
@@ -52,81 +49,6 @@ class UtilityTests(TestCase):
     Tests for non-specific utilities that should be refactored out of the worker
     implementation eventually.
     """
-
-    def setUp(self):
-        """
-        set up test dependencies for utilities.
-        """
-        self.treq_patcher = mock.patch('otter.worker.launch_server_v1.treq')
-        self.treq = self.treq_patcher.start()
-        self.addCleanup(self.treq_patcher.stop)
-
-    def test_api_error(self):
-        """
-        An APIError will be instantiated with an HTTP Code and an HTTP response
-        body and will expose these in public attributes and have a reasonable
-        string representation.
-        """
-        e = APIError(404, "Not Found.")
-
-        self.assertEqual(e.code, 404)
-        self.assertEqual(e.body, "Not Found.")
-        self.assertEqual(str(e), "API Error code=404, body='Not Found.'")
-
-    def test_check_success(self):
-        """
-        check_success will return the response if the response.code is in success_codes.
-        """
-        response = mock.Mock()
-        response.code = 201
-
-        self.assertEqual(check_success(response, [200, 201]), response)
-
-    def test_check_success_non_success_code(self):
-        """
-        check_success will return a deferred that errbacks with an APIError
-        if the response.code is not in success_codes.
-        """
-        response = mock.Mock()
-        response.code = 404
-        self.treq.content.return_value = succeed('Not Found.')
-
-        d = check_success(response, [200, 201])
-        f = self.failureResultOf(d)
-
-        self.assertTrue(f.check(APIError))
-        self.assertEqual(f.value.code, 404)
-        self.assertEqual(f.value.body, 'Not Found.')
-
-    def test_auth_headers_content_type(self):
-        """
-        auth_headers will use a json content-type.
-        """
-        self.assertEqual(
-            auth_headers('any')['content-type'], ['application/json'])
-
-    def test_auth_headers_accept(self):
-        """
-        auth_headers will use a json accept header.
-        """
-        self.assertEqual(
-            auth_headers('any')['accept'], ['application/json'])
-
-    def test_auth_headers_sets_auth_token(self):
-        """
-        auth_headers will set the X-Auth-Token header based on it's auth_token
-        argument.
-        """
-        self.assertEqual(
-            auth_headers('my-auth-token')['x-auth-token'], ['my-auth-token'])
-
-    def test_auth_headers_can_be_http_headers(self):
-        """
-        auth_headers will produce a result that can be passed to
-        twisted.web.http_headers.Headers.
-        """
-        headers = Headers(auth_headers('my-auth-token'))
-        self.assertIsInstance(headers, Headers)
 
     def test_private_ip_addresses(self):
         """
@@ -185,9 +107,8 @@ class LoadBalancersTests(TestCase):
         """
         set up test dependencies for load balancers.
         """
-        treq_patcher = mock.patch('otter.worker.launch_server_v1.treq')
-        self.treq = treq_patcher.start()
-        self.addCleanup(treq_patcher.stop)
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        patch(self, 'otter.util.http.treq', new=self.treq)
 
     def test_add_to_load_balancer(self):
         """
@@ -313,13 +234,10 @@ class ServerTests(TestCase):
         """
         Set up test dependencies.
         """
-        treq_patcher = mock.patch('otter.worker.launch_server_v1.treq')
-        self.treq = treq_patcher.start()
-        self.addCleanup(treq_patcher.stop)
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        patch(self, 'otter.util.http.treq', new=self.treq)
 
-        generate_server_name_patcher = mock.patch('otter.worker.launch_server_v1.generate_server_name')
-        self.generate_server_name = generate_server_name_patcher.start()
-        self.addCleanup(generate_server_name_patcher.stop)
+        self.generate_server_name = patch(self, 'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name.return_value = 'as000000'
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
@@ -703,6 +621,7 @@ class DeleteServerTests(TestCase):
         Set up some mocks.
         """
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        patch(self, 'otter.util.http.treq', new=self.treq)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
     def test_delete_server_deletes_load_balancer_node(self, remove_from_load_balancer):

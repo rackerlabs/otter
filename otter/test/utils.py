@@ -1,6 +1,7 @@
 """
 Mixins and utilities to be used for testing.
 """
+import json
 import mock
 import os
 
@@ -91,3 +92,37 @@ def patch(testcase, *args, **kwargs):
         testcase._stopallAdded = True
 
     return mock.patch(*args, **kwargs).start()
+
+
+class SameJSON(object):
+    """
+    Compare an expected decoded JSON structure to a string of JSON by
+    decoding the input string and comparing the resulting structure to our
+    expected structure.
+
+    Example::
+
+        foo.assert_called_once_with(SameJSON({'success': True}))
+    """
+    def __init__(self, expected):
+        """
+        :param expected: The expected result of JSON decoding.
+        """
+        self._expected = expected
+
+    def __eq__(self, other):
+        """
+        :param str other: A string of JSON that will be decoded and compared
+            to our expected structure.
+
+        :return: `True` if the the result of decoding `other` compares equal
+            to our expected structure, otherwise `False`
+        :rtype: bool
+        """
+        return self._expected == json.loads(other)
+
+    def __repr__(self):
+        """
+        repr containing the expected object.
+        """
+        return 'SameJSON({0!r})'.format(self._expected)
