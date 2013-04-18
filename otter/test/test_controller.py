@@ -571,28 +571,20 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(Exception))
 
-    def test_complete_pending_called_when_jobs_succeed(self):
+    def test_complete_pending_called_when_jobs_done(self):
         """
         ``execute_launch_config`` sets it up so that ``_complete_pending_job``
-        gets called whenever a job finishes successfully
+        gets called whenever a job finishes, whether successfully or not
         """
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
-        for deferred in self.execute_config_deferreds:
-            deferred.callback(None)
+        for i, deferred in enumerate(self.execute_config_deferreds):
+            if (i + 1) % 2:
+                deferred.callback(None)
+            else:
+                deferred.errback(Exception('meh'))
 
         self.assertEqual(self.complete_job.mock_calls,
-                         [mock.call(self.log, str(i + 1), True) for i in range(3)])
-
-    def test_complete_pending_called_when_jobs_fail(self):
-        """
-        ``execute_launch_config`` sets it up so that ``_complete_pending_job``
-        gets called whenever a job finishes unsuccessfully
-        """
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 3)
-        for deferred in self.execute_config_deferreds:
-            deferred.errback(Exception('meh'))
-
-        self.assertEqual(self.complete_job.mock_calls,
-                         [mock.call(self.log, str(i + 1), False) for i in range(3)])
+                         [mock.call(self.log, '1', True),
+                          mock.call(self.log, '2', False),
+                          mock.call(self.log, '3', True)])
