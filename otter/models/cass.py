@@ -394,7 +394,7 @@ class CassScalingGroup(object):
             policyTouched = _jsonloads_data(res["policyTouched"])
             groupTouched = res["groupTouched"]
             pending = _jsonloads_data(res["pending"])
-            paused = res["paused"]
+            paused = bool(ord(res["paused"]))
             return {
                 "active": active,
                 "paused": paused,
@@ -989,7 +989,7 @@ class CassScalingGroupCollection:
             if len(res) == 0:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             res = res[0]
-            if res['deleted'] is True:
+            if bool(ord(res['deleted'])) is True:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             return (res['tenantId'], res['groupId'], res['policyId'])
 
