@@ -251,9 +251,10 @@ policy = {
         "desiredCapacity": {
             "type": "integer",
             "description": (
-                "How many servers there should be in the desiredCapacity "
-                "state (an absolute number, rather than a delta from the "
-                "current number of servers)."),
+                "The desired capacity of the group - i.e. how many servers there "
+                "should be (an absolute number, rather than a delta from the "
+                "current number of servers). For example, if this is 10 and then "
+                "executing policy with this will bring the number of servers to 10."),
             "minimum": 0
         },
         "cooldown": {

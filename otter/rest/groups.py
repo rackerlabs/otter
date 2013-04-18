@@ -283,6 +283,13 @@ def create_new_scaling_group(request, log, tenantId, data):
                         "cooldown": 6
                     },
                     {
+                        "id": "{policyId3}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
+                            "rel": "self"
+                          }
+                        ],
                         "name": 'set number of servers to 10',
                         "desiredCapacity": 10,
                         "cooldown": 3

@@ -104,13 +104,13 @@ POST /{tenantId}/groups
             "type": "webhook"
         },
         {
-            "name": 'scale down by 5.5 percent',
+            "name": "scale down by 5.5 percent",
             "changePercent": -5.5,
             "cooldown": 6,
             "type": "webhook"
         },
         {
-            "name": 'set number of servers to 10',
+            "name": "set number of servers to 10",
             "desiredCapacity": 10,
             "cooldown": 3,
             "type": "webhook"
@@ -126,10 +126,6 @@ POST /{tenantId}/groups
           {
             "href": "{url_root}/v1.0/010101/groups/{groupId}"
             "rel": "self"
-          },
-          {
-            "href": "{url_root}/010101/groups/{groupId}"
-            "rel": "bookmark"
           }
         ],
         "groupConfiguration": {
@@ -180,31 +176,36 @@ POST /{tenantId}/groups
                   {
                     "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
                     "rel": "self"
-                  },
-                  {
-                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId1}"
-                    "rel": "bookmark"
                   }
                 ],
                 "name": "scale up by 10",
                 "change": 10,
                 "cooldown": 5,
                 "type": "webhook"
-            }
+            },
             {
                 "id": "{policyId2}",
                 "links": [
                   {
                     "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
                     "rel": "self"
-                  },
-                  {
-                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId2}"
-                    "rel": "bookmark"
                   }
                 ],
-                "name": 'scale down by 5.5 percent',
+                "name": "scale down by 5.5 percent",
                 "changePercent": -5.5,
+                "cooldown": 6,
+                "type": "webhook"
+            },
+            {
+                "id": "{policyId3}",
+                "links": [
+                  {
+                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                    "rel": "self"
+                  }
+                ],
+                "name": "Set number of servers to 10",
+                "desiredCapacity": 10,
                 "cooldown": 6,
                 "type": "webhook"
             }
@@ -291,7 +292,7 @@ GET /{tenantId}/groups/{groupId}
                     "rel": "self"
                   }
                 ],
-                "name": 'scale down by 5.5 percent',
+                "name": "scale down by 5.5 percent",
                 "changePercent": -5.5,
                 "cooldown": 6,
                 "type": "webhook"
@@ -302,13 +303,9 @@ GET /{tenantId}/groups/{groupId}
                   {
                     "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
                     "rel": "self"
-                  },
-                  {
-                    "href": "{url_root}/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "bookmark"
                   }
                 ],
-                "name": 'set number of servers to 10',
+                "name": "set number of servers to 10",
                 "desiredCapacity": 10,
                 "cooldown": 3,
                 "type": "webhook"
@@ -602,7 +599,7 @@ POST /{tenantId}/groups/{groupId}/policies
         "type": "webhook"
     },
     {
-        "name": 'scale down by 5.5 percent',
+        "name": "scale down by 5.5 percent",
         "changePercent": -5.5,
         "cooldown": 6,
         "type": "webhook"
@@ -633,7 +630,7 @@ POST /{tenantId}/groups/{groupId}/policies
                     "rel": "self"
                 }
             ],
-            "name": 'scale down by 5.5 percent',
+            "name": "scale down by 5.5 percent",
             "changePercent": -5.5,
             "cooldown": 6,
             "type": "webhook"
