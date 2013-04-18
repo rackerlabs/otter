@@ -256,26 +256,29 @@ class ScalingPolicyTestCase(TestCase):
         for example in group_examples.policy():
             validate(example, group_schemas.policy)
 
-    def test_either_change_or_changePercent(self):
+    def test_either_change_or_changePercent_or_desiredCapacity(self):
         """
-        A scaling policy can have the attribute "change" or "changePercent",
-        but not both
+        A scaling policy can have one of the attribute "change" or "changePercent"
+        or "desiredCapacity", but not any 2 or 3 of them
         """
         invalid = {
             "name": "meh",
-            "cooldown": 5,
-            "change": 5,
-            "changePercent": 2
+            "cooldown": 5
         }
-        self.assertRaisesRegexp(
-            ValidationError, 'not of type',
-            validate, invalid, group_schemas.policy)
+        invalid1 = invalid.copy().update({'change': 3, 'changePercent': 23})
+        invalid2 = invalid.copy().update({'change': 3, 'desiredCapacity': 23})
+        invalid3 = invalid.copy().update({'changePercent': 3, 'desiredCapacity': 23})
+        invalid4 = invalid.copy().update({'change': 4, 'changePercent': 3, 'desiredCapacity': 23})
+        for invalid in [invalid1, invalid2, invalid3, invalid4]:
+            self.assertRaisesRegexp(
+                ValidationError, 'not of type',
+                validate, invalid, group_schemas.policy)
 
     def test_no_other_properties_valid(self):
         """
         Scaling policy can only have the following properties: name,
-        change/changePercent, cooldown, type, and capabilityUrls.  Any
-        other property results in an error.
+        change/changePercent/desiredCapacity, cooldown, type, and capabilityUrls.
+        Any other property results in an error.
         """
         invalid = {
             "name": "aname",
@@ -285,14 +288,14 @@ class ScalingPolicyTestCase(TestCase):
             "poofy": False
         }
         self.assertRaisesRegexp(
-            ValidationError, 'Additional properties are not allowed',
+            ValidationError, 'is not of type',
             validate, invalid, group_schemas.policy)
 
     def test_type_set(self):
         """
         Scaling policy can only have the following properties: name,
-        change/changePercent, cooldown, type, and capabilityUrls.  Ensure
-        that if the type is not present, that's an error.
+        change/changePercent/desiredCapacity, cooldown, type, and capabilityUrls.
+        Ensure that if the type is not present, that's an error.
         """
         invalid = {
             "name": "aname",

@@ -201,6 +201,16 @@ policy = {
                 "change": {"required": True}
             },
             "additionalProperties": False
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {},
+                "cooldown": {},
+                "type": {},
+                "desiredCapacity": {"required": True}
+            },
+            "additionalProperties": False
         }
     ],
     "description": (
@@ -238,6 +248,15 @@ policy = {
                 "-0.5 servers, the actual number of servers that will be "
                 "shut down is 1.")
         },
+        "desiredCapacity": {
+            "type": "integer",
+            "description": (
+                "The desired capacity of the group - i.e. how many servers there "
+                "should be (an absolute number, rather than a delta from the "
+                "current number of servers). For example, if this is 10 and then "
+                "executing policy with this will bring the number of servers to 10."),
+            "minimum": 0
+        },
         "cooldown": {
             "type": "number",
             "description": (
@@ -251,8 +270,7 @@ policy = {
             "enum": ["webhook"],
             "required": True
         }
-    },
-    "additionalProperties": False
+    }
 }
 
 
