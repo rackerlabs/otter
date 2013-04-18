@@ -5,7 +5,7 @@
     },
     "identity": {
         "username": "autoscale",
-        "password": "REPLACE_WITH_REAL_PASSWORD"
+        "password": "REPLACE_WITH_REAL_PASSWORD",
         "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
         "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
     }
