@@ -253,10 +253,92 @@ class CalculateDeltaTestCase(TestCase):
                          controller.calculate_delta(self.mock_log, fake_state,
                                                     fake_config, fake_policy))
 
-    def test_no_change_or_percent_fails(self):
+    def test_desired_positive_change_within_min_max(self):
         """
-        If 'change' or 'changePercent' is not there in scaling policy, then
-        then calculate delta doesn't know how to handle the policy
+        If the policy is based on desiredCapacity and a min and max are given,
+        and the desired number of servers fall between the min and the max,
+        then ``calculate_delta`` returns a delta that is just the policy change.
+        """
+        fake_policy = {'desiredCapacity': 25}
+        fake_config = {'minEntities': 0, 'maxEntities': 300}
+        fake_state = {'active': dict.fromkeys(range(5)), 'pending': {}}
+
+        self.assertEqual(20, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                       fake_policy))
+
+    def test_desired_positive_change_will_hit_max(self):
+        """
+        If the policy is based on desiredCapacity and a min and max are given,
+        and the desired number is above the max,
+        then ``calculate_delta`` returns a truncated delta.
+        """
+        fake_policy = {'desiredCapacity': 15}
+        fake_config = {'minEntities': 0, 'maxEntities': 10}
+        fake_state = {'active': dict.fromkeys(range(4)),
+                      'pending': dict.fromkeys(range(4))}
+
+        self.assertEqual(2, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                       fake_policy))
+
+    def test_desired_positive_change_but_at_max(self):
+        """
+        If the policy is based on desiredCapacity  and a min and max are given,
+        and the current active + pending is at the max already,
+        then ``calculate_delta`` returns 0.
+        """
+        fake_policy = {'desiredCapacity': 15}
+        fake_config = {'minEntities': 0, 'maxEntities': 10}
+        fake_state = {'active': dict.fromkeys(range(5)),
+                      'pending': dict.fromkeys(range(5))}
+
+        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                       fake_policy))
+
+    def test_desired_positive_change_but_at_default_max(self):
+        """
+        If the policy is based on desiredCapacity and a min and no max,
+        and the current active + pending is at the default max already,
+        then ``calculate_delta`` returns 0.
+        """
+        fake_policy = {'desiredCapacity': 15}
+        fake_config = {'minEntities': 0, 'maxEntities': None}
+        fake_state = {'active': dict.fromkeys(range(5)),
+                      'pending': dict.fromkeys(range(5))}
+
+        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                       fake_policy))
+
+    def test_desired_will_hit_min(self):
+        """
+        If the policy is based on desiredCapacity and a min and max are given,
+        and the desired number is below the min,
+        then ``calculate_delta`` returns a truncated delta.
+        """
+        fake_policy = {'desiredCapacity': 3}
+        fake_config = {'minEntities': 5, 'maxEntities': 10}
+        fake_state = {'active': dict.fromkeys(range(4)),
+                      'pending': dict.fromkeys(range(4))}
+
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                        fake_policy))
+
+    def test_desired_at_min(self):
+        """
+        If the policy is based on desiredCapacity and a min and max are given,
+        and the current active + pending is at the min already,
+        then ``calculate_delta`` returns 0.
+        """
+        fake_policy = {'desiredCapacity': 3}
+        fake_config = {'minEntities': 5, 'maxEntities': 10}
+        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
+
+        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                                       fake_policy))
+
+    def test_no_change_or_percent_or_desired_fails(self):
+        """
+        If 'change' or 'changePercent' or 'desiredCapacity' is not there in scaling policy,
+        then ``calculate_delta`` doesn't know how to handle the policy
         """
         fake_policy = {'changeNone': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}

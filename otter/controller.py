@@ -219,6 +219,8 @@ def calculate_delta(log, state, config, policy):
         with localcontext() as lc:
             lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
             change = int((current * (Decimal(percentage) / 100)).to_integral_value())
+    elif "desiredCapacity" in policy:
+        change = policy["desiredCapacity"] - current
     else:
         raise NotImplementedError()
 
