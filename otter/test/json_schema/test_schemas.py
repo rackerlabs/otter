@@ -274,6 +274,20 @@ class ScalingPolicyTestCase(TestCase):
                 ValidationError, 'not of type',
                 validate, invalid, group_schemas.policy)
 
+    def test_desired_negative(self):
+        """
+        A scaling policy cannot have a negative "desiredCapacity" attribute
+        """
+        invalid = {
+            "name": "aname",
+            "desiredCapacity": -5,
+            "cooldown": 5,
+            "type": "webhook"
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'is less than the minimum of 0',
+            validate, invalid, group_schemas.policy)
+
     def test_no_other_properties_valid(self):
         """
         Scaling policy can only have the following properties: name,
