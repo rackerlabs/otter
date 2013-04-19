@@ -76,6 +76,12 @@ def _cassandrify_data(list_of_dicts):
     for data_dict in list_of_dicts:
         columns = []
         for key, value in data_dict.iteritems():
+            if isinstance(value, bool):
+                if value is True:
+                    value = '\x01'
+                else:
+                    value = '\x00'
+
             columns.append({
                 'timestamp': None,
                 'name': key,
@@ -453,6 +459,31 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                              'pending': {'F': 'R'},
                              'policyTouched': {'F': 'R'},
                              'paused': False})
+
+    def test_view_paused_state(self):
+        """
+        view_state returns a dictionary with a key paused equal to True for a
+        paused group.
+        """
+        cass_response = _cassandrify_data([
+            {'active': '{"F":"R"}', 'pending': '{"F":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"F":"R"}', 'paused': True}])
+
+        self.returns = [cass_response]
+        d = self.group.view_state()
+        r = self.assert_deferred_succeeded(d)
+        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM '
+                       'group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
+                       'deleted = False;')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g"}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+        self.assertEqual(r, {'active': {'F': 'R'},
+                             'groupTouched': '123',
+                             'pending': {'F': 'R'},
+                             'policyTouched': {'F': 'R'},
+                             'paused': True})
 
     def test_view_config_bad_db_data(self):
         """
