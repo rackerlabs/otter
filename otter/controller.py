@@ -24,6 +24,7 @@ Storage model for state information:
 from datetime import datetime
 import iso8601
 from decimal import Decimal, localcontext, ROUND_HALF_UP, ROUND_HALF_DOWN
+import math
 
 from twisted.internet import defer
 
@@ -219,6 +220,9 @@ def calculate_delta(log, state, config, policy):
         with localcontext() as lc:
             lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
             change = int((current * (Decimal(percentage) / 100)).to_integral_value())
+            # +1 or -1 a server if percentage is too small to have a change
+            if percentage and not change:
+                change = math.copysign(1, percentage)
             desired = current + change
     elif "desiredCapacity" in policy:
         desired = policy["desiredCapacity"]

@@ -253,6 +253,23 @@ class CalculateDeltaTestCase(TestCase):
                          controller.calculate_delta(self.mock_log, fake_state,
                                                     fake_config, fake_policy))
 
+    def test_percent_no_change(self):
+        """
+        If a policy is scale up or down by x% and changePercent rounds off to 0,
+        ``calculate_delta`` returns +/-1 instead of 0
+        """
+        fake_policy = {'changePercent': 0.05}
+        fake_config = {'minEntities': 0, 'maxEntities': 10}
+        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
+
+        self.assertEqual(1,
+                         controller.calculate_delta(self.mock_log, fake_state,
+                                                    fake_config, fake_policy))
+        fake_policy = {'changePercent': -0.05}
+        self.assertEqual(-1,
+                         controller.calculate_delta(self.mock_log, fake_state,
+                                                    fake_config, fake_policy))
+
     def test_desired_positive_change_within_min_max(self):
         """
         If the policy is based on desiredCapacity and a min and max are given,
