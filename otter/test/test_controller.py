@@ -588,11 +588,10 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         """
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
-        for i, deferred in enumerate(self.execute_config_deferreds):
-            if (i + 1) % 2:
-                deferred.callback(None)
-            else:
-                deferred.errback(Exception('meh'))
+
+        self.execute_config_deferreds[0].callback(None)              # job id 1
+        self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
+        self.execute_config_deferreds[2].callback(None)              # job id 3
 
         self.assertEqual(self.complete_job.mock_calls,
                          [mock.call(self.log, '1', True),
