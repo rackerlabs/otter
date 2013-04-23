@@ -53,6 +53,7 @@ setup(
     name=NAME,
     version='0.0.0',
     packages=packages,
+    license="Apache 2.0",
     data_files=data_files,
     scripts=['scripts/load_cql.py']
 )
