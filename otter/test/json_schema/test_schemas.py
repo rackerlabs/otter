@@ -261,18 +261,41 @@ class ScalingPolicyTestCase(TestCase):
         A scaling policy can have one of the attribute "change" or "changePercent"
         or "desiredCapacity", but not any 2 or 3 of them
         """
-        invalid = {
+        _invalid = {
             "name": "meh",
-            "cooldown": 5
+            "cooldown": 5,
+            "type": "webhook"
         }
-        invalid1 = invalid.copy().update({'change': 3, 'changePercent': 23})
-        invalid2 = invalid.copy().update({'change': 3, 'desiredCapacity': 23})
-        invalid3 = invalid.copy().update({'changePercent': 3, 'desiredCapacity': 23})
-        invalid4 = invalid.copy().update({'change': 4, 'changePercent': 3, 'desiredCapacity': 23})
-        for invalid in [invalid1, invalid2, invalid3, invalid4]:
+        for props in [{'change': 3, 'changePercent': 23},
+                      {'change': 3, 'desiredCapacity': 23},
+                      {'changePercent': 3, 'desiredCapacity': 23},
+                      {'change': 4, 'changePercent': 3, 'desiredCapacity': 23}]:
+            invalid = _invalid.copy()
+            invalid.update(props)
             self.assertRaisesRegexp(
                 ValidationError, 'not of type',
                 validate, invalid, group_schemas.policy)
+
+    def test_change_or_percent_zero(self):
+        """
+        A scaling policy cannot have 0 in 'change' or 'changePercent' but can have
+        0 in 'desiredCapacity'
+        """
+        invalid = {
+            "name": "meh",
+            "cooldown": 5,
+            "type": "webhook"
+        }
+        invalid['change'] = 0
+        self.assertRaisesRegexp(
+            ValidationError, 'is disallowed for 0',
+            validate, invalid, group_schemas.policy)
+
+        del invalid['change']
+        invalid['changePercent'] = 0.0
+        self.assertRaisesRegexp(
+            ValidationError, 'is disallowed for 0.0',
+            validate, invalid, group_schemas.policy)
 
     def test_desired_negative(self):
         """

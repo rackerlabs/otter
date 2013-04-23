@@ -179,6 +179,10 @@ config = {
     "required": True
 }
 
+zero = {
+    "minimum": 0,
+    "maximum": 0
+}
 
 policy = {
     "type": [
@@ -233,7 +237,8 @@ policy = {
                 "A non-zero integer change to make in the number of servers "
                 "in the scaling group.  If positive, the number of servers "
                 "will increase.  If negative, the number of servers will "
-                "decrease.")
+                "decrease."),
+            "disallow": [zero]
         },
         "changePercent": {
             "type": "number",
@@ -246,7 +251,8 @@ policy = {
                 "down to the nearest integer greater than zero.  This means "
                 "that if -X% of the current number of servers turns out to be "
                 "-0.5 servers, the actual number of servers that will be "
-                "shut down is 1.")
+                "shut down is 1."),
+            "disallow": [zero]
         },
         "desiredCapacity": {
             "type": "integer",
