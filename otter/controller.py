@@ -257,14 +257,17 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         log.info('updating state')
         jobs_dict = state['pending'].copy()
 
+        def get_callback(this_job_id, this_val):
+            return lambda _: _complete_pending_job(log, this_job_id, this_val)
+
         for job_id, completion_deferred, job_info in pending_results:
             assert job_id not in state['pending'], "Job already exists: {0}".format(job_id)
             jobs_dict[job_id] = job_info
 
             # XXX: Simplest thing that could possibly work.
             completion_deferred.addCallbacks(
-                lambda _: _complete_pending_job(log, job_id, True),  # XXX: True?
-                lambda _: _complete_pending_job(log, job_id, False))  # XXX: False?
+                get_callback(job_id, True),   # XXX: True?
+                get_callback(job_id, False))  # XXX: False?
 
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
@@ -273,11 +276,12 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             supervisor.execute_config(log, transaction_id,
                                       authenticate_tenant,
                                       scaling_group, launch)
-            for i in range(abs(delta))
+            for i in range(delta)
         ]
     else:
         raise NotImplementedError()
 
-    pendings_deferred = defer.gatherResults(deferreds)
+    pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
     pendings_deferred.addCallback(_update_state)
+    pendings_deferred.addErrback(unwrap_first_error)
     return pendings_deferred
