@@ -1,0 +1,2 @@
+include otter/rest/otter_ascii.txt
+recursive-include schema *.cql

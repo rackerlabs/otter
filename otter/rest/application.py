@@ -2,12 +2,12 @@
 Contains the actual Klein app, backing store, and utilities used by the route
 handlers for the REST service.
 """
-import os.path
+import pkgutil
 from functools import partial
 
 from twisted.web.resource import Resource
 from twisted.web.server import Request
-from twisted.web.static import File
+from twisted.web.static import Data
 
 from klein import Klein
 
@@ -16,8 +16,7 @@ from otter.util.http import append_segments
 
 _store = None
 _urlRoot = 'http://127.0.0.1'
-_otter = File(os.path.join(os.path.dirname(__file__), 'otter_ascii.txt'))
-
+_otter = Data(pkgutil.get_data('otter.rest', 'otter_ascii.txt'), 'text/plain')
 Request.defaultContentType = 'application/json'  # everything should be json
 
 
