@@ -29,7 +29,12 @@ class SupervisorExecuteTests(TestCase):
         self.service_catalog = {}
         self.auth_function = mock.Mock(return_value=succeed((self.auth_token, self.service_catalog)))
 
-        self.launch_server = patch(self, 'otter.supervisor.launch_server_v1.launch_server')
+        self.fake_server_details = {
+            'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh', 'metadata': {}}
+        }
+
+        self.launch_server = patch(self, 'otter.supervisor.launch_server_v1.launch_server',
+                                   return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
         self.launch_config = {'type': 'launch_server',
@@ -81,7 +86,7 @@ class SupervisorExecuteTests(TestCase):
         (job_id, completed_d, job_info) = self.successResultOf(d)
 
         result = self.successResultOf(completed_d)
-        self.assertEqual(None, result)
+        self.assertEqual(result, {'id': 'server_id', 'links': ['links'], 'name': 'meh'})
 
         self.launch_server.assert_called_once_with(
             mock.ANY,
