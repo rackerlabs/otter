@@ -248,10 +248,12 @@ policy = {
                 "will increase by the given percentage.  If negative, the "
                 "number of servers will decrease by the given percentage. The "
                 "absolute change in the number of servers will be rounded "
-                "down to the nearest integer greater than zero.  This means "
-                "that if -X% of the current number of servers turns out to be "
-                "-0.5 servers, the actual number of servers that will be "
-                "shut down is 1."),
+                "to the nearest integer away than zero. This means that "
+                "if -X% of the current number of servers turns out to be "
+                "-0.5 or -0.25 or -0.75 servers, the actual number of servers "
+                "that will be shut down is 1. And if X% of current number of "
+                "servers turn out to be 1.2 or 1.5 or 1.7 servers, the actual "
+                "number of servers that will be launched is 2"),
             "disallow": [zero]
         },
         "desiredCapacity": {

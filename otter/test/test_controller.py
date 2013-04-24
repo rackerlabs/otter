@@ -137,7 +137,7 @@ class CalculateDeltaTestCase(TestCase):
         and the desired number of servers fall between the min and the max,
         then ``calculate_delta`` returns a delta that is just the policy change.
         """
-        fake_policy = {'changePercent': 25}
+        fake_policy = {'changePercent': 20}
         fake_config = {'minEntities': 0, 'maxEntities': 300}
         fake_state = {'active': dict.fromkeys(range(5)), 'pending': {}}
 
@@ -228,45 +228,49 @@ class CalculateDeltaTestCase(TestCase):
 
     def test_percent_positive_rounding(self):
         """
-        If a policy is scale up by x% and changePercent gives a fraction
-        of 0.5, ``calculate_delta`` uses round half-up technique and
-        returns number+1
+        When 'changePercent' is x%, ``calculate_delta`` rounds up to an integer
+        away from zero.
         """
-        fake_policy = {'changePercent': 50}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
         fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
 
+        # 2.5 gets rounded to 3
+        fake_policy = {'changePercent': 50}
         self.assertEqual(3,
+                         controller.calculate_delta(self.mock_log, fake_state,
+                                                    fake_config, fake_policy))
+        # 0.25 gets rounded to 1
+        fake_policy = {'changePercent': 5}
+        self.assertEqual(1,
+                         controller.calculate_delta(self.mock_log, fake_state,
+                                                    fake_config, fake_policy))
+        # 3.75 gets rounded to 4
+        fake_policy = {'changePercent': 75}
+        self.assertEqual(4,
                          controller.calculate_delta(self.mock_log, fake_state,
                                                     fake_config, fake_policy))
 
     def test_percent_negative_rounding(self):
         """
-        If a policy is scale down by x% and changePercent gives a fraction
-        of -0.5, ``calculate_delta`` uses round half-up technique and
-        returns number-0.5
+        When 'changePercent' is -x%, ``calculate_delta`` rounds up to an integer
+        away from zero (more negative).
         """
+        fake_config = {'minEntities': 0, 'maxEntities': 10}
+        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
+
+        # -2.5 gets rounded to -3
         fake_policy = {'changePercent': -50}
-        fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
-
-        self.assertEqual(-2,
+        self.assertEqual(-3,
                          controller.calculate_delta(self.mock_log, fake_state,
                                                     fake_config, fake_policy))
-
-    def test_percent_no_change(self):
-        """
-        When changePercent rounds off to 0, ``calculate_delta`` returns +/-1 instead of 0
-        """
-        fake_policy = {'changePercent': 0.05}
-        fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
-
-        self.assertEqual(1,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
-        fake_policy = {'changePercent': -0.05}
+        # -0.25 gets rounded to -1
+        fake_policy = {'changePercent': -5}
         self.assertEqual(-1,
+                         controller.calculate_delta(self.mock_log, fake_state,
+                                                    fake_config, fake_policy))
+        # -3.75 gets rounded to -4
+        fake_policy = {'changePercent': -75}
+        self.assertEqual(-4,
                          controller.calculate_delta(self.mock_log, fake_state,
                                                     fake_config, fake_policy))
 
