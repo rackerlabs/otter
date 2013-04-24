@@ -226,7 +226,7 @@ class CalculateDeltaTestCase(TestCase):
         self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
                                                        fake_policy))
 
-    def test_percent_positive_rounding(self):
+    def test_percent_rounding(self):
         """
         When 'changePercent' is x%, ``calculate_delta`` rounds up to an integer
         away from zero.
@@ -234,45 +234,15 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 0, 'maxEntities': 10}
         fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
 
-        # 2.5 gets rounded to 3
-        fake_policy = {'changePercent': 50}
-        self.assertEqual(3,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
-        # 0.25 gets rounded to 1
-        fake_policy = {'changePercent': 5}
-        self.assertEqual(1,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
-        # 3.75 gets rounded to 4
-        fake_policy = {'changePercent': 75}
-        self.assertEqual(4,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
+        test_cases = [
+            (50, 3), (5, 1), (75, 4),
+            (-50, -3), (-5, -1), (-75, -4)]
 
-    def test_percent_negative_rounding(self):
-        """
-        When 'changePercent' is -x%, ``calculate_delta`` rounds up to an integer
-        away from zero (more negative).
-        """
-        fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = {'active': {}, 'pending': dict.fromkeys(range(5))}
-
-        # -2.5 gets rounded to -3
-        fake_policy = {'changePercent': -50}
-        self.assertEqual(-3,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
-        # -0.25 gets rounded to -1
-        fake_policy = {'changePercent': -5}
-        self.assertEqual(-1,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
-        # -3.75 gets rounded to -4
-        fake_policy = {'changePercent': -75}
-        self.assertEqual(-4,
-                         controller.calculate_delta(self.mock_log, fake_state,
-                                                    fake_config, fake_policy))
+        for change_percent, expected_delta in test_cases:
+            fake_policy = {'changePercent': change_percent}
+            self.assertEqual(expected_delta,
+                             controller.calculate_delta(self.mock_log,
+                                                        fake_state, fake_config, fake_policy))
 
     def test_desired_positive_change_within_min_max(self):
         """
