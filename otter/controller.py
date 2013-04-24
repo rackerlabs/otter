@@ -24,7 +24,6 @@ Storage model for state information:
 from datetime import datetime
 import iso8601
 from decimal import Decimal, localcontext, ROUND_UP
-import math
 
 from twisted.internet import defer
 
