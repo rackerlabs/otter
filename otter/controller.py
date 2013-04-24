@@ -23,7 +23,7 @@ Storage model for state information:
 """
 from datetime import datetime
 import iso8601
-from decimal import Decimal, localcontext, ROUND_HALF_UP, ROUND_HALF_DOWN
+from decimal import Decimal, ROUND_UP
 
 from twisted.internet import defer
 
@@ -216,10 +216,8 @@ def calculate_delta(log, state, config, policy):
         desired = current + policy['change']
     elif "changePercent" in policy:
         percentage = policy["changePercent"]
-        with localcontext() as lc:
-            lc.rounding = ROUND_HALF_UP if percentage > 0 else ROUND_HALF_DOWN
-            change = int((current * (Decimal(percentage) / 100)).to_integral_value())
-            desired = current + change
+        change = int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        desired = current + change
     elif "desiredCapacity" in policy:
         desired = policy["desiredCapacity"]
     else:
