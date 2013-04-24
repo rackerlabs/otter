@@ -12,6 +12,7 @@ from otter import controller
 from otter.models.interface import IScalingGroup, NoSuchPolicyError
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
+from otter.models.interface import IScalingGroupState
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -457,9 +458,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
     def setUp(self):
         """
-        Mock every method in the controller, and also the supervisor.
-        Individual tests can stop the patching for the method it is testing.
-
+        Mock relevant controller methods and also the supervisor.
         Also build a mock model that can be used for testing.
         """
         self.mocks = {}
@@ -517,10 +516,10 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_log.fields.assert_called_once_with(
             scaling_group=self.group.uuid, policy_id='pol1')
 
-        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
-                                                              "config", "policy", 'pol1')
-        self.mocks['calculate_delta'].assert_called_once_with(self.mock_log.fields.return_value, "state",
-                                                              "config", "policy")
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.mock_log.fields.return_value, "state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
             self.mock_log.fields.return_value.fields.return_value,
             'transaction', "state", "launch", self.group,
@@ -538,8 +537,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
-        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
-                                                              "config", "policy", 'pol1')
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
         self.assertEqual(len(self.mocks['calculate_delta'].mock_calls), 0)
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
 
@@ -557,8 +556,142 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertIn("Policy execution would violate min/max constraints",
                       str(f.value))
 
-        self.mocks['check_cooldowns'].assert_called_once_with(self.mock_log.fields.return_value, "state",
-                                                              "config", "policy", 'pol1')
-        self.mocks['calculate_delta'].assert_called_once_with(self.mock_log.fields.return_value, "state",
-                                                              "config", "policy")
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.mock_log.fields.return_value, "state", "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+
+
+class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
+    """
+    Tests for :func:`otter.controller.execute_launch_config`
+    """
+
+    def setUp(self):
+        """
+        Mock relevant controller methods, and also the supervisor.
+        Also build a mock model that can be used for testing.
+        """
+        self.complete_job = patch(
+            self, 'otter.controller._complete_pending_job', return_value=None)
+        self.authenticate_tenant = patch(
+            self, 'otter.controller.authenticate_tenant')
+
+        self.execute_config_deferreds = []
+
+        def fake_execute(*args, **kwargs):
+            d = defer.Deferred()
+            self.execute_config_deferreds.append(d)
+            return defer.succeed((str(len(self.execute_config_deferreds)), d, {}))
+
+        self.execute_config = patch(
+            self, 'otter.controller.supervisor.execute_config',
+            side_effect=fake_execute)
+
+        self.log = mock.MagicMock()
+
+        self.group = iMock(IScalingGroupState, tenant_id='tenant', uuid='group')
+        self.group.update_jobs.return_value = defer.succeed(None)
+
+        self.fake_state = {'active': {}, 'pending': {}}
+
+    def test_positive_delta_execute_config_called_delta_times(self):
+        """
+        If delta > 0, ``execute_launch_config`` calls
+        ``supervisor.execute_config`` delta times.
+        """
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 5)
+        self.assertEqual(self.execute_config.mock_calls,
+                         [mock.call(self.log, '1', self.authenticate_tenant,
+                                    self.group, 'launch')] * 5)
+
+    def test_positive_delta_excute_config_failures_propagated(self):
+        """
+        ``execute_launch_config`` fails if ``execute_config`` fails for any one
+        case, and propagates the first ``execute_config`` error.
+        """
+        class ExecuteException(Exception):
+            pass
+
+        def fake_execute(*args, **kwargs):
+            if len(self.execute_config_deferreds) > 1:
+                return defer.fail(ExecuteException('no more!'))
+            d = defer.Deferred()
+            self.execute_config_deferreds.append(d)
+            return defer.succeed((str(len(self.execute_config_deferreds)), d, {}))
+
+        self.execute_config.side_effect = fake_execute
+        d = controller.execute_launch_config(self.log, '1', self.fake_state,
+                                             'launch', self.group, 3)
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(ExecuteException))
+
+    def test_negative_delta_not_implemented(self):
+        """
+        ``execute_launch_config`` raises ``NotImplementedError`` if the delta
+        is not positive
+        """
+        self.assertRaises(
+            NotImplementedError,
+            controller.execute_launch_config,
+            self.log, '1', self.fake_state, 'launch', self.group, -5)
+
+    def test_assertion_error_when_adding_already_exiting_job(self):
+        """
+        If there is already a job in ``pending`` with the same ID,
+        ``execute_launch_config`` raises an ``AssertionError``.
+        """
+        self.fake_state['pending']['1'] = None
+        d = controller.execute_launch_config(self.log, '1', self.fake_state,
+                                             'launch', self.group, 1)
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(AssertionError))
+
+    def test_update_jobs_called_with_new_jobs(self):
+        """
+        ``execute_launch_config`` calls ``update_jobs`` with a full pending jobs
+        dictionary containing both old and new jobs
+        """
+        self.fake_state = {'active': {'1': None}, 'pending': {'old': None}}
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 3)
+        self.group.update_jobs.assert_called_once_with(
+            self.fake_state, {'old': None, '1': {}, '2': {}, '3': {}}, '1')
+
+    def test_propagates_update_jobs_return_value(self):
+        """
+        ``execute_launch_config`` returns whatever value ``update_jobs`` returns
+        """
+        self.group.update_jobs.return_value = defer.succeed('hey!')
+        d = controller.execute_launch_config(self.log, '1', self.fake_state,
+                                             'launch', self.group, 1)
+        self.assertEqual(self.successResultOf(d), 'hey!')
+
+    def test_propagates_update_jobs_failures(self):
+        """
+        ``execute_launch_config`` fails if ``update_jobs`` fails
+        """
+        self.group.update_jobs.return_value = defer.fail(Exception('boo!'))
+        d = controller.execute_launch_config(self.log, '1', self.fake_state,
+                                             'launch', self.group, 1)
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(Exception))
+
+    def test_complete_pending_called_when_jobs_done(self):
+        """
+        ``execute_launch_config`` sets it up so that ``_complete_pending_job``
+        gets called whenever a job finishes, whether successfully or not
+        """
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 3)
+
+        self.execute_config_deferreds[0].callback(None)              # job id 1
+        self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
+        self.execute_config_deferreds[2].callback(None)              # job id 3
+
+        self.assertEqual(self.complete_job.mock_calls,
+                         [mock.call(self.log, '1', True),
+                          mock.call(self.log, '2', False),
+                          mock.call(self.log, '3', True)])
