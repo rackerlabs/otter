@@ -255,8 +255,7 @@ class CalculateDeltaTestCase(TestCase):
 
     def test_percent_no_change(self):
         """
-        If a policy is scale up or down by x% and changePercent rounds off to 0,
-        ``calculate_delta`` returns +/-1 instead of 0
+        When changePercent rounds off to 0, ``calculate_delta`` returns +/-1 instead of 0
         """
         fake_policy = {'changePercent': 0.05}
         fake_config = {'minEntities': 0, 'maxEntities': 10}

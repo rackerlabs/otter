@@ -276,17 +276,16 @@ class ScalingPolicyTestCase(TestCase):
                 ValidationError, 'not of type',
                 validate, invalid, group_schemas.policy)
 
-    def test_change_or_percent_zero(self):
+    def test_change_zero(self):
         """
-        A scaling policy cannot have 0 in 'change' or 'changePercent' but can have
-        0 in 'desiredCapacity'
+        A scaling policy cannot have 'change' as 0
         """
         invalid = {
             "name": "meh",
             "cooldown": 5,
-            "type": "webhook"
+            "type": "webhook",
+            "change": 0
         }
-        invalid['change'] = 0
         self.assertRaisesRegexp(
             ValidationError, 'is disallowed for 0',
             validate, invalid, group_schemas.policy)
@@ -296,6 +295,32 @@ class ScalingPolicyTestCase(TestCase):
         self.assertRaisesRegexp(
             ValidationError, 'is disallowed for 0.0',
             validate, invalid, group_schemas.policy)
+
+    def test_changepercent_zero(self):
+        """
+        A scaling policy cannot have 'changePercent' as 0.0
+        """
+        invalid = {
+            "name": "meh",
+            "cooldown": 5,
+            "type": "webhook",
+            "changePercent": 0.0
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'is disallowed for 0.0',
+            validate, invalid, group_schemas.policy)
+
+    def test_desired_zero(self):
+        """
+        A scaling policy CAN have 'desiredCapacity' as 0
+        """
+        valid = {
+            "name": "meh",
+            "cooldown": 5,
+            "type": "webhook",
+            "desiredCapacity": 0
+        }
+        validate(valid, group_schemas.policy)
 
     def test_desired_negative(self):
         """
