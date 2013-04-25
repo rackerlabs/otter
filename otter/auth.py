@@ -36,6 +36,8 @@ a token.)
 """
 
 import json
+from itertools import groupby
+
 import treq
 
 from otter.util.config import config_value
@@ -102,7 +104,7 @@ class _ImpersonatingAuthenticator(object):
 
         def endpoints((identity_admin_token, token)):
             scd = endpoints_for_token(self._admin_url, identity_admin_token, token)
-            scd.addCallback(lambda catalog: (token, catalog.get('endpoints', [])))
+            scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
         d.addCallback(endpoints)
@@ -209,3 +211,12 @@ def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10
     d.addCallback(check_success, [200, 203])
     d.addCallback(treq.json_content)
     return d
+
+
+def _endpoints_to_service_catalog(endpoints):
+    """
+    Convert the endpoint list from the endpoints API to the service catalog format
+    from the authentication API.
+    """
+    return [{'endpoints': list(e), 'name': n, 'type': t}
+            for (n, t), e in groupby(endpoints['endpoints'], lambda i: (i['name'], i['type']))]
