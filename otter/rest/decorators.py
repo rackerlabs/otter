@@ -14,12 +14,6 @@ from otter.util.deferredutils import unwrap_first_error
 from otter.log import log
 
 
-def _escape_python_formats(str):
-    s = str.replace('{', '{{')
-    s = s.replace('}', '}}')
-    return s
-
-
 def fails_with(mapping):
     """
     Map a result.  In success case, returns the success_code, otherwise uses
