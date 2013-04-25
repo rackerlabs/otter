@@ -12,7 +12,11 @@ def append_segments(uri, *segments):
     """
     Append segments to URI in a reasonable way.
 
-    :param str uri: base URI with or without a trailing /.
+    :param str or unicode uri: base URI with or without a trailing /.
+        If uri is unicode it will be encoded as ascii.  This is not strictly
+        correct but is probably fine since all these URIs are coming from JSON
+        and should be properly encoded.  We just need to make them str objects
+        for Twisted.
     :type segments: str or unicode
     :param segments: One or more segments to append to the base URI.
 
@@ -24,6 +28,9 @@ def append_segments(uri, *segments):
                 s = s.encode('utf-8')
 
             yield quote(s)
+
+    if isinstance(uri, unicode):
+        uri = uri.encode('ascii')
 
     uri = '/'.join(chain([uri.rstrip('/')], _segments(segments)))
     return uri

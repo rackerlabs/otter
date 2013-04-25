@@ -50,6 +50,17 @@ class HTTPUtilityTests(TestCase):
             'http://example.com/%E2%98%83'
         )
 
+    def test_append_segments_unicode_uri(self):
+        """
+        append_segments will convert a uri to an ascii bytestring if it is
+        a unicode object.
+        """
+
+        self.assertEqual(
+            append_segments(u'http://example.com', 'foo'),
+            'http://example.com/foo'
+        )
+
     def test_append_segments_quote(self):
         """
         append_segments will quote all path segments.
