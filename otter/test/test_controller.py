@@ -27,7 +27,7 @@ class CalculateDeltaTestCase(TestCase):
         patcher = mock.patch.object(controller, 'MAX_ENTITIES', new=10)
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.mock_log = mock.MagicMock()
+        self.mock_log = mock.Mock()
 
     def test_positive_change_within_min_max(self):
         """
@@ -487,15 +487,15 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(result, 'this should be returned')
 
         # log should have been updated
-        self.mock_log.fields.assert_called_once_with(
+        self.mock_log.bind.assert_called_once_with(
             scaling_group=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, "state", "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.fields.return_value, "state", "config", "policy")
+            self.mock_log.bind.return_value, "state", "config", "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
-            self.mock_log.fields.return_value.fields.return_value,
+            self.mock_log.bind.return_value.bind.return_value,
             'transaction', "state", "launch", self.group,
             self.mocks['calculate_delta'].return_value)
 
@@ -512,7 +512,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertIn("Cooldowns not met", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, "state", "config", "policy", 'pol1')
         self.assertEqual(len(self.mocks['calculate_delta'].mock_calls), 0)
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
 
@@ -531,9 +531,9 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                       str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.fields.return_value, "state", "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, "state", "config", "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.fields.return_value, "state", "config", "policy")
+            self.mock_log.bind.return_value, "state", "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
 
 

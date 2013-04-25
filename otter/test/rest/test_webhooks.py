@@ -453,3 +453,5 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_store.webhook_info_by_hash.return_value = defer.fail(ValueError('otters in pants'))
 
         self.assert_status_code(500, '/v1.0/execute/1/11111/', 'POST')
+
+        self.flushLoggedErrors(ValueError)
