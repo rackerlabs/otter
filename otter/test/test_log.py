@@ -12,8 +12,152 @@ from twisted.trial.unittest import TestCase
 from twisted.python import log as tplog
 from twisted.python.failure import Failure
 
+from otter.log.bound import BoundLog
 from otter.log import log as olog
+
+from otter.log.formatters import JSONObserverWrapper
+from otter.log.formatters import StreamObserverWrapper
+from otter.test.utils import SameJSON
+
 #from otter.log.formatters import GELFFormat
+
+
+class BoundLogTests(TestCase):
+    """
+    Test the BoundLog utility.
+    """
+    def setUp(self):
+        """
+        Set up the mocks and a new BoundLog.
+        """
+        self.msg = mock.Mock()
+        self.err = mock.Mock()
+        self.log = BoundLog(self.msg, self.err)
+
+    def test_bind_msg(self):
+        """
+        bind saves it's keyword arguments and passes them to msg when it is called.
+        """
+        log = self.log.bind(system='hello')
+        log.msg('Hi there')
+
+        self.msg.assert_called_once_with('Hi there', system='hello')
+
+    def test_bind_err(self):
+        """
+        bind saves it's keyword arguments and passes them to err when it is called.
+        """
+        exc = ValueError('uh oh')
+        log = self.log.bind(system='hello')
+        log.err(exc)
+
+        self.err.assert_called_once_with(exc, system='hello')
+
+
+class JSONObserverWrapperTests(TestCase):
+    """
+    Test the JSON observer wrapper.
+    """
+    def setUp(self):
+        """
+        Set up a mock observer.
+        """
+        self.observer = mock.Mock()
+
+    def test_default_formatter(self):
+        """
+        JSONObserverWrapper returns an ILogObserver that serializes the eventDict as JSON,
+        and calls the wrapped observer with the JSON bytes as the message.
+        """
+        eventDict = {'foo': 'bar', 'baz': 'bax'}
+        observer = JSONObserverWrapper(self.observer)
+        observer(eventDict)
+        self.observer.assert_called_once_with({'message': (SameJSON(eventDict),)})
+
+    def test_propagates_keyword_arguments(self):
+        """
+        JSONObserverWrapper passes keyword arguments to json.dumps.
+        """
+        eventDict = {'foo': 'bar', 'baz': 'bax'}
+        observer = JSONObserverWrapper(self.observer, sort_keys=True)
+        observer(eventDict)
+        self.observer.assert_called_once_with(
+            {'message': (json.dumps(eventDict, sort_keys=True),)})
+
+    def test_repr_fallback(self):
+        """
+        JSONObserverWrapper serializes non-JSON serializable objects as their
+        repr() string.
+        """
+        class NotSerializable(object):
+            def __repr__(self):
+                return "NotSerializableRepr"
+
+        eventDict = {'foo': NotSerializable()}
+        observer = JSONObserverWrapper(self.observer)
+        observer(eventDict)
+
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON({'foo': 'NotSerializableRepr'}),)})
+
+
+class StreamObserverWrapperTests(TestCase):
+    """
+    Test the StreamObserverWrapper.
+    """
+    def setUp(self):
+        """
+        Set up a mock stream.
+        """
+        self.stream = mock.Mock()
+
+    def test_unbuffered_output(self):
+        """
+        StreamObserverWrapper returns an observer that writes to the stream,
+        calling flush after every write.
+        """
+        observer = StreamObserverWrapper(self.stream, buffered=False)
+        observer({'message': ('foo',)})
+        self.stream.write.assert_has_calls(
+            [mock.call('foo'),
+             mock.call('\n')])
+
+        self.stream.flush.assert_called_once_with()
+
+    def test_buffered_output(self):
+        """
+        StreamObserverWrapper returns an observer that writes to the stream,
+        calling flush after every write.
+        """
+        observer = StreamObserverWrapper(self.stream, buffered=True)
+        observer({'message': ('foo',)})
+        self.stream.write.assert_has_calls(
+            [mock.call('foo'),
+             mock.call('\n')])
+
+        self.assertEqual(self.stream.flush.call_count, 0)
+
+    def test_non_default_delimiter(self):
+        """
+        StremaObserverWrapper uses the delimiter specified with the delimiter
+        keyword argument.
+        """
+        observer = StreamObserverWrapper(self.stream, delimiter='\r\n')
+        observer({'message': ('foo',)})
+        self.stream.write.assert_has_calls(
+            [mock.call('foo'),
+             mock.call('\r\n')])
+
+    def test_no_delimiter(self):
+        """
+        StreamObserverWrapper will not write the delimiter if it is None.
+        """
+        observer = StreamObserverWrapper(self.stream, delimiter=None)
+        observer({'message': ('foo',)})
+        observer({'message': ('bar',)})
+        self.stream.write.assert_has_calls(
+            [mock.call('foo'),
+             mock.call('bar')])
 
 
 class TwiggyLoggingTests(TestCase):

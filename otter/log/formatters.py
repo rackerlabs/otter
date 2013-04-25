@@ -9,24 +9,7 @@ import time
 IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
 
 
-class ReprFallbackEncoder(json.JSONEncoder):
-    """
-    A JSONEncoder that will use the repr(obj) as the default serialization
-    for objects that the base JSONEncoder does not know about.
-
-    This will ensure that even log messages that include unserializable objects
-    (like from 3rd party libraries) will still have reasonable representations
-    in the logged JSON and will actually be logged and not discarded by the
-    logging system because of a formatting error.
-    """
-    def default(self, obj):
-        """
-        Serialize obj as repr(obj).
-        """
-        return repr(obj)
-
-
-def GELFFormatter(observer):
+def GELFObserverWrapper(observer):
     """
     Create a log observer that will format messages as GELF and delegate to
     `observer`.
@@ -72,7 +55,24 @@ def GELFFormatter(observer):
     return GELFObserver
 
 
-def JSONFormatter(observer, **kwargs):
+class ReprFallbackEncoder(json.JSONEncoder):
+    """
+    A JSONEncoder that will use the repr(obj) as the default serialization
+    for objects that the base JSONEncoder does not know about.
+
+    This will ensure that even log messages that include unserializable objects
+    (like from 3rd party libraries) will still have reasonable representations
+    in the logged JSON and will actually be logged and not discarded by the
+    logging system because of a formatting error.
+    """
+    def default(self, obj):
+        """
+        Serialize obj as repr(obj).
+        """
+        return repr(obj)
+
+
+def JSONObserverWrapper(observer, **kwargs):
     """
     Create an observer that will format the eventDict as JSON using the
     supplied keyword arguments and delegate to `observer`.
