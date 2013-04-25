@@ -5,11 +5,97 @@ from jsonschema import validate
 
 from zope.interface.verify import verifyObject
 
+from twisted.trial.unittest import TestCase
+
 from otter.models.interface import (
-    IScalingGroup, IScalingGroupCollection, IScalingGroupState)
+    GroupState, IScalingGroup, IScalingGroupCollection, IScalingGroupState)
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas
 from otter.test.utils import DeferredTestMixin
+
+
+class GroupStateTestCase(TestCase):
+    """
+    Tests the state object `otter.mode.s
+    """
+    def test_add_job_success(self):
+        """
+        If the job ID is not in the pending list, ``add_job`` adds it along with
+        the creation time.
+        """
+        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+                           now=lambda: 'datetime')
+        state.add_job('1')
+        self.assertEqual(state.pending, {'1': {'created': 'datetime'}})
+
+    def test_add_job_fails(self):
+        """
+        If the job ID is in the pending list, ``add_job`` raises an
+        AssertionError.
+        """
+        state = GroupState('tid', 'gid', {}, {'1': {}}, True, {}, None)
+        self.assertRaises(AssertionError, state.add_job, '1')
+        self.assertEqual(state.pending, {'1': {}})
+
+    def test_del_job_success(self):
+        """
+        If the job ID is in the pending list, ``del_job`` removes it.
+        """
+        state = GroupState('tid', 'gid', {}, {'1': {}}, True, {}, None)
+        state.del_job('1')
+        self.assertEqual(state.pending, {})
+
+    def test_del_job_fails(self):
+        """
+        If the job ID is not in the pending list, ``del_job`` raises an
+        AssertionError.
+        """
+        state = GroupState('tid', 'gid', {}, {}, True, {}, None)
+        self.assertRaises(AssertionError, state.del_job, '1')
+        self.assertEqual(state.pending, {})
+
+    def test_add_active_success_adds_creation_time(self):
+        """
+        If the server ID is not in the active list, ``add_active`` adds it along
+        with server info, and adds the creation time to server info that
+        does not already have it.
+        """
+        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+                           now=lambda: 'datetime')
+        state.add_active('1', {'stuff': 'here'})
+        self.assertEqual(state.active,
+                         {'1': {'stuff': 'here', 'created': 'datetime'}})
+
+    def test_add_active_success_preserves_creation_time(self):
+        """
+        If the server ID is not in the active list, ``add_active`` adds it along
+        with server info, and does not change the server info's creation time.
+        """
+        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+                           now=lambda: 'other_now')
+        state.add_active('1', {'stuff': 'here', 'created': 'now'})
+        self.assertEqual(state.active,
+                         {'1': {'stuff': 'here', 'created': 'now'}})
+
+    def test_add_active_fails(self):
+        """
+        If the server ID is in the active list, ``add_active`` raises an
+        AssertionError.
+        """
+        state = GroupState('tid', 'gid', {'1': {}}, {}, True, {}, None)
+        self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
+        self.assertEqual(state.active, {'1': {}})
+
+    def test_mark_executed_updates_policy_and_group(self):
+        """
+        Marking executed updates the policy touched and group touched to the
+        same time.
+        """
+        t = ['0']
+        state = GroupState('tid', 'gid', {}, {}, True, {}, None, now=t.pop)
+        state.mark_executed('pid')
+        self.assertEqual(state.group_touched, '0')
+        self.assertEqual(state.policy_touched, {'pid': '0'})
 
 
 class IScalingGroupStateProviderMixin(DeferredTestMixin):

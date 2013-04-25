@@ -4,6 +4,91 @@ Interface to be used by the scaling groups engine
 
 from zope.interface import Interface, Attribute
 
+from otter.util import timestamp
+
+
+class GroupState(object):
+    """
+    Object that represents the state
+
+    :ivar str tenant_id: the tenant ID of the scaling group whose state this
+        object represents
+
+    :ivar str group_id: the ID of the scaling group whose state this
+        object represents
+    :ivar dict active: the mapping of active server ids and their info
+    :ivar dict pending: the list of pending job ids and their info
+    :ivar bool paused: whether the scaling group is paused in scaling activities
+    :ivar dict policy_touched: dictionary mapping policy ids to the last time
+        they were executed, if ever.
+    :ivar str group_touched: timezone-aware timestamp that represents when the
+        last time any policy was executed on the group.  Could be None.
+    :ivar callable now: callable that returns a ``str`` timestamp - used for
+        testing purposes.  Defaults to :func:`timestamp.now`
+
+    TODO: ``del_active``, ``pause`` and ``resume`` ?
+    """
+    def __init__(self, tenant_id, group_id, active, pending, paused,
+                 policy_touched, group_touched, now=timestamp.now):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.active = active
+        self.pending = pending
+        self.paused = paused
+        self.policy_touched = policy_touched
+        self.group_touched = group_touched
+
+        self.now = now
+
+    def del_job(self, job_id):
+        """
+        Removes a pending job from the pending list.  If the job is not in
+        pending, raises an AssertionError.
+
+        :param str job_id:  the id of the job to complete
+        :returns: None
+        :raises: :class:`AssertionError` if the job doesn't exist
+        """
+        assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
+        del self.pending[job_id]
+
+    def add_job(self, job_id):
+        """
+        Adds a pending job to the pending collection.  If the job is already in
+        pending, raises an AssertError.
+
+        :param str job_id:  the id of the job to complete
+        :returns: None
+        :raises: :class:`AssertionError` if the job already exists
+        """
+        assert job_id not in self.pending, "Job exists: {0}".format(job_id)
+        self.pending[job_id] = {'created': self.now()}
+
+    def add_active(self, server_id, server_info):
+        """
+        Adds a server to the collection of active servers.  Adds a creation time
+        if there isn't one.
+
+        :param str job_id:  the id of the job to complete
+        :param dict server_info: a dictionary containing relevant server info.
+            TBD: What's in server_info ultimately - currently: name, url
+        :returns: None
+        :raises: :class:`AssertionError` if the server id already exists
+        """
+        assert server_id not in self.active, "Server already exists: {}".format(server_id)
+        server_info.setdefault('created', self.now())
+        self.active[server_id] = server_info
+
+    def mark_executed(self, policy_id):
+        """
+        Record the execution time (now) of a particular policy.  This also
+        updates the group touched time.
+
+        :param str policy_id:  the id of the policy that was executed
+        :returns: None
+        """
+        self.policy_touched[policy_id] = self.group_touched = self.now()
+
 
 class UnrecognizedCapabilityError(Exception):
     """
