@@ -29,16 +29,17 @@ class GELFFormat(object):
     A Twiggy log Format that produces https://github.com/Graylog2/graylog2-docs/wiki/GELF
     format messages.
     """
-    def __init__(self, facility, suffix='\n'):
+    def __init__(self, observer, facility, suffix='\n'):
+        self.observer = observer
         self.suffix = suffix
         self.facility = facility
 
-    def __call__(self, msg):
+    def __call__(self, eventDict):
         """
         Twiggy uses callable to format messages.
         """
-        message_dict = self._make_message_dict(msg)
-        return json.dumps(message_dict, cls=ReprFallbackEncoder) + self.suffix
+        message_dict = self._make_message_dict(eventDict)
+        self.observer(json.dumps(message_dict, cls=ReprFallbackEncoder) + self.suffix)
 
     def _convert_level_to_syslog(self, level):
         """
@@ -52,25 +53,25 @@ class GELFFormat(object):
             name2level("DEBUG"): 7,
         }.get(level, level)
 
-    def _make_message_dict(self, record):
+    def _make_message_dict(self, eventDict):
         """
         Make a JSON serializable dict out of a record.
         """
         outrec = {
             'version': "1.0",
             'host': socket.gethostname(),
-            'short_message': record.text,
-            'timestamp': time.mktime(record.fields["time"]),
-            'level': self._convert_level_to_syslog(record.fields["level"]),
-            'facility': record.fields.get('name', self.facility),
-            'full_message': record.traceback or '',
+            'short_message': eventDict['message'],
+            'timestamp': time.mktime(eventDict.get("time") or time.time()),
+            'level': self._convert_level_to_syslog(eventDict.get("logLevel", "info")),
+            'facility': eventDict.get('system', self.facility),
+            'full_message': '',
             '_pid': os.getpid(),
             '_thread_name': thread_name()
         }
 
-        return self._add_extra_fields(outrec, record.fields)
+        return self._add_extra_fields(outrec, eventDict)
 
-    def _add_extra_fields(self, message_dict, record):
+    def _add_extra_fields(self, message_dict, eventDict):
         """
         Add extra fields to an existing message dict,
         skipping clearly illegal arguments (e.g. id) and things that
@@ -79,7 +80,7 @@ class GELFFormat(object):
         """
         skip_list = ('level', 'time', 'name', 'id')
 
-        for key, value in record.items():
+        for key, value in eventDict.items():
             if key not in skip_list:
                 message_dict['_%s' % key] = value
 

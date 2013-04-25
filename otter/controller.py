@@ -116,8 +116,8 @@ def maybe_execute_scaling_policy(
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
     """
-    bound_log = log.fields(scaling_group=scaling_group.uuid, policy_id=policy_id)
-    bound_log.info("beginning to execute scaling policy")
+    bound_log = log.bind(scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log.msg("beginning to execute scaling policy")
 
     # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
@@ -142,12 +142,12 @@ def maybe_execute_scaling_policy(
 
         if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(bound_log, state, config, policy)
-            execute_bound_log = bound_log.fields(server_delta=delta)
+            execute_bound_log = bound_log.bind(server_delta=delta)
             if delta != 0:
-                execute_bound_log.info("cooldowns checked, executing launch configs")
+                execute_bound_log.msg("cooldowns checked, executing launch configs")
                 return execute_launch_config(execute_bound_log, transaction_id, state,
                                              launch, scaling_group, delta)
-            execute_bound_log.info("cooldowns checked, no change in servers")
+            execute_bound_log.msg("cooldowns checked, no change in servers")
             error_msg = "Policy execution would violate min/max constraints."
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
@@ -182,9 +182,9 @@ def check_cooldowns(log, state, config, policy, policy_id):
         if last_time is not None:
             delta = this_now - from_timestamp(last_time)
             if delta.total_seconds() < cooldown:
-                log.fields(time_since_last_touched=delta.total_seconds(),
-                           cooldown_type=cooldown_type,
-                           cooldown_seconds=cooldown).info("cooldown not reached")
+                log.bind(time_since_last_touched=delta.total_seconds(),
+                         cooldown_type=cooldown_type,
+                         cooldown_seconds=cooldown).msg("cooldown not reached")
                 return False
 
     return True
@@ -206,9 +206,9 @@ def calculate_delta(log, state, config, policy):
         max_entities = config['maxEntities']
         if max_entities is None:
             max_entities = MAX_ENTITIES
-        log.fields(desired_change=desired, max_entities=max_entities,
-                   min_entities=config['minEntities'], active=len(state['active']),
-                   pending=len(state['pending'])).info("calculating delta")
+        log.bind(desired_change=desired, max_entities=max_entities,
+                 min_entities=config['minEntities'], active=len(state['active']),
+                 pending=len(state['pending'])).msg("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
     current = len(state['active']) + len(state['pending'])
@@ -252,7 +252,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         :param pending_results: ``list`` of tuples of
         ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
         """
-        log.info('updating state')
+        log.msg('updating state')
         jobs_dict = state['pending'].copy()
 
         def get_callback(this_job_id, this_val):

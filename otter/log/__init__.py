@@ -4,11 +4,9 @@ Package for all otter specific logging functionality.
 
 from otter.log.setup import observer_factory, observer_factory_debug
 from otter.log.formatters import GELFFormat
+from otter.log.bound import BoundLog
+from twisted.python.log import msg, err
 
-from twiggy import log
-from twixxy.features.failure import failure
-
-log = log.name('otter')
-log.addFeature(failure)
+log = BoundLog(msg, err).bind(system='otter')
 
 __all__ = ['observer_factory', 'observer_factory_debug', 'GELFFormat', 'log']

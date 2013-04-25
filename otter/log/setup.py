@@ -2,37 +2,28 @@
 Set up twiggy for the project
 """
 import sys
-from twiggy import addEmitters, outputs, levels, formats
+
+from twisted.python import log
 from otter.log.formatters import GELFFormat
 
-from twixxy import TwiggyLoggingObserver
+stdout = sys.stdout
+
+
+def writeLog(msg):
+    stdout.write(msg)
+    stdout.write('\n')
+    stdout.flush()
 
 
 def observer_factory():
     """
     Setup twiggy and return a twisted log observer.
     """
-    std_output = outputs.StreamOutput(format=GELFFormat('otter'),
-                                      stream=sys.stdout)
-
-    addEmitters(
-        # (name, min_level, filter, output),
-        ("*", levels.DEBUG, None, std_output))
-
-    observer = TwiggyLoggingObserver()
-    return observer.emit
+    return GELFFormat(writeLog, 'otter')
 
 
 def observer_factory_debug():
     """
     Setup twiggy and return a twisted log observer.
     """
-    std_output = outputs.StreamOutput(format=formats.line_format,
-                                      stream=sys.stdout)
-
-    addEmitters(
-        # (name, min_level, filter, output),
-        ("*", levels.DEBUG, None, std_output))
-
-    observer = TwiggyLoggingObserver()
-    return observer.emit
+    return log.FileLogObserver(sys.stdout).emit

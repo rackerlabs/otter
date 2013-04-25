@@ -317,8 +317,8 @@ def execute_webhook(request, log, capability_version, capability_hash):
 
     def log_unrecognized_cap(failure):
         exc = failure.trap(UnrecognizedCapabilityError)
-        log.fields(capability_hash=capability_hash,
-                   capability_version=capability_version).warning(repr(exc))
+        log.bind(capability_hash=capability_hash,
+                 capability_version=capability_version).msg(repr(exc))
 
     d.addErrback(log_unrecognized_cap)
 
