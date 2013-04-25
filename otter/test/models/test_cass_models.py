@@ -460,6 +460,16 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                              'policyTouched': {'F': 'R'},
                              'paused': False})
 
+    def test_view_state_no_such_group(self):
+        """
+        Calling ``view_state`` on a group that doesn't exist raises a
+        ``NoSuchScalingGroupError``
+        """
+        self.returns = [[]]
+        d = self.group.view_state()
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(NoSuchScalingGroupError))
+
     def test_view_paused_state(self):
         """
         view_state returns a dictionary with a key paused equal to True for a

@@ -242,20 +242,6 @@ def _jsonize_cassandra_data(raw_response):
     return results
 
 
-def _unwrap_one_row(raw_response):
-    """
-    Unwrap a row into a dict - None is an acceptable raw response
-    """
-    if raw_response is None:
-        return None
-
-    if len(raw_response) != 1:
-        raise CassBadDataError("multiple responses when we expected 1")
-
-    results = _jsonize_cassandra_data(raw_response)
-    return results[0]
-
-
 def _jsonloads_data(raw_data):
     try:
         data = json.loads(raw_data)
@@ -389,9 +375,10 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         def _do_state_lookup(state_rec):
-            res = _unwrap_one_row(state_rec)
-            if res is None:
+            res = _jsonize_cassandra_data(state_rec)
+            if len(res) == 0:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
+            res = res[0]
             active = _jsonloads_data(res["active"])
             policyTouched = _jsonloads_data(res["policyTouched"])
             groupTouched = res["groupTouched"]
