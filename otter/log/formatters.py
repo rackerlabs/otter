@@ -2,41 +2,58 @@
 Composable log observers for use with Twisted's log module.
 """
 import json
-import socket
 import time
 
 
 IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
 
 
-def GELFObserverWrapper(observer):
+def GELFObserverWrapper(observer, hostname, seconds=None):
     """
     Create a log observer that will format messages as GELF and delegate to
     `observer`.
 
+    :param str hostname: The hostname to be used in the gelf format.
     :param ILogObserver observer: The log observer to call with our GELF
         formatted data.
+    :param seconds: A 0-argument callable that returns a UNIX timestamp.
+
     :rtype: ILogObserver
     """
-    hostname = socket.gethostname()
+
+    if seconds is None:  # pragma: no cover
+        seconds = time.time
 
     def GELFObserver(eventDict):
-        if eventDict["isError"] and 'failure' in eventDict:
+        short_message = None
+        full_message = None
+
+        if eventDict.get("isError", False):
             level = 3
-            shortMessage = '{0}: {1}'.format(eventDict['why'],
-                                             str(eventDict['failure'].value))
-            fullMessage = eventDict['failure'].getTraceback()
+
+            if 'failure' in eventDict:
+                short_message = repr(eventDict['failure'].value)
+                full_message = eventDict['failure'].getTraceback()
+
+            if 'why' in eventDict and eventDict['why']:
+                short_message = '{0}: {1}'.format(eventDict['why'],
+                                                  short_message)
+
         else:
             level = 6
-            shortMessage = eventDict["message"][0] if eventDict["message"] else ""
-            fullMessage = " ".join([str(m) for m in eventDict["message"]])
+
+        if not short_message:
+            short_message = eventDict["message"][0] if eventDict["message"] else ""
+
+        if not full_message:
+            full_message = " ".join([str(m) for m in eventDict["message"]])
 
         log_params = {
             "version": "1.0",
             "host": hostname,
-            "short_message": shortMessage,
-            "full_message": fullMessage,
-            "timestamp": eventDict.get("time", time.time()),
+            "short_message": short_message,
+            "full_message": full_message,
+            "timestamp": eventDict.get("time", seconds()),
             "level": eventDict.get("level", level),
             "facility": eventDict.get("system", ""),
         }

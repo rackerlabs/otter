@@ -3,23 +3,18 @@ Tests for logging integration.
 """
 
 import json
-
-from StringIO import StringIO
-
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.python import log as tplog
 from twisted.python.failure import Failure
 
 from otter.log.bound import BoundLog
-from otter.log import log as olog
 
 from otter.log.formatters import JSONObserverWrapper
 from otter.log.formatters import StreamObserverWrapper
-from otter.test.utils import SameJSON
+from otter.log.formatters import GELFObserverWrapper
 
-#from otter.log.formatters import GELFFormat
+from otter.test.utils import SameJSON
 
 
 class BoundLogTests(TestCase):
@@ -160,275 +155,147 @@ class StreamObserverWrapperTests(TestCase):
              mock.call('bar')])
 
 
-class TwiggyLoggingTests(TestCase):
+class _Subdict(object):
     """
-    Test the GELFFormat when using the twiggy logging API.
+    An object that compares equal to a dictionary if all keys in expected_items
+    exist in that dictionary and their values compare equal.
     """
-    skip = "Oh well.."
+    def __init__(self, expected_items):
+        self._expected_items = expected_items
 
+    def __eq__(self, other):
+        for key, value in self._expected_items.iteritems():
+            if key not in other or value != other[key]:
+                return False
+
+        return True
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __repr__(self):
+        return '{0}({1!r})'.format(self.__class__.__name__, self._expected_items)
+
+
+class _Contains(object):
+    """
+    An object that compares equal to another object if it contains `expected_in`.
+    """
+    def __init__(self, expected_in):
+        self._expected_in = expected_in
+
+    def __eq__(self, other):
+        return self._expected_in in other
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __repr__(self):
+        return '{0}({1!r})'.format(self.__class__.__name__, self._expected_in)
+
+
+class GELFObserverWrapperTests(TestCase):
+    """
+    Test the GELFObserverWrapper.
+    """
     def setUp(self):
         """
-        Set up test dependencies.
+        Set up a mock observer.
         """
-        self.destination = StringIO()
+        self.observer = mock.Mock()
+        self.seconds = mock.Mock(return_value=0)
+        self.gelf = GELFObserverWrapper(self.observer,
+                                        hostname='localhost',
+                                        seconds=self.seconds)
 
-        # Patch gethostname so we get a consistent hostname.
-        gethostname_patcher = mock.patch('otter.log.formatters.socket.gethostname')
-        self.gethostname = gethostname_patcher.start()
-        self.addCleanup(gethostname_patcher.stop)
-        self.gethostname.return_value = 'my-hostname'
-
-        # Patch getpid so we get a consistent pid.
-        getpid_patcher = mock.patch('otter.log.formatters.os.getpid')
-        self.getpid = getpid_patcher.start()
-        self.addCleanup(getpid_patcher.stop)
-        self.getpid.return_value = 1000
-
-        # Patch thread_name so we get a consistent thread name.
-        thread_name_patcher = mock.patch('otter.log.formatters.thread_name')
-        self.thread_name = thread_name_patcher.start()
-        self.addCleanup(thread_name_patcher.stop)
-        self.thread_name.return_value = 'my-thread'
-
-        mktime_patcher = mock.patch('otter.log.formatters.time.mktime')
-        self.mktime = mktime_patcher.start()
-        self.addCleanup(mktime_patcher.stop)
-        self.mktime.return_value = 1
-
-        # Save twiggy emitters so we can restore them after tests.
-        _emitters = twiggy.emitters
-
-        def _restore_emitters():
-            twiggy.emitters = _emitters
-
-        self.addCleanup(_restore_emitters)
-
-        # Configure output just for tests.
-        # output = twiggy.outputs.StreamOutput(format=GELFFormat('tests'),
-        #                                      stream=self.destination)
-
-        # twiggy.addEmitters(('*', twiggy.levels.DEBUG, None, output))
-
-        observer = TwiggyLoggingObserver()
-        _observers = tplog.theLogPublisher.observers
-        tplog.theLogPublisher.observers = []
-        tplog.addObserver(observer.emit)
-
-        def _restore_observers():
-            tplog.theLogPublisher.observers = _observers
-
-        self.addCleanup(_restore_observers)
-
-    def last_logged_json(self):
+    def test_formats_eventDict_a_gelf(self):
         """
-        Return the last log line parsed as JSON.
+        GELFObserverWrapper calls the wrapped observer with a dictionary
+        in the GELF format.
         """
-        return json.loads(self.destination.getvalue().split('\n')[-2])
+        self.gelf({'message': ('Hello',)})
 
-    def test_log_includes_separator(self):
+        self.observer.assert_called_once_with({
+            'host': 'localhost',
+            'version': '1.0',
+            'short_message': 'Hello',
+            'full_message': 'Hello',
+            'facility': '',
+            'timestamp': 0,
+            'level': 6,
+        })
+
+    def test_failure_include_traceback_in_full_message(self):
         """
-        Formatted log lines should include the configured separator as a suffix.
+        The observer puts the traceback in the full_message key.
         """
-        log.info('hello')
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
 
-        value_list = self.destination.getvalue().split('\n')
-        self.assertEqual(len(value_list), 2)
-        self.assertEqual(value_list[-1], '')
+        self.observer.assert_called_once_with(
+            _Subdict({'full_message': _Contains('Traceback')}))
 
-    def test_stripped_log_is_json_object(self):
+    def test_failure_repr_in_short_message(self):
         """
-        Formatted log lines should be parseable as JSON, and be JSON objects.
+        The observer includes the repr of failure.value in short_message.
         """
-        log.info('hello')
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+        self.observer.assert_called_once_with(
+            _Subdict({'short_message': repr(ValueError())}))
 
-        self.assertIsInstance(self.last_logged_json(), dict)
-
-    def test_default_facility(self):
+    def test_isError_with_message_instead_of_failure(self):
         """
-        Formatted log lines should include the default facility configured in
-        GELFFormat.
+        The observer should use message when there is no failure.
         """
-        log.info('hello')
+        self.gelf({'message': ('uh oh',), 'isError': True})
 
-        m = self.last_logged_json()
+        self.observer.assert_called_once_with(
+            _Subdict({'short_message': 'uh oh',
+                      'full_message': 'uh oh'}))
 
-        self.assertEqual(m['facility'], 'tests')
-
-    def test_named_facility(self):
+    def test_isError_sets_level_3(self):
         """
-        Formatted log lines should use the name of a bound logger as the facility,
-        if available.
-        """
-        log.name('named_test').info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['facility'], 'named_test')
-
-    def test_hostname(self):
-        """
-        Formatted log lines should include the hostname from socket.gethostname.
-        """
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['host'], 'my-hostname')
-
-    def test_pid(self):
-        """
-        Formatted log lines should include the pid from os.getpid()
-        """
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['_pid'], 1000)
-
-    def test_thread_name(self):
-        """
-        Formatted log lines should include the name of the current thread.
-        """
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['_thread_name'], 'my-thread')
-
-    def test_log_level(self):
-        """
-        Formatted log lines should include a syslog level converted from
-        twiggy log levels.
-        """
-        levels = [(log.info, 6),
-                  (log.error, 3),
-                  (log.critical, 2),
-                  (log.warning, 4),
-                  (log.debug, 7)]
-
-        for m, i in levels:
-            m('hello')
-            m = self.last_logged_json()
-            self.assertEqual(m['level'], i)
-
-    def test_version(self):
-        """
-        Formatted log lines should include the GELF format version.
-        """
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['version'], '1.0')
-
-    def test_short_message(self):
-        """
-        The argument passed to the twiggy log method should be used as the
-        short_message.
-        """
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'hello')
-
-    def test_timestmap(self):
-        """
-        The timestamp in the formatted log message should be a unix timestamp.
-        """
-        # TODO: Assert something about the value passed to mktime.
-        log.info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['timestamp'], 1)
-
-    def test_traceback_as_full_message(self):
-        """
-        The traceback should be included as a string in full_message.
-        """
-        try:
-            1 / 0
-        except:
-            log.trace().error('an error happened')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'an error happened')
-        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
-                      m['full_message'])
-
-    def test_fields(self):
-        """
-        Log fields should be included in the formatted message prefixed with
-        an underscore.
-        """
-        log.fields(foo='bar', baz='bax {').info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['_foo'], 'bar')
-        self.assertEqual(m['_baz'], 'bax {')
-
-    def test_fallback(self):
-        """
-        Non-JSON encodable objects should be serialized as their repr.
-        """
-        o = object()
-        log.fields(foo=o).info('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['_foo'], repr(o))
-
-    def test_twisted_log_msg(self):
-        """
-        Log messages from twisted's logging API should be correctly formatted.
-        """
-        tplog.msg('hello')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'hello')
-
-    def test_twisted_log_err_with_reason(self):
-        """
-        Errors logged with an explicit reason should be correctly formatted.
-        """
-        try:
-            1 / 0
-        except:
-            tplog.err(_why='an error occurred')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'an error occurred')
-        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
-                      m['full_message'])
-
-    def test_twisted_log_err_without_reason(self):
-        """
-        Errors logged without a reason should be logged as Unhandled Error.
-        """
-        try:
-            1 / 0
-        except:
-            tplog.err()
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'Unhandled Error')
-        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
-                      m['full_message'])
-
-    def test_base_logger(self):
-        """
-        The base logger is bound to the 'otter' name.
-        """
-        olog.info('foo')
-
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'foo')
-        self.assertEqual(m['facility'], 'otter')
-
-    def test_base_logger_failure_feature(self):
-        """
-        The base logger supports the failure feature.
+        The observer sets the level to 3 (syslog ERROR) when isError is true.
         """
 
-        try:
-            1 / 0
-        except:
-            olog.failure(Failure()).error('uh oh')
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
 
-        m = self.last_logged_json()
-        self.assertEqual(m['short_message'], 'uh oh')
-        self.assertIn('ZeroDivisionError: integer division or modulo by zero',
-                      m['full_message'])
+        self.observer.assert_called_once_with(
+            _Subdict({'level': 3}))
+
+    def test_isError_includes_why_in_short_message(self):
+        """
+        The observer includes 'why' in the short_message when isError is true.
+        """
+        self.gelf({'failure': Failure(ValueError()),
+                   'isError': True,
+                   'why': 'Everything is terrible.'})
+
+        self.observer.assert_called_once_with(
+            _Subdict({'short_message': _Contains('Everything is terrible.')}))
+
+    def test_includes_structured_data(self):
+        """
+        The observer includes arbitrary structured data prefixed with an _.
+        """
+        self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
+
+        self.observer.assert_called_once_with(
+            _Subdict({'_uri': 'http://example.com'}))
+
+    def test_includes_file(self):
+        """
+        The observer includes file if it is specified.
+        """
+        self.gelf({'message': 'hello', 'file': 'test.py'})
+
+        self.observer.assert_called_once_with(
+            _Subdict({'file': 'test.py'}))
+
+    def test_includes_line(self):
+        """
+        The observer includes line if it is specified.
+        """
+        self.gelf({'line': 10, 'message': ''})
+
+        self.observer.assert_called_once_with(
+            _Subdict({'line': 10}))

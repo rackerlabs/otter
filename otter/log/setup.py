@@ -2,6 +2,7 @@
 Observer factories which will be used to configure twistd logging.
 """
 import sys
+import socket
 
 from otter.log.formatters import (
     GELFObserverWrapper,
@@ -16,7 +17,8 @@ def observer_factory():
     """
     return GELFObserverWrapper(
         JSONObserverWrapper(
-            StreamObserverWrapper(sys.stdout)))
+            StreamObserverWrapper(sys.stdout)),
+        hostname=socket.gethostname())
 
 
 def observer_factory_debug():
@@ -27,4 +29,5 @@ def observer_factory_debug():
         JSONObserverWrapper(
             StreamObserverWrapper(sys.stdout),
             sort_keys=True,
-            indent=2))
+            indent=2),
+        hostname=socket.gethostname())
