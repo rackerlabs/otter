@@ -12,12 +12,8 @@ from twisted.trial.unittest import TestCase
 from twisted.python import log as tplog
 from twisted.python.failure import Failure
 
-import twiggy
-from twiggy import log
-from twixxy import TwiggyLoggingObserver
-
 from otter.log import log as olog
-from otter.log.formatters import GELFFormat
+#from otter.log.formatters import GELFFormat
 
 
 class TwiggyLoggingTests(TestCase):
@@ -25,6 +21,7 @@ class TwiggyLoggingTests(TestCase):
     Test the GELFFormat when using the twiggy logging API.
     """
     skip = "Oh well.."
+
     def setUp(self):
         """
         Set up test dependencies.
@@ -63,10 +60,10 @@ class TwiggyLoggingTests(TestCase):
         self.addCleanup(_restore_emitters)
 
         # Configure output just for tests.
-        output = twiggy.outputs.StreamOutput(format=GELFFormat('tests'),
-                                             stream=self.destination)
+        # output = twiggy.outputs.StreamOutput(format=GELFFormat('tests'),
+        #                                      stream=self.destination)
 
-        twiggy.addEmitters(('*', twiggy.levels.DEBUG, None, output))
+        # twiggy.addEmitters(('*', twiggy.levels.DEBUG, None, output))
 
         observer = TwiggyLoggingObserver()
         _observers = tplog.theLogPublisher.observers

@@ -262,6 +262,11 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             assert job_id not in state['pending'], "Job already exists: {0}".format(job_id)
             jobs_dict[job_id] = job_info
 
+            def _log_failure(f):
+                log.err(f)
+                return f
+
+            completion_deferred.addErrback(_log_failure)
             # XXX: Simplest thing that could possibly work.
             completion_deferred.addCallbacks(
                 get_callback(job_id, True),   # XXX: True?
@@ -270,6 +275,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
     if delta > 0:
+        log.msg("Launching some servers.")
         deferreds = [
             supervisor.execute_config(log, transaction_id,
                                       authenticate_tenant,

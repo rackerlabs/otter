@@ -1,29 +1,26 @@
 """
-Set up twiggy for the project
+Observer factories which will be used to configure twistd logging.
 """
 import sys
 
-from twisted.python import log
-from otter.log.formatters import GELFFormat
-
-stdout = sys.stdout
-
-
-def writeLog(msg):
-    stdout.write(msg)
-    stdout.write('\n')
-    stdout.flush()
+from otter.log.formatters import GELFFormatter, JSONFormatter, StreamObserverWrapper
 
 
 def observer_factory():
     """
-    Setup twiggy and return a twisted log observer.
+    Log JSON formatted GELF structures to sys.stdout.
     """
-    return GELFFormat(writeLog, 'otter')
+    return GELFFormatter(
+        JSONFormatter(
+            StreamObserverWrapper(sys.stdout)))
 
 
 def observer_factory_debug():
     """
-    Setup twiggy and return a twisted log observer.
+    Log pretty JSON formatted GELF structures to sys.stdout.
     """
-    return log.FileLogObserver(sys.stdout).emit
+    return GELFFormatter(
+        JSONFormatter(
+            StreamObserverWrapper(sys.stdout),
+            sort_keys=True,
+            indent=2))
