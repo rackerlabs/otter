@@ -1,10 +1,75 @@
-"""JSON Formatters for GELF with Twiggy """
+"""
+Composable log observers for use with Twisted's log module.
+"""
 import json
-import socket
-from twiggy.levels import name2level
-from twiggy.lib import thread_name
-import os
 import time
+
+
+IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
+
+
+def GELFObserverWrapper(observer, hostname, seconds=None):
+    """
+    Create a log observer that will format messages as GELF and delegate to
+    `observer`.
+
+    :param str hostname: The hostname to be used in the gelf format.
+    :param ILogObserver observer: The log observer to call with our GELF
+        formatted data.
+    :param seconds: A 0-argument callable that returns a UNIX timestamp.
+
+    :rtype: ILogObserver
+    """
+
+    if seconds is None:  # pragma: no cover
+        seconds = time.time
+
+    def GELFObserver(eventDict):
+        short_message = None
+        full_message = None
+
+        if eventDict.get("isError", False):
+            level = 3
+
+            if 'failure' in eventDict:
+                short_message = repr(eventDict['failure'].value)
+                full_message = eventDict['failure'].getTraceback()
+
+            if 'why' in eventDict and eventDict['why']:
+                short_message = '{0}: {1}'.format(eventDict['why'],
+                                                  short_message)
+
+        else:
+            level = 6
+
+        if not short_message:
+            short_message = eventDict["message"][0] if eventDict["message"] else ""
+
+        if not full_message:
+            full_message = " ".join([str(m) for m in eventDict["message"]])
+
+        log_params = {
+            "version": "1.0",
+            "host": hostname,
+            "short_message": short_message,
+            "full_message": full_message,
+            "timestamp": eventDict.get("time", seconds()),
+            "level": eventDict.get("level", level),
+            "facility": eventDict.get("system", ""),
+        }
+
+        if "file" in eventDict:
+            log_params["file"] = eventDict["file"]
+        if "line" in eventDict:
+            log_params["line"] = eventDict["line"]
+
+        for key, value in eventDict.iteritems():
+            if key not in IGNORE_FIELDS:
+                log_params["_%s" % (key, )] = value
+
+        observer(log_params)
+
+    return GELFObserver
 
 
 class ReprFallbackEncoder(json.JSONEncoder):
@@ -24,63 +89,37 @@ class ReprFallbackEncoder(json.JSONEncoder):
         return repr(obj)
 
 
-class GELFFormat(object):
+def JSONObserverWrapper(observer, **kwargs):
     """
-    A Twiggy log Format that produces https://github.com/Graylog2/graylog2-docs/wiki/GELF
-    format messages.
+    Create an observer that will format the eventDict as JSON using the
+    supplied keyword arguments and delegate to `observer`.
+
+    :param ILogObserver observer: The observer to delegate message delivery to.
+
+    :rtype: ILogObserver
     """
-    def __init__(self, facility, suffix='\n'):
-        self.suffix = suffix
-        self.facility = facility
+    def JSONObserver(eventDict):
+        observer({'message': (json.dumps(eventDict, cls=ReprFallbackEncoder, **kwargs),)})
 
-    def __call__(self, msg):
-        """
-        Twiggy uses callable to format messages.
-        """
-        message_dict = self._make_message_dict(msg)
-        return json.dumps(message_dict, cls=ReprFallbackEncoder) + self.suffix
+    return JSONObserver
 
-    def _convert_level_to_syslog(self, level):
-        """
-        Convert the level from Twiggy into a syslog appropriate level.
-        """
-        return {
-            name2level("CRITICAL"): 2,
-            name2level("ERROR"): 3,
-            name2level("WARNING"): 4,
-            name2level("INFO"): 6,
-            name2level("DEBUG"): 7,
-        }.get(level, level)
 
-    def _make_message_dict(self, record):
-        """
-        Make a JSON serializable dict out of a record.
-        """
-        outrec = {
-            'version': "1.0",
-            'host': socket.gethostname(),
-            'short_message': record.text,
-            'timestamp': time.mktime(record.fields["time"]),
-            'level': self._convert_level_to_syslog(record.fields["level"]),
-            'facility': record.fields.get('name', self.facility),
-            'full_message': record.traceback or '',
-            '_pid': os.getpid(),
-            '_thread_name': thread_name()
-        }
+def StreamObserverWrapper(stream, delimiter='\n', buffered=False):
+    """
+    Create a log observer that will write bytes to the specified stream.
+    :param str or None delimter: A delimiter for each message.
+    :param bool buffered: True if output should be buffered, if False we will
+        call `flush` on the `stream` after writing every message.
 
-        return self._add_extra_fields(outrec, record.fields)
+    :rtype: ILogObserver
+    """
+    def StreamObserver(eventDict):
+        stream.write(''.join(eventDict['message']))
 
-    def _add_extra_fields(self, message_dict, record):
-        """
-        Add extra fields to an existing message dict,
-        skipping clearly illegal arguments (e.g. id) and things that
-        are being sent elsewhere (e.g. level, time, name) and also
-        making sure that the data is serializable.
-        """
-        skip_list = ('level', 'time', 'name', 'id')
+        if delimiter is not None:
+            stream.write(delimiter)
 
-        for key, value in record.items():
-            if key not in skip_list:
-                message_dict['_%s' % key] = value
+        if not buffered:
+            stream.flush()
 
-        return message_dict
+    return StreamObserver

@@ -27,18 +27,18 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     job_id = generate_job_id(scaling_group.uuid)
     completion_d = Deferred()
 
-    log = log.fields(job_id=job_id,
-                     worker=launch_config['type'],
-                     tenant_id=scaling_group.tenant_id)
+    log = log.bind(job_id=job_id,
+                   worker=launch_config['type'],
+                   tenant_id=scaling_group.tenant_id)
 
     assert launch_config['type'] == 'launch_server'
 
-    log.fields(tenant_id=scaling_group.tenant_id).info("Authenticating for tenant")
+    log.msg("Authenticating for tenant")
 
     d = auth_function(scaling_group.tenant_id)
 
     def when_authenticated((auth_token, service_catalog)):
-        log.info("Executing launch config.")
+        log.msg("Executing launch config.")
         return launch_server_v1.launch_server(
             'ORD',  # TODO: Get the region probably from the config or something.
             scaling_group,
@@ -49,7 +49,7 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     d.addCallback(when_authenticated)
 
     def when_launch_server_completed(result):
-        log.info("Done executing launch config.")
+        log.msg("Done executing launch config.")
         # XXX: Meaningful return value?
 
     d.addCallback(when_launch_server_completed)

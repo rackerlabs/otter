@@ -325,7 +325,9 @@ class CassScalingGroup(object):
         """
         Creates a CassScalingGroup object.
         """
-        self.log = log.name(self.__class__.__name__).fields(tenant_id=tenant_id, scaling_group_id=uuid)
+        self.log = log.bind(system=self.__class__.__name__,
+                            tenant_id=tenant_id,
+                            scaling_group_id=uuid)
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
@@ -429,8 +431,8 @@ class CassScalingGroup(object):
 
         del pending[pending_job_id]
 
-        self.log.fields(name=name, instance_id=instance_id, uri=uri, pending_job_id=pending_job_id,
-                        timestamp=created).info("Adding server to database")
+        self.log.bind(name=name, instance_id=instance_id, uri=uri, pending_job_id=pending_job_id,
+                      timestamp=created).msg("Adding server to database")
 
         active[instance_id] = {"name": name,
                                "instanceURL": uri,
@@ -453,8 +455,8 @@ class CassScalingGroup(object):
         if timestamp is None:
             timestamp = now()
 
-        self.log.fields(new_jobs=job_dict, policy_id=policy_id,
-                        timestamp=timestamp).info("Updating jobs")
+        self.log.bind(new_jobs=job_dict, policy_id=policy_id,
+                      timestamp=timestamp).msg("Updating jobs")
 
         policy_touched = state["policyTouched"]
         if policy_id is not None:
@@ -476,7 +478,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
         """
-        self.log.fields(updated_config=data).info("Updating config")
+        self.log.bind(updated_config=data).msg("Updating config")
 
         def _do_update_config(lastRev):
             queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
@@ -495,7 +497,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_launch_config`
         """
-        self.log.fields(updated_launch_config=data).info("Updating launch config")
+        self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
         def _do_update_launch(lastRev):
             queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
@@ -564,7 +566,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_policies`
         """
-        self.log.fields(policies=data).info("Creating policies")
+        self.log.bind(policies=data).msg("Creating policies")
 
         def _do_create_pol(lastRev):
             queries = []
@@ -588,7 +590,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_policy`
         """
-        self.log.fields(updated_policy=data, policy_id=policy_id).info("Updating policy")
+        self.log.bind(updated_policy=data, policy_id=policy_id).msg("Updating policy")
 
         def _do_update_launch(lastRev):
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
@@ -647,7 +649,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
-        self.log.fields(policy_id=policy_id).info("Deleting policy")
+        self.log.bind(policy_id=policy_id).msg("Deleting policy")
         d = self.get_policy(policy_id)
         d.addCallback(lambda _: self._naive_delete_policy(
             policy_id, get_consistency_level('delete', 'policy')))
@@ -698,7 +700,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.create_webhooks`
         """
-        self.log.fields(policy_id=policy_id, webhook=data).info("Creating webhooks")
+        self.log.bind(policy_id=policy_id, webhook=data).msg("Creating webhooks")
 
         def _do_create(lastRev):
             queries = []
@@ -748,8 +750,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_webhook`
         """
-        self.log.fields(policy_id=policy_id, webhook_id=webhook_id,
-                        webhook=data).info("Updating webhook")
+        self.log.bind(policy_id=policy_id, webhook_id=webhook_id,
+                      webhook=data).msg("Updating webhook")
 
         def _update_data(lastRev):
             data.setdefault('metadata', {})
@@ -770,7 +772,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_webhook`
         """
-        self.log.fields(policy_id=policy_id, webhook_id=webhook_id).info("Deleting webhook")
+        self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
 
         def _do_delete(lastRev):
             query = _cql_delete_webhook.format(
@@ -913,7 +915,7 @@ class CassScalingGroupCollection:
         """
         scaling_group_id = generate_key_str('scalinggroup')
 
-        log.fields(tenant_id=tenant_id, scaling_group_id=scaling_group_id).info("Creating scaling group")
+        log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
 
         queries = [
             _cql_insert.format(cf=self.config_table, name=":scaling"),

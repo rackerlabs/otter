@@ -1,38 +1,33 @@
 """
-Set up twiggy for the project
+Observer factories which will be used to configure twistd logging.
 """
 import sys
-from twiggy import addEmitters, outputs, levels, formats
-from otter.log.formatters import GELFFormat
+import socket
 
-from twixxy import TwiggyLoggingObserver
+from otter.log.formatters import (
+    GELFObserverWrapper,
+    JSONObserverWrapper,
+    StreamObserverWrapper
+)
 
 
 def observer_factory():
     """
-    Setup twiggy and return a twisted log observer.
+    Log JSON formatted GELF structures to sys.stdout.
     """
-    std_output = outputs.StreamOutput(format=GELFFormat('otter'),
-                                      stream=sys.stdout)
-
-    addEmitters(
-        # (name, min_level, filter, output),
-        ("*", levels.DEBUG, None, std_output))
-
-    observer = TwiggyLoggingObserver()
-    return observer.emit
+    return GELFObserverWrapper(
+        JSONObserverWrapper(
+            StreamObserverWrapper(sys.stdout)),
+        hostname=socket.gethostname())
 
 
 def observer_factory_debug():
     """
-    Setup twiggy and return a twisted log observer.
+    Log pretty JSON formatted GELF structures to sys.stdout.
     """
-    std_output = outputs.StreamOutput(format=formats.line_format,
-                                      stream=sys.stdout)
-
-    addEmitters(
-        # (name, min_level, filter, output),
-        ("*", levels.DEBUG, None, std_output))
-
-    observer = TwiggyLoggingObserver()
-    return observer.emit
+    return GELFObserverWrapper(
+        JSONObserverWrapper(
+            StreamObserverWrapper(sys.stdout),
+            sort_keys=True,
+            indent=2),
+        hostname=socket.gethostname())
