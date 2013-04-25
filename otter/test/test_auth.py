@@ -242,7 +242,7 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.impersonate_user.return_value = succeed(
             {'access': {'token': {'id': 'impersonation_token'}}})
         self.endpoints_for_token.return_value = succeed(
-            {'endpoints': [{'name': 'anEndpoint'}]})
+            {'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})
 
         self.url = 'http://identity'
         self.admin_url = 'http://identity_admin'
@@ -292,7 +292,10 @@ class ImpersonatingAuthenticatorTests(TestCase):
         result = self.successResultOf(self.ia.authenticate_tenant(1111111))
 
         self.assertEqual(result[0], 'impersonation_token')
-        self.assertEqual(result[1], [{'name': 'anEndpoint'}])
+        self.assertEqual(result[1],
+                         [{'name': 'anEndpoint',
+                           'type': 'anType',
+                           'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]}])
 
     def test_authenticate_tenant_propagates_auth_errors(self):
         """
@@ -381,7 +384,9 @@ class AuthenticateTenantTests(TestCase):
         method.
         """
         self.ia.return_value.authenticate_tenant.return_value = succeed(
-            ('impersonation_token', [{'name': 'anEndpoint'}]))
+            ('impersonation_token', [{'endpoints': [], 'name': 'anEndpoint', 'type': 'anType'}]))
 
         result = self.successResultOf(authenticate_tenant(111111))
-        self.assertEqual(result, ('impersonation_token', [{'name': 'anEndpoint'}]))
+        self.assertEqual(result,
+                         ('impersonation_token',
+                          [{'endpoints': [], 'name': 'anEndpoint', 'type': 'anType'}]))
