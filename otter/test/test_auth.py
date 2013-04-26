@@ -14,7 +14,7 @@ from otter.auth import authenticate_user
 from otter.auth import extract_token
 from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
-from otter.auth import users_for_tenant
+from otter.auth import user_for_tenant
 from otter.auth import _ImpersonatingAuthenticator
 from otter.auth import authenticate_tenant
 from otter.util.config import set_config_data
@@ -55,12 +55,12 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.post.return_value = succeed(response)
 
-        d = authenticate_user('http://identity', 'user', 'pass')
+        d = authenticate_user('http://identity/v2.0', 'user', 'pass')
 
         self.assertEqual(self.successResultOf(d), response_body)
 
         self.treq.post.assert_called_once_with(
-            'http://identity/tokens',
+            'http://identity/v2.0/tokens',
             SameJSON({'auth': {
                 'passwordCredentials': {
                     'username': 'user',
@@ -78,7 +78,7 @@ class HelperTests(TestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.post.return_value = succeed(response)
 
-        d = authenticate_user('http://identity', 'user', 'pass')
+        d = authenticate_user('http://identity/v2.0', 'user', 'pass')
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(APIError))
@@ -99,12 +99,12 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.post.return_value = succeed(response)
 
-        d = impersonate_user('http://identity', 'auth-token', 'foo')
+        d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo')
 
         self.assertEqual(self.successResultOf(d), response_body)
 
         self.treq.post.assert_called_once_with(
-            'http://identity/RAX-AUTH/impersonation-tokens',
+            'http://identity/v2.0/RAX-AUTH/impersonation-tokens',
             SameJSON({
                 'RAX-AUTH:impersonation': {
                     'user': {'username': 'foo'},
@@ -127,12 +127,12 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.post.return_value = succeed(response)
 
-        d = impersonate_user('http://identity', 'auth-token', 'foo', expire_in=60)
+        d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo', expire_in=60)
 
         self.assertEqual(self.successResultOf(d), response_body)
 
         self.treq.post.assert_called_once_with(
-            'http://identity/RAX-AUTH/impersonation-tokens',
+            'http://identity/v2.0/RAX-AUTH/impersonation-tokens',
             SameJSON({
                 'RAX-AUTH:impersonation': {
                     'user': {'username': 'foo'},
@@ -149,7 +149,7 @@ class HelperTests(TestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.post.return_value = succeed(response)
 
-        d = impersonate_user('http://identity', 'auth-token', 'foo', expire_in=60)
+        d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo', expire_in=60)
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(APIError))
@@ -165,12 +165,12 @@ class HelperTests(TestCase):
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = endpoints_for_token('http://identity', 'auth-token', 'user-token')
+        d = endpoints_for_token('http://identity/v2.0', 'auth-token', 'user-token')
 
         self.assertEqual(self.successResultOf(d), response_body)
 
         self.treq.get.assert_called_once_with(
-            'http://identity/tokens/user-token/endpoints',
+            'http://identity/v2.0/tokens/user-token/endpoints',
             headers=expected_headers)
 
     def test_endpoints_for_token_propogates_errors(self):
@@ -181,40 +181,41 @@ class HelperTests(TestCase):
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = endpoints_for_token('http://identity', 'auth-token', 'user-token')
+        d = endpoints_for_token('http://identity/v2.0', 'auth-token', 'user-token')
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(APIError))
         self.assertEqual(failure.value.code, 500)
         self.assertEqual(failure.value.body, 'error_body')
 
-    def test_users_for_tenant(self):
+    def test_user_for_tenant(self):
         """
-        users_for_tenant sends a properly formed request to the identity API for
+        user_for_tenant sends a properly formed request to the identity API for
         the list of users for a given tenant.
         """
         response = mock.Mock(code=200)
-        response_body = {'users': []}
+        response_body = {'user': {'id': 'ausername'}}
         self.treq.json_content.return_value = succeed(response_body)
         self.treq.get.return_value = succeed(response)
 
-        d = users_for_tenant('http://identity', 'auth-token', 111111)
+        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 111111)
 
-        self.assertEqual(self.successResultOf(d), response_body)
+        self.assertEqual(self.successResultOf(d), 'ausername')
 
         self.treq.get.assert_called_once_with(
-            'http://identity/tenants/111111/users',
-            headers=expected_headers)
+            'http://identity/v1.1/mosso/111111',
+            auth=('username', 'password'),
+            allow_redirects=False)
 
-    def test_users_for_tenant_propagates_errors(self):
+    def test_user_for_tenant_propagates_errors(self):
         """
-        users_for_tenant propagates API errors.
+        user_for_tenant propagates API errors.
         """
         response = mock.Mock(code=500)
         self.treq.content.return_value = succeed('error_body')
         self.treq.get.return_value = succeed(response)
 
-        d = users_for_tenant('http://identity', 'auth-token', 111111)
+        d = user_for_tenant('http://identity/v2.0', 'username', 'password', 111111)
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(APIError))
@@ -231,21 +232,20 @@ class ImpersonatingAuthenticatorTests(TestCase):
         Shortcut by mocking all the helper functions that do IO.
         """
         self.authenticate_user = patch(self, 'otter.auth.authenticate_user')
-        self.users_for_tenant = patch(self, 'otter.auth.users_for_tenant')
+        self.user_for_tenant = patch(self, 'otter.auth.user_for_tenant')
         self.impersonate_user = patch(self, 'otter.auth.impersonate_user')
         self.endpoints_for_token = patch(self, 'otter.auth.endpoints_for_token')
 
         self.authenticate_user.return_value = succeed(
             {'access': {'token': {'id': 'auth-token'}}})
-        self.users_for_tenant.return_value = succeed(
-            {'users': [{'username': 'test_user'}]})
+        self.user_for_tenant.return_value = succeed('test_user')
         self.impersonate_user.return_value = succeed(
             {'access': {'token': {'id': 'impersonation_token'}}})
         self.endpoints_for_token.return_value = succeed(
             {'endpoints': [{'name': 'anEndpoint', 'type': 'anType'}]})
 
-        self.url = 'http://identity'
-        self.admin_url = 'http://identity_admin'
+        self.url = 'http://identity/v2.0'
+        self.admin_url = 'http://identity_admin/v2.0'
         self.user = 'service_user'
         self.password = 'service_password'
         self.ia = _ImpersonatingAuthenticator(self.user, self.password,
@@ -259,13 +259,13 @@ class ImpersonatingAuthenticatorTests(TestCase):
 
         self.authenticate_user.assert_called_once_with(self.url, self.user, self.password)
 
-    def test_authenticate_tenant_gets_users_for_specified_tenant(self):
+    def test_authenticate_tenant_gets_user_for_specified_tenant(self):
         """
-        authenticate_tenant gets users for the specified tenant from the admin endpoint.
+        authenticate_tenant gets user for the specified tenant from the admin endpoint.
         """
         self.successResultOf(self.ia.authenticate_tenant(111111))
 
-        self.users_for_tenant.assert_called_once_with(self.admin_url, 'auth-token', 111111)
+        self.user_for_tenant.assert_called_once_with(self.admin_url, self.user, self.password, 111111)
 
     def test_authenticate_tenant_impersonates_first_user(self):
         """
@@ -308,9 +308,9 @@ class ImpersonatingAuthenticatorTests(TestCase):
 
     def test_authenticate_tenant_propagates_user_list_errors(self):
         """
-        authenticate_tenant propagates errors from users_for_tenant
+        authenticate_tenant propagates errors from user_for_tenant
         """
-        self.users_for_tenant.return_value = fail(APIError(500, '500'))
+        self.user_for_tenant.return_value = fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
@@ -345,7 +345,7 @@ class AuthenticateTenantTests(TestCase):
         set_config_data({'identity': {
             'username': 'service_user',
             'password': 'service_password',
-            'url': 'http://identity',
+            'url': 'http://identity/v2.0',
             'admin_url': 'http://identity_admin'
         }})
 
@@ -359,7 +359,7 @@ class AuthenticateTenantTests(TestCase):
         authenticate_tenant(111111)
 
         self.ia.assert_called_once_with('service_user', 'service_password',
-                                        'http://identity', 'http://identity_admin')
+                                        'http://identity/v2.0', 'http://identity_admin')
 
     def test_authenticate_tenant_calls_authenticators_authenticate_tenant(self):
         """
