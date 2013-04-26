@@ -84,6 +84,7 @@ class SupervisorExecuteTests(TestCase):
         self.assertEqual(None, result)
 
         self.launch_server.assert_called_once_with(
+            mock.ANY,
             'ORD',
             self.group,
             self.service_catalog,
