@@ -1,7 +1,7 @@
 """
 Implement a global configuration API.
 """
-_config_data = None
+_config_data = {}
 
 
 def set_config_data(data):

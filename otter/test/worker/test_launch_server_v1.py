@@ -24,10 +24,10 @@ from otter.worker.launch_server_v1 import (
     public_endpoint_url
 )
 
+
 from otter.test.utils import patch
 from otter.util.http import APIError
 from otter.util.deferredutils import unwrap_first_error
-
 
 fake_service_catalog = [
     {'type': 'compute',
