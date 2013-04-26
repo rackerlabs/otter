@@ -5,6 +5,7 @@ the scaling policies associated with a particular scaling group.
 (/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
 """
 
+from functools import partial
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
@@ -300,9 +301,8 @@ def execute_policy(request, log, tenantId, groupId, policyId):
         {}
     """
     group = get_store().get_scaling_group(log, tenantId, groupId)
-
-    d = controller.maybe_execute_scaling_policy(
-        log, transaction_id(request), group, policyId)
-
+    d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
+                                   log, transaction_id(request),
+                                   policy_id=policyId))
     d.addCallback(lambda _: "{}")  # Return value TBD
     return d

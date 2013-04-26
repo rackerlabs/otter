@@ -1,18 +1,18 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
+from functools import partial
+
 from zope.interface import implementer
 
 from twisted.internet import defer
 
 from otter.models.interface import (
-    GroupNotEmptyError, IScalingGroupState, IScalingGroup,
+    GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
-#from otter.controller import maybe_execute_scaling_policy
-from otter.util.timestamp import now
 
 from silverberg.client import ConsistencyLevel
 
@@ -64,11 +64,11 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
 _cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
                          'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
-_cql_add_server_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending)'
-                               ' VALUES(:tenantId, :groupId, :active:, :pending);')
-_cql_update_job_group_state = ('INSERT INTO {cf}("tenantId", "groupId", pending, "groupTouched", '
-                               '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
-                               ':policyTouched);')
+_cql_update_group_state = (
+    'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
+    '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
+    ':groupTouched, :policyTouched, :paused);')
+
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -281,7 +281,7 @@ def _grab_list(raw_response, id_name, has_data=True):
                                'required field "{0!s}"'.format(e))
 
 
-@implementer(IScalingGroup, IScalingGroupState)
+@implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
     .. autointerface:: otter.models.interface.IScalingGroup
@@ -379,18 +379,14 @@ class CassScalingGroup(object):
             if len(res) == 0:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             res = res[0]
-            active = _jsonloads_data(res["active"])
-            policyTouched = _jsonloads_data(res["policyTouched"])
-            groupTouched = res["groupTouched"]
-            pending = _jsonloads_data(res["pending"])
-            paused = bool(ord(res["paused"]))
-            return {
-                "active": active,
-                "paused": paused,
-                "policyTouched": policyTouched,
-                "groupTouched": groupTouched,
-                "pending": pending
-            }
+            return GroupState(
+                self.tenant_id, self.uuid,
+                _jsonloads_data(res["active"]),
+                _jsonloads_data(res["pending"]),
+                res["groupTouched"],
+                _jsonloads_data(res["policyTouched"]),
+                bool(ord(res["paused"]))
+            )
 
         query = _cql_view_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
@@ -400,67 +396,31 @@ class CassScalingGroup(object):
         d.addCallback(_do_state_lookup)
         return d
 
-    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
+    def modify_state(self, modifier_callable):
         """
-        see :meth:`otter.models.interface.IScalingGroupState.add_server`
+        see :meth:`otter.models.interface.IScalingGroup.modify_state`
+
+        TODO: locking!!
         """
-        if created is None:
-            created = now()
+        def _write_state(new_state):
+            assert (new_state.tenant_id == self.tenant_id and
+                    new_state.group_id == self.uuid)
+            params = {
+                'tenantId': new_state.tenant_id,
+                'groupId': new_state.group_id,
+                'active': serialize_json_data(new_state.active, 1),
+                'pending': serialize_json_data(new_state.pending, 1),
+                'paused': new_state.paused,
+                'groupTouched': new_state.group_touched,
+                'policyTouched': serialize_json_data(new_state.policy_touched, 1)
+            }
+            return self.connection.execute(_cql_update_group_state, params,
+                                           get_consistency_level('update', 'state'))
 
-        pending = state["pending"]
-        active = state["active"]
+        d = self.view_state()
+        d.addCallback(partial(modifier_callable, self))
+        return d.addCallback(_write_state)
 
-        if not pending_job_id in pending:
-            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of "
-                                        "pending jobs"))
-        if instance_id in active:
-            return defer.fail(Exception("Internal error: Server is already active"))
-
-        del pending[pending_job_id]
-
-        self.log.bind(name=name, instance_id=instance_id, uri=uri, pending_job_id=pending_job_id,
-                      timestamp=created).msg("Adding server to database")
-
-        active[instance_id] = {"name": name,
-                               "instanceURL": uri,
-                               "created": created}
-
-        query = _cql_add_server_group_state.format(cf=self.state_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid,
-                                     "active": serialize_json_data(active, 1),
-                                     "pending": serialize_json_data(pending, 1)},
-                                    get_consistency_level('update', 'state'))
-        return d
-
-    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
-                    timestamp=None):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
-        """
-        if timestamp is None:
-            timestamp = now()
-
-        self.log.bind(new_jobs=job_dict, policy_id=policy_id,
-                      timestamp=timestamp).msg("Updating jobs")
-
-        policy_touched = state["policyTouched"]
-        if policy_id is not None:
-            policy_touched[policy_id] = timestamp
-
-        query = _cql_update_job_group_state.format(cf=self.state_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid,
-                                     "groupTouched": timestamp,
-                                     "policyTouched": serialize_json_data(policy_touched, 1),
-                                     "pending": serialize_json_data(job_dict, 1)},
-                                    get_consistency_level('update', 'state'))
-        return d
-
-    # TODO: There is no state yet, and updating the config should update the
-    # state
     def update_config(self, data):
         """
         see :meth:`otter.models.interface.IScalingGroup.update_config`
@@ -795,28 +755,16 @@ class CassScalingGroup(object):
 
         return _jsonloads_data(results[0]['data'])
 
-    def pause(self):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.pause`
-        """
-        raise NotImplementedError()
-
-    def resume(self):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.resume`
-        """
-        raise NotImplementedError()
-
     def delete_group(self):
         """
-        see :meth:`otter.models.interface.IScalingGroupState.delete_group`
+        see :meth:`otter.models.interface.IScalingGroup.delete_group`
 
         TODO: locking!!
         """
         d = self.view_state()
 
         def _maybe_delete(state):
-            if len(state['active']) + len(state['pending']) > 0:
+            if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
             consistency = get_consistency_level('delete', 'group')

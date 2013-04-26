@@ -4,6 +4,117 @@ Interface to be used by the scaling groups engine
 
 from zope.interface import Interface, Attribute
 
+from otter.util import timestamp
+
+
+class GroupState(object):
+    """
+    Object that represents the state
+
+    :ivar str tenant_id: the tenant ID of the scaling group whose state this
+        object represents
+
+    :ivar str group_id: the ID of the scaling group whose state this
+        object represents
+    :ivar dict active: the mapping of active server ids and their info
+    :ivar dict pending: the list of pending job ids and their info
+    :ivar bool paused: whether the scaling group is paused in scaling activities
+    :ivar dict policy_touched: dictionary mapping policy ids to the last time
+        they were executed, if ever.
+    :ivar str group_touched: timezone-aware timestamp that represents when the
+        last time any policy was executed on the group.  Could be None.
+    :ivar callable now: callable that returns a ``str`` timestamp - used for
+        testing purposes.  Defaults to :func:`timestamp.now`
+
+    TODO: ``remove_active``, ``pause`` and ``resume`` ?
+    """
+    def __init__(self, tenant_id, group_id, active, pending, group_touched,
+                 policy_touched, paused, now=timestamp.now):
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.active = active
+        self.pending = pending
+        self.paused = paused
+        self.policy_touched = policy_touched
+        self.group_touched = group_touched
+
+        self.now = now
+
+    def __eq__(self, other):
+        """
+        Two states are equal if all of the parameters are equal (except for
+        the now callable)
+        """
+        params = ('tenant_id', 'group_id', 'active', 'pending', 'paused',
+                  'policy_touched', 'group_touched')
+        return all((getattr(self, param) == getattr(other, param)
+                    for param in params))
+
+    def __ne__(self, other):
+        """
+        Negate __eq__
+        """
+        return other.__class__ != self.__class__ or not self.__eq__(other)
+
+    def __repr__(self):
+        """
+        Prints out a representation of self
+        """
+        return "GroupState({}, {}, {}, {}, {}, {}, {})".format(
+            self.tenant_id, self.group_id, repr(self.active),
+            repr(self.pending), self.paused, repr(self.policy_touched),
+            self.group_touched
+        )
+
+    def remove_job(self, job_id):
+        """
+        Removes a pending job from the pending list.  If the job is not in
+        pending, raises an AssertionError.
+
+        :param str job_id:  the id of the job to complete
+        :returns: None
+        :raises: :class:`AssertionError` if the job doesn't exist
+        """
+        assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
+        del self.pending[job_id]
+
+    def add_job(self, job_id):
+        """
+        Adds a pending job to the pending collection.  If the job is already in
+        pending, raises an AssertError.
+
+        :param str job_id:  the id of the job to complete
+        :returns: None
+        :raises: :class:`AssertionError` if the job already exists
+        """
+        assert job_id not in self.pending, "Job exists: {0}".format(job_id)
+        self.pending[job_id] = {'created': self.now()}
+
+    def add_active(self, server_id, server_info):
+        """
+        Adds a server to the collection of active servers.  Adds a creation time
+        if there isn't one.
+
+        :param str job_id:  the id of the job to complete
+        :param dict server_info: a dictionary containing relevant server info.
+            TBD: What's in server_info ultimately - currently: name, url
+        :returns: None
+        :raises: :class:`AssertionError` if the server id already exists
+        """
+        assert server_id not in self.active, "Server already exists: {}".format(server_id)
+        server_info.setdefault('created', self.now())
+        self.active[server_id] = server_info
+
+    def mark_executed(self, policy_id):
+        """
+        Record the execution time (now) of a particular policy.  This also
+        updates the group touched time.
+
+        :param str policy_id:  the id of the policy that was executed
+        :returns: None
+        """
+        self.policy_touched[policy_id] = self.group_touched = self.now()
+
 
 class UnrecognizedCapabilityError(Exception):
     """
@@ -60,102 +171,6 @@ class GroupNotEmptyError(Exception):
             .format(t=tenant_id, g=group_id))
 
 
-class IScalingGroupState(Interface):
-    """
-    Represents an accessor for group state.
-    """
-
-    def delete_group():
-        """
-        Deletes the scaling group if the state is empty.  This method should
-        handle its own locking, if required.
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-
-        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
-            doesn't exist for this tenant id
-        :raises: :class:`GroupNotEmptyError` if the scaling group cannot be
-            deleted (e.g. if the state is not empty)
-        """
-
-    def add_server(state, name, instance_id, uri, pending_job_id, created=None):
-        """
-        Takes information about an active server and adds it to the store of
-        active servers.  Note that this does not raise
-        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
-        the check is expected to be performed elsewhere.
-
-        :param dict state: a dict, like you'd see returned from view_state,
-            containing the state of the group
-        :param str name: the name of the server
-        :param str instance_id: the instance id of the server
-        :param str uri: the link to the server
-        :param str pending_job_id: the job ID that used to have this
-        :param str created: the time the server moved from pending to created -
-            if not provided, the created time will be the time this function
-            is called.  This should be a timestamp as produced by or parsed by
-            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
-            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-        """
-
-    def update_jobs(state, job_dict, transaction_id, policy_id=None, timestamp=None):
-        """
-        Update jobs with the jobs dict, which should contain all outstanding
-        jobs in the group, not just new jobs.  Note this does not raise
-        :class:`NoSuchScalingGroupError` if this scaling group does not exist -
-        the check is expected to be performed elsewhere.
-
-        If the jobs changed as a result of hte policy, modify the touched times
-        for the given policy (and the group at large).
-
-        :param dict state: a dict, like you'd see returned from view_state,
-            containing the state of the group
-
-        :param dict job_dict: a dictionary mapping jobs to a dictionary as
-            defined by :data:`otter.json_schema.model_schemas.pending_jobs`.
-            This should contain both all the old jobs and new jobs to be added.
-            The old jobs should have been obtained by a call to
-            :meth:`read_state`.
-
-        :param transaction_id: the ID of the transaction that caused the jobs
-            to be updated.  A policy execution would have a transaction ID,
-            as would a config update that causes jobs to execute.
-
-        :param policy_id: The ID of the policy that was executed, if any.
-
-        :param str timestamp: the time the policy was executed, resulting in
-            the change in jobs.  If not provided, and ``policy_id`` is provided,
-            the created time will be the time this function is called.  This
-            should be a timestamp as produced by or parsed by
-            :meth:`otter.util.timestamp` (which is a ISO8601 formatted
-            UTC date/timestamp, with a 'T' separator and Zulu timezone format)
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-        """
-
-    def pause():
-        """
-        Updates the state so that the scaling group is paused.  This is an
-        idempotent change, if it's already paused, this does not raise an error.
-        (But perhaps it should not be re-paused, if that is an expensive
-        operation.)
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-        """
-
-    def resume():
-        """
-        Updates the state so that the scaling group is paused.  This is an
-        idempotent change, if it's already unpaused, this does not raise an
-        error. (But perhaps it should not be re-resumed, if that is an expensive
-        operation.)
-
-        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
-        """
-
-
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -200,38 +215,26 @@ class IScalingGroup(Interface):
 
     def view_state():
         """
-        State information looks like::
-
-            {
-              "active": {
-                "instance id": {
-                  "name": "server_name",
-                  "instanceURL": "instance URL",
-                  "created": "timestamp when the server was done being set up"
-                },
-                ...
-              },
-              "pending": {
-                "job_id": {
-                    "created": "timestamp when the job was created/started"
-                },
-                  ...
-              },
-              "groupTouched": "timestamp any policy was last executed"
-              "policyTouched": {
-                "policy_id": "timestamp this policy was last executed",
-                ...
-              },
-              "paused": false
-            }
-
-        :return: the state information
+        :return: the state information as a :class:`GroupState`
 
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
+        """
+
+    def delete_group():
+        """
+        Deletes the scaling group if the state is empty.  This method should
+        handle its own locking, if required.
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if the scaling group id
+            doesn't exist for this tenant id
+        :raises: :class:`GroupNotEmptyError` if the scaling group cannot be
+            deleted (e.g. if the state is not empty)
         """
 
     def update_config(config):
@@ -261,6 +264,23 @@ class IScalingGroup(Interface):
         :param launch_config: launch config data in JSON format, as specified
             by :data:`otter.json_schema.scaling_group.launch_config`
         :type launch_config: ``dict``
+
+        :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
+        """
+
+    def modify_state(modifier_callable):
+        """
+        Updates the scaling group state, replacing the whole thing.  This
+        takes a callable which produces a state, and then saves it,
+        overwriting the entire previous state.  This method should handle its
+        own locking, if necessary.
+
+        :param modifier_callable: a ``callable`` that takes as its arguments
+            the :class:`IScalingGroup`, a :class:`GroupState`, and returns a
+            :class:`GroupState`.
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
