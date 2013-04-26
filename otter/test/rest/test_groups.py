@@ -18,8 +18,7 @@ from otter.json_schema.group_examples import (
 from otter.json_schema import rest_schemas
 
 from otter.models.interface import (
-    GroupNotEmptyError, IScalingGroup, IScalingGroupState,
-    NoSuchScalingGroupError)
+    GroupState, GroupNotEmptyError, IScalingGroup, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError
 
 from otter.rest.groups import format_state_dict
@@ -40,42 +39,33 @@ class FormatterHelpers(TestCase):
 
     def test_format_state_dict_has_active_and_pending(self):
         """
-        :func:`otter.rest.groups.format_state_dict` transforms a state
-        dictionary as returned by the model and transforms it into the state
-        dictionary that is returned by the rest API (minus extra stuff like
-        wrapping it in an extra dictionary with the keyword 'group', etc.)
+        :func:`otter.rest.groups.format_state_dict` transforms a
+        :class:`GroupState` into the state dictionary that is returned by the
+        rest API (minus extra stuff like wrapping it in an extra dictionary
+        with the keyword 'group', etc.)
 
         When there are active servers, this dictionary includes a list of
         active server links and ids.
         """
-        translated = format_state_dict({
-            'active': {
-                's1': {'instanceId': '1', 'instanceUri': 'uri1', 'created': 't'},
-                's2': {'instanceId': '2', 'instanceUri': 'uri2', 'created': 't'},
-                's3': {'instanceId': '3', 'instanceUri': 'uri3', 'created': 't'}
-            },
-            'pending': {
-                'j1': {'created': 't'},
-                'j2': {'created': 't'},
-                'j3': {'created': 't'}
-            },
-            'paused': True,
-            'groupTouched': 'ts1',
-            'policyTouched': {
-                'p1': 'ts1',
-                'p1': 'ts2',
-                'p1': 'ts3',
-            }
-        }, '11111', 'one')
+        active = {
+            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
+            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
+            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+        pending = {
+            'j1': {'created': 't'},
+            'j2': {'created': 't'},
+            'j3': {'created': 't'}}
+        translated = format_state_dict(
+            GroupState('11111', 'one', active, pending, None, {}, True))
 
         # sort so it can be compared
         translated['active'].sort(key=lambda x: x['id'])
 
         self.assertEqual(translated, {
             'active': [
-                {'id': '1', 'links': [{'href': 'uri1', 'rel': 'self'}]},
-                {'id': '2', 'links': [{'href': 'uri2', 'rel': 'self'}]},
-                {'id': '3', 'links': [{'href': 'uri3', 'rel': 'self'}]}
+                {'id': '1', 'links': ['links1']},
+                {'id': '2', 'links': ['links2']},
+                {'id': '3', 'links': ['links3']}
             ],
             'activeCapacity': 3,
             'pendingCapacity': 3,
@@ -149,9 +139,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(200)
         self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
 
-        mock_format.assert_has_calls([mock.call("STATE!", '11111', '1'),
-                                      mock.call("STATE!", '11111', '2')],
-                                     any_order=True)
+        mock_format.assert_has_calls([mock.call("STATE!"), mock.call("STATE!")])
         self.assertEqual(len(mock_format.mock_calls), 2)
 
     @mock.patch('otter.rest.groups.format_state_dict')
@@ -460,7 +448,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
             'id': 1,
             'links': [{'href': 'hey', 'rel': 'self'}]
         }
-        self.mock_group.view_state.return_value = defer.succeed({})
+        self.mock_group.view_state.return_value = defer.succeed('group_state')
         response_body = self.assert_status_code(200, method="GET")
         resp = json.loads(response_body)
 
@@ -472,7 +460,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_group.view_state.assert_called_once_with()
-        mock_format.assert_called_once_with({}, '11111', 'one')
+        mock_format.assert_called_once_with('group_state')
 
 
 class GroupPauseTestCase(RestAPITestMixin, TestCase):
@@ -487,15 +475,9 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
         Set the uuid of the group to "one"
         """
         super(GroupPauseTestCase, self).setUp()
-        self.mock_group = iMock(IScalingGroupState)
-        self.mock_store.get_scaling_group.return_value = self.mock_group
-        self.mock_group.uuid = "one"
-
-        pause_patch = mock.patch(
-            'otter.rest.groups.controller.pause_scaling_group',
+        self.mock_pause = patch(
+            self, 'otter.rest.groups.controller.pause_scaling_group',
             return_value=defer.succeed(None))
-        self.mock_pause = pause_patch.start()
-        self.addCleanup(pause_patch.stop)
 
     def test_pause(self):
         """
@@ -520,15 +502,9 @@ class GroupResumeTestCase(RestAPITestMixin, TestCase):
         Set the uuid of the group to "one"
         """
         super(GroupResumeTestCase, self).setUp()
-        self.mock_group = iMock(IScalingGroupState)
-        self.mock_store.get_scaling_group.return_value = self.mock_group
-        self.mock_group.uuid = "one"
-
-        resume_patch = mock.patch(
-            'otter.rest.groups.controller.resume_scaling_group',
+        self.mock_resume = patch(
+            self, 'otter.rest.groups.controller.resume_scaling_group',
             return_value=defer.succeed(None))
-        self.mock_resume = resume_patch.start()
-        self.addCleanup(resume_patch.stop)
 
     def test_resume(self):
         """

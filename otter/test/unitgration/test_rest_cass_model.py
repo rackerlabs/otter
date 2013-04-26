@@ -18,13 +18,15 @@ from twisted.internet import defer
 
 from otter.json_schema.group_examples import (
     config, launch_server_config, policy)
-from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.models.interface import (
+    GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.models.cass import CassScalingGroupCollection
 from otter.rest.application import root, set_store
 
 from otter.test.resources import OtterKeymaster
 
 from otter.test.rest.request import path_only, request, RequestTestMixin
+from otter.test.utils import patch
 
 
 try:
@@ -199,11 +201,15 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         self._config = config()[0]
         self._launch = launch_server_config()[0]
 
+        self.mock_controller = patch(self, 'otter.rest.policies.controller')
+
         def _set_group_id(manifest):
             self.group_id = manifest['id']
             self.policies_url = (
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
+            self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
+                GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
 
         mock_log = mock.MagicMock()
         d = store.create_scaling_group(mock_log, self.tenant_id,
@@ -347,3 +353,32 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         # delete a scaling policy - there should be one fewer scaling policy
         yield self.delete_and_view_scaling_policy(second_policies[0])
         yield self.assert_number_of_scaling_policies(len_total_policies - 1)
+
+    @defer.inlineCallbacks
+    def test_execute_scaling_policy_success(self):
+        """
+        Executing a scaling policy should result in a 202.
+        """
+        yield self.assert_number_of_scaling_policies(0)
+        first_policies = yield self.create_and_view_scaling_policies()
+
+        yield self.assert_number_of_scaling_policies(len(first_policies))
+
+        wrapper = yield request(root, 'POST', first_policies[0] + 'execute/')
+        self.assertEqual(wrapper.response.code, 202,
+                         "Execute failed: {0}".format(wrapper.content))
+        self.assertEqual(wrapper.content, "{}")
+
+    @defer.inlineCallbacks
+    def test_execute_scaling_policy_failed(self):
+        """
+        Executing a non-existant scaling policy should result in a 404.
+        """
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+            NoSuchPolicyError('11111', '1', '2'))
+
+        wrapper = yield request(root, 'POST', self.policies_url + '1/execute/')
+        self.assertEqual(wrapper.response.code, 404,
+                         "Execute did not fail as expected: {0}".format(wrapper.content))
+
+        self.flushLoggedErrors(NoSuchPolicyError)
