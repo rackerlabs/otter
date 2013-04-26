@@ -174,16 +174,18 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         """
         verifyObject(IScalingGroup, self.group)
 
-    def test_modify_state_calls_modifier_with_group_and_state(self):
+    def test_modify_state_calls_modifier_with_group_and_state_and_others(self):
         """
-        ``modify_state`` calls the modifier callable with the group and the state.
+        ``modify_state`` calls the modifier callable with the group and the
+        state as the first two arguments, and the other args and keyword args
+        passed to it.
         """
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         # calling with a Deferred that never gets callbacked, because we aren't
         # testing the saving portion in this test
         modifier = mock.Mock(return_value=defer.Deferred())
-        self.group.modify_state(modifier)
-        modifier.assert_called_once_with(self.group, 'state')
+        self.group.modify_state(modifier, 'arg1', kwarg1='1')
+        modifier.assert_called_once_with(self.group, 'state', 'arg1', kwarg1='1')
 
     def test_modify_state_propagates_view_state_error(self):
         """
