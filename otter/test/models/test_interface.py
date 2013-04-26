@@ -7,8 +7,7 @@ from zope.interface.verify import verifyObject
 
 from twisted.trial.unittest import TestCase
 
-from otter.models.interface import (
-    GroupState, IScalingGroup, IScalingGroupCollection, IScalingGroupState)
+from otter.models.interface import GroupState, IScalingGroup, IScalingGroupCollection
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas
 from otter.test.utils import DeferredTestMixin
@@ -18,6 +17,35 @@ class GroupStateTestCase(TestCase):
     """
     Tests the state object `otter.mode.s
     """
+    def test_two_states_are_equal_if_all_vars_are_equal(self):
+        """
+        Two groups with the same parameters (even if now is different) are
+        equal
+        """
+        self.assertEqual(
+            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, True, {}, 'date'),
+            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, True, {}, 'date',
+                       now=lambda: 'meh'))
+
+    def test_two_states_are_unequal_if_vars_different(self):
+        """
+        Two groups with any different parameters are unequal
+        """
+        args = ('tid', 'gid', {}, {}, True, {}, 'date')
+
+        def perterb(args, index):
+            copy = [arg for arg in args]
+            if isinstance(copy[index], str):
+                copy[index] += '_'
+            elif isinstance(copy[index], bool):
+                copy[index] = not copy[index]
+            else:  # it's a dict
+                copy[index]['1'] = {}
+            return copy
+
+        for i in range(len(args)):
+            self.assertNotEqual(GroupState(*args), GroupState(*(perterb(args, i))))
+
     def test_add_job_success(self):
         """
         If the job ID is not in the pending list, ``add_job`` adds it along with
@@ -96,23 +124,6 @@ class GroupStateTestCase(TestCase):
         state.mark_executed('pid')
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
-
-
-class IScalingGroupStateProviderMixin(DeferredTestMixin):
-    """
-    Mixin that tests for anything that provides
-    :class:`otter.models.interface.IScalingGroupState`.
-
-    :ivar group: an instance of an
-        :class:`otter.models.interface.IScalingGroupState` provider
-    """
-
-    def test_implements_interface(self):
-        """
-        The provider correctly implements
-        :class:`otter.models.interface.IScalingGroupState`.
-        """
-        verifyObject(IScalingGroupState, self.state)
 
 
 class IScalingGroupProviderMixin(DeferredTestMixin):
