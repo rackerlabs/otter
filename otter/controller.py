@@ -119,7 +119,6 @@ def maybe_execute_scaling_policy(
     bound_log = log.bind(scaling_group=scaling_group.uuid, policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
-    # TODO: locking
     # make sure that the policy (and the group) exists before doing anything else
     deferred = scaling_group.get_policy(policy_id)
 
@@ -140,13 +139,19 @@ def maybe_execute_scaling_policy(
         state, config, launch, policy = state_config_launch_policy
         error_msg = "Cooldowns not met."
 
+        def mark_executed(_):
+            state.mark_executed(policy_id)
+            return state  # propagate the fully updated state back
+
         if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(bound_log, state, config, policy)
             execute_bound_log = bound_log.bind(server_delta=delta)
             if delta != 0:
                 execute_bound_log.msg("cooldowns checked, executing launch configs")
-                return execute_launch_config(execute_bound_log, transaction_id, state,
-                                             launch, scaling_group, delta)
+                d = execute_launch_config(execute_bound_log, transaction_id, state,
+                                          launch, scaling_group, delta)
+                return d.addCallback(mark_executed)
+
             execute_bound_log.msg("cooldowns checked, no change in servers")
             error_msg = "Policy execution would violate min/max constraints."
 
@@ -174,8 +179,8 @@ def check_cooldowns(log, state, config, policy, policy_id):
     this_now = datetime.now(iso8601.iso8601.UTC)
 
     timestamp_and_cooldowns = [
-        (state['policyTouched'].get(policy_id), policy['cooldown'], 'policy'),
-        (state['groupTouched'], config['cooldown'], 'group'),
+        (state.policy_touched.get(policy_id), policy['cooldown'], 'policy'),
+        (state.group_touched, config['cooldown'], 'group'),
     ]
 
     for last_time, cooldown, cooldown_type in timestamp_and_cooldowns:
@@ -207,11 +212,11 @@ def calculate_delta(log, state, config, policy):
         if max_entities is None:
             max_entities = MAX_ENTITIES
         log.bind(desired_change=desired, max_entities=max_entities,
-                 min_entities=config['minEntities'], active=len(state['active']),
-                 pending=len(state['pending'])).msg("calculating delta")
+                 min_entities=config['minEntities'], active=len(state.active),
+                 pending=len(state.pending)).msg("calculating delta")
         return max(min(desired, max_entities), config['minEntities'])
 
-    current = len(state['active']) + len(state['pending'])
+    current = len(state.active) + len(state.pending)
     if "change" in policy:
         desired = current + policy['change']
     elif "changePercent" in policy:
@@ -253,14 +258,12 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
         """
         log.msg('updating state')
-        jobs_dict = state['pending'].copy()
 
         def get_callback(this_job_id, this_val):
             return lambda _: _complete_pending_job(log, this_job_id, this_val)
 
         for job_id, completion_deferred, job_info in pending_results:
-            assert job_id not in state['pending'], "Job already exists: {0}".format(job_id)
-            jobs_dict[job_id] = job_info
+            state.add_job(job_id)
 
             def _log_failure(f):
                 log.err(f)
@@ -271,8 +274,6 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             completion_deferred.addCallbacks(
                 get_callback(job_id, True),   # XXX: True?
                 get_callback(job_id, False))  # XXX: False?
-
-        return scaling_group.update_jobs(state, jobs_dict, transaction_id)
 
     if delta > 0:
         log.msg("Launching some servers.")
