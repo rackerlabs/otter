@@ -27,7 +27,14 @@ from otter.worker.launch_server_v1 import (
 
 from otter.test.utils import patch
 from otter.util.http import APIError
+from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
+
+fake_config = {
+    'regionOverrides': {},
+    'cloudServersOpenStack': 'cloudServersOpenStack',
+    'cloudLoadBalancers': 'cloudLoadBalancers'
+}
 
 fake_service_catalog = [
     {'type': 'compute',
@@ -234,6 +241,10 @@ class ServerTests(TestCase):
         """
         Set up test dependencies.
         """
+        self.log = mock.Mock()
+        set_config_data(fake_config)
+        self.addCleanup(set_config_data, {})
+
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
@@ -330,7 +341,8 @@ class ServerTests(TestCase):
 
         server_details.side_effect = _server_status
 
-        d = wait_for_status('http://url/', 'my-auth-token', 'serverId', 'ACTIVE',
+        d = wait_for_status(self.log,
+                            'http://url/', 'my-auth-token', 'serverId', 'ACTIVE',
                             clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token', 'serverId')
@@ -390,7 +402,8 @@ class ServerTests(TestCase):
             (54321, ('10.0.0.1', 81))
         ])
 
-        d = launch_server('DFW',
+        d = launch_server(self.log,
+                          'DFW',
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
@@ -407,7 +420,8 @@ class ServerTests(TestCase):
                                               'my-auth-token',
                                               expected_server_config)
 
-        wait_for_status.assert_called_once_with('http://dfw.openstack/',
+        wait_for_status.assert_called_once_with(mock.ANY,
+                                                'http://dfw.openstack/',
                                                 'my-auth-token',
                                                 '1',
                                                 'ACTIVE')
@@ -425,7 +439,8 @@ class ServerTests(TestCase):
         """
         create_server.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW',
+        d = launch_server(self.log,
+                          'DFW',
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
@@ -457,7 +472,8 @@ class ServerTests(TestCase):
 
         wait_for_status.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW',
+        d = launch_server(self.log,
+                          'DFW',
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
@@ -491,7 +507,8 @@ class ServerTests(TestCase):
 
         add_to_load_balancers.return_value = fail(APIError(500, "Oh noes"))
 
-        d = launch_server('DFW',
+        d = launch_server(self.log,
+                          'DFW',
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
@@ -620,6 +637,10 @@ class DeleteServerTests(TestCase):
         """
         Set up some mocks.
         """
+        set_config_data(fake_config)
+        self.addCleanup(set_config_data, {})
+
+        self.log = mock.Mock()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
@@ -631,7 +652,11 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = succeed(None)
 
-        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log,
+                          'DFW',
+                          fake_service_catalog,
+                          'my-auth-token',
+                          instance_details)
         self.successResultOf(d)
 
         remove_from_load_balancer.has_calls([
@@ -649,7 +674,7 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = succeed(None)
 
-        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
@@ -663,7 +688,7 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = fail(APIError(500, ''))
 
-        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.code, 500)
@@ -682,7 +707,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = delete_server('DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = self.failureResultOf(d)
 
         self.assertEqual(failure.value.code, 500)
