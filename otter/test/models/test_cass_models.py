@@ -104,141 +104,6 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
-class CassScalingGroupStateTestCase(TestCase):
-    """
-    Tests for :class:`CassScalingGroup`
-    """
-    skip = "No longer implemented"
-
-    def setUp(self):
-        """
-        Create a mock group
-        """
-        self.tenant_id = '11111'
-        self.group_id = '12345678g'
-        self.mock_log = mock.MagicMock()
-        self.connection = mock.MagicMock(spec=['execute'])
-
-        self.returns = [None]
-
-        def _responses(*args):
-            result = _de_identify(self.returns.pop(0))
-            if isinstance(result, Exception):
-                return defer.fail(result)
-            return defer.succeed(result)
-
-        self.connection.execute.side_effect = _responses
-
-        # config, launch config, etc. doesn't matter, only policies
-        self.policies = group_examples.policy()[:1]
-
-        self.state = CassScalingGroup(
-            self.mock_log, self.tenant_id, self.group_id, self.connection)
-
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
-
-    def test_state_update_jobs(self):
-        """
-        Test the normal use case..  update an empty group with a job,
-        move the server to fully operational.
-        """
-        fake_state = {'policyTouched': {}}
-
-        self.returns = [None, None]
-
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
-        d = self.state.update_jobs(fake_state, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
-                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
-                       ':policyTouched);')
-        expectedData = {'policyTouched': '{"_ver": 1, "pol1": "2012-12-25 00:00:00-06:39Z"}',
-                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
-                        'groupId': '12345678g',
-                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
-    def test_state_update_jobs_no_pol(self):
-        """
-        Update an empty group with a job, move the server to fully
-        operational.  Make sure it works without a scaling policy.
-        """
-        fake_state = {'policyTouched': {}}
-
-        self.returns = [None, None]
-
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
-        d = self.state.update_jobs(fake_state, jobs, "trans1", None, "2012-12-25 00:00:00-06:39Z")
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", pending, "groupTouched", '
-                       '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
-                       ':policyTouched);')
-        expectedData = {'policyTouched': '{"_ver": 1}',
-                        'pending': '{"_ver": 1, "job1": {"created": "2012-12-25 00:00:00-06:39Z"}}',
-                        'groupId': '12345678g',
-                        'groupTouched': '2012-12-25 00:00:00-06:39Z', 'tenantId': '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
-    def test_state_add_server(self):
-        """
-        Test the add server operation that moves a server from the job listing to
-        the active list
-        """
-        fake_state = {'active': {},
-                      'paused': False,
-                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                      'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
-
-        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        expectedCql = ('INSERT INTO group_state("tenantId", "groupId", active, pending) '
-                       'VALUES(:tenantId, :groupId, :active:, :pending);')
-        expectedData = {'active': ('{"frrr": {"created": "2012-12-25 00:00:00-06:39Z", "name": "foo", '
-                                   '"instanceURL": "uri"}, "_ver": 1}'),
-                        'groupId': '12345678g', 'pending': '{"_ver": 1}', 'tenantId': '11111'}
-        self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData,
-                                                   ConsistencyLevel.TWO)
-
-    def test_state_bad_job_id(self):
-        """
-        If we try to add a server with a job ID that does not exist, the server is
-        still added without error
-        """
-        fake_state = {'policyTouched': {}, 'pending': {}, 'active': {}}
-
-        self.returns = [None]
-
-        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called, False)
-
-    def test_state_bad_server(self):
-        """
-        Test if we try to add a server that is already in existance that it is
-        still added without error
-        """
-
-        fake_state = {'active': {'frrr': {'name': 'foo', 'instance_uri': 'uri',
-                                          'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'paused': False,
-                      'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                      'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                      'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}}
-
-        self.returns = [None]
-
-        d = self.state.add_server(fake_state, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        self.assertEqual(self.connection.execute.called, False)
-
-
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -365,8 +230,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       {'A': 'R'}, {'P': 'R'}, False,
-                                       {'PT': 'R'}, '123'))
+                                       {'A': 'R'}, {'P': 'R'}, '123',
+                                       {'PT': 'R'}, False))
 
     def test_view_state_no_such_group(self):
         """
@@ -391,8 +256,90 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       {'A': 'R'}, {'P': 'R'}, True,
-                                       {'PT': 'R'}, '123'))
+                                       {'A': 'R'}, {'P': 'R'}, '123',
+                                       {'PT': 'R'}, True))
+
+    @mock.patch('otter.models.cass.serialize_json_data',
+                side_effect=lambda *args: _S(args[0]))
+    def test_modify_state_succeeds_synchronous_modifier(self, mock_serial):
+        """
+        ``modify_state`` writes the state the synchronous modifier returns to
+        the database
+        """
+        def modifier(group):
+            self.assertIs(self.group, group)
+            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+
+        d = self.group.modify_state(modifier)
+        self.assertEqual(self.successResultOf(d), None)
+        expectedCql = (
+            'INSERT INTO group_state("tenantId", "groupId", active, '
+            'pending, "groupTouched", "policyTouched", paused) VALUES('
+            ':tenantId, :groupId, :active, :pending, :groupTouched, '
+            ':policyTouched, :paused);')
+
+        expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
+                        "active": _S({}), "pending": _S({}),
+                        "groupTouched": None, "policyTouched": _S({}),
+                        "paused": True}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.serialize_json_data',
+                side_effect=lambda *args: _S(args[0]))
+    def test_modify_state_succeeds_asynchronous_modifier(self, mock_serial):
+        """
+        ``modify_state`` writes the state the synchronous modifier returns to
+        the database
+        """
+        def modifier(group):
+            self.assertIs(self.group, group)
+            return defer.succeed(
+                GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True))
+
+        d = self.group.modify_state(modifier)
+        self.assertEqual(self.successResultOf(d), None)
+        expectedCql = (
+            'INSERT INTO group_state("tenantId", "groupId", active, '
+            'pending, "groupTouched", "policyTouched", paused) VALUES('
+            ':tenantId, :groupId, :active, :pending, :groupTouched, '
+            ':policyTouched, :paused);')
+
+        expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
+                        "active": _S({}), "pending": _S({}),
+                        "groupTouched": None, "policyTouched": _S({}),
+                        "paused": True}
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_modify_state_propagates_modifier_error(self):
+        """
+        ``modify_state`` writes the state the synchronous modifier returns to
+        the database
+        """
+        def modifier(group):
+            raise NoSuchScalingGroupError(self.tenant_id, self.group_id)
+
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.assertEqual(self.connection.execute.call_count, 0)
+
+    def test_modify_state_asserts_error_if_tenant_and_group_id_mismatch(self):
+        """
+        ``modify_state`` raises an :class:`AssertionError` if the tenant id
+        and group id of the :class:`GroupState` returned by the modifier do not
+        match its group and tenant ids
+        """
+        def modifier(group):
+            return GroupState('tid', 'gid', {}, {}, None, {}, True)
+
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(AssertionError))
+        self.assertEqual(self.connection.execute.call_count, 0)
 
     def test_view_config_bad_db_data(self):
         """

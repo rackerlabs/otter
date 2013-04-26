@@ -62,11 +62,11 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
 _cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
                          'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
-_cql_add_server_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending)'
-                               ' VALUES(:tenantId, :groupId, :active:, :pending);')
-_cql_update_job_group_state = ('INSERT INTO {cf}("tenantId", "groupId", pending, "groupTouched", '
-                               '"policyTouched") VALUES(:tenantId, :groupId, :pending:, :groupTouched, '
-                               ':policyTouched);')
+_cql_update_group_state = (
+    'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
+    '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
+    ':groupTouched, :policyTouched, :paused);')
+
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -381,9 +381,9 @@ class CassScalingGroup(object):
                 self.tenant_id, self.uuid,
                 _jsonloads_data(res["active"]),
                 _jsonloads_data(res["pending"]),
-                bool(ord(res["paused"])),
+                res["groupTouched"],
                 _jsonloads_data(res["policyTouched"]),
-                res["groupTouched"]
+                bool(ord(res["paused"]))
             )
 
         query = _cql_view_group_state.format(cf=self.state_table)
@@ -397,8 +397,26 @@ class CassScalingGroup(object):
     def modify_state(self, modifier_callable):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
+
+        TODO: locking!!
         """
-        raise NotImplementedError()
+        def _write_state(new_state):
+            assert (new_state.tenant_id == self.tenant_id and
+                    new_state.group_id == self.uuid)
+            params = {
+                'tenantId': new_state.tenant_id,
+                'groupId': new_state.group_id,
+                'active': serialize_json_data(new_state.active, 1),
+                'pending': serialize_json_data(new_state.pending, 1),
+                'paused': new_state.paused,
+                'groupTouched': new_state.group_touched,
+                'policyTouched': serialize_json_data(new_state.policy_touched, 1)
+            }
+            return self.connection.execute(_cql_update_group_state, params,
+                                           get_consistency_level('update', 'state'))
+
+        d = defer.maybeDeferred(modifier_callable, self)
+        return d.addCallback(_write_state)
 
     def update_config(self, data):
         """
