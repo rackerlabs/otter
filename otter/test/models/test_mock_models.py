@@ -8,12 +8,11 @@ from twisted.trial.unittest import TestCase
 from otter.json_schema import group_examples
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
-from otter.models.interface import (GroupNotEmptyError, NoSuchScalingGroupError,
-                                    NoSuchPolicyError, NoSuchWebhookError,
-                                    UnrecognizedCapabilityError)
+from otter.models.interface import (
+    GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
+    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
 
 from otter.test.models.test_interface import (
-    IScalingGroupStateProviderMixin,
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin)
 
@@ -67,165 +66,6 @@ class GenerateEntityLinksTestCase(TestCase):
         self.assertEqual(len(links), 5)
 
 
-class MockScalingGroupStateTestCase(IScalingGroupStateProviderMixin, TestCase):
-    """
-    Tests for :class:`MockScalingGroup`'s ``IScalingGroupState`` interface
-    implementation.
-    """
-
-    def setUp(self):
-        """
-        Create a mock group
-        """
-        self.tenant_id = '11111'
-        self.mock_log = mock.MagicMock()
-        self.collection = mock.MagicMock(spec=[], data={self.tenant_id: {}})
-
-        # config, launch config, etc. policies don't matter
-        self.state = MockScalingGroup(
-            self.mock_log, self.tenant_id, 1, self.collection,
-            {'config': {}, 'launch': {}, 'policies': {}})
-
-        self.collection.data[self.tenant_id][1] = self.state
-
-    def test_state(self):
-        """
-        Test the normal use case..  update an empty group with a job,
-        move the server to fully operational.
-        """
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"}}
-        d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
-        self.assert_deferred_succeeded(d)
-        d = self.state.view_state()
-        result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {},
-                                  'paused': False,
-                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
-        d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        d = self.state.view_state()
-        result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
-                                                      'instanceURL': 'uri',
-                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
-                                  'paused': False,
-                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {},
-                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
-
-    def test_state_bad_job_id(self):
-        """
-        Test that if we try to pass in a bad job ID it continues
-        """
-        d = self.state.add_server({}, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        d = self.state.view_state()
-        result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {},
-                                  'paused': False,
-                                  'groupTouched': None,
-                                  'pending': {},
-                                  'policyTouched': {}})
-
-    def test_state_bad_server(self):
-        """
-        Test that if we try to pass in a bad server it continues
-        """
-        jobs = {"job1": {"created": "2012-12-25 00:00:00-06:39Z"},
-                "job2": {"created": "2012-12-25 00:00:00-06:39Z"}}
-        d = self.state.update_jobs({}, jobs, "trans1", "pol1", "2012-12-25 00:00:00-06:39Z")
-        self.assert_deferred_succeeded(d)
-        d = self.state.view_state()
-        result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {},
-                                  'paused': False,
-                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {'job1': {'created': '2012-12-25 00:00:00-06:39Z'},
-                                              'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
-        d = self.state.add_server(result, "foo", "frrr", "uri", "job1", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_succeeded(d)
-        d = self.state.add_server(result, "foo", "frrr", "uri", "job2", '2012-12-25 00:00:00-06:39Z')
-        self.assert_deferred_failed(d, Exception)
-        d = self.state.view_state()
-        result = self.assert_deferred_succeeded(d)
-        self.assertEqual(result, {'active': {'frrr': {'name': 'foo',
-                                                      'instanceURL': 'uri',
-                                                      'created': '2012-12-25 00:00:00-06:39Z'}},
-                                  'paused': False,
-                                  'groupTouched': '2012-12-25 00:00:00-06:39Z',
-                                  'pending': {'job2': {'created': '2012-12-25 00:00:00-06:39Z'}},
-                                  'policyTouched': {'pol1': '2012-12-25 00:00:00-06:39Z'}})
-
-    def test_pause(self):
-        """
-        Tests that pause sets the state to paused, returns None, and pausing
-        an already paused group does not raise an error.
-        """
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertFalse(result['paused'], "sanity check")
-
-        self.assertIsNone(self.assert_deferred_succeeded(self.state.pause()))
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertTrue(result['paused'], "Pausing should set paused to True")
-
-        self.assertIsNone(self.assert_deferred_succeeded(self.state.pause()))
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertTrue(result['paused'], "Pausing again should not fail")
-
-    def test_resume(self):
-        """
-        Tests that resume sets the state to unpaused, returns None, and resuming
-        an already resumed group does not raise an error.
-        """
-        self.state.paused = True
-
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertTrue(result['paused'], "sanity check")
-
-        self.assertIsNone(self.assert_deferred_succeeded(self.state.resume()))
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertFalse(result['paused'], "Resuming should set paused to False")
-
-        self.assertIsNone(self.assert_deferred_succeeded(self.state.resume()))
-        result = self.assert_deferred_succeeded(self.state.view_state())
-        self.assertFalse(result['paused'], "Resuming again should not fail")
-
-    def test_delete_group_removes_self_from_collection_if_state_empty(self):
-        """
-        Deleting a scaling group succeeds if there are no active and pending
-        entities/jobs.
-        """
-        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
-                      self.state, "Sanity check")
-
-        self.state.active_entities = []
-        self.state.pending_jobs = []
-
-        d = self.state.delete_group()
-        self.assertEqual(None, self.successResultOf(d))
-
-        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 0)
-
-    def test_delete_scaling_group_fails_if_scaling_group_not_empty(self):
-        """
-        Deleting a scaling group that has active or pending jobs errbacks with
-        a :class:`GroupNotEmptyError`
-        """
-        self.assertIs(self.collection.data[self.state.tenant_id][self.state.uuid],
-                      self.state, "Sanity check")
-
-        self.state.active_entities = [1]
-        self.state.pending_jobs = []
-
-        self.assert_deferred_failed(self.state.delete_group(),
-                                    GroupNotEmptyError)
-
-        self.assertEqual(len(self.collection.data[self.state.tenant_id]), 1)
-
-
 class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -237,7 +77,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.tenant_id = '11111'
         self.mock_log = mock.MagicMock()
-        self.collection = mock.MagicMock()
+        self.collection = mock.MagicMock(spec=[], data={self.tenant_id: {}})
 
         self.config = {
             'name': 'aname',
@@ -261,6 +101,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.mock_log, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
+
+        self.collection.data[self.tenant_id]['1'] = self.group
 
     def test_view_manifest_has_all_info(self):
         """
@@ -290,19 +132,13 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(self.group.view_launch_config())
         self.assertEqual(result, self.launch_config)
 
-    def test_view_state_returns_valid_scheme_when_empty(self):
+    def test_view_state_returns_empty_state(self):
         """
-        ``view_state`` returns all the state information stored in the
-        MockScalingGroup as the required keys
+        ``view_state`` a group state with empty info
         """
-        result = self.assert_deferred_succeeded(self.group.view_state())
-        self.assertEquals(result, {
-            'active': {},
-            'pending': {},
-            'paused': False,
-            'groupTouched': None,
-            'policyTouched': {}
-        })
+        result = self.successResultOf(self.group.view_state())
+        self.assertEqual(result, GroupState(self.tenant_id, '1', {}, {},
+                                            False, {}, None))
 
     def test_update_config_overwrites_existing_data(self):
         """
@@ -400,6 +236,26 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertGreater(len(list_result), len(create_response))
         for key, value in create_response.iteritems():
             self.assertEqual(list_result[key], value)
+
+    def test_delete_group_removes_self_from_collection_if_state_empty(self):
+        """
+        Deleting a scaling group succeeds if there are no active and pending
+        entities/jobs.
+        """
+        self.assertEqual(len(self.collection.data[self.group.tenant_id]), 1)
+        d = self.group.delete_group()
+        self.assertEqual(None, self.successResultOf(d))
+        self.assertEqual(len(self.collection.data[self.group.tenant_id]), 0)
+
+    def test_delete_scaling_group_fails_if_scaling_group_not_empty(self):
+        """
+        Deleting a scaling group that has active or pending jobs errbacks with
+        a :class:`GroupNotEmptyError`
+        """
+        self.group.state.active = {'1': {}}
+        self.assert_deferred_failed(self.group.delete_group(),
+                                    GroupNotEmptyError)
+        self.assertEqual(len(self.collection.data[self.group.tenant_id]), 1)
 
     def test_list_empty_policies(self):
         """

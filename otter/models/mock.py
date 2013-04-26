@@ -11,11 +11,10 @@ from zope.interface import implementer
 from twisted.internet import defer
 
 from otter.models.interface import (
-    GroupNotEmptyError, IScalingGroup, IScalingGroupState, IScalingGroupCollection,
+    GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
 from otter.util.hashkey import generate_capability
-from otter.util.timestamp import now
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -34,7 +33,7 @@ def generate_entity_links(tenant_id, entity_ids,
         for entity_id in entity_ids])
 
 
-@implementer(IScalingGroup, IScalingGroupState)
+@implementer(IScalingGroup)
 class MockScalingGroup:
     """
     .. autointerface:: otter.models.interface.IScalingGroup
@@ -98,12 +97,7 @@ class MockScalingGroup:
         self.tenant_id = tenant_id
         self.uuid = uuid
 
-        # state that may be changed
-        self.active_entities = {}
-        self.pending_jobs = {}
-        self.policy_touched = {}
-        self.group_touched = None
-        self.paused = False
+        self.state = GroupState(self.tenant_id, self.uuid, {}, {}, False, {}, None)
 
         self._collection = collection
 
@@ -165,13 +159,18 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
-        return defer.succeed({
-            'active': self.active_entities,
-            'pending': self.pending_jobs,
-            'paused': self.paused,
-            'groupTouched': self.group_touched,
-            'policyTouched': self.policy_touched
-        })
+        return defer.succeed(self.state)
+
+    def modify_state(self, modifier_callable):
+        """
+        see :meth:`otter.models.interface.IScalingGroup.modify_state`
+        """
+        def assign_state(new_state):
+            self.state = new_state
+
+        d = defer.maybeDeferred(modifier_callable, self)
+        d.addCallback(assign_state)
+        return d
 
     def update_config(self, data, partial_update=False):
         """
@@ -363,53 +362,6 @@ class MockScalingGroup:
             return defer.fail(NoSuchWebhookError(self.tenant_id, self.uuid,
                                                  policy_id, webhook_id))
 
-    def add_server(self, state, name, instance_id, uri, pending_job_id, created=None):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.add_server`
-        """
-        ts = created
-        if ts is None:
-            ts = now()
-        if not pending_job_id in self.pending_jobs:
-            return defer.fail(Exception("Internal error: Pending job ID isn't in the list of "
-                                        "pending jobs"))
-        if instance_id in self.active_entities:
-            return defer.fail(Exception("Internal error: Server is already active"))
-
-        del self.pending_jobs[pending_job_id]
-        self.active_entities[instance_id] = {"name": name,
-                                             "instanceURL": uri,
-                                             "created": ts}
-
-        return defer.succeed(None)
-
-    def update_jobs(self, state, job_dict, transaction_id, policy_id=None,
-                    timestamp=None):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.update_jobs`
-        """
-        ts = timestamp
-        if ts is None:
-            ts = now()
-        self.pending_jobs = job_dict
-        self.group_touched = ts
-        self.policy_touched[policy_id] = ts
-        return defer.succeed(None)
-
-    def pause(self):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.pause`
-        """
-        self.paused = True
-        return defer.succeed(None)
-
-    def resume(self):
-        """
-        see :meth:`otter.models.interface.IScalingGroupState.resume`
-        """
-        self.paused = False
-        return defer.succeed(None)
-
     def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroupState.delete_group`
@@ -417,7 +369,7 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
 
-        if len(self.pending_jobs) + len(self.active_entities) > 0:
+        if len(self.state.pending) + len(self.state.active) > 0:
             return defer.fail(GroupNotEmptyError(self.tenant_id, self.uuid))
 
         collection = self._collection
