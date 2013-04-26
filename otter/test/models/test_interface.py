@@ -21,7 +21,7 @@ class GroupStateTestCase(TestCase):
         """
         repr(GroupState) returns something human readable
         """
-        state = GroupState('tid', 'gid', {'1': {}}, {}, True, {}, 'date')
+        state = GroupState('tid', 'gid', {'1': {}}, {}, 'date', {}, True)
         self.assertEqual(
             repr(state),
             "GroupState(tid, gid, {'1': {}}, {}, True, {}, date)")
@@ -32,15 +32,15 @@ class GroupStateTestCase(TestCase):
         equal
         """
         self.assertEqual(
-            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, True, {}, 'date'),
-            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, True, {}, 'date',
+            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True),
+            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True,
                        now=lambda: 'meh'))
 
     def test_two_states_are_unequal_if_vars_different(self):
         """
         Two groups with any different parameters are unequal
         """
-        args = ('tid', 'gid', {}, {}, True, {}, 'date')
+        args = ('tid', 'gid', {}, {}, 'date', {}, True)
 
         def perterb(args, index):
             copy = [arg for arg in args]
@@ -60,7 +60,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is not in the pending list, ``add_job`` adds it along with
         the creation time.
         """
-        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
                            now=lambda: 'datetime')
         state.add_job('1')
         self.assertEqual(state.pending, {'1': {'created': 'datetime'}})
@@ -70,7 +70,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is in the pending list, ``add_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {}, {'1': {}}, True, {}, None)
+        state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
         self.assertRaises(AssertionError, state.add_job, '1')
         self.assertEqual(state.pending, {'1': {}})
 
@@ -78,7 +78,7 @@ class GroupStateTestCase(TestCase):
         """
         If the job ID is in the pending list, ``del_job`` removes it.
         """
-        state = GroupState('tid', 'gid', {}, {'1': {}}, True, {}, None)
+        state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
         state.del_job('1')
         self.assertEqual(state.pending, {})
 
@@ -87,7 +87,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is not in the pending list, ``del_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {}, {}, True, {}, None)
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True)
         self.assertRaises(AssertionError, state.del_job, '1')
         self.assertEqual(state.pending, {})
 
@@ -97,7 +97,7 @@ class GroupStateTestCase(TestCase):
         with server info, and adds the creation time to server info that
         does not already have it.
         """
-        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
                            now=lambda: 'datetime')
         state.add_active('1', {'stuff': 'here'})
         self.assertEqual(state.active,
@@ -108,7 +108,7 @@ class GroupStateTestCase(TestCase):
         If the server ID is not in the active list, ``add_active`` adds it along
         with server info, and does not change the server info's creation time.
         """
-        state = GroupState('tid', 'gid', {}, {}, True, {}, None,
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
                            now=lambda: 'other_now')
         state.add_active('1', {'stuff': 'here', 'created': 'now'})
         self.assertEqual(state.active,
@@ -119,7 +119,7 @@ class GroupStateTestCase(TestCase):
         If the server ID is in the active list, ``add_active`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {'1': {}}, {}, True, {}, None)
+        state = GroupState('tid', 'gid', {'1': {}}, {}, None, {}, True)
         self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
         self.assertEqual(state.active, {'1': {}})
 
@@ -129,7 +129,7 @@ class GroupStateTestCase(TestCase):
         same time.
         """
         t = ['0']
-        state = GroupState('tid', 'gid', {}, {}, True, {}, None, now=t.pop)
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True, now=t.pop)
         state.mark_executed('pid')
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})

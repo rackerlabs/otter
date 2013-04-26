@@ -97,7 +97,7 @@ class MockScalingGroup:
         self.tenant_id = tenant_id
         self.uuid = uuid
 
-        self.state = GroupState(self.tenant_id, self.uuid, {}, {}, False, {}, None)
+        self.state = GroupState(self.tenant_id, self.uuid, {}, {}, None, {}, False)
 
         self._collection = collection
 

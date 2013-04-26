@@ -138,7 +138,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         result = self.successResultOf(self.group.view_state())
         self.assertEqual(result, GroupState(self.tenant_id, '1', {}, {},
-                                            False, {}, None))
+                                            None, {}, False))
 
     def test_update_config_overwrites_existing_data(self):
         """
