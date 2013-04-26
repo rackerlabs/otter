@@ -17,7 +17,7 @@ USE @@KEYSPACE@@;
 
 -- active is the active list.
 -- format:
---   {"instanceid: {"name": "servername", instanceURI": uri, "created": date}}
+--   {"instanceid: {"name": "servername", "links": json_links_obj, "created": date}}
 --
 -- pending is the pending list.
 -- format:
@@ -27,7 +27,7 @@ USE @@KEYSPACE@@;
 --  was executed in the group
 --
 -- policyTouched is a list of timestamps for the policy
---  {"policyid": {"touched": date}}
+--  {"policyid": date}
 
 CREATE COLUMNFAMILY group_state (
     "tenantId" ascii,
