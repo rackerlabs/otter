@@ -45,13 +45,16 @@ class GroupState(object):
         Two states are equal if all of the parameters are equal (except for
         the now callable)
         """
-        if not isinstance(other, self.__class__):
-            return False
-
         params = ('tenant_id', 'group_id', 'active', 'pending', 'paused',
                   'policy_touched', 'group_touched')
         return all((getattr(self, param) == getattr(other, param)
                     for param in params))
+
+    def __ne__(self, other):
+        """
+        Negate __eq__
+        """
+        return other.__class__ != self.__class__ or not self.__eq__(other)
 
     def __repr__(self):
         """

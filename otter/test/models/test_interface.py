@@ -1,6 +1,7 @@
 """
 Tests for :mod:`otter.models.interface`
 """
+from collections import namedtuple
 from jsonschema import validate
 
 import mock
@@ -54,11 +55,22 @@ class GroupStateTestCase(TestCase):
             elif isinstance(copy[index], bool):
                 copy[index] = not copy[index]
             else:  # it's a dict
-                copy[index]['1'] = {}
+                copy[index] = {'1': {}}
             return copy
 
         for i in range(len(args)):
             self.assertNotEqual(GroupState(*args), GroupState(*(perterb(args, i))))
+
+    def test_a_state_is_not_equal_to_something_else(self):
+        """
+        The classes of the two objects have to be the same.
+        """
+        _GroupState = namedtuple('_GroupState',
+                                 ['tenant_id', 'group_id', 'active', 'pending',
+                                  'group_touched', 'policy_touched', 'paused'])
+        self.assertNotEqual(
+            _GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True),
+            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True))
 
     def test_add_job_success(self):
         """
