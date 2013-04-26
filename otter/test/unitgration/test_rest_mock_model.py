@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from otter.json_schema.group_examples import config, launch_server_config, policy
 from otter.models.interface import (
-    NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
+    GroupState, NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
@@ -208,7 +208,8 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         controller_patcher = mock.patch('otter.rest.policies.controller')
         self.mock_controller = controller_patcher.start()
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
+        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
+            GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
         self.addCleanup(controller_patcher.stop)
 
     def assert_number_of_scaling_policies(self, number):
