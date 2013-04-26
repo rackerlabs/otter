@@ -4,6 +4,7 @@ engine
 """
 from copy import deepcopy
 from collections import defaultdict
+from functools import partial
 from uuid import uuid4
 
 from zope.interface import implementer
@@ -166,9 +167,12 @@ class MockScalingGroup:
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         def assign_state(new_state):
+            assert (new_state.tenant_id == self.tenant_id and
+                    new_state.group_id == self.uuid)
             self.state = new_state
 
-        d = defer.maybeDeferred(modifier_callable, self)
+        d = self.view_state()
+        d.addCallback(partial(modifier_callable, self))
         d.addCallback(assign_state)
         return d
 

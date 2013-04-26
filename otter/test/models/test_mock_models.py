@@ -76,6 +76,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Create a mock group
         """
         self.tenant_id = '11111'
+        self.group_id = '1'
         self.mock_log = mock.MagicMock()
         self.collection = mock.MagicMock(spec=[], data={self.tenant_id: {}})
 
@@ -98,7 +99,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }
         self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
-            self.mock_log, self.tenant_id, '1', self.collection,
+            self.mock_log, self.tenant_id, self.group_id, self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': self.policies})
 
@@ -139,6 +140,44 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.successResultOf(self.group.view_state())
         self.assertEqual(result, GroupState(self.tenant_id, '1', {}, {},
                                             None, {}, False))
+
+    def test_modify_state(self):
+        """
+        ``modify_state`` saves the new state returned by the function if the
+        tenant ids and group ids match
+        """
+        new_state = GroupState(self.tenant_id, self.group_id, {1: {}}, {},
+                               'date', {}, True)
+
+        def modifier(group, state):
+            return new_state
+
+        self.group.modify_state(modifier)
+        self.assertEqual(self.group.state, new_state)
+
+    def test_modify_state_fails_if_tenant_ids_do_not_match(self):
+        """
+        ``modify_state`` does not save the state that the modifier returns if
+        the tenant IDs do not match
+        """
+        def modifier(group, state):
+            return GroupState('tid', self.group_id, {}, {}, 'date', {}, True)
+
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(AssertionError))
+
+    def test_modify_state_fails_if_group_ids_do_not_match(self):
+        """
+        ``modify_state`` does not save the state that the modifier returns if
+        the tenant IDs do not match
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, 'meh', {}, {}, 'date', {}, True)
+
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(AssertionError))
 
     def test_update_config_overwrites_existing_data(self):
         """

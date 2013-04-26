@@ -3,11 +3,16 @@ Tests for :mod:`otter.models.interface`
 """
 from jsonschema import validate
 
+import mock
+
 from zope.interface.verify import verifyObject
 
+from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.models.interface import GroupState, IScalingGroup, IScalingGroupCollection
+from otter.models.interface import (
+    GroupState, IScalingGroup, IScalingGroupCollection,
+    NoSuchScalingGroupError)
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas
 from otter.test.utils import DeferredTestMixin
@@ -156,6 +161,31 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         :class:`otter.models.interface.IScalingGroup`.
         """
         verifyObject(IScalingGroup, self.group)
+
+    def test_modify_state_calls_modifier_with_group_and_state(self):
+        """
+        ``modify_state`` calls the modifier callable with the group and the state.
+        """
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        # calling with a Deferred that never gets callbacked, because we aren't
+        # testing the saving portion in this test
+        modifier = mock.Mock(return_value=defer.Deferred())
+        self.group.modify_state(modifier)
+        modifier.assert_called_once_with(self.group, 'state')
+
+    def test_modify_state_propagates_view_state_error(self):
+        """
+        ``modify_state`` should propagate a :class:`NoSuchScalingGroupError`
+        that is raised by ``view_state``
+        """
+        self.group.view_state = mock.Mock(
+            return_value=defer.fail(NoSuchScalingGroupError(1, 1)))
+
+        modifier = mock.Mock()
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(NoSuchScalingGroupError))
+        self.assertEqual(modifier.call_count, 0)
 
     def validate_view_manifest_return_value(self, *args, **kwargs):
         """

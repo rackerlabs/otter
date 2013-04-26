@@ -1,6 +1,8 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
+from functools import partial
+
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -415,7 +417,8 @@ class CassScalingGroup(object):
             return self.connection.execute(_cql_update_group_state, params,
                                            get_consistency_level('update', 'state'))
 
-        d = defer.maybeDeferred(modifier_callable, self)
+        d = self.view_state()
+        d.addCallback(partial(modifier_callable, self))
         return d.addCallback(_write_state)
 
     def update_config(self, data):

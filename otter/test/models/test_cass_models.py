@@ -261,42 +261,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
-    def test_modify_state_succeeds_synchronous_modifier(self, mock_serial):
+    def test_modify_state_succeeds(self, mock_serial):
         """
         ``modify_state`` writes the state the synchronous modifier returns to
         the database
         """
-        def modifier(group):
-            self.assertIs(self.group, group)
+        def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
 
-        d = self.group.modify_state(modifier)
-        self.assertEqual(self.successResultOf(d), None)
-        expectedCql = (
-            'INSERT INTO group_state("tenantId", "groupId", active, '
-            'pending, "groupTouched", "policyTouched", paused) VALUES('
-            ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused);')
-
-        expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
-                        "active": _S({}), "pending": _S({}),
-                        "groupTouched": None, "policyTouched": _S({}),
-                        "paused": True}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
-    @mock.patch('otter.models.cass.serialize_json_data',
-                side_effect=lambda *args: _S(args[0]))
-    def test_modify_state_succeeds_asynchronous_modifier(self, mock_serial):
-        """
-        ``modify_state`` writes the state the synchronous modifier returns to
-        the database
-        """
-        def modifier(group):
-            self.assertIs(self.group, group)
-            return defer.succeed(
-                GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True))
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
@@ -319,22 +292,42 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``modify_state`` writes the state the synchronous modifier returns to
         the database
         """
-        def modifier(group):
+        def modifier(group, state):
             raise NoSuchScalingGroupError(self.tenant_id, self.group_id)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)
         self.assertTrue(f.check(NoSuchScalingGroupError))
         self.assertEqual(self.connection.execute.call_count, 0)
 
-    def test_modify_state_asserts_error_if_tenant_and_group_id_mismatch(self):
+    def test_modify_state_asserts_error_if_tenant_id_mismatch(self):
         """
         ``modify_state`` raises an :class:`AssertionError` if the tenant id
-        and group id of the :class:`GroupState` returned by the modifier do not
-        match its group and tenant ids
+        of the :class:`GroupState` returned by the modifier does not match its
+        tenant id
         """
-        def modifier(group):
-            return GroupState('tid', 'gid', {}, {}, None, {}, True)
+        def modifier(group, state):
+            return GroupState('tid', self.group_id, {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+
+        d = self.group.modify_state(modifier)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(AssertionError))
+        self.assertEqual(self.connection.execute.call_count, 0)
+
+    def test_modify_state_asserts_error_if_group_id_mismatch(self):
+        """
+        ``modify_state`` raises an :class:`AssertionError` if the group id
+        of the :class:`GroupState` returned by the modifier does not match its
+        group id
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, 'gid', {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)

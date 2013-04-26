@@ -275,13 +275,14 @@ class IScalingGroup(Interface):
         overwriting the entire previous state.  This method should handle its
         own locking, if necessary.
 
-        :param modifier_callable: a ``callable`` that takes as its argument,
-            the :class:`IScalingGroup` and returns a :class:`GroupState`.
-            This callable should take care to raise
-            :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        :param modifier_callable: a ``callable`` that takes as its arguments
+            the :class:`IScalingGroup`, a :class:`GroupState`, and returns a
+            :class:`GroupState`.
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
+
+        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
+            with this uuid) does not exist
         """
 
     def create_policies(data):
