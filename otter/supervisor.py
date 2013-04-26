@@ -63,4 +63,4 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     d.addCallback(when_launch_server_completed)
     d.chainDeferred(completion_d)
 
-    return succeed((job_id, completion_d, {}))
+    return succeed((job_id, completion_d))

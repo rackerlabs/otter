@@ -69,7 +69,7 @@ class SupervisorExecuteTests(TestCase):
         d = execute_config(self.log, 'transaction-id', self.auth_function,
                            self.group, self.launch_config)
 
-        (job_id, completed_d, job_info) = self.successResultOf(d)
+        (job_id, completed_d) = self.successResultOf(d)
 
         failure = self.failureResultOf(completed_d)
         failure.trap(ValueError)
@@ -83,7 +83,7 @@ class SupervisorExecuteTests(TestCase):
         d = execute_config(self.log, 'transaction-id', self.auth_function,
                            self.group, self.launch_config)
 
-        (job_id, completed_d, job_info) = self.successResultOf(d)
+        (job_id, completed_d) = self.successResultOf(d)
 
         result = self.successResultOf(completed_d)
         self.assertEqual(result, {'id': 'server_id', 'links': ['links'], 'name': 'meh'})
