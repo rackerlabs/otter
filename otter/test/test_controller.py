@@ -453,7 +453,6 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.group.view_config.return_value = defer.succeed("config")
         self.group.get_policy.return_value = defer.succeed("policy")
-        self.group.view_state.return_value = defer.succeed(self.mock_state)
         self.group.view_launch_config.return_value = defer.succeed("launch")
 
     def test_maybe_execute_scaling_policy_no_such_policy(self):
@@ -466,12 +465,12 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             NoSuchPolicyError('1', '1', '1'))
 
         d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, 'pol1')
+                                                    self.group, self.mock_state,
+                                                    'pol1')
         self.assert_deferred_failed(d, NoSuchPolicyError)
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
-        self.assertEqual(len(self.group.view_state.mock_calls), 0)
 
     def test_maybe_execute_scaling_policy_success(self):
         """
@@ -483,7 +482,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             'this should be returned')
 
         d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, 'pol1')
+                                                    self.group, self.mock_state,
+                                                    'pol1')
 
         result = self.successResultOf(d)
         self.assertEqual(result, self.mock_state)
@@ -512,7 +512,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mocks['check_cooldowns'].return_value = False
 
         d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, 'pol1')
+                                                    self.group, self.mock_state,
+                                                    'pol1')
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
@@ -533,7 +534,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mocks['calculate_delta'].return_value = 0
 
         d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, 'pol1')
+                                                    self.group, self.mock_state,
+                                                    'pol1')
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Policy execution would violate min/max constraints",
                       str(f.value))

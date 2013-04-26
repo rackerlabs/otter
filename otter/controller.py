@@ -96,6 +96,7 @@ def maybe_execute_scaling_policy(
         log,
         transaction_id,
         scaling_group,
+        state,
         policy_id):
     """
     Checks whether and how much a scaling policy can be executed.
@@ -122,21 +123,20 @@ def maybe_execute_scaling_policy(
     # make sure that the policy (and the group) exists before doing anything else
     deferred = scaling_group.get_policy(policy_id)
 
-    def _do_get_config_and_state(policy):
+    def _do_get_configs(policy):
         deferred = defer.gatherResults([
-            scaling_group.view_state(),
             scaling_group.view_config(),
             scaling_group.view_launch_config()
         ])
         return deferred.addCallback(lambda results: results + [policy])
 
-    deferred.addCallbacks(_do_get_config_and_state, unwrap_first_error)
+    deferred.addCallbacks(_do_get_configs, unwrap_first_error)
 
-    def _do_maybe_execute(state_config_launch_policy):
+    def _do_maybe_execute(config_launch_policy):
         """
         state_config_policy should be returned by ``check_cooldowns``
         """
-        state, config, launch, policy = state_config_launch_policy
+        config, launch, policy = config_launch_policy
         error_msg = "Cooldowns not met."
 
         def mark_executed(_):
