@@ -289,8 +289,8 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         state = mock.Mock()
 
-        def mock_modify_state(modifier):
-            modifier(self.mock_group, state)
+        def mock_modify_state(modifier, *args, **kwargs):
+            modifier(self.mock_group, state, *args, **kwargs)
             return defer.succeed(None)
 
         self.mock_group.modify_state.side_effect = mock_modify_state
