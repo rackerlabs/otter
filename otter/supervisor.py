@@ -40,6 +40,7 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     def when_authenticated((auth_token, service_catalog)):
         log.msg("Executing launch config.")
         return launch_server_v1.launch_server(
+            log,
             'ORD',  # TODO: Get the region probably from the config or something.
             scaling_group,
             service_catalog,

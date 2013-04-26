@@ -30,15 +30,6 @@ from otter.util.http import append_segments, headers, check_success
 from otter.util.hashkey import generate_server_name
 
 
-cloudServersOpenStack = 'cloudServersOpenStack'
-cloudLoadBalancers = 'cloudLoadBalancers'
-
-# This is pretty terrible but the staging service catalog for rackspace is all
-# messed up.
-if config_value('environment') == 'staging':  # pragma: no cover
-    cloudServersOpenStack = 'cloudServersPreprod'
-
-
 def server_details(server_endpoint, auth_token, server_id):
     """
     Fetch the details of a server as specified by id.
@@ -57,7 +48,8 @@ def server_details(server_endpoint, auth_token, server_id):
     return d.addCallback(treq.json_content)
 
 
-def wait_for_status(server_endpoint,
+def wait_for_status(log,
+                    server_endpoint,
                     auth_token,
                     server_id,
                     expected_status,
@@ -69,6 +61,7 @@ def wait_for_status(server_endpoint,
     @TODO: Timeouts
     @TODO: Errback on error statuses.
 
+    :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
@@ -77,11 +70,15 @@ def wait_for_status(server_endpoint,
 
     :return: Deferred that fires when the expected status has been seen.
     """
+    log.msg(format="Checking instance status every %(interval)s seconds",
+            interval=interval)
 
     d = Deferred()
 
     def poll():
         def _check_status(server):
+            log.msg(format="waiting for status %(expected_status)s got %(status)s",
+                    expected_status=expected_status, status=server['server']['status'])
             if server['server']['status'] == expected_status:
                 d.callback(server)
 
@@ -260,11 +257,12 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     return launch_config
 
 
-def launch_server(region, scaling_group, service_catalog, auth_token, launch_config):
+def launch_server(log, region, scaling_group, service_catalog, auth_token, launch_config):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
 
+    :param BoundLog log: A bound logger.
     :param str region: A rackspace region as found in the service catalog.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
@@ -278,9 +276,22 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
+    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
+    cloudLoadBalancers = config_value('cloudLoadBalancers')
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
+
+    log.msg(format="Looking for load balancer endpoint",
+            service_name=cloudLoadBalancers,
+            region=lb_region)
+
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
-                                      region)
+                                      lb_region)
+
+    log.msg(format="Looking for cloud servers endpoint",
+            service_name=cloudServersOpenStack,
+            region=region)
+
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
                                           region)
@@ -289,10 +300,14 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
 
     server_config = launch_config['server']
 
+    log = log.bind(server_name=server_config['name'])
+
     d = create_server(server_endpoint, auth_token, server_config)
 
     def _wait_for_server(server):
+        ilog = log.bind(instance_id=server['server']['id'])
         return wait_for_status(
+            ilog,
             server_endpoint,
             auth_token,
             server['server']['id'], 'ACTIVE')
@@ -328,7 +343,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     return d
 
 
-def delete_server(region, service_catalog, auth_token, instance_details):
+def delete_server(log, region, service_catalog, auth_token, instance_details):
     """
     Delete the server specified by instance_details.
 
@@ -353,9 +368,23 @@ def delete_server(region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
+
+    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
+    cloudLoadBalancers = config_value('cloudLoadBalancers')
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
+
+    log.msg(format="Looking for load balancer endpoint: %(service_name)s",
+            service_name=cloudLoadBalancers,
+            region=lb_region)
+
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
-                                      region)
+                                      lb_region)
+
+    log.msg(format="Looking for cloud servers endpoint: %(service_name)s",
+            service_name=cloudServersOpenStack,
+            region=region)
+
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
                                           region)
