@@ -53,6 +53,16 @@ class GroupState(object):
         return all((getattr(self, param) == getattr(other, param)
                     for param in params))
 
+    def __repr__(self):
+        """
+        Prints out a representation of self
+        """
+        return "GroupState({}, {}, {}, {}, {}, {}, {})".format(
+            self.tenant_id, self.group_id, repr(self.active),
+            repr(self.pending), self.paused, repr(self.policy_touched),
+            self.group_touched
+        )
+
     def del_job(self, job_id):
         """
         Removes a pending job from the pending list.  If the job is not in

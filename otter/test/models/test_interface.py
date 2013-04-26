@@ -17,6 +17,15 @@ class GroupStateTestCase(TestCase):
     """
     Tests the state object `otter.mode.s
     """
+    def test_repr_str(self):
+        """
+        repr(GroupState) returns something human readable
+        """
+        state = GroupState('tid', 'gid', {'1': {}}, {}, True, {}, 'date')
+        self.assertEqual(
+            repr(state),
+            "GroupState(tid, gid, {'1': {}}, {}, True, {}, date)")
+
     def test_two_states_are_equal_if_all_vars_are_equal(self):
         """
         Two groups with the same parameters (even if now is different) are
