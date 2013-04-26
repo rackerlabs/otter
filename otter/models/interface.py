@@ -26,7 +26,7 @@ class GroupState(object):
     :ivar callable now: callable that returns a ``str`` timestamp - used for
         testing purposes.  Defaults to :func:`timestamp.now`
 
-    TODO: ``del_active``, ``pause`` and ``resume`` ?
+    TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
     def __init__(self, tenant_id, group_id, active, pending, group_touched,
                  policy_touched, paused, now=timestamp.now):
@@ -63,7 +63,7 @@ class GroupState(object):
             self.group_touched
         )
 
-    def del_job(self, job_id):
+    def remove_job(self, job_id):
         """
         Removes a pending job from the pending list.  If the job is not in
         pending, raises an AssertionError.

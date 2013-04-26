@@ -79,21 +79,21 @@ class GroupStateTestCase(TestCase):
         self.assertRaises(AssertionError, state.add_job, '1')
         self.assertEqual(state.pending, {'1': {}})
 
-    def test_del_job_success(self):
+    def test_remove_job_success(self):
         """
-        If the job ID is in the pending list, ``del_job`` removes it.
+        If the job ID is in the pending list, ``remove_job`` removes it.
         """
         state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
-        state.del_job('1')
+        state.remove_job('1')
         self.assertEqual(state.pending, {})
 
-    def test_del_job_fails(self):
+    def test_remove_job_fails(self):
         """
-        If the job ID is not in the pending list, ``del_job`` raises an
+        If the job ID is not in the pending list, ``remove_job`` raises an
         AssertionError.
         """
         state = GroupState('tid', 'gid', {}, {}, None, {}, True)
-        self.assertRaises(AssertionError, state.del_job, '1')
+        self.assertRaises(AssertionError, state.remove_job, '1')
         self.assertEqual(state.pending, {})
 
     def test_add_active_success_adds_creation_time(self):
