@@ -271,16 +271,17 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def modify_state(modifier_callable):
+    def modify_state(modifier_callable, *args, **kwargs):
         """
         Updates the scaling group state, replacing the whole thing.  This
         takes a callable which produces a state, and then saves it,
         overwriting the entire previous state.  This method should handle its
         own locking, if necessary.
 
-        :param modifier_callable: a ``callable`` that takes as its arguments
-            the :class:`IScalingGroup`, a :class:`GroupState`, and returns a
-            :class:`GroupState`.
+        :param modifier_callable: a ``callable`` that takes as first two
+            arguments the :class:`IScalingGroup`, a :class:`GroupState`, and
+            returns a :class:`GroupState`.  Other arguments provided to
+            :func:`modify_state` will be passed to the ``callable``.
 
         :return: a :class:`twisted.internet.defer.Deferred` that fires with None
 
