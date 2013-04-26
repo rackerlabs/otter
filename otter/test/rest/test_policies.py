@@ -287,38 +287,35 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a policy.
         """
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
+        def mock_modify_state(modifier):
+            modifier(self.mock_group)
+            return defer.succeed(None)
 
+        self.mock_group.modify_state.side_effect = mock_modify_state
         response_body = self.assert_status_code(202,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         self.assertEqual(response_body, "{}")
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
+        self.assertEqual(self.mock_group.modify_state.call_count, 1)
+
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
             self.mock_group,
-            self.policy_id
+            policy_id=self.policy_id
         )
 
     def test_execute_policy_failure_404(self):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
+        self.mock_group.modify_state.return_value = defer.fail(
             NoSuchPolicyError('11111', '1', '2'))
 
         response_body = self.assert_status_code(404,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
-
-        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            mock.ANY,
-            'transaction-id',
-            self.mock_group,
-            self.policy_id
-        )
-
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
