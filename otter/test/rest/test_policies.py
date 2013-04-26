@@ -287,8 +287,10 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a policy.
         """
+        state = mock.Mock()
+
         def mock_modify_state(modifier):
-            modifier(self.mock_group)
+            modifier(self.mock_group, state)
             return defer.succeed(None)
 
         self.mock_group.modify_state.side_effect = mock_modify_state
@@ -303,6 +305,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             mock.ANY,
             'transaction-id',
             self.mock_group,
+            state,
             policy_id=self.policy_id
         )
 
