@@ -25,8 +25,18 @@ from twisted.internet.task import LoopingCall
 
 import treq
 
+from otter.util.config import config_value
 from otter.util.http import append_segments, headers, check_success
 from otter.util.hashkey import generate_server_name
+
+
+cloudServersOpenStack = 'cloudServersOpenStack'
+cloudLoadBalancers = 'cloudLoadBalancers'
+
+# This is pretty terrible but the staging service catalog for rackspace is all
+# messed up.
+if config_value('environment') == 'staging':  # pragma: no cover
+    cloudServersOpenStack = 'cloudServersPreprod'
 
 
 def server_details(server_endpoint, auth_token, server_id):
@@ -268,8 +278,12 @@ def launch_server(region, scaling_group, service_catalog, auth_token, launch_con
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
-    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
+    lb_endpoint = public_endpoint_url(service_catalog,
+                                      cloudLoadBalancers,
+                                      region)
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
 
     lb_config = launch_config.get('loadBalancers', [])
 
@@ -339,8 +353,12 @@ def delete_server(region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
-    lb_endpoint = public_endpoint_url(service_catalog, 'cloudLoadBalancers', region)
-    server_endpoint = public_endpoint_url(service_catalog, 'cloudServersOpenStack', region)
+    lb_endpoint = public_endpoint_url(service_catalog,
+                                      cloudLoadBalancers,
+                                      region)
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
 
     (server_details, loadbalancer_details) = instance_details
 
