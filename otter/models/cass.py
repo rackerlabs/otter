@@ -761,7 +761,7 @@ class CassScalingGroup(object):
         d = self.view_state()
 
         def _maybe_delete(state):
-            if len(state['active']) + len(state['pending']) > 0:
+            if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
             consistency = get_consistency_level('delete', 'group')
