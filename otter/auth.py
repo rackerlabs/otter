@@ -66,11 +66,8 @@ class _ImpersonatingAuthenticator(object):
     def __init__(self, identity_admin_user, identity_admin_password, url, admin_url):
         self._identity_admin_user = identity_admin_user
         self._identity_admin_password = identity_admin_password
-
-        # XXX: TODO: This is not the correct way to deal with unicode URLs.
-        # Maybe append_segments should support it better.
-        self._url = url.encode('ascii')
-        self._admin_url = admin_url.encode('ascii')
+        self._url = url
+        self._admin_url = admin_url
 
     def authenticate_tenant(self, tenant_id):
         """
@@ -84,11 +81,12 @@ class _ImpersonatingAuthenticator(object):
         d.addCallback(extract_token)
 
         def find_user(identity_admin_token):
-            return users_for_tenant(
-                self._admin_url,
-                identity_admin_token,
-                tenant_id).addCallback(
-                    lambda users: (identity_admin_token, users['users'][0]['username']))
+            d = user_for_tenant(self._admin_url,
+                                self._identity_admin_user,
+                                self._identity_admin_password,
+                                tenant_id)
+            d.addCallback(lambda username: (identity_admin_token, username))
+            return d
 
         d.addCallback(find_user)
 
@@ -141,22 +139,24 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
     return d
 
 
-def users_for_tenant(auth_endpoint, identity_admin_token, tenant_id):
+def user_for_tenant(auth_endpoint, username, password, tenant_id):
     """
-    Retrieve all users for the specified tenant.
+    Use a super secret API to get the special actual username for a tenant id.
 
-    :param str auth_endpoint: Identity API endpoint URL.
-    :param str identity_admin_token: An Auth token for an identity admin user
-        who can get the endpoints for a specified user token.
-    :param tenant_id: The tenant ID we wish to find a user for.
+    :param str auth_endpoint: Identity Admin API endpoint.
+    :param str username: A service username.
+    :param str password: A service password.
+    :param tenant_id: The tenant ID we wish to find the user for.
 
-    :return: Decoded JSON response as dict.
+    :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint, 'tenants', str(tenant_id), 'users'),
-        headers=headers(identity_admin_token))
-    d.addCallback(check_success, [200, 203])
+        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
+        auth=(username, password),
+        allow_redirects=False)
+    d.addCallback(check_success, [301])
     d.addCallback(treq.json_content)
+    d.addCallback(lambda user: user['user']['id'])
     return d
 
 
