@@ -22,8 +22,9 @@ Storage model for state information:
 
 """
 from datetime import datetime
-import iso8601
 from decimal import Decimal, ROUND_UP
+from functools import partial
+import iso8601
 
 from twisted.internet import defer
 
@@ -70,15 +71,36 @@ def resume_scaling_group(log, transaction_id, scaling_group):
     return None
 
 
-def obey_config_change(log, transaction_id, scaling_group):
+def obey_config_change(log, transaction_id, config, scaling_group, state):
     """
-    Checks to make sure, after a scaling policy config change, that
-    the current steady state is within the min and max.
+    Given the config change, do servers need to be started or deleted?
+
+    Ignore all cooldowns.
+
+    :param log: A twiggy bound log for logging
+    :param str transaction_id: the transaction id
+    :param dict config: the scaling group config
+    :param scaling_group: an IScalingGroup provider
+    :param state: a :class:`otter.models.interface.GroupState` representing the
+        state
+
+    :return: a ``Deferred`` that fires with the updated (or not)
+        :class:`otter.models.interface.GroupState` if successful
     """
-    state = scaling_group.view_state()
-    # TODO: Lock group
-    # TODO: finish
-    print state
+    bound_log = log.bind(scaling_group=scaling_group.uuid)
+
+    # XXX:  this is a hack to create an internal zero-change policy so
+    # calculate delta will work
+    delta = calculate_delta(bound_log, state, config, {'change': 0})
+    if delta != 0:
+        deferred = scaling_group.view_launch_config()
+        deferred.addCallback(partial(execute_launch_config, log, transaction_id,
+                                     state, scaling_group=scaling_group,
+                                     delta=delta))
+        deferred.addCallback(lambda _: state)
+        return deferred
+
+    return defer.succeed(state)
 
 
 def _complete_pending_job(log, job_id, state):
@@ -102,13 +124,14 @@ def maybe_execute_scaling_policy(
     Checks whether and how much a scaling policy can be executed.
 
     :param log: A twiggy bound log for logging
+    :param str transaction_id: the transaction id
     :param scaling_group: an IScalingGroup provider
+    :param state: a :class:`otter.models.interface.GroupState` representing the
+        state
     :param policy_id: the policy id to execute
 
-    Current plan: If a user executes a policy, return whether or not it will be
-    executed. If it is going to be executed, ????
-
-    :return: a ``Deferred`` that fires with None
+    :return: a ``Deferred`` that fires with the updated
+        :class:`otter.models.interface.GroupState` if successful
 
     :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
     :raises: :class:`NoSuchPolicyError` if the policy id does not exist

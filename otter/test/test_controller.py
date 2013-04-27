@@ -333,6 +333,44 @@ class CalculateDeltaTestCase(TestCase):
                           controller.calculate_delta,
                           self.mock_log, fake_state, fake_config, fake_policy)
 
+    def test_zero_change_within_min_max(self):
+        """
+        If 'change' is zero, but the current active + pending is within the min
+        and max, then ``calculate_delta`` returns 0
+        """
+        fake_policy = {'change': 0}
+        fake_config = {'minEntities': 1, 'maxEntities': 10}
+        fake_state = self.get_state(dict.fromkeys(range(5)), {})
+
+        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state,
+                                                       fake_config, fake_policy))
+
+    def test_zero_change_below_min(self):
+        """
+        If 'change' is zero, but the current active + pending is below the min,
+        then ``calculate_delta`` returns the difference between
+        current + pending and the min
+        """
+        fake_policy = {'change': 0}
+        fake_config = {'minEntities': 5, 'maxEntities': 10}
+        fake_state = self.get_state({}, {})
+
+        self.assertEqual(5, controller.calculate_delta(self.mock_log, fake_state,
+                                                       fake_config, fake_policy))
+
+    def test_zero_change_above_max(self):
+        """
+        If 'change' is zero, but the current active + pending is above the max,
+        then ``calculate_delta`` returns the negative difference between the
+        current + pending and the max
+        """
+        fake_policy = {'change': 0}
+        fake_config = {'minEntities': 0, 'maxEntities': 2}
+        fake_state = self.get_state(dict.fromkeys(range(5)), {})
+
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state,
+                                                        fake_config, fake_policy))
+
 
 class CheckCooldownsTestCase(TestCase):
     """
@@ -426,6 +464,66 @@ class CheckCooldownsTestCase(TestCase):
                                                     fake_policy, 'pol'))
 
 
+class ObeyConfigChangeTestCase(TestCase):
+    """
+    Tests for :func:`otter.controller.obey_config_change`
+    """
+
+    def setUp(self):
+        """
+        Mock execute_launch_config and calculate_delta
+        """
+        self.calculate_delta = patch(self, 'otter.controller.calculate_delta')
+        self.execute_launch_config = patch(
+            self, 'otter.controller.execute_launch_config',
+            return_value=defer.succeed(None))
+
+        self.log = mock.MagicMock()
+        self.state = mock.MagicMock(spec=[])  # so calling anything will fail
+
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        self.group.view_launch_config.return_value = defer.succeed("launch")
+
+    def test_zero_delta_nothing_happens_state_is_returned(self):
+        """
+        If the delta is zero, ``execute_launch_config`` is not called and
+        ``obey_config_change`` returns the current state
+        """
+        self.calculate_delta.return_value = 0
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        self.assertEqual(self.execute_launch_config.call_count, 0)
+
+    def test_nonzero_delta_state_is_returned_if_execute_successful(self):
+        """
+        If the delta is nonzero, ``execute_launch_config`` is called and if
+        it is successful, ``obey_config_change`` returns the current state
+        """
+        self.calculate_delta.return_value = 5
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        self.execute_launch_config.assert_called_once_with(
+            self.log, 'transaction-id', self.state, 'launch',
+            scaling_group=self.group, delta=5)
+
+    def test_nonzero_delta_execute_errors_propagated(self):
+        """
+        ``obey_config_change`` propagates any errors ``execute_launch_config``
+        raises
+        """
+        self.calculate_delta.return_value = 5
+        self.execute_launch_config.return_value = defer.fail(Exception('meh'))
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(Exception))
+        self.execute_launch_config.assert_called_once_with(
+            self.log, 'transaction-id', self.state, 'launch',
+            scaling_group=self.group, delta=5)
+
+
 class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
@@ -433,8 +531,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
     def setUp(self):
         """
-        Mock relevant controller methods and also the supervisor.
-        Also build a mock model that can be used for testing.
+        Mock relevant controller methods. Also build a mock model that can be
+        used for testing.
         """
         self.mocks = {}
         things_and_return_vals = {
