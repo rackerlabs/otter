@@ -4,7 +4,6 @@ engine
 """
 from copy import deepcopy
 from collections import defaultdict
-from functools import partial
 from uuid import uuid4
 
 from zope.interface import implementer
@@ -162,7 +161,7 @@ class MockScalingGroup:
             return defer.fail(self.error)
         return defer.succeed(self.state)
 
-    def modify_state(self, modifier_callable):
+    def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
@@ -172,7 +171,7 @@ class MockScalingGroup:
             self.state = new_state
 
         d = self.view_state()
-        d.addCallback(partial(modifier_callable, self))
+        d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
         d.addCallback(assign_state)
         return d
 
