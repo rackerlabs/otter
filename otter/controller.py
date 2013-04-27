@@ -250,15 +250,18 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         """
         job_log = log.bind(job_id=job_id)
 
-        def _on_success(group, state, result):
-            state.remove_job(job_id)
-            state.add_active(result['id'], result)
+        # next_round_state is a new state blob passed to these functions by
+        # modify_state.  By the time these are called, state may have changed.
+
+        def _on_success(group, next_round_state, result):
+            next_round_state.remove_job(job_id)
+            next_round_state.add_active(result['id'], result)
             job_log.bind(server_id=result['id']).msg(
                 "Job completed, resulting in an active server.")
-            return state
+            return next_round_state
 
-        def _on_failure(group, state, f):
-            state.remove_job(job_id)
+        def _on_failure(group, next_round_state, f):
+            next_round_state.remove_job(job_id)
             return f
 
         completion_deferred.addCallbacks(
