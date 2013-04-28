@@ -12,6 +12,7 @@ tests and Cassandra model unit tests do not lie.
 
 import json
 import mock
+import re
 
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
@@ -44,7 +45,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
     (not policies or webhooks) against the Cassandra model.
     """
 
-    _config = config()[1]
+    _config = config()[0]
     _launch_server_config = launch_server_config()[0]
     _policies = policy()
 
@@ -54,6 +55,9 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         """
         keyspace.resume()
         set_store(store)
+        self._config['minEntities'] = 0
+        self.mock_controller = patch(self, 'otter.rest.configs.controller',
+                                     spec=['obey_config_change'])
 
     def tearDown(self):
         """
@@ -102,8 +106,10 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
 
         def _check_creation_worked(path):
             # TODO: check manifest and state as well
-            d = request(root, 'GET', path + 'policies/').addCallback(
-                _check_policies_created)
+            d = defer.gatherResults([
+                request(root, 'GET', path + 'policies/').addCallback(
+                    _check_policies_created),
+                self.assert_state(path, 0, False)])
 
             # no matter what, just return the path
             return d.addCallback(lambda _: path)
@@ -111,6 +117,21 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         deferred = self.create_scaling_group()
         deferred.addCallback(_check_creation_worked)
         return deferred
+
+    def assert_state(self, path, entities, paused):
+        """
+        Assert that the state has the specified number of total entities and
+        is or is not paused, as specified.
+
+        :return: deferred that fires with None
+        """
+        def _check_state(wrapper):
+            self.assertEqual(wrapper.response.code, 200)
+            response = json.loads(wrapper.content)
+            self.assertEqual(response['group']['paused'], paused)
+            self.assertEqual(response['group']['desiredCapacity'], entities)
+
+        return request(root, 'GET', path + 'state/').addCallback(_check_state)
 
     @defer.inlineCallbacks
     def delete_and_view_scaling_group(self, path):
@@ -180,6 +201,30 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         self.assert_response(wrapper, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'launchConfiguration': edited_launch})
+
+    @defer.inlineCallbacks
+    def test_update_config(self):
+        """
+        Editing the config of a scaling group to one with a higher min returns
+        204 with no content.  The state is updated to reflect existing at least
+        the min number of pending + current
+        """
+        path = yield self.create_scaling_group()
+        searcher = re.compile('/v1.0/([a-zA-Z0-9\-]+)/groups/([a-zA-Z0-9\-]+)')
+        tenant_id, group_id = searcher.search(path).groups()
+
+        config_path = path + 'config/'
+        self._config['minEntities'] = 2
+        self.mock_controller.obey_config_change.return_value = defer.succeed(
+            GroupState(tenant_id, group_id, {}, {'1': {}, '2': {}},
+                       'date', {}, False))
+
+        wrapper = yield request(root, 'PUT', config_path,
+                                body=json.dumps(self._config))
+        self.assert_response(wrapper, 204, "Edit config failed")
+        self.assertEqual(wrapper.content, "")
+
+        yield self.assert_state(path, 2, False)
 
 
 class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
