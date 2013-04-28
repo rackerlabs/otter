@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 import mock
 
 from twisted.internet import defer
+from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter import controller
@@ -655,8 +656,6 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         Mock relevant controller methods, and also the supervisor.
         Also build a mock model that can be used for testing.
         """
-        self.complete_job = patch(
-            self, 'otter.controller._complete_pending_job', return_value=None)
         self.authenticate_tenant = patch(
             self, 'otter.controller.authenticate_tenant')
 
@@ -665,7 +664,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         def fake_execute(*args, **kwargs):
             d = defer.Deferred()
             self.execute_config_deferreds.append(d)
-            return defer.succeed((str(len(self.execute_config_deferreds)), d, {}))
+            return defer.succeed((str(len(self.execute_config_deferreds)), d))
 
         self.execute_config = patch(
             self, 'otter.controller.supervisor.execute_config',
@@ -739,10 +738,11 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(AssertionError))
 
-    def test_complete_pending_called_when_jobs_done(self):
+    def test_on_job_completion_modify_state_called(self):
         """
-        ``execute_launch_config`` sets it up so that ``_complete_pending_job``
-        gets called whenever a job finishes, whether successfully or not
+        ``execute_launch_config`` sets it up so that the group's
+        ``modify_state``state is called with the result as an arg whenever a job
+        finishes, whether successfully or not
         """
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
@@ -751,7 +751,73 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
         self.execute_config_deferreds[2].callback(None)              # job id 3
 
-        self.assertEqual(self.complete_job.mock_calls,
-                         [mock.call(self.log, '1', True),
-                          mock.call(self.log, '2', False),
-                          mock.call(self.log, '3', True)])
+        self.assertEqual(self.group.modify_state.mock_calls,
+                         [mock.call(mock.ANY, None),
+                          mock.call(mock.ANY, mock.ANY),
+                          mock.call(mock.ANY, None)])
+
+    def test_job_sucess(self):
+        """
+        ``execute_launch_config`` sets it up so that when a job succeeds, it is
+        removed from pending and the server is added to active.  It is also
+        logged.
+        """
+        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+
+        def fake_modify_state(callback, *args, **kwargs):
+            callback(self.group, s, *args, **kwargs)
+
+        self.group.modify_state.side_effect = fake_modify_state
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 1)
+
+        self.execute_config_deferreds[0].callback({'id': 's1'})
+        self.assertEqual(s.pending, {})  # job removed
+        self.assertIn('s1', s.active)    # active server added
+
+        self.log.bind.assert_called_once_with(job_id='1')
+        self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
+        self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
+
+    def test_job_failure(self):
+        """
+        ``execute_launch_config`` sets it up so that when a job fails, it is
+        removed from pending.  It is also lgoged.
+        """
+        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+
+        def fake_modify_state(callback, *args, **kwargs):
+            return defer.maybeDeferred(callback, self.group, s, *args, **kwargs)
+
+        self.group.modify_state.side_effect = fake_modify_state
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 1)
+
+        f = Failure(Exception('meh'))
+        self.execute_config_deferreds[0].errback(f)
+        # job is removed, no active servers added
+        self.assertEqual(s, GroupState('tenant', 'group', {}, {}, None, {}, False))
+
+        self.log.bind.assert_called_once_with(job_id='1')
+        self.log.bind().err.assert_called_once_with(f)
+
+    def test_modify_state_failure_logged(self):
+        """
+        If the job succeeded but modifying the state fails, that error is logged.
+        """
+        self.group.modify_state.side_effect = AssertionError
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 1)
+        self.execute_config_deferreds[0].callback({'id': 's1'})
+
+        self.log.bind.assert_called_once_with(job_id='1')
+
+        class _CheckFailure(object):
+            def __init__(self, exception_type):
+                self.exception_type = exception_type
+
+            def __eq__(self, other):
+                return isinstance(other, Failure) and other.check(self.exception_type)
+
+        self.log.bind.return_value.err.assert_called_once_with(
+            _CheckFailure(AssertionError))

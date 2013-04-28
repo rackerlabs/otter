@@ -103,17 +103,6 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     return defer.succeed(state)
 
 
-def _complete_pending_job(log, job_id, state):
-    """
-    Updates the state with a pending job, mark it as completed
-
-    State is True if we succeeded, False if we didn't
-
-    Recursive Forkbomb pseudocode magic!  Fill in later! That's why it's magic!
-    """
-    return True
-
-
 def maybe_execute_scaling_policy(
         log,
         transaction_id,
@@ -275,6 +264,34 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     :return: Deferred
     """
 
+    def _handle_completion(completion_deferred, job_id):
+        """
+        Marks a job as completed by removing it from pending.
+        If successful, adds the server info to the active servers.
+        If unsuccessful, TBD.
+        """
+        job_log = log.bind(job_id=job_id)
+
+        # next_round_state is a new state blob passed to these functions by
+        # modify_state.  By the time these are called, state may have changed.
+
+        def _on_success(group, next_round_state, result):
+            next_round_state.remove_job(job_id)
+            next_round_state.add_active(result['id'], result)
+            job_log.bind(server_id=result['id']).msg(
+                "Job completed, resulting in an active server.")
+            return next_round_state
+
+        def _on_failure(group, next_round_state, f):
+            next_round_state.remove_job(job_id)
+            return f
+
+        completion_deferred.addCallbacks(
+            partial(scaling_group.modify_state, _on_success),
+            partial(scaling_group.modify_state, _on_failure))
+
+        completion_deferred.addErrback(job_log.err)
+
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
@@ -282,21 +299,9 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         """
         log.msg('updating state')
 
-        def get_callback(this_job_id, this_val):
-            return lambda _: _complete_pending_job(log, this_job_id, this_val)
-
-        for job_id, completion_deferred, job_info in pending_results:
+        for job_id, completion_deferred in pending_results:
             state.add_job(job_id)
-
-            def _log_failure(f):
-                log.err(f)
-                return f
-
-            completion_deferred.addErrback(_log_failure)
-            # XXX: Simplest thing that could possibly work.
-            completion_deferred.addCallbacks(
-                get_callback(job_id, True),   # XXX: True?
-                get_callback(job_id, False))  # XXX: False?
+            _handle_completion(completion_deferred, job_id)
 
     if delta > 0:
         log.msg("Launching some servers.")
