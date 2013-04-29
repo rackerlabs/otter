@@ -6,7 +6,7 @@ policy.
 (/tenantId/groups/groupId/policy/policyId/webhook
  /tenantId/groups/groupId/policy/policyId/webhook/webhookId)
 """
-
+from functools import partial
 import json
 
 from otter.json_schema.group_schemas import webhook
@@ -305,13 +305,10 @@ def execute_webhook(request, log, capability_version, capability_hash):
 
     def execute_policy((tenant_id, group_id, policy_id)):
         group = store.get_scaling_group(log, tenant_id, group_id)
-
-        controller.maybe_execute_scaling_policy(
-            log,
-            transaction_id(request),
-            group,
-            policy_id,
-        )
+        # no deferred return because this doesn't wait for execution
+        group.modify_state(partial(controller.maybe_execute_scaling_policy,
+                                   log, transaction_id(request),
+                                   policy_id=policy_id))
 
     d.addCallback(execute_policy)
 

@@ -313,6 +313,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         """
         Try to execute a nonexistant policy, fails with a 404.
         """
+        self.mock_group.modify_state.side_effect = None
         self.mock_group.modify_state.return_value = defer.fail(
             NoSuchPolicyError('11111', '1', '2'))
 

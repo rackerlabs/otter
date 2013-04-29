@@ -414,7 +414,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
 
     def test_execute_webhook(self):
         """
-        Execute a webhook by hash.
+        Execute a webhook by hash returns a 202
         """
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
@@ -424,18 +424,37 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, self.tenant_id, self.group_id)
+
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
             'transaction-id',
             self.mock_group,
-            self.policy_id
+            self.mock_state,
+            policy_id=self.policy_id
         )
+
+        self.assertEqual(response_body, '')
+
+    def test_execute_webhook_does_not_wait_for_response(self):
+        """
+        If the policy execution fails, the webhook should still return 202 and
+        does not wait for the response
+        """
+        self.mock_group.modify_state.side_effect = None
+        self.mock_group.modify_state.return_value = defer.Deferred()  # no callback
+
+        self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
+            (self.tenant_id, self.group_id, self.policy_id))
+
+        response_body = self.assert_status_code(
+            202, '/v1.0/execute/1/11111/', 'POST')
 
         self.assertEqual(response_body, '')
 
     def test_execute_webhook_that_doesnt_exist(self):
         """
-        Executing a webhook with an unknown hash should appear to succeed.
+        Executing a webhook with an unknown hash should appear to succeed with
+        a 202
         """
         self.mock_store.webhook_info_by_hash.return_value = defer.fail(
             UnrecognizedCapabilityError("11111", 1))
