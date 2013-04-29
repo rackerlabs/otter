@@ -288,6 +288,9 @@ def create_new_scaling_group(request, log, tenantId, data):
         }
 
     """
+    data['groupConfiguration'].setdefault('maxEntities', 25)
+    data['groupConfiguration'].setdefault('metadata', {})
+
     deferred = get_store().create_scaling_group(
         log, tenantId, data['groupConfiguration'], data['launchConfiguration'],
         data.get('scalingPolicies', None))
