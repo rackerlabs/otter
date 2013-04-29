@@ -4,7 +4,7 @@ or launch configuration for a scaling group.
 
 (/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
 """
-
+from functools import partial
 import json
 
 from otter.json_schema import group_schemas
@@ -78,14 +78,13 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     The entire schema body must be provided.  Any optional information that is
     left out will be replaced by the defaults.
     """
-    def _do_obey_config_change(_):
-        # After the config has been updated, update the state, but we do not
-        # need to wait on the result of updating the state.  So this callback
-        # returns nothing.
-        controller.obey_config_change(log, transaction_id(request), rec)
+    def _do_obey_config_change(_, group):
+        return group.modify_state(
+            partial(controller.obey_config_change, log, transaction_id(request),
+                    data))
 
     rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.update_config(data).addCallback(_do_obey_config_change)
+    deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
     return deferred
 
 

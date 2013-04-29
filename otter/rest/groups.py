@@ -2,7 +2,7 @@
 Autoscale REST endpoints having to do with a group or collection of groups
 (/tenantId/groups and /tenantId/groups/groupId)
 """
-
+from functools import partial
 import json
 
 from twisted.internet import defer
@@ -10,7 +10,7 @@ from twisted.internet import defer
 from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
-from otter.rest.application import app, get_autoscale_links, get_store
+from otter.rest.application import app, get_autoscale_links, get_store, transaction_id
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -288,7 +288,21 @@ def create_new_scaling_group(request, log, tenantId, data):
         }
 
     """
-    def send_redirect(result, data):
+    deferred = get_store().create_scaling_group(
+        log, tenantId, data['groupConfiguration'], data['launchConfiguration'],
+        data.get('scalingPolicies', None))
+
+    def _do_obey_config_change(result):
+        group_id = result['id']
+        config = result['groupConfiguration']
+        group = get_store().get_scaling_group(log, tenantId, group_id)
+        d = group.modify_state(partial(controller.obey_config_change, log,
+                                       transaction_id(request), config))
+        return d.addCallback(lambda _: result)
+
+    deferred.addCallback(_do_obey_config_change)
+
+    def _format_output(result):
         uuid = result['id']
         request.setHeader(
             "Location", get_autoscale_links(tenantId, uuid, format=None))
@@ -297,10 +311,7 @@ def create_new_scaling_group(request, log, tenantId, data):
             result["scalingPolicies"], tenantId, uuid)
         return {"group": result}
 
-    deferred = get_store().create_scaling_group(
-        log, tenantId, data['groupConfiguration'], data['launchConfiguration'],
-        data.get('scalingPolicies', None))
-    deferred.addCallback(send_redirect, data)
+    deferred.addCallback(_format_output)
     deferred.addCallback(json.dumps)
     return deferred
 
@@ -514,8 +525,7 @@ def pause_scaling_group(request, log, tenantId, groupId):
     pausing an already paused group does nothing.
     """
     group = get_store().get_scaling_group(log, tenantId, groupId)
-    transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
-    return controller.pause_scaling_group(log, transaction_id, group)
+    return controller.pause_scaling_group(log, transaction_id(request), group)
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/resume/', methods=['POST'])
@@ -529,5 +539,4 @@ def resume_scaling_group(request, log, tenantId, groupId):
     running group does nothing.
     """
     group = get_store().get_scaling_group(log, tenantId, groupId)
-    transaction_id = request.responseHeaders.getRawHeaders('X-Response-Id')[0]
-    return controller.resume_scaling_group(log, transaction_id, group)
+    return controller.resume_scaling_group(log, transaction_id(request), group)
