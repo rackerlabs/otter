@@ -90,7 +90,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Mock modify state
         """
         super(AllGroupsEndpointTestCase, self).setUp()
-        self.mock_group.modify_state.return_value = defer.succeed(None)
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
 
     def test_list_unknown_error_is_500(self):
         """
@@ -287,20 +287,11 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch_examples()[0],
         })
 
-    @mock.patch('otter.rest.groups.controller', spec=['obey_config_change'])
-    def test_group_create_calls_obey_config_changes(self, mock_controller):
+    def test_group_create_calls_obey_config_changes(self):
         """
         If the group creation succeeds, ``obey_config_change`` is called with
         the updated log, transaction id, config, group, and state
         """
-        state = mock.MagicMock(spec=[])  # so nothing can call it
-
-        def _mock_modify_state(modifier, *args, **kwargs):
-            modifier(self.mock_group, state, *args, **kwargs)
-            return defer.succeed(None)
-
-        self.mock_group.modify_state.side_effect = _mock_modify_state
-
         config = config_examples()[0]
         manifest = {
             'groupConfiguration': config,
@@ -310,8 +301,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self._test_successful_create(manifest)
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
-        mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", config, self.mock_group, state)
+        self.mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction-id", config, self.mock_group, self.mock_state)
 
     def test_create_group_propagates_modify_state_errors(self):
         """

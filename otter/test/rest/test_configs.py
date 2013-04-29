@@ -16,11 +16,10 @@ from otter.json_schema.group_examples import (
     config as config_examples,
     launch_server_config as launch_examples)
 from otter.json_schema import rest_schemas
-from otter.models.interface import IScalingGroup, NoSuchScalingGroupError
+from otter.models.interface import NoSuchScalingGroupError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import iMock
 
 
 class GroupConfigTestCase(RestAPITestMixin, TestCase):
@@ -38,8 +37,6 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         Set up a mock group to be used for viewing and updating configurations
         """
         super(GroupConfigTestCase, self).setUp()
-        self.mock_group = iMock(IScalingGroup, uuid='1')
-        self.mock_store.get_scaling_group.return_value = self.mock_group
 
     def test_get_group_config_404(self):
         """
@@ -122,6 +119,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
+    @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_success(self, *args):
         """
         If the update succeeds, the data is updated and a 204 is returned.
@@ -149,13 +147,6 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         Obey config change is called with the updated log, transaction id,
         config, group, and state
         """
-        state = mock.MagicMock(spec=[])  # so nothing can call it
-
-        def _mock_modify_state(modifier, *args, **kwargs):
-            modifier(self.mock_group, state, *args, **kwargs)
-            return defer.succeed(None)
-
-        self.mock_group.modify_state.side_effect = _mock_modify_state
         self.mock_group.update_config.return_value = defer.succeed(None)
         new_config = {
             'name': 'blah',
@@ -168,7 +159,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", new_config, self.mock_group, state)
+            mock.ANY, "transaction-id", new_config, self.mock_group, self.mock_state)
 
     def test_update_group_config_propagates_modify_state_errors(self):
         """
