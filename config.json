@@ -1,5 +1,6 @@
 {
     "environment": "staging",
+    "url_root": "http://127.0.0.1:9000"
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter"
