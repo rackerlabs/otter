@@ -30,7 +30,7 @@ class GroupStateTestCase(TestCase):
         state = GroupState('tid', 'gid', {'1': {}}, {}, 'date', {}, True)
         self.assertEqual(
             repr(state),
-            "GroupState(tid, gid, {'1': {}}, {}, True, {}, date)")
+            "GroupState(tid, gid, {'1': {}}, {}, date, {}, True)")
 
     def test_two_states_are_equal_if_all_vars_are_equal(self):
         """
@@ -71,6 +71,14 @@ class GroupStateTestCase(TestCase):
         self.assertNotEqual(
             _GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True),
             GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True))
+
+    def test_group_touched_is_min_if_None(self):
+        """
+        If a group_touched of None is provided, groupTouched is
+        '0001-01-01T00:00:00Z'
+        """
+        state = GroupState('tid', 'gid', {}, {}, None, {}, False)
+        self.assertEqual(state.group_touched, '0001-01-01T00:00:00Z')
 
     def test_add_job_success(self):
         """
@@ -146,7 +154,7 @@ class GroupStateTestCase(TestCase):
         same time.
         """
         t = ['0']
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True, now=t.pop)
+        state = GroupState('tid', 'gid', {}, {}, 'date', {}, True, now=t.pop)
         state.mark_executed('pid')
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})

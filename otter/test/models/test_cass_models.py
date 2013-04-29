@@ -281,7 +281,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
-                        "groupTouched": None, "policyTouched": _S({}),
+                        "groupTouched": '0001-01-01T00:00:00Z',
+                        "policyTouched": _S({}),
                         "paused": True}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,

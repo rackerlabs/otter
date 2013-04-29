@@ -433,9 +433,9 @@ class CheckCooldownsTestCase(TestCase):
         If no policy has ever been executed (hence there is no global touch
         time), ``check_cooldowns`` returns True.
         """
-        self.mock_now(30)
-        fake_config = {'cooldown': 1000000000}
-        fake_policy = {'cooldown': 10000000}
+        self.mock_now(10000)
+        fake_config = {'cooldown': 1000}
+        fake_policy = {'cooldown': 100}
         fake_state = self.get_state(None, {})
         self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
                                                    fake_policy, 'pol'))
