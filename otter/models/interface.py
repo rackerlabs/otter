@@ -512,16 +512,16 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
 
-    def list_scaling_groups(log, tenant_id):
+    def list_scaling_group_states(log, tenant_id):
         """
-        List the scaling groups for this tenant ID
+        List the scaling groups states for this tenant ID
 
-        :param tenant_id: the tenant ID of the scaling groups
+        :param tenant_id: the tenant ID of the scaling group info to list
         :type tenant_id: ``str``
 
-        :return: a list of scaling groups
+        :return: a list of scaling group states
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a
-            ``list`` of :class:`IScalingGroup` providers
+            ``list`` of :class:`GroupState`
         """
 
     def get_scaling_group(log, tenant_id, scaling_group_id):
