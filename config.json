@@ -1,5 +1,6 @@
 {
     "environment": "staging",
+    "region": "ORD",
     "cassandra": {
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter"
