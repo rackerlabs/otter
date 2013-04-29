@@ -217,8 +217,12 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
 
+        expected_config = config.copy()
+        expected_config.setdefault('maxEntities', 25)
+        expected_config.setdefault('metadata', {})
+
         rval = {
-            'groupConfiguration': config,
+            'groupConfiguration': expected_config,
             'launchConfiguration': launch,
             'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
                                         [p.copy() for p in policies])),
@@ -231,7 +235,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
 
         self.mock_store.create_scaling_group.assert_called_once_with(
-            mock.ANY, '11111', config, launch, policies or None)
+            mock.ANY, '11111', expected_config, launch, policies or None)
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_and_manifest_response)
@@ -242,7 +246,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.assertEqual(resp, {
             'group': {
-                'groupConfiguration': config,
+                'groupConfiguration': expected_config,
                 'launchConfiguration': launch,
                 'id': '1',
                 'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
@@ -293,8 +297,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         the updated log, transaction id, config, group, and state
         """
         config = config_examples()[0]
+
+        expected_config = config.copy()
+        expected_config.setdefault('maxEntities', 25)
+        expected_config.setdefault('metadata', {})
+
         manifest = {
-            'groupConfiguration': config,
+            'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
         }
         self.mock_store.create_scaling_group.return_value = defer.succeed(manifest)
@@ -302,7 +311,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         self.mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", config, self.mock_group, self.mock_state)
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state)
 
     def test_create_group_propagates_modify_state_errors(self):
         """

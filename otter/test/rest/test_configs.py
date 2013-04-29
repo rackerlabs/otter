@@ -88,11 +88,18 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             NoSuchScalingGroupError('11111', 'one'))
 
         request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        expected_config = {
+            'name': 'blah',
+            'cooldown': 60,
+            'minEntities': 0,
+            'maxEntities': 25,
+            'metadata': {}
+        }
         response_body = self.assert_status_code(404, method='PUT',
                                                 body=json.dumps(request_body))
         resp = json.loads(response_body)
 
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(expected_config)
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
@@ -104,56 +111,78 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             DummyException())
 
         request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        expected_config = {
+            'name': 'blah',
+            'cooldown': 60,
+            'minEntities': 0,
+            'maxEntities': 25,
+            'metadata': {}
+        }
+
         response_body = self.assert_status_code(500, method="PUT",
                                                 body=json.dumps(request_body))
         resp = json.loads(response_body)
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(expected_config)
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_success(self, *args):
         """
-        If the update succeeds, the data is updated and a 204 is returned.
+        If the update succeeds (even with minimally required config data), the
+        complete data is updated and a 204 is returned.
         """
         self.mock_group.modify_state.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         request_body = {
             'name': 'blah',
             'cooldown': 35,
-            'minEntities': 1,
-            'maxEntities': 5,
-            'metadata': {'something': 'that'}
+            'minEntities': 1
         }
+
+        expected_config = {
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1,
+            'maxEntities': 25,
+            'metadata': {}
+        }
+
         response_body = self.assert_status_code(204, method='PUT',
                                                 body=json.dumps(request_body))
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', '1')
-        self.mock_group.update_config.assert_called_once_with(request_body)
+        self.mock_group.update_config.assert_called_once_with(expected_config)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_calls_obey_config_change(self, mock_controller):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         Obey config change is called with the updated log, transaction id,
-        config, group, and state
+        the complete config (including non-required, group, and state
         """
         self.mock_group.update_config.return_value = defer.succeed(None)
-        new_config = {
+        self.assert_status_code(204, method='PUT', body=json.dumps({
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1
+        }))
+
+        expected_config = {
             'name': 'blah',
             'cooldown': 35,
             'minEntities': 1,
-            'maxEntities': 5,
-            'metadata': {'something': 'that'}
+            'maxEntities': 25,
+            'metadata': {}
         }
-        self.assert_status_code(204, method='PUT', body=json.dumps(new_config))
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction-id", new_config, self.mock_group, self.mock_state)
+            mock.ANY, "transaction-id", expected_config, self.mock_group,
+            self.mock_state)
 
     def test_update_group_config_propagates_modify_state_errors(self):
         """
