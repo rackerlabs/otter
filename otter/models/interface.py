@@ -1,7 +1,6 @@
 """
 Interface to be used by the scaling groups engine
 """
-
 from zope.interface import Interface, Attribute
 
 from otter.util import timestamp
@@ -38,6 +37,9 @@ class GroupState(object):
         self.policy_touched = policy_touched
         self.group_touched = group_touched
 
+        if self.group_touched is None:
+            self.group_touched = timestamp.MIN
+
         self.now = now
 
     def __eq__(self, other):
@@ -62,8 +64,8 @@ class GroupState(object):
         """
         return "GroupState({}, {}, {}, {}, {}, {}, {})".format(
             self.tenant_id, self.group_id, repr(self.active),
-            repr(self.pending), self.paused, repr(self.policy_touched),
-            self.group_touched
+            repr(self.pending), self.group_touched, repr(self.policy_touched),
+            self.paused
         )
 
     def remove_job(self, job_id):
