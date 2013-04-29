@@ -11,10 +11,11 @@ from twisted.web.static import Data
 from klein import Klein
 
 from otter.util.http import append_segments
+from otter.util.config import config_value
 
 
 _store = None
-_urlRoot = 'http://127.0.0.1'
+
 
 Request.defaultContentType = 'application/json'  # everything should be json
 
@@ -36,8 +37,7 @@ def get_url_root():
     Get the URL root
     :return: string containing the URL root
     """
-    global _urlRoot
-    return _urlRoot
+    return config_value('url_root')
 
 
 def set_store(store):

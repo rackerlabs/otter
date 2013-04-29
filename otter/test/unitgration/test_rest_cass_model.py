@@ -27,6 +27,7 @@ from otter.test.resources import OtterKeymaster
 
 from otter.test.rest.request import path_only, request, RequestTestMixin
 from otter.test.utils import patch
+from otter.util.config import set_config_data
 
 
 try:
@@ -53,6 +54,8 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         """
         keyspace.resume()
         set_store(store)
+        set_config_data({'url_root': 'http://127.0.0.1'})
+        self.addCleanup(set_config_data, {})
 
         self.config = config()[0]
         self.config['minEntities'] = 0
@@ -256,6 +259,9 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         """
         keyspace.resume()
         set_store(store)  # ensure it's the cassandra store
+
+        set_config_data({'url_root': 'http://127.0.0.1'})
+        self.addCleanup(set_config_data, {})
 
         self._config = config()[0]
         self._launch = launch_server_config()[0]

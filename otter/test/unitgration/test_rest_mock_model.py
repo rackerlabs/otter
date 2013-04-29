@@ -26,6 +26,8 @@ from otter.rest.application import root, set_store
 from otter.test.rest.request import request
 from otter.test.utils import DeferredTestMixin, patch
 
+from otter.util.config import set_config_data
+
 
 def _strip_base_url(url):
     return urlsplit(url)[2]
@@ -61,6 +63,8 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         store = MockScalingGroupCollection()
         set_store(store)
+        set_config_data({'url_root': 'http://127.0.0.1'})
+        self.addCleanup(set_config_data, {})
 
         self.config = config()[1]
         self.config['minEntities'] = 0
@@ -226,6 +230,9 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
             GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
         self.addCleanup(controller_patcher.stop)
+
+        set_config_data({'url_root': 'http://127.0.0.1'})
+        self.addCleanup(set_config_data, {})
 
     def assert_number_of_scaling_policies(self, number):
         """
@@ -425,6 +432,9 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
             return defer.succeed(state)
 
         self.mock_controller.maybe_execute_scaling_policy.side_effect = _mock_maybe_execute
+
+        set_config_data({'url_root': 'http://127.0.0.1'})
+        self.addCleanup(set_config_data, {})
 
     def assert_number_of_webhooks(self, number):
         """
