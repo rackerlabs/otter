@@ -24,7 +24,7 @@ from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
 from otter.test.rest.request import request
-from otter.test.utils import DeferredTestMixin
+from otter.test.utils import DeferredTestMixin, patch
 
 
 def _strip_base_url(url):
@@ -62,6 +62,21 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         store = MockScalingGroupCollection()
         set_store(store)
 
+        self.config = config()[1]
+        self.config['minEntities'] = 0
+        self.active_pending_etc = ({}, {}, 'date', {}, False)
+
+        # patch both the config and the groups
+        self.mock_controller = patch(self, 'otter.rest.configs.controller',
+                                     spec=['obey_config_change'])
+        patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
+
+        def _mock_obey_config_change(log, trans, config, group, state):
+            return defer.succeed(GroupState(
+                state.tenant_id, state.group_id, *self.active_pending_etc))
+
+        self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
+
     def create_and_view_scaling_group(self):
         """
         Creating a scaling group with a valid config returns with a 200 OK and
@@ -70,7 +85,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         :return: the path to the new scaling group resource
         """
         request_body = {
-            "groupConfiguration": config()[1],
+            "groupConfiguration": self.config,
             "launchConfiguration": launch_server_config()[0]
         }
         wrapper = self.assert_deferred_succeeded(request(
@@ -95,7 +110,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.response.code, 200, path)
 
         response = json.loads(wrapper.content)
-        self.assertEqual(response["group"]['groupConfiguration'], config()[1])
+        self.assertEqual(response["group"]['groupConfiguration'], self.config)
         self.assertEqual(response["group"]['launchConfiguration'],
                          launch_server_config()[0])
 

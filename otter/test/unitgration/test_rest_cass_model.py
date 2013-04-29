@@ -12,7 +12,6 @@ tests and Cassandra model unit tests do not lie.
 
 import json
 import mock
-import re
 
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
@@ -45,19 +44,30 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
     (not policies or webhooks) against the Cassandra model.
     """
 
-    _config = config()[0]
     _launch_server_config = launch_server_config()[0]
     _policies = policy()
 
     def setUp(self):
         """
-        Make sure the store is the Cassandra store
+        Set the Cassandra store, and also patch the controller
         """
         keyspace.resume()
         set_store(store)
-        self._config['minEntities'] = 0
+
+        self.config = config()[0]
+        self.config['minEntities'] = 0
+        self.active_pending_etc = ({}, {}, 'date', {}, False)
+
+        # patch both the config and the groups
         self.mock_controller = patch(self, 'otter.rest.configs.controller',
                                      spec=['obey_config_change'])
+        patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
+
+        def _mock_obey_config_change(log, trans, config, group, state):
+            return defer.succeed(GroupState(
+                state.tenant_id, state.group_id, *self.active_pending_etc))
+
+        self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
 
     def tearDown(self):
         """
@@ -80,7 +90,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
             return path_only(self.get_location_header(wrapper))
 
         request_body = {
-            "groupConfiguration": self._config,
+            "groupConfiguration": self.config,
             "launchConfiguration": self._launch_server_config,
             "scalingPolicies": self._policies
         }
@@ -98,6 +108,8 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
 
         :return: the path to the new scaling group resource
         """
+        self.config['minEntities'] = 0
+        self.active_pending_etc = ({}, {}, 'date', {}, False)
 
         def _check_policies_created(wrapper):
             self.assert_response(wrapper, 200)
@@ -209,21 +221,28 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         204 with no content.  The state is updated to reflect existing at least
         the min number of pending + current
         """
-        path = yield self.create_scaling_group()
-        searcher = re.compile('/v1.0/([a-zA-Z0-9\-]+)/groups/([a-zA-Z0-9\-]+)')
-        tenant_id, group_id = searcher.search(path).groups()
-
+        path = yield self.create_and_view_scaling_group()
         config_path = path + 'config/'
-        self._config['minEntities'] = 2
-        self.mock_controller.obey_config_change.return_value = defer.succeed(
-            GroupState(tenant_id, group_id, {}, {'1': {}, '2': {}},
-                       'date', {}, False))
+
+        self.config['minEntities'] = 2
+        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
 
         wrapper = yield request(root, 'PUT', config_path,
-                                body=json.dumps(self._config))
+                                body=json.dumps(self.config))
         self.assert_response(wrapper, 204, "Edit config failed")
         self.assertEqual(wrapper.content, "")
 
+        yield self.assert_state(path, 2, False)
+
+    @defer.inlineCallbacks
+    def test_create_scaling_group_with_min_entities(self):
+        """
+        Create a scaling group with >0 min entities calls obey config changes
+        """
+        self.config['minEntities'] = 2
+        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
+
+        path = yield self.create_scaling_group()
         yield self.assert_state(path, 2, False)
 
 
