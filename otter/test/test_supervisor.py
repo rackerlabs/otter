@@ -9,6 +9,7 @@ from twisted.internet.defer import succeed, fail
 from otter.models.interface import IScalingGroup
 from otter.supervisor import execute_config
 from otter.test.utils import iMock, patch
+from otter.util.config import set_config_data
 
 
 class SupervisorExecuteTests(TestCase):
@@ -39,6 +40,9 @@ class SupervisorExecuteTests(TestCase):
         self.generate_job_id.return_value = 'job-id'
         self.launch_config = {'type': 'launch_server',
                               'args': {'server': {}}}
+
+        set_config_data({'region': 'ORD'})
+        self.addCleanup(set_config_data, {})
 
     def test_only_allow_launch_server(self):
         """
