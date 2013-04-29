@@ -32,15 +32,6 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/1/config/"
     invalid_methods = ("DELETE", "POST")
 
-    def setUp(self):
-        """
-        Set up a mock group to be used for viewing and updating configurations
-        """
-        super(GroupConfigTestCase, self).setUp()
-        self.mock_group = mock.MagicMock(
-            spec=('uuid', 'view_config', 'update_config'), uuid='1')
-        self.mock_store.get_scaling_group.return_value = self.mock_group
-
     def test_get_group_config_404(self):
         """
         If the group does not exist, an attempt to get the config returns a 404
@@ -123,15 +114,11 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(DummyException)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
-    def test_update_group_config_success(self, mock_trans, mock_controller):
+    def test_update_group_config_success(self, *args):
         """
         If the update succeeds, the data is updated and a 204 is returned.
-        It does not wait for the result of calling ``obey_config_change``.
         """
-        mock_controller.obey_config_change.return_value = defer.succeed(
-            "this should not be the text that is returned as a body")
+        self.mock_group.modify_state.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         request_body = {
             'name': 'blah',
@@ -147,9 +134,43 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(request_body)
 
-        # first parameter is the log
+    @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
+    def test_update_group_config_calls_obey_config_change(self, mock_controller):
+        """
+        If the update succeeds, the data is updated and a 204 is returned.
+        Obey config change is called with the updated log, transaction id,
+        config, group, and state
+        """
+        self.mock_group.update_config.return_value = defer.succeed(None)
+        new_config = {
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1,
+            'maxEntities': 5,
+            'metadata': {'something': 'that'}
+        }
+        self.assert_status_code(204, method='PUT', body=json.dumps(new_config))
+
+        self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction!", self.mock_group)
+            mock.ANY, "transaction-id", new_config, self.mock_group, self.mock_state)
+
+    def test_update_group_config_propagates_modify_state_errors(self):
+        """
+        If the update succeeds, the data is updated and a 204 is returned.
+        It does not wait for the result of calling .
+        """
+        self.mock_group.modify_state.side_effect = AssertionError
+        self.mock_group.update_config.return_value = defer.succeed(None)
+        new_config = {
+            'name': 'blah',
+            'cooldown': 35,
+            'minEntities': 1,
+            'maxEntities': 5,
+            'metadata': {'something': 'that'}
+        }
+        self.assert_status_code(500, method='PUT', body=json.dumps(new_config))
+        self.flushLoggedErrors(AssertionError)
 
     def test_group_modify_bad_or_missing_input_400(self):
         """
