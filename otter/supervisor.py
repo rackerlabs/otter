@@ -5,6 +5,7 @@ The Otter Supervisor manages a number of workers to execute a launch config.
 from twisted.internet.defer import Deferred, succeed
 from otter.util.hashkey import generate_job_id
 
+from otter.util.config import config_value
 from otter.worker import launch_server_v1
 
 
@@ -41,7 +42,7 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
         log.msg("Executing launch config.")
         return launch_server_v1.launch_server(
             log,
-            'ORD',  # TODO: Get the region probably from the config or something.
+            config_value('region'),
             scaling_group,
             service_catalog,
             auth_token,
