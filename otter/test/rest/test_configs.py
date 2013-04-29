@@ -32,12 +32,6 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/1/config/"
     invalid_methods = ("DELETE", "POST")
 
-    def setUp(self):
-        """
-        Set up a mock group to be used for viewing and updating configurations
-        """
-        super(GroupConfigTestCase, self).setUp()
-
     def test_get_group_config_404(self):
         """
         If the group does not exist, an attempt to get the config returns a 404
