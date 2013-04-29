@@ -287,10 +287,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch_examples()[0],
         })
 
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
     @mock.patch('otter.rest.groups.controller', spec=['obey_config_change'])
-    def test_group_create_calls_obey_config(self, mock_controller, *_):
+    def test_group_create_calls_obey_config_changes(self, mock_controller):
         """
         If the group creation succeeds, ``obey_config_change`` is called with
         the updated log, transaction id, config, group, and state
@@ -313,18 +311,17 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction!", config, self.mock_group, state)
+            mock.ANY, "transaction-id", config, self.mock_group, state)
 
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
-    def test_create_group_propagates_modify_state_errors(self, *_):
+    def test_create_group_propagates_modify_state_errors(self):
         """
-        If the update succeeds, the data is updated and a 204 is returned.
-        It does not wait for the result of calling .
+        If there is an error when modify state is called, even if the group
+        creation succeeds, a 500 is returned.
         """
         self.mock_group.modify_state.side_effect = AssertionError
         config = config_examples()[0]
         launch = launch_examples()[0]
+
         self.mock_store.create_scaling_group.return_value = defer.succeed({
             'groupConfiguration': config,
             'launchConfiguration': launch,

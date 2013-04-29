@@ -122,8 +122,6 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
     def test_update_group_config_success(self, *args):
         """
         If the update succeeds, the data is updated and a 204 is returned.
@@ -144,10 +142,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(request_body)
 
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
-    def test_update_group_config_calls_obey_config_change(self, mock_controller, *_):
+    def test_update_group_config_calls_obey_config_change(self, mock_controller):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         Obey config change is called with the updated log, transaction id,
@@ -172,11 +168,9 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.modify_state.assert_called_once_with(mock.ANY)
         mock_controller.obey_config_change.assert_called_once_with(
-            mock.ANY, "transaction!", new_config, self.mock_group, state)
+            mock.ANY, "transaction-id", new_config, self.mock_group, state)
 
-    @mock.patch('otter.rest.decorators.generate_transaction_id',
-                return_value="transaction!")
-    def test_update_group_config_propagates_modify_state_errors(self, *_):
+    def test_update_group_config_propagates_modify_state_errors(self):
         """
         If the update succeeds, the data is updated and a 204 is returned.
         It does not wait for the result of calling .

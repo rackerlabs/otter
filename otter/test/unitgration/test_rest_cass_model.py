@@ -99,8 +99,6 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         deferred.addCallback(_check_create_response)
         return deferred
 
-    # this is not a defer.inlineCallbacks because checking the state and the
-    # manifest can be done concurrently
     def create_and_view_scaling_group(self):
         """
         Creating a scaling group with a valid config returns with a 200 OK and
@@ -108,9 +106,6 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
 
         :return: the path to the new scaling group resource
         """
-        self.config['minEntities'] = 0
-        self.active_pending_etc = ({}, {}, 'date', {}, False)
-
         def _check_policies_created(wrapper):
             self.assert_response(wrapper, 200)
             response = json.loads(wrapper.content)
@@ -121,7 +116,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
             d = defer.gatherResults([
                 request(root, 'GET', path + 'policies/').addCallback(
                     _check_policies_created),
-                self.assert_state(path, 0, False)])
+                self.assert_state(path, self.config['minEntities'], False)])
 
             # no matter what, just return the path
             return d.addCallback(lambda _: path)
