@@ -150,7 +150,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
     def test_update_group_config_calls_obey_config_change(self, mock_controller, *_):
         """
         If the update succeeds, the data is updated and a 204 is returned.
-        It does not wait for the result of calling .
+        Obey config change is called with the updated log, transaction id,
+        config, group, and state
         """
         state = mock.MagicMock(spec=[])  # so nothing can call it
 

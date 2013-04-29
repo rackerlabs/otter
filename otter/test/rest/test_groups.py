@@ -85,6 +85,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/"
     invalid_methods = ("DELETE", "PUT")
 
+    def setUp(self):
+        """
+        Mock modify state
+        """
+        super(AllGroupsEndpointTestCase, self).setUp()
+        self.mock_group.modify_state.return_value = defer.succeed(None)
+
     def test_list_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -188,7 +195,6 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         Checks that the scaling groups schema is obeyed --
         an empty schema is bad.
         """
-
         self.mock_store.create_scaling_group.return_value = defer.succeed({
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
@@ -280,6 +286,57 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
         })
+
+    @mock.patch('otter.rest.decorators.generate_transaction_id',
+                return_value="transaction!")
+    @mock.patch('otter.rest.groups.controller', spec=['obey_config_change'])
+    def test_group_create_calls_obey_config(self, mock_controller, *_):
+        """
+        If the group creation succeeds, ``obey_config_change`` is called with
+        the updated log, transaction id, config, group, and state
+        """
+        state = mock.MagicMock(spec=[])  # so nothing can call it
+
+        def _mock_modify_state(modifier, *args, **kwargs):
+            modifier(self.mock_group, state, *args, **kwargs)
+            return defer.succeed(None)
+
+        self.mock_group.modify_state.side_effect = _mock_modify_state
+
+        config = config_examples()[0]
+        manifest = {
+            'groupConfiguration': config,
+            'launchConfiguration': launch_examples()[0],
+        }
+        self.mock_store.create_scaling_group.return_value = defer.succeed(manifest)
+        self._test_successful_create(manifest)
+
+        self.mock_group.modify_state.assert_called_once_with(mock.ANY)
+        mock_controller.obey_config_change.assert_called_once_with(
+            mock.ANY, "transaction!", config, self.mock_group, state)
+
+    @mock.patch('otter.rest.decorators.generate_transaction_id',
+                return_value="transaction!")
+    def test_create_group_propagates_modify_state_errors(self, *_):
+        """
+        If the update succeeds, the data is updated and a 204 is returned.
+        It does not wait for the result of calling .
+        """
+        self.mock_group.modify_state.side_effect = AssertionError
+        config = config_examples()[0]
+        launch = launch_examples()[0]
+        self.mock_store.create_scaling_group.return_value = defer.succeed({
+            'groupConfiguration': config,
+            'launchConfiguration': launch,
+            'scalingPolicies': {},
+            'id': '1'
+        })
+
+        self.assert_status_code(500, None, 'POST', body=json.dumps({
+            'groupConfiguration': config,
+            'launchConfiguration': launch
+        }))
+        self.flushLoggedErrors(AssertionError)
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
