@@ -254,6 +254,15 @@ class RestAPITestMixin(RequestTestMixin):
 
         set_store(self.mock_store)
 
+        # mock out modify state
+        self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
+
+        def _mock_modify_state(modifier, *args, **kwargs):
+            modifier(self.mock_group, self.mock_state, *args, **kwargs)
+            return defer.succeed(None)
+
+        self.mock_group.modify_state.side_effect = _mock_modify_state
+
     def test_invalid_methods_are_405(self):
         """
         All methods other than GET return a 405: Forbidden Method
