@@ -24,7 +24,7 @@ from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
 from otter.test.rest.request import request
-from otter.test.utils import DeferredTestMixin
+from otter.test.utils import DeferredTestMixin, patch
 
 
 def _strip_base_url(url):
@@ -404,10 +404,12 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
                 tenant=self.tenant_id, group=self.group_id,
                 policy=self.policy_id))
 
-        controller_patcher = mock.patch('otter.rest.webhooks.controller')
-        self.mock_controller = controller_patcher.start()
-        self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(None)
-        self.addCleanup(controller_patcher.stop)
+        self.mock_controller = patch(self, 'otter.rest.webhooks.controller')
+
+        def _mock_maybe_execute(log, trans, group, state, policy_id):
+            return defer.succeed(state)
+
+        self.mock_controller.maybe_execute_scaling_policy.side_effect = _mock_maybe_execute
 
     def assert_number_of_webhooks(self, number):
         """
