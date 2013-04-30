@@ -786,9 +786,13 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         removed from pending.  It is also lgoged.
         """
         s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+        written = []
 
+        # modify state writes on callback, doesn't write on error
         def fake_modify_state(callback, *args, **kwargs):
-            return defer.maybeDeferred(callback, self.group, s, *args, **kwargs)
+            d = defer.maybeDeferred(callback, self.group, s, *args, **kwargs)
+            d.addCallback(written.append)
+            return d
 
         self.group.modify_state.side_effect = fake_modify_state
         controller.execute_launch_config(self.log, '1', self.fake_state,
@@ -796,8 +800,12 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         f = Failure(Exception('meh'))
         self.execute_config_deferreds[0].errback(f)
-        # job is removed, no active servers added
+
+        # job is removed and no active servers added
         self.assertEqual(s, GroupState('tenant', 'group', {}, {}, None, {}, False))
+        # state is written
+        self.assertEqual(len(written), 1)
+        self.assertEqual(written[0], s)
 
         self.log.bind.assert_called_once_with(job_id='1')
         self.log.bind().err.assert_called_once_with(f)

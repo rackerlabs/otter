@@ -269,14 +269,13 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     def _handle_completion(completion_deferred, job_id):
         """
         Marks a job as completed by removing it from pending.
-        If successful, adds the server info to the active servers.
-        If unsuccessful, TBD.
+        If successful, adds the server info to the active servers, log, and save
+        If unsuccessful, TBD other stuff, log, and save.
         """
         job_log = log.bind(job_id=job_id)
 
         # next_round_state is a new state blob passed to these functions by
         # modify_state.  By the time these are called, state may have changed.
-
         def _on_success(group, next_round_state, result):
             next_round_state.remove_job(job_id)
             next_round_state.add_active(result['id'], result)
@@ -286,7 +285,8 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
 
         def _on_failure(group, next_round_state, f):
             next_round_state.remove_job(job_id)
-            return f
+            job_log.err(f)
+            return next_round_state
 
         completion_deferred.addCallbacks(
             partial(scaling_group.modify_state, _on_success),
