@@ -337,23 +337,19 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         validate(result, model_schemas.manifest)
         return result
 
-    def validate_list_return_value(self, *args, **kwargs):
+    def validate_list_states_return_value(self, *args, **kwargs):
         """
-        Calls ``list_scaling_groups()`` and validates that it returns a list
-        of :class:`IScalingGroup` providers
+        Calls ``list_scaling_group_states()`` and validates that it returns a
+        list of :class:`GroupState`
 
-        :return: the return value of ``list_scaling_groups()``
+        :return: the return value of ``list_scaling_group_states()``
         """
         result = self.assert_deferred_succeeded(
-            self.collection.list_scaling_groups(*args, **kwargs))
+            self.collection.list_scaling_group_states(*args, **kwargs))
 
-        # not valid JSON, since the ultimate objects are IScalingGroup
-        # objects, so assert that it's a dictionary, all its
-        # keys are strings, all its values are dicts whose keys are strings
-        # and whose values are IScalingGroups
         self.assertEqual(type(result), list)
         for group in result:
-            self.assertTrue(IScalingGroup.providedBy(group))
+            self.assertTrue(isinstance(group, GroupState))
 
         return result
 
