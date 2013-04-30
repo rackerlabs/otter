@@ -318,16 +318,16 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
-    def test_execute_policy_failure_409(self):
+    def test_execute_policy_failure_403(self):
         """
         If a policy cannot be executed due to cooldowns or budgetary constraints,
-        fail with a 409.
+        fail with a 403.
         """
         self.mock_group.modify_state.side_effect = None
         self.mock_group.modify_state.return_value = defer.fail(
             CannotExecutePolicyError('11111', '1', '2', 'meh'))
 
-        response_body = self.assert_status_code(409,
+        response_body = self.assert_status_code(403,
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)

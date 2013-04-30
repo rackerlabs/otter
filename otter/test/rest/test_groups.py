@@ -439,14 +439,14 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_group_delete_409(self):
+    def test_group_delete_403(self):
         """
-        Deleting a non-empty group fails with a 409.
+        Deleting a non-empty group fails with a 403.
         """
         self.mock_group.delete_group.return_value = defer.fail(
             GroupNotEmptyError('11111', '1'))
 
-        response_body = self.assert_status_code(409, method="DELETE")
+        response_body = self.assert_status_code(403, method="DELETE")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
         self.mock_group.delete_group.assert_called_once_with()
