@@ -20,5 +20,6 @@ exception_codes = {
     NoSuchPolicyError: 404,
     NoSuchWebhookError: 404,
     GroupNotEmptyError: 409,
-    CannotExecutePolicyError: 409
+    CannotExecutePolicyError: 409,
+    NotImplementedError: 501
 }

@@ -336,3 +336,14 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
             resp['message'],
             'Cannot execute scaling policy 2 for group 1 for tenant 11111: meh')
         self.flushLoggedErrors(CannotExecutePolicyError)
+
+    def test_execute_policy_failure_501(self):
+        """
+        Try to execute a scale down policy fails with a 501 not implemented.
+        """
+        self.mock_controller.maybe_execute_scaling_policy.side_effect = (
+            NotImplementedError)
+
+        self.assert_status_code(501, endpoint=self.endpoint + 'execute/',
+                                method="POST")
+        self.flushLoggedErrors(NotImplementedError)

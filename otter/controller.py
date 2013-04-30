@@ -13,18 +13,18 @@ TODO:
 
 Storage model for state information:
  * active list
-    * Instance URI
+    * Instance links
     * Created time
  * pending list
     * Job ID
  * last touched information for group
- * last touched information for polciy
-
+ * last touched information for policy
 """
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
 from functools import partial
 import iso8601
+import json
 
 from twisted.internet import defer
 
@@ -55,7 +55,7 @@ def pause_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    return None
+    raise NotImplementedError('Pause is not yet implemented')
 
 
 def resume_scaling_group(log, transaction_id, scaling_group):
@@ -68,7 +68,7 @@ def resume_scaling_group(log, transaction_id, scaling_group):
 
     :return: None
     """
-    return None
+    raise NotImplementedError('Resume is not yet implemented')
 
 
 def obey_config_change(log, transaction_id, config, scaling_group, state):
@@ -238,7 +238,9 @@ def calculate_delta(log, state, config, policy):
     elif "desiredCapacity" in policy:
         desired = policy["desiredCapacity"]
     else:
-        raise NotImplementedError()
+        raise AttributeError(
+            "Policy doesn't have attributes 'change', 'changePercent', or "
+            "'desiredCapacity: {0}".format(json.dumps(policy)))
 
     return constrain(desired) - current
 
@@ -312,7 +314,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             for i in range(delta)
         ]
     else:
-        raise NotImplementedError()
+        raise NotImplementedError("Scaling down has not been implemented yet.")
 
     pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
     pendings_deferred.addCallback(_update_state)
