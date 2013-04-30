@@ -12,6 +12,7 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
+from otter.controller import CannotExecutePolicyError
 from otter.json_schema.group_examples import policy as policy_examples
 from otter.json_schema import rest_schemas
 from otter.models.interface import NoSuchPolicyError
@@ -315,4 +316,20 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 method="POST")
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.flushLoggedErrors(NoSuchPolicyError)
+
+    def test_execute_policy_failure_409(self):
+        """
+        If a policy cannot be executed due to cooldowns or budgetary constraints,
+        fail with a 409.
+        """
+        self.mock_group.modify_state.side_effect = None
+        self.mock_group.modify_state.return_value = defer.fail(
+            CannotExecutePolicyError('11111', '1', '2', 'meh'))
+
+        response_body = self.assert_status_code(409,
+                                                endpoint=self.endpoint + 'execute/',
+                                                method="POST")
+        resp = json.loads(response_body)
+        self.assertEqual(resp['type'], 'CannotExecutePolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
