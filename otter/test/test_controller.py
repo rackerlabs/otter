@@ -323,14 +323,15 @@ class CalculateDeltaTestCase(TestCase):
 
     def test_no_change_or_percent_or_desired_fails(self):
         """
-        If 'change' or 'changePercent' or 'desiredCapacity' is not there in scaling policy,
-        then ``calculate_delta`` doesn't know how to handle the policy
+        If 'change' or 'changePercent' or 'desiredCapacity' is not there in
+        scaling policy, then ``calculate_delta`` doesn't know how to handle the
+        policy and raises a ValueError
         """
         fake_policy = {'changeNone': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
         fake_state = self.get_state({}, {})
 
-        self.assertRaises(NotImplementedError,
+        self.assertRaises(AttributeError,
                           controller.calculate_delta,
                           self.mock_log, fake_state, fake_config, fake_policy)
 

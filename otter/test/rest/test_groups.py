@@ -525,24 +525,24 @@ class GroupPauseTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/one/pause/"
     invalid_methods = ("DELETE", "GET", "PUT")
 
-    def setUp(self):
-        """
-        Set the uuid of the group to "one"
-        """
-        super(GroupPauseTestCase, self).setUp()
-        self.mock_pause = patch(
-            self, 'otter.rest.groups.controller.pause_scaling_group',
-            return_value=defer.succeed(None))
-
     def test_pause(self):
         """
         Pausing should call the controller's ``pause_scaling_group`` function
         """
+        mock_pause = patch(
+            self, 'otter.rest.groups.controller.pause_scaling_group',
+            return_value=defer.succeed(None))
         response_body = self.assert_status_code(204, method="POST")
         self.assertEqual(response_body, "")
 
-        self.mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
-                                                self.mock_group)
+        mock_pause.assert_called_once_with(mock.ANY, 'transaction-id',
+                                           self.mock_group)
+
+    def test_pause_not_implemented(self):
+        """
+        Resume currently raises 501 not implemented
+        """
+        self.assert_status_code(501, method="POST")
 
 
 class GroupResumeTestCase(RestAPITestMixin, TestCase):
@@ -552,21 +552,21 @@ class GroupResumeTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/one/resume/"
     invalid_methods = ("DELETE", "GET", "PUT")
 
-    def setUp(self):
-        """
-        Set the uuid of the group to "one"
-        """
-        super(GroupResumeTestCase, self).setUp()
-        self.mock_resume = patch(
-            self, 'otter.rest.groups.controller.resume_scaling_group',
-            return_value=defer.succeed(None))
-
     def test_resume(self):
         """
         Resume should call the controller's ``resume_scaling_group`` function
         """
+        mock_resume = patch(
+            self, 'otter.rest.groups.controller.resume_scaling_group',
+            return_value=defer.succeed(None))
         response_body = self.assert_status_code(204, method="POST")
         self.assertEqual(response_body, "")
 
-        self.mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
-                                                 self.mock_group)
+        mock_resume.assert_called_once_with(mock.ANY, 'transaction-id',
+                                            self.mock_group)
+
+    def test_resume_not_implemented(self):
+        """
+        Resume currently raises 501 not implemented
+        """
+        self.assert_status_code(501, method="POST")
