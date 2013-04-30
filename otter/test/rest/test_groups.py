@@ -18,13 +18,13 @@ from otter.json_schema.group_examples import (
 from otter.json_schema import rest_schemas
 
 from otter.models.interface import (
-    GroupState, GroupNotEmptyError, IScalingGroup, NoSuchScalingGroupError)
+    GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
 from otter.rest.decorators import InvalidJsonError
 
 from otter.rest.groups import format_state_dict
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
-from otter.test.utils import iMock, patch
+from otter.test.utils import patch
 
 
 class FormatterHelpers(TestCase):
@@ -97,7 +97,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         If an unexpected exception is raised, endpoint returns a 500.
         """
         error = DummyException('what')
-        self.mock_store.list_scaling_groups.return_value = defer.fail(error)
+        self.mock_store.list_scaling_group_states.return_value = defer.fail(error)
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
@@ -120,9 +120,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         If there are no groups for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
         """
-        self.mock_store.list_scaling_groups.return_value = defer.succeed([])
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
+        self.mock_store.list_scaling_group_states.assert_called_once_with(mock.ANY, '11111')
 
         resp = json.loads(body)
         self.assertEqual(resp, {"groups": [], "groups_links": []})
@@ -134,45 +134,44 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         ``list_all_scaling_groups`` translates a list of IScalingGroup to a
         list of states that are all formatted
         """
-        mock_groups = [
-            iMock(IScalingGroup, tenant_id='11111', uuid="1"),
-            iMock(IScalingGroup, tenant_id='11111', uuid="2")
+        states = [
+            GroupState('11111', '2', {}, {}, None, {}, False),
+            GroupState('11111', '2', {}, {}, None, {}, False)
         ]
 
-        self.mock_store.list_scaling_groups.return_value = defer.succeed(mock_groups)
-        for group in mock_groups:
-            group.view_state.return_value = defer.succeed("STATE!")
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(states)
 
         self.assert_status_code(200)
-        self.mock_store.list_scaling_groups.assert_called_once_with(mock.ANY, '11111')
+        self.mock_store.list_scaling_group_states.assert_called_once_with(
+            mock.ANY, '11111')
 
-        mock_format.assert_has_calls([mock.call("STATE!"), mock.call("STATE!")])
+        mock_format.assert_has_calls([mock.call(state) for state in states])
         self.assertEqual(len(mock_format.mock_calls), 2)
 
-    @mock.patch('otter.rest.groups.format_state_dict')
-    def test_list_group_returns_valid_schema(self, mock_format):
+    @mock.patch('otter.rest.groups.get_autoscale_links',
+                return_value=[{'href': 'hey', 'rel': 'self'}])
+    def test_list_group_returns_valid_schema(self, *args):
         """
         ``list_all_scaling_groups`` produces a repsonse has the correct schema
         so long as format returns the right value
         """
-        mock_format.return_value = {
-            'active': [],
-            'activeCapacity': 0,
-            'pendingCapacity': 1,
-            'desiredCapacity': 1,
-            'paused': False,
-            'id': 1,
-            'links': [{'href': 'hey', 'rel': 'self'}]
-        }
-        mock_group = iMock(IScalingGroup, tenant_id='11111', uuid="1")
-        mock_group.view_state.return_value = defer.succeed({})
-        self.mock_store.list_scaling_groups.return_value = defer.succeed([mock_group])
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed(
+            [GroupState('11111', '1', {}, {1: {}}, None, {}, False)]
+        )
 
         body = self.assert_status_code(200)
         resp = json.loads(body)
         validate(resp, rest_schemas.list_groups_response)
         self.assertEqual(resp, {
-            "groups": [mock_format.return_value],
+            "groups": [{
+                'active': [],
+                'activeCapacity': 0,
+                'pendingCapacity': 1,
+                'desiredCapacity': 1,
+                'paused': False,
+                'id': '1',
+                'links': [{'href': 'hey', 'rel': 'self'}]
+            }],
             "groups_links": []
         })
 
