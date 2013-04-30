@@ -276,9 +276,10 @@ class IScalingGroup(Interface):
     def modify_state(modifier_callable, *args, **kwargs):
         """
         Updates the scaling group state, replacing the whole thing.  This
-        takes a callable which produces a state, and then saves it,
-        overwriting the entire previous state.  This method should handle its
-        own locking, if necessary.
+        takes a callable which produces a state, and then saves it if the
+        callable successfully returns it, overwriting the entire previous state.
+        This method should handle its own locking, if necessary.  If the
+        callback is unsuccessful, does not save.
 
         :param modifier_callable: a ``callable`` that takes as first two
             arguments the :class:`IScalingGroup`, a :class:`GroupState`, and
