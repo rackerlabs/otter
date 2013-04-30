@@ -406,11 +406,11 @@ class MockScalingGroupCollection:
 
         return self.data[tenant][uuid].view_manifest()
 
-    def list_scaling_groups(self, log, tenant):
+    def list_scaling_group_states(self, log, tenant):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
+        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
-        return defer.succeed(self.data.get(tenant, {}).values())
+        return defer.succeed([v.state for v in self.data.get(tenant, {}).values()])
 
     def get_scaling_group(self, log, tenant, uuid):
         """

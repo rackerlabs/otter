@@ -5,8 +5,6 @@ Autoscale REST endpoints having to do with a group or collection of groups
 from functools import partial
 import json
 
-from twisted.internet import defer
-
 from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
@@ -95,14 +93,7 @@ def list_all_scaling_groups(request, log, tenantId):
             "groups_links": []
         }
 
-    # This is TERRIBLE.  If there are a lot of groups this will be a lot of DB
-    # hits.  But the models should change soon, for other reasons too, so
-    # leaving this for now.
-    def get_states(groups):
-        return defer.gatherResults([g.view_state() for g in groups])
-
-    deferred = get_store().list_scaling_groups(log, tenantId)
-    deferred.addCallback(get_states)
+    deferred = get_store().list_scaling_group_states(log, tenantId)
     deferred.addCallback(format_list)
     deferred.addCallback(json.dumps)
     return deferred
