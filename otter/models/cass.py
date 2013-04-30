@@ -60,8 +60,8 @@ _cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
-_cql_view_group_state = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM {cf} '
-                         'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+_cql_view_group_state = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId AND '
+                         '"groupId" = :groupId AND deleted = False;')
 _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
@@ -83,7 +83,7 @@ _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId
 _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND '
                        '"webhookId" = :{name}')
-_cql_list = 'SELECT "groupId" FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
+_cql_list_states = 'SELECT * FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -279,6 +279,17 @@ def _grab_list(raw_response, id_name, has_data=True):
                                'required field "{0!s}"'.format(e))
 
 
+def _unmarshal_state(state_dict):
+    return GroupState(
+        state_dict['tenantId'], state_dict['groupId'],
+        _jsonloads_data(state_dict["active"]),
+        _jsonloads_data(state_dict["pending"]),
+        state_dict["groupTouched"],
+        _jsonloads_data(state_dict["policyTouched"]),
+        bool(ord(state_dict["paused"]))
+    )
+
+
 @implementer(IScalingGroup)
 class CassScalingGroup(object):
     """
@@ -376,15 +387,7 @@ class CassScalingGroup(object):
             res = _jsonize_cassandra_data(state_rec)
             if len(res) == 0:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-            res = res[0]
-            return GroupState(
-                self.tenant_id, self.uuid,
-                _jsonloads_data(res["active"]),
-                _jsonloads_data(res["pending"]),
-                res["groupTouched"],
-                _jsonloads_data(res["policyTouched"]),
-                bool(ord(res["paused"]))
-            )
+            return _unmarshal_state(res[0])
 
         query = _cql_view_group_state.format(cf=self.state_table)
         d = self.connection.execute(query,
@@ -876,19 +879,18 @@ class CassScalingGroupCollection:
         })
         return d
 
-    def list_scaling_groups(self, log, tenant_id):
+    def list_scaling_group_states(self, log, tenant_id):
         """
-        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_groups`
+        see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
-        def _build_cass_groups(group_ids):
-            return [CassScalingGroup(log, tenant_id, group_id, self.connection)
-                    for group_id in group_ids]
-        query = _cql_list.format(cf=self.config_table)
-        d = self.connection.execute(query,
+        def _build_states(group_states):
+            return [_unmarshal_state(state) for state in group_states]
+
+        d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
-        d.addCallback(_grab_list, 'groupId', has_data=False)
-        d.addCallback(_build_cass_groups)
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(_build_states)
         return d
 
     def get_scaling_group(self, log, tenant_id, scaling_group_id):

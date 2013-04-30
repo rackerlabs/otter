@@ -216,15 +216,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can call view state and receive a valid parsed response
         """
         cass_response = _cassandrify_data([
-            {'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': False}])
+            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': False, 'deleted': False}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT active, pending, "groupTouched", "policyTouched", paused FROM '
-                       'group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       'deleted = False;')
+        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -249,8 +249,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         paused group.
         """
         cass_response = _cassandrify_data([
-            {'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': True}])
+            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': True, 'deleted': False}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
@@ -1580,68 +1581,48 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-    def test_list(self):
+    def test_list_states(self):
         """
-        Test that you can list a bunch of configs.
+        ``list_scaling_group_states`` returns a list of :class:`GroupState`
+        objects from cassandra
         """
-        self.returns = [[
-            {'cols': [{'timestamp': None, 'name': 'groupId',
-                       'value': 'group1', 'ttl': None}], 'key': ''},
-            {'cols': [{'timestamp': None, 'name': 'groupId',
-                       'value': 'group3', 'ttl': None}], 'key': ''}]]
+        self.returns = [_cassandrify_data([{
+            'tenantId': '123',
+            'groupId': 'group{}'.format(i),
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': False,
+            'deleted': False
+        } for i in range(2)])]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
+        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        d = self.collection.list_scaling_groups(self.mock_log, '123')
-        r = self.assert_deferred_succeeded(d)
-        self.assertEqual(len(r), 2)
-        for row in r:
-            self.assertEqual(row.tenant_id, '123')
-        self.assertEqual(r[0].uuid, 'group1')
-        self.assertEqual(r[1].uuid, 'group3')
+        r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+        self.assertEqual(r, [
+            GroupState('123', 'group0', {}, {}, '0001-01-01T00:00:00Z', {}, False),
+            GroupState('123', 'group1', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
     def test_list_empty(self):
         """
-        Test that you can list a bunch of configs.
+        If there are no states in cassandra, ``list_scaling_group_states``
+        returns an empty list
         """
         self.returns = [[]]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT "groupId" FROM scaling_config WHERE "tenantId" = :tenantId '
+        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
                        'AND deleted = False;')
-        d = self.collection.list_scaling_groups(self.mock_log, '123')
-        r = self.assert_deferred_succeeded(d)
-        self.assertEqual(len(r), 0)
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-
-    def test_list_errors(self):
-        """
-        Errors from cassandra in listing groups cause :class:`CassBadDataErrors`
-        """
-        bads = (
-            None,
-            [{}],
-            # no results
-            [{'cols': [{}]}],
-            # no value
-            [{'cols': [{'timestamp': None, 'name': 'groupId', 'ttl': None}],
-              'key': ''}],
-            # wrong column
-            [{'cols': [{'timestamp': None, 'name': 'data',
-                        'value': '{}', 'ttl': None}],
-              'key': ''}]
-        )
-        for bad in bads:
-            self.returns = [bad]
-            self.assert_deferred_failed(self.collection.list_scaling_groups(self.mock_log, '123'),
-                                        CassBadDataError)
-            self.flushLoggedErrors(CassBadDataError)
 
     def test_get_scaling_group(self):
         """
