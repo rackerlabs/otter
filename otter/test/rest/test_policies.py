@@ -332,4 +332,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 method="POST")
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'CannotExecutePolicyError')
-        self.flushLoggedErrors(NoSuchPolicyError)
+        self.assertEqual(
+            resp['message'],
+            'Cannot execute scaling policy 2 for group 1 for tenant 11111: meh')
+        self.flushLoggedErrors(CannotExecutePolicyError)
