@@ -1,8 +1,8 @@
 HOST: https://{region}.autoscale.api.rackspacecloud.com/
 
---- otter-apiary ---
+--- Rackspace Autoscale ---
 ---
-All comments can be written in (support [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax)
+All comments can be written in [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax
 ---
 --
 Group Resource
@@ -497,9 +497,11 @@ PUT /{tenantId}/groups/{groupId}/launch
 < 204
 < Content-Type: application/json
 
+
 Pause all execution of scaling policies for this scaling group.
 POST /{tenantId}/groups/{groupId}/pause
 < 204
+
 
 Resume all execution of scaling policies for this scaling group.
 POST /{tenantId}/groups/{groupId}/resume
@@ -512,6 +514,7 @@ the scaling policies associated with a particular scaling group.
 
 (/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
 --
+
 
 Get a list of scaling policies in the group. Each policy describes an id,
 name, type, adjustment, cooldown, and links. This data is returned in the
@@ -694,13 +697,13 @@ Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the webhooks associated with a particular scaling group's particular scaling
 policy.
 
-(/tenantId/groups/groupId/policy/policyId/webhook
-/tenantId/groups/groupId/policy/policyId/webhook/webhookId)
+(/tenantId/groups/groupId/policy/policyId/webhooks
+/tenantId/groups/groupId/policy/policyId/webhooks/webhookId)
 --
 
 Get a list of webhooks and their IDs.
 This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
 < 200
 < Content-Type: application/json
 {
@@ -748,7 +751,7 @@ Create one or more new scaling policy webhooks. Webhooks must have a name.
 If successful, the created response body will contain the IDs and links to the
 newly created webhooks.
 This data provided in the request body in JSON format.
-POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
+POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
 > Accepts: application/json
 [
     {
@@ -804,7 +807,7 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhook
 
 Get information about a specific scaling policy webhook.
 This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 < 200
 < Content-Type: application/json
 {
@@ -830,7 +833,7 @@ Update an existing webhook.
 WebhookIds not recognized will be ignored with accompanying data.
 URLs will be ignored if submitted, but that will not invalidate the request.
 If successful, no response body will be returned.
-PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 > Accepts: application/json
 {
     "name": "alice",
@@ -843,5 +846,5 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
 
 Delete a scaling policy webhook.
 If successful, no response body will be returned.
-DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhook/{webhookId}
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 < 204
