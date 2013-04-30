@@ -17,5 +17,6 @@ exception_codes = {
     NoSuchScalingGroupError: 404,
     NoSuchPolicyError: 404,
     NoSuchWebhookError: 404,
-    GroupNotEmptyError: 409
+    GroupNotEmptyError: 409,
+    NotImplementedError: 501
 }
