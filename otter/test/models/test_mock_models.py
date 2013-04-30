@@ -652,25 +652,24 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Listing all scaling groups for a tenant id, with no scaling groups
         because they are a new tenant id, returns an empty list
         """
-        self.assertEqual(self.validate_list_return_value(self.mock_log, self.
-                         tenant_id), [],
-                         "Should start off with zero groups for tenant")
+        self.assertEqual(self.validate_list_states_return_value(
+            self.mock_log, self.tenant_id), [],
+            "Should start off with zero groups for tenant")
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
-    def test_create_group_with_config_and_list_scaling_groups(self, mock_sgrp):
+    def test_create_group_with_config_and_list_scaling_group_states(self, mock_sgrp):
         """
-        Listing a scaling group returns a mapping of scaling group uuid to
-        scaling group model, and adding another scaling group increases the
-        number of scaling groups in the collection.  These are tested together
-        since testing list involves putting scaling groups in the collection
-        (create), and testing creation involves enumerating the collection
-        (list)
+        Listing scaling group states returns one :class:`GroupState` per group,
+        and adding another scaling group increases the number of scaling groups
+        in the collection.  These are tested together since testing list
+        involves putting scaling groups in the collection (create), and testing
+        creation involves enumerating the collection (list)
 
         Creation of a scaling group with a 'config' parameter creates a
         scaling group with the specified configuration.
         """
         policies = group_examples.policy()[:2]
-        self.assertEqual(self.validate_list_return_value(
+        self.assertEqual(self.validate_list_states_return_value(
                          self.mock_log, self.
                          tenant_id), [],
                          "Should start off with zero groups")
@@ -686,9 +685,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'id': '1'
         })
 
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
+        result = self.validate_list_states_return_value(self.mock_log, self.tenant_id)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].uuid, '1', "Group not added to collection")
+        self.assertEqual(result[0].group_id, '1', "Group not added to collection")
 
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, '1', self.collection,
@@ -725,12 +724,12 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        self.assert_deferred_succeeded(
+        manifest = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        group = result[0]
+        group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
+                                                  manifest['id'])
 
         pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
 
@@ -754,12 +753,12 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        self.assert_deferred_succeeded(
+        manifest = self.assert_deferred_succeeded(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
-        result = self.validate_list_return_value(self.mock_log, self.tenant_id)
-        group = result[0]
+        group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
+                                                  manifest['id'])
 
         pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
 
