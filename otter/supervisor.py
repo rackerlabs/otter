@@ -51,10 +51,11 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     d.addCallback(when_authenticated)
 
     def when_launch_server_completed(result):
-        log.info("Done executing launch config.")
         # XXX: Something should be done with this data. Currently only enough
         # to pass to the controller to store in the active state is returned
         server_details, lb_info = result
+        log.msg("Done executing launch config.",
+                instance_id=server_details['server']['id'])
         return {
             'id': server_details['server']['id'],
             'links': server_details['server']['links'],
