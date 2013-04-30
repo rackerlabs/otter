@@ -60,7 +60,8 @@ _cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
                            ':pending, :groupTouched, :policyTouched, :paused, False)')
-_cql_view_group_state = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+                         '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
                          '"groupId" = :groupId AND deleted = False;')
 _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
@@ -83,7 +84,9 @@ _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId
 _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND '
                        '"webhookId" = :{name}')
-_cql_list_states = 'SELECT * FROM {cf} WHERE "tenantId" = :tenantId AND deleted = False;'
+_cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+                    '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId '
+                    'AND deleted = False;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND deleted = False;')
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '

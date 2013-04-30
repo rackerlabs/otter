@@ -223,8 +223,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND deleted = False;')
+        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+                       '"groupTouched", "policyTouched", paused FROM group_state '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'AND deleted = False;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1598,8 +1600,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         } for i in range(2)])]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
-                       'AND deleted = False;')
+        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+                       '"groupTouched", "policyTouched", paused FROM group_state '
+                       'WHERE "tenantId" = :tenantId AND deleted = False;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1616,8 +1619,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[]]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT * FROM group_state WHERE "tenantId" = :tenantId '
-                       'AND deleted = False;')
+        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+                       '"groupTouched", "policyTouched", paused FROM group_state '
+                       'WHERE "tenantId" = :tenantId AND deleted = False;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(expectedCql,
