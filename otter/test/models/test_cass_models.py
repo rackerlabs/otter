@@ -263,8 +263,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 side_effect=lambda *args: _S(args[0]))
     def test_modify_state_succeeds(self, mock_serial):
         """
-        ``modify_state`` writes the state the synchronous modifier returns to
-        the database
+        ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
@@ -288,10 +287,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-    def test_modify_state_propagates_modifier_error(self):
+    def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
-        ``modify_state`` writes the state the synchronous modifier returns to
-        the database
+        ``modify_state`` does not write anything to the db if the modifier
+        raises an exception
         """
         def modifier(group, state):
             raise NoSuchScalingGroupError(self.tenant_id, self.group_id)
