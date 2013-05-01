@@ -123,3 +123,28 @@ def StreamObserverWrapper(stream, delimiter='\n', buffered=False):
             stream.flush()
 
     return StreamObserver
+
+
+def SystemFilterWrapper(observer):
+    """
+    Normalize the system key in the eventDict to not leak strange
+    internal twisted system values to the world.
+
+    :param ILogObserver observer: The log observer to delegate to after
+        fixing system.
+
+    :rtype: ILogObserver
+    """
+    def SystemFilterObserver(eventDict):
+        system = eventDict['system']
+
+        if system == '-':  # No system.
+            system = 'otter'
+        elif ',' in system:  # This is likely one of the tcp.Server/Client contexts.
+            eventDict['log_context'] = system
+            system = 'otter'
+
+        eventDict['system'] = system
+        observer(eventDict)
+
+    return SystemFilterObserver
