@@ -336,6 +336,3 @@ class SystemFilterWrapperTests(TestCase):
         """
         self.sfo({'system': 'otter.rest.blah.blargh'})
         self.observer.assert_called_once_with({'system': 'otter.rest.blah.blargh'})
-
-
-
