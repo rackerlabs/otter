@@ -13,6 +13,7 @@ from otter.log.bound import BoundLog
 from otter.log.formatters import JSONObserverWrapper
 from otter.log.formatters import StreamObserverWrapper
 from otter.log.formatters import GELFObserverWrapper
+from otter.log.formatters import SystemFilterWrapper
 
 from otter.test.utils import SameJSON
 
@@ -299,3 +300,39 @@ class GELFObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with(
             _Subdict({'line': 10}))
+
+
+class SystemFilterWrapperTests(TestCase):
+    """
+    Test the SystemFilterWrapper
+    """
+    def setUp(self):
+        """
+        Set up a mock observer.
+        """
+        self.observer = mock.Mock()
+        self.sfo = SystemFilterWrapper(self.observer)
+
+    def test_default_system(self):
+        """
+        SystemFilterObserver rewrites the default twisted system of '-' to
+        'otter'.
+        """
+        self.sfo({'system': '-'})
+        self.observer.assert_called_once_with({'system': 'otter'})
+
+    def test_comma_system(self):
+        """
+        SystemFilterObserver rewrites systems that contain a comma to 'otter',
+        storing the original system in 'log_context'.
+        """
+        self.sfo({'system': 'HTTPChannel,1,127.0.0.1'})
+        self.observer.assert_called_once_with({
+            'system': 'otter', 'log_context': 'HTTPChannel,1,127.0.0.1'})
+
+    def test_passthrough_system(self):
+        """
+        SystemFilterObserver passes through all other systems.
+        """
+        self.sfo({'system': 'otter.rest.blah.blargh'})
+        self.observer.assert_called_once_with({'system': 'otter.rest.blah.blargh'})
