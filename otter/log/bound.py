@@ -9,8 +9,8 @@ class BoundLog(object):
     """
     BoundLog manages a partially applied copy of msg and err.
 
-    @ivar msg: The function to call for logging non-error messages.
-    @ivar err: The function to call for logging errors.
+    :ivar msg: The function to call for logging non-error messages.
+    :ivar err: The function to call for logging errors.
     """
     def __init__(self, msg, err):
         self.msg = msg
@@ -20,8 +20,8 @@ class BoundLog(object):
         """
         Bind the keyword arguments to `self.msg` and `self.err`.
 
-        :params dict kwargs:  Keyword arguments accepted by :py:function:`log.msg`
-            and :py:function:`log.err`.
+        :params dict kwargs:  Keyword arguments accepted by :py:func:`log.msg`
+            and :py:func:`log.err`.
         :returns: A new :py:class:`BoundLog` instance.
         :rtype: BoundLog
         """
