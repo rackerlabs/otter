@@ -262,10 +262,7 @@ Integration Testing
 =======
 Metrics
 =======
-#. Use metric library `yunomi <https://github.com/richzeng/yunomi>`_ for timers, histograms, etc.
-#. Anything that makes or accepts RPC or http requests should include support for tracing headers: a
-   trace id, a span id, and a parent span id.  Can use the `tryfer python client library
-   <https://github.com/racker/tryfer>`_
+TBD
 
 =======
 Logging
