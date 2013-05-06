@@ -160,12 +160,13 @@ Limiting the scope of the testing often involves mocking modules, classes, or fu
 Michael Foord's `mock package <http://www.voidspace.org.uk/python/mock/>`_ to do so - it has extensive
 documentation.  Here are a couple more suggestions:
 
-#. Patching that happens in ``setUp`` should be reverted in in ``tearDown``
-#. Mocking should happen in the right place (if you import X from Y, mock Y.X, not X)
+#. If patching needs to happen, it should be in ``setUp`` should be reverted in in ``tearDown`` and
+   the right dependency should be patched:  (i.e. if you import X from Y, mock Y.X, not X)
+#. Dependency injection is preferred over patching.
 #. Autospec/specify the spec unless you have a good reason not to (see
    http://www.voidspace.org.uk/python/mock/helpers.html#autospeccing), so your tests do not pass by
    accident (e.g. when a mock evaluates to true, or when calling assert_X just calls a mock rather than
-   the actually assert method).
+   the actually assert method)
 
 ----------------------------
 Interface testing guidelines
@@ -251,13 +252,11 @@ expected to have been logged.
 -------------------
 Integration Testing
 -------------------
-
-(work in progress)
-
-#. integration tests on dev machine - would be nice to limit number of real services that need to be
-   run at once
-
-#. mocking other rackspace REST services (http://sourceforge.net/p/soaprest-mocker/wiki/Home/,
+#. Some limited integration-y tests exist in ``otter.test.unitgration``, but these may be removed.
+#. `cloudcafe tests <https://github.com/rackerlabs/autoscale_cloudcafe>`_ for autoscale can currently
+   be run from the dev VM.  It currently does not attempt to scale up, but eventually it would be nice
+   to limit the services that ene to be spun up.
+#. TBD: mocking other rackspace REST services (http://sourceforge.net/p/soaprest-mocker/wiki/Home/,
    http://fog.io/#.6.0/compute/, or we can write our own)
 
 =======
@@ -272,35 +271,33 @@ Metrics
 Logging
 =======
 
-#. Use the `twiggy <https://twiggy.wearpants.org/>`_ logging API.
-#. Use the bound logger at ``otter.log.log``.
-#. For large subsystems create a new bound logger with the name of the subsystem::
+#. Use the bound twisted logger :data:`otter.log.log`, which is an instance of
+   :class:`otter.log.bound.BoundLog`
+#. The bound log should be passed down the call stack so that structured data can be passed along.
+   Bind more structured data by doing the following::
 
-    from otter.log import log
+    def some_function(log, *args, **kwargs):
+        further_bound_log = log.bind(system="the logging facility",
+                                     user_id="some user id")
+        some_other_function(further_bound_log)
 
-    log = log.name('otter.worker')
-
-#. Log failure objects with the ``failure`` feature::
+#. Log failure objects with the ``err`` function::
 
     def _errback(failure):
-        log.failure(failure).error('error doing something')
+        log.err(failure)
 
     d = do_something()
     d.addErrback(_errback)
 
-#. Log exceptions with ``trace``::
-
-    try:
-        1 / 0
-    except:
-        log.trace().error("Uh oh maths.")
 
 =============
 Build process
 =============
-*(work in progress)*
-
-#. Merges trigger tests and would be nice if it could trigger auto re-generation of API docs.
+#. The Github Pull-Request Builder plugin for jenkins builds the latest commit to all open pull requests
+   by first merging it into master, then running all the unit tests and linters on it.  If a build
+   fails to pass tests or linting, the pull request is marked as unsafe to merge.
+#. The build also builds these Sphinx docs every time.
+#. Automated integration tests TBD
 
 =============================
 Partial code review checklist

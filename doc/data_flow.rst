@@ -9,11 +9,11 @@ Diagram
 
 
 All autoscaling information is stored in Cassandra and accessed via a model
-layer which knows about the schema.
+layer which knows about the schema.  The red parts are not yet implemented.
 
 
-User-specified information
---------------------------
+**User-specified information**
+------------------------------
 
 This is the information that the user provides that define the hows and the
 scope of the scaling group.
@@ -36,8 +36,8 @@ config (to enforce limits on how many servers can be started or shut down) and
 the launch config (to actually tell the launch config to start servers).
 
 
-Group State information
------------------------
+**Group State information**
+---------------------------
 
 This is the information that autoscaling generates to keep track of which
 entities are part of the scaling group.
@@ -49,16 +49,16 @@ Access
 ^^^^^^
 
 The group state information is accessed and modified mainly by the controller,
-although the REST API may read from this information to present it to the user.
+although the REST API may read from this information to present it to the user,
+and the REST API also deletes this information as part of group delete.
 
-Every controller action should be atomic, so any controller will first acquire
-a lock before modifying or reading any information, and then it will release
-the lock.  Note that the model reading state information from the group state
-will not require any lock interaction.
+Every controller action should be atomic, so any controller (also the REST API
+when it deletes the group) will first acquire a lock before modifying or
+reading any information, and then it will release the lock.
 
 
-Job State information (tentative)
----------------------------------
+**Job State information (tentative)**
+-------------------------------------
 
 This is a store for supervisors to coordinate/keep track of the statuses of
 jobs allocated to workers.
@@ -70,8 +70,8 @@ Only supervisors can access or modify this information.  Whether or not to
 lock TBD.
 
 
-Example Scenarios
------------------
+**Example Scenarios**
+---------------------
 
 User executes policy
 ^^^^^^^^^^^^^^^^^^^^
@@ -81,13 +81,16 @@ User executes policy
 
 * The controller acquires a lock
 
-* The controller looks up config information, modifies the desired change by
-  making sure the final number of servers conforms to the constraints specified
-  by the config.  If the change is not zero, it tells the supervisor that this
-  change should be made (possibly also passing the supervisor the launch config,
-  if the change is positive).
+* The controller looks up config, policy, state, and launch information.  It
+  figures out the desired change based the change specified by the policy and
+  the current number of active and pending servers.  It then constraints this
+  by the min/max upon the min/max.
 
-  It then stores the job IDs from the supervisor as pending servers.
+  If the change is not zero, it tells the supervisor that this change should be
+  made, passes the supervisor the launch config, and the supervisor will
+  enact the changes, returning a set of job IDs for pending servers.
+
+  The controller then stores the job IDs from the supervisor as pending servers.
 
 * The controller releases the lock
 
@@ -95,13 +98,13 @@ User executes policy
   the state of the job(s) in Cassandra.
 
 * As each job finishes, the supervisor tells the controller that the job has
-  been completed.
+  been completed.  For each of these jobs:
 
-* The controller acquires a lock
+  * The controller acquires a lock
 
-* The controller removes the job from pending and places a server ID in active
+  * The controller removes the job from pending and places a server ID in active
 
-* The controller releases the lock
+  * The controller releases the lock
 
 
 User modifies the config
@@ -112,22 +115,17 @@ User modifies the config
 
 * The controller acquires a lock
 
-* The controller looks up config information, modifies the desired change (which
-  is zero) by making sure the final number of servers conforms to the
-  possibly new constraints specified by the config.  If this change is anything
-  other than zero, it tells the supervisor that this change should be made
-  (possibly also passing the supervisor the launch config, if the change is
-  positive).
-
-  It then stores the job IDs from the supervisor as pending servers.
+* The controller looks up launch and config information, calculates the desired
+  change, if any, based on the current min/max and the current number of
+  servers, and potentially passes this number (and the launch) to the supervisor
+  to enact the change.  See above scenario regarding what happens if desired
+  servers != 0.
 
 * The controller releases the lock
 
-* See above scenario for the case of the change being non-zero.
 
-
-User deletes a server fron Nova
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+User deletes a server from Nova (not implemented)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * The AtomHopper poller notices that a server has been deleted, and notifies
   the controller.
@@ -136,7 +134,8 @@ User deletes a server fron Nova
 
 * The controller acquires a lock
 
-* The controller looks up config information, modifies the desired change (which
-  is plus one, to make up for the deleted server) by making sure the final
-  number of servers conforms to the possibly new constraints specified by the
-  config.  etc. etc. - please see above scenarios
+* The controller looks up config information, calculates the desired increase
+  (based on how many servers have been deleted and what the current min/max
+  and number of servers is) and maybe tells the supervisor to start up some
+  servers to compensate for the deleted servers. See above scenario regarding
+  what happens if desired servers != 0.
