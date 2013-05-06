@@ -9,6 +9,7 @@ The current workflow for impersonating a customer is as follows:
 
 #. Authenticate as our service account (username: autoscale)
 #. Given a tenant ID
+
  #. Find a user for that tenant ID.
     NOTE: Currently tenants only have a single user.  In a multi-user future,
     we'll need to find a user that has the appropriate capabilities to execute
