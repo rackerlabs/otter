@@ -57,11 +57,8 @@ Scaling Supervisor
 * 'Circles back' to add/remove additional servers if the state doesn't transition back to OK
 * Allows for re-running of crashed/restarted worker events
 
-Stored state
+Stored Data
 ------------
-
-* Scaling Groups config
-* Server Ledger -- potentially done using tagging
 
 .. tocTree::
     :maxdepth: 2
