@@ -70,15 +70,17 @@ def wait_for_status(log,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    log.msg(format="Checking instance status every %(interval)s seconds",
+    log.msg("Checking instance status every {interval} seconds",
             interval=interval)
 
     d = Deferred()
 
     def poll():
         def _check_status(server):
-            log.msg(format="waiting for status %(expected_status)s got %(status)s",
-                    expected_status=expected_status, status=server['server']['status'])
+            log.msg("Waiting for status {expected_status} got {status}.",
+                    expected_status=expected_status,
+                    status=server['server']['status'])
+
             if server['server']['status'] == expected_status:
                 d.callback(server)
 
@@ -280,7 +282,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg(format="Looking for load balancer endpoint",
+    log.msg("Looking for load balancer endpoint",
             service_name=cloudLoadBalancers,
             region=lb_region)
 
@@ -288,7 +290,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
                                       cloudLoadBalancers,
                                       lb_region)
 
-    log.msg(format="Looking for cloud servers endpoint",
+    log.msg("Looking for cloud servers endpoint",
             service_name=cloudServersOpenStack,
             region=region)
 
@@ -373,7 +375,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg(format="Looking for load balancer endpoint: %(service_name)s",
+    log.msg("Looking for load balancer endpoint: %(service_name)s",
             service_name=cloudLoadBalancers,
             region=lb_region)
 
@@ -381,7 +383,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                       cloudLoadBalancers,
                                       lb_region)
 
-    log.msg(format="Looking for cloud servers endpoint: %(service_name)s",
+    log.msg("Looking for cloud servers endpoint: %(service_name)s",
             service_name=cloudServersOpenStack,
             region=region)
 
