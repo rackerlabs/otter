@@ -350,6 +350,14 @@ class PEP3101FormattingWrapperTests(TestCase):
         self.observer = mock.Mock()
         self.wrapper = PEP3101FormattingWrapper(self.observer)
 
+    def test_why_is_None(self):
+        """
+        PEP3101FormattingWrapper won't format anything if why is not specified
+        to log.err.
+        """
+        self.wrapper({'why': None, 'key': 'value'})
+        self.observer.assert_called_once_with({'why': None, 'key': 'value'})
+
     def test_format_why(self):
         """
         PEP3101FormattingWrapper formats the why argument to log.err.

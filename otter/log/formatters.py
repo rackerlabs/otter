@@ -159,7 +159,7 @@ def PEP3101FormattingWrapper(observer):
     :rtype: ILogObserver
     """
     def PEP3101FormattingObserver(eventDict):
-        if 'why' in eventDict:
+        if eventDict.get('why'):
             eventDict['why'] = eventDict['why'].format(**eventDict)
 
         if 'message' in eventDict:
