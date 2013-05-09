@@ -148,3 +148,26 @@ def SystemFilterWrapper(observer):
         observer(eventDict)
 
     return SystemFilterObserver
+
+
+def PEP3101FormattingWrapper(observer):
+    """
+    Format messages using PEP3101 format strings.
+    :param ILogObserver observer: The log observer to delegate to after
+        formatting message.
+
+    :rtype: ILogObserver
+    """
+    def PEP3101FormattingObserver(eventDict):
+        if eventDict.get('why'):
+            eventDict['why'] = eventDict['why'].format(**eventDict)
+
+        if 'message' in eventDict:
+            message = ' '.join(eventDict['message'])
+
+            if message:
+                eventDict['message'] = (message.format(**eventDict),)
+
+        observer(eventDict)
+
+    return PEP3101FormattingObserver

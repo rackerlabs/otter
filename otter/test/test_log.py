@@ -14,6 +14,7 @@ from otter.log.formatters import JSONObserverWrapper
 from otter.log.formatters import StreamObserverWrapper
 from otter.log.formatters import GELFObserverWrapper
 from otter.log.formatters import SystemFilterWrapper
+from otter.log.formatters import PEP3101FormattingWrapper
 
 from otter.test.utils import SameJSON
 
@@ -336,3 +337,44 @@ class SystemFilterWrapperTests(TestCase):
         """
         self.sfo({'system': 'otter.rest.blah.blargh'})
         self.observer.assert_called_once_with({'system': 'otter.rest.blah.blargh'})
+
+
+class PEP3101FormattingWrapperTests(TestCase):
+    """
+    Test the PEP3101 Formatting.
+    """
+    def setUp(self):
+        """
+        set up a mock observer.
+        """
+        self.observer = mock.Mock()
+        self.wrapper = PEP3101FormattingWrapper(self.observer)
+
+    def test_why_is_None(self):
+        """
+        PEP3101FormattingWrapper won't format anything if why is not specified
+        to log.err.
+        """
+        self.wrapper({'why': None, 'key': 'value'})
+        self.observer.assert_called_once_with({'why': None, 'key': 'value'})
+
+    def test_format_why(self):
+        """
+        PEP3101FormattingWrapper formats the why argument to log.err.
+        """
+        self.wrapper({'why': 'Hello {name}', 'name': 'World'})
+        self.observer.assert_called_once_with({'why': 'Hello World', 'name': 'World'})
+
+    def test_format_message(self):
+        """
+        PEP3101FormattingWrapper formats the message.
+        """
+        self.wrapper({'message': ('foo {bar}',), 'bar': 'bar'})
+        self.observer.assert_called_once_with({'message': ('foo bar',), 'bar': 'bar'})
+
+    def test_format_message_tuple(self):
+        """
+        PEP3101FormattingWrapper joins the message tuple before formatting.
+        """
+        self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
+        self.observer.assert_called_once_with({'message': ('foo bar baz bax',), 'bax': 'bax'})
