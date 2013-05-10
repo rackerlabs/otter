@@ -412,7 +412,7 @@ class CassScalingGroup(object):
             params = {
                 'tenantId': new_state.tenant_id,
                 'groupId': new_state.group_id,
-                'active': serialize_json_data(new_state.active, 1),
+                'active': serialize_json_data(new_state.active, 2),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
                 'groupTouched': new_state.group_touched,
