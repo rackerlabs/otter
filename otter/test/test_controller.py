@@ -774,7 +774,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         self.execute_config_deferreds[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
-        self.assertIn('s1', s.active)    # active server added
+        self.assertEqual(s.active,
+                         {'s1': {'id': 's1', 'created': mock.ANY, 'job': '1'}})
 
         self.log.bind.assert_called_once_with(job_id='1')
         self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')

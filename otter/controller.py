@@ -278,6 +278,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         # modify_state.  By the time these are called, state may have changed.
         def _on_success(group, next_round_state, result):
             next_round_state.remove_job(job_id)
+            result['job'] = job_id
             next_round_state.add_active(result['id'], result)
             job_log.bind(server_id=result['id']).msg(
                 "Job completed, resulting in an active server.")
