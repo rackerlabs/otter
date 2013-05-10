@@ -8,6 +8,26 @@ import os
 from zope.interface import directlyProvides
 
 
+class matches(object):
+    """
+    A helper for using testtools matchers with mock.
+    """
+    def __init__(self, matcher):
+        self._matcher = matcher
+
+    def __eq__(self, other):
+        return self._matcher.match(other) is None
+
+    def __ne__(self, other):
+        return self != other
+
+    def __str__(self):
+        return str(self._matcher)
+
+    def __repr__(self):
+        return 'matches({0!s}'.format(self._matcher)
+
+
 class DeferredTestMixin(object):
     """
     Class that can be used for asserting whether a ``Deferred`` has fired or
