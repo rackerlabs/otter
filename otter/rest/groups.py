@@ -34,9 +34,9 @@ def format_state_dict(state):
         'links': get_autoscale_links(state.tenant_id, state.group_id),
         'active': [
             {
-                'id': key,
+                'id': server_blob['id'],
                 'links': server_blob['links'],
-            } for key, server_blob in state.active.iteritems()
+            } for server_blob in state.active.values()
         ]
     }
 
