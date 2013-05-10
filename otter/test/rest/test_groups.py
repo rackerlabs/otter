@@ -48,9 +48,9 @@ class FormatterHelpers(TestCase):
         active server links and ids.
         """
         active = {
-            '1': {'name': 'n1', 'links': ['links1'], 'created': 't'},
-            '2': {'name': 'n2', 'links': ['links2'], 'created': 't'},
-            '3': {'name': 'n3', 'links': ['links3'], 'created': 't'}}
+            'j11': {'name': 'n1', 'links': ['links1'], 'created': 't', 'id': '1'},
+            'j22': {'name': 'n2', 'links': ['links2'], 'created': 't', 'id': '2'},
+            'j33': {'name': 'n3', 'links': ['links3'], 'created': 't', 'id': '3'}}
         pending = {
             'j1': {'created': 't'},
             'j2': {'created': 't'},

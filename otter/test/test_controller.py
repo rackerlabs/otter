@@ -718,22 +718,22 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
             controller.execute_launch_config,
             self.log, '1', self.fake_state, 'launch', self.group, -5)
 
-    def test_add_job_called_with_new_jobs(self):
+    def test_add_pending_called_with_new_jobs(self):
         """
-        ``execute_launch_config`` calls ``add_job`` on the state for every job
+        ``execute_launch_config`` calls ``add_pending`` on the state for every job
         that has been started
         """
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
-        self.fake_state.add_job.assert_has_calls(
+        self.fake_state.add_pending.assert_has_calls(
             [mock.call(str(i)) for i in (1, 2, 3)])
-        self.assertEqual(self.fake_state.add_job.call_count, 3)
+        self.assertEqual(self.fake_state.add_pending.call_count, 3)
 
-    def test_propagates_add_job_failures(self):
+    def test_propagates_add_pending_failures(self):
         """
-        ``execute_launch_config`` fails if ``add_job`` raises an error
+        ``execute_launch_config`` fails if ``add_pending`` raises an error
         """
-        self.fake_state.add_job.side_effect = AssertionError
+        self.fake_state.add_pending.side_effect = AssertionError
         d = controller.execute_launch_config(self.log, '1', self.fake_state,
                                              'launch', self.group, 1)
         failure = self.failureResultOf(d)
@@ -774,7 +774,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         self.execute_config_deferreds[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
-        self.assertIn('s1', s.active)    # active server added
+        self.assertEqual(s.active, {'1': {'id': 's1', 'created': mock.ANY}})
 
         self.log.bind.assert_called_once_with(job_id='1')
         self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
