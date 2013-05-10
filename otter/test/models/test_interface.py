@@ -80,40 +80,40 @@ class GroupStateTestCase(TestCase):
         state = GroupState('tid', 'gid', {}, {}, None, {}, False)
         self.assertEqual(state.group_touched, '0001-01-01T00:00:00Z')
 
-    def test_add_job_success(self):
+    def test_add_pending_success(self):
         """
-        If the job ID is not in the pending list, ``add_job`` adds it along with
+        If the job ID is not in the pending list, ``add_pending`` adds it along with
         the creation time.
         """
         state = GroupState('tid', 'gid', {}, {}, None, {}, True,
                            now=lambda: 'datetime')
-        state.add_job('1')
+        state.add_pending('1')
         self.assertEqual(state.pending, {'1': {'created': 'datetime'}})
 
-    def test_add_job_fails(self):
+    def test_add_pending_fails(self):
         """
-        If the job ID is in the pending list, ``add_job`` raises an
+        If the job ID is in the pending list, ``add_pending`` raises an
         AssertionError.
         """
         state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
-        self.assertRaises(AssertionError, state.add_job, '1')
+        self.assertRaises(AssertionError, state.add_pending, '1')
         self.assertEqual(state.pending, {'1': {}})
 
-    def test_remove_job_success(self):
+    def test_remove_pending_success(self):
         """
-        If the job ID is in the pending list, ``remove_job`` removes it.
+        If the job ID is in the pending list, ``remove_pending`` removes it.
         """
         state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
-        state.remove_job('1')
+        state.remove_pending('1')
         self.assertEqual(state.pending, {})
 
-    def test_remove_job_fails(self):
+    def test_remove_pending_fails(self):
         """
-        If the job ID is not in the pending list, ``remove_job`` raises an
+        If the job ID is not in the pending list, ``remove_pending`` raises an
         AssertionError.
         """
         state = GroupState('tid', 'gid', {}, {}, None, {}, True)
-        self.assertRaises(AssertionError, state.remove_job, '1')
+        self.assertRaises(AssertionError, state.remove_pending, '1')
         self.assertEqual(state.pending, {})
 
     def test_add_active_success_adds_creation_time(self):

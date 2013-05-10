@@ -68,7 +68,7 @@ class GroupState(object):
             self.paused
         )
 
-    def remove_job(self, job_id):
+    def remove_pending(self, job_id):
         """
         Removes a pending job from the pending list.  If the job is not in
         pending, raises an AssertionError.
@@ -80,7 +80,7 @@ class GroupState(object):
         assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
         del self.pending[job_id]
 
-    def add_job(self, job_id):
+    def add_pending(self, job_id):
         """
         Adds a pending job to the pending collection.  If the job is already in
         pending, raises an AssertError.
@@ -92,7 +92,7 @@ class GroupState(object):
         assert job_id not in self.pending, "Job exists: {0}".format(job_id)
         self.pending[job_id] = {'created': self.now()}
 
-    def add_active(self, server_id, server_info):
+    def add_active(self, job_id, server_info):
         """
         Adds a server to the collection of active servers.  Adds a creation time
         if there isn't one.
@@ -103,9 +103,9 @@ class GroupState(object):
         :returns: None
         :raises: :class:`AssertionError` if the server id already exists
         """
-        assert server_id not in self.active, "Server already exists: {}".format(server_id)
+        assert job_id not in self.active, "Server already exists for job {}".format(job_id)
         server_info.setdefault('created', self.now())
-        self.active[server_id] = server_info
+        self.active[job_id] = server_info
 
     def mark_executed(self, policy_id):
         """
