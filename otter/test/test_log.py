@@ -14,7 +14,6 @@ from otter.log.formatters import StreamObserverWrapper
 from otter.log.formatters import SystemFilterWrapper
 from otter.log.formatters import PEP3101FormattingWrapper
 
-from otter.log.formatters import fanout
 from otter.test.utils import SameJSON
 
 
@@ -231,22 +230,3 @@ class PEP3101FormattingWrapperTests(TestCase):
         """
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
         self.observer.assert_called_once_with({'message': ('foo bar baz bax',), 'bax': 'bax'})
-
-
-class FanoutTests(TestCase):
-    """
-    Test observer fanout.
-    """
-
-    def test_all_observers(self):
-        """
-        eventDicts sent to the fanoutObserver get sent to all configured observers.
-        """
-        message = {'message': ('Hello',)}
-        observers = [mock.Mock(), mock.Mock()]
-        fanout_observer = fanout(*observers)
-
-        fanout_observer(message)
-
-        observers[0].assert_called_once_with(message)
-        observers[1].assert_called_once_with(message)

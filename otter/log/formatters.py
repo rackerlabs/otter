@@ -103,17 +103,3 @@ def PEP3101FormattingWrapper(observer):
         observer(eventDict)
 
     return PEP3101FormattingObserver
-
-
-def fanout(*observers):
-    """
-    Send the eventDict to all observers.
-
-    :param observers: One or more ILogObserver instances
-    :rtype: ILogObserver
-    """
-    def fanoutObserver(eventDict):
-        for observer in observers:
-            observer(eventDict)
-
-    return fanoutObserver
