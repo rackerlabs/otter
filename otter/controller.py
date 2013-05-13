@@ -258,6 +258,14 @@ def find_server_to_evict(log, state, delta):
     """
     return []
 
+def exec_scale_down(log, transaction_id, authenticate_tenant, scaling_group):
+    # find pending jobs to cancel
+    # if they are enough, cancel them
+    # while cancelling them, delete those jobs and update the state
+    # if not, find servers to evict
+    # and delete those servers
+
+
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
     """
@@ -314,7 +322,7 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             for i in range(delta)
         ]
     else:
-        raise NotImplementedError("Scaling down has not been implemented yet.")
+        exec_scale_down(log, transaction_id, authenticate_tenant, scaling_group)
 
     pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
     pendings_deferred.addCallback(_update_state)
