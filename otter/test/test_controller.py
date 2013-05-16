@@ -8,9 +8,13 @@ import mock
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
+from txzookeeper.client import ZookeeperClient
+from txzookeeper.lock import Lock
 
 from otter import controller
 from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
+from otter.models.interface import IScalingGroup, NoSuchPolicyError
+from otter.util.config import set_config_data
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
 
@@ -540,8 +544,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         things_and_return_vals = {
             'check_cooldowns': True,
             'calculate_delta': 1,
-            'execute_launch_config': defer.succeed(None)
+            'execute_launch_config': defer.succeed(None),
         }
+        lock = Lock('', None)
+        lock.release = mock.MagicMock(return_value=defer.succeed(None))
+        things_and_return_vals['acquire_group_lock'] = defer.succeed(lock)
 
         for thing, return_val in things_and_return_vals.iteritems():
             self.mocks[thing] = patch(self, 'otter.controller.{0}'.format(thing),
