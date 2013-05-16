@@ -54,7 +54,7 @@ def view_config_for_scaling_group(request, log, tenantId, groupId):
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(group_schemas.config)
+@validate_body(group_schemas.update_config)
 def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum

@@ -3,6 +3,8 @@ JSON Schemas that define the scaling group - the launch config, the general
 scaling group configuration, and policies.
 """
 
+from copy import deepcopy
+
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
 # required-based-on-value-of-another-field
@@ -178,6 +180,10 @@ config = {
     "additionalProperties": False,
     "required": True
 }
+
+# Copy and require maxEntities for updates.
+update_config = deepcopy(config)
+update_config['properties']['maxEntities']['required'] = True
 
 zero = {
     "minimum": 0,
