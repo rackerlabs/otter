@@ -73,7 +73,7 @@ def acquire_group_lock(scaling_group):
 
     if _zookeeper_client.connected:
         deferred = _check_lock_node_exists(None)
-        deferred.addCallback(create_lock_node(None))
+        deferred.addCallback(create_lock_node)
         deferred.addCallback(_create_lock)
         return deferred
 
