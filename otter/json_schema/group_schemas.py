@@ -184,6 +184,7 @@ config = {
 # Copy and require maxEntities for updates.
 update_config = deepcopy(config)
 update_config['properties']['maxEntities']['required'] = True
+update_config['properties']['metadata']['required'] = True
 
 zero = {
     "minimum": 0,

@@ -82,7 +82,6 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
             partial(controller.obey_config_change, log, transaction_id(request),
                     data))
 
-    data.setdefault('metadata', {})
     rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
     return deferred

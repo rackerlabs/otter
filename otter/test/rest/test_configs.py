@@ -91,7 +91,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             'name': 'blah',
             'cooldown': 60,
             'minEntities': 0,
-            'maxEntities': 25
+            'maxEntities': 25,
+            'metadata': {}
         }
         expected_config = {
             'name': 'blah',
@@ -119,7 +120,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             'name': 'blah',
             'cooldown': 60,
             'minEntities': 0,
-            'maxEntities': 25
+            'maxEntities': 25,
+            'metadata': {}
         }
         expected_config = {
             'name': 'blah',
@@ -149,7 +151,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             'name': 'blah',
             'cooldown': 35,
             'minEntities': 1,
-            'maxEntities': 25
+            'maxEntities': 25,
+            'metadata': {}
         }
 
         expected_config = {
@@ -179,7 +182,8 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             'name': 'blah',
             'cooldown': 35,
             'minEntities': 1,
-            'maxEntities': 25
+            'maxEntities': 25,
+            'metadata': {}
         }))
 
         expected_config = {
