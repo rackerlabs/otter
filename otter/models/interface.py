@@ -107,6 +107,17 @@ class GroupState(object):
         server_info.setdefault('created', self.now())
         self.active[server_id] = server_info
 
+    def remove_active(self, server_id):
+        """
+        Removes a server to the collection of active servers.
+
+        :param str server_id:  the id of the server to delete
+        :raises: :class:`AssertionError` if the server id does not exist
+        """
+        assert server_id in self.active, "Server already exists: {}".format(server_id)
+        server_info.setdefault('created', self.now())
+        self.active[server_id] = server_info
+
     def mark_executed(self, policy_id):
         """
         Record the execution time (now) of a particular policy.  This also

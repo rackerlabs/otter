@@ -41,12 +41,12 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     def when_authenticated((auth_token, service_catalog)):
         log.msg("Executing launch config.")
         return launch_server_v1.launch_server(
-            log,
-            config_value('region'),
-            scaling_group,
-            service_catalog,
-            auth_token,
-            launch_config['args'])
+                    log,
+                    config_value('region'),
+                    scaling_group,
+                    service_catalog,
+                    auth_token,
+                    launch_config['args'])
 
     d.addCallback(when_authenticated)
 
@@ -57,12 +57,45 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
         log.msg("Done executing launch config.",
                 instance_id=server_details['server']['id'])
         return {
-            'id': server_details['server']['id'],
-            'links': server_details['server']['links'],
-            'name': server_details['server']['name']
+            'server': server_details,
+            'lb_info': lb_info
         }
 
     d.addCallback(when_launch_server_completed)
     d.chainDeferred(completion_d)
 
     return succeed((job_id, completion_d))
+
+
+def execute_delete_server(log, transaction_id, auth_function, scaling_group, job):
+    """
+    Executes a single delete server
+
+    Return a Deferred that fires with job_id of server that gets deleted. On error,
+    the Failure instance passed on contains the job_id as well
+    """
+    job_id, server = job
+    # authenticate for tenant
+    d = auth_function(scaling_group.tenant_id)
+
+    def when_authenticated((auth_token, service_catalog)):
+        return launch_server_v1.delete_server(
+                        log,
+                        config_value('region'),
+                        service_catalog,
+                        auth_token,
+                        (server['server'], server['lb_info']))
+
+    d.addCallback(when_authenticated)
+
+    def when_deleted():
+        return job_id
+
+    def on_delete_error(f):
+        f.job_id = job_id
+        return f
+
+    d.addCallback(when_deleted)
+    d.addErrback(on_delete_error)
+
+    return d
