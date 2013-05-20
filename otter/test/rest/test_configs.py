@@ -87,7 +87,13 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.mock_group.update_config.return_value = defer.fail(
             NoSuchScalingGroupError('11111', 'one'))
 
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        request_body = {
+            'name': 'blah',
+            'cooldown': 60,
+            'minEntities': 0,
+            'maxEntities': 25,
+            'metadata': {}
+        }
         expected_config = {
             'name': 'blah',
             'cooldown': 60,
@@ -110,7 +116,13 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.mock_group.update_config.return_value = defer.fail(
             DummyException())
 
-        request_body = {'name': 'blah', 'cooldown': 60, 'minEntities': 0}
+        request_body = {
+            'name': 'blah',
+            'cooldown': 60,
+            'minEntities': 0,
+            'maxEntities': 25,
+            'metadata': {}
+        }
         expected_config = {
             'name': 'blah',
             'cooldown': 60,
@@ -131,15 +143,16 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
     def test_update_group_config_success(self, *args):
         """
-        If the update succeeds (even with minimally required config data), the
-        complete data is updated and a 204 is returned.
+        If the update succeeds, the complete data is updated and a 204 is returned.
         """
         self.mock_group.modify_state.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
         request_body = {
             'name': 'blah',
             'cooldown': 35,
-            'minEntities': 1
+            'minEntities': 1,
+            'maxEntities': 25,
+            'metadata': {}
         }
 
         expected_config = {
@@ -168,7 +181,9 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(204, method='PUT', body=json.dumps({
             'name': 'blah',
             'cooldown': 35,
-            'minEntities': 1
+            'minEntities': 1,
+            'maxEntities': 25,
+            'metadata': {}
         }))
 
         expected_config = {
@@ -221,6 +236,9 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         400
         """
         invalids = ({"name": "1"}, {},
+                    {"name": "1", 'minEntities': 1},
+                    {"name": "1", 'maxEntities': 2},
+                    {"name": "1", "metadata": {"Foo": "Bar"}},
                     {'name': '1', 'cooldown': 5, 'minEntities': 1, "hat": "2"})
         for request_body in invalids:
             self.mock_group.update_config.return_value = None

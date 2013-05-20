@@ -54,7 +54,7 @@ def view_config_for_scaling_group(request, log, tenantId, groupId):
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(group_schemas.config)
+@validate_body(group_schemas.update_config)
 def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
@@ -75,16 +75,13 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
             }
         }
 
-    The entire schema body must be provided.  Any optional information that is
-    left out will be replaced by the defaults.
+    The entire schema body must be provided.
     """
     def _do_obey_config_change(_, group):
         return group.modify_state(
             partial(controller.obey_config_change, log, transaction_id(request),
                     data))
 
-    data.setdefault('maxEntities', 25)
-    data.setdefault('metadata', {})
     rec = get_store().get_scaling_group(log, tenantId, groupId)
     deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
     return deferred
