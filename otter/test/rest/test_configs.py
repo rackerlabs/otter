@@ -236,6 +236,9 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         400
         """
         invalids = ({"name": "1"}, {},
+                    {"name": "1", 'minEntities': 1},
+                    {"name": "1", 'maxEntities': 2},
+                    {"name": "1", "metadata": {"Foo": "Bar"}},
                     {'name': '1', 'cooldown': 5, 'minEntities': 1, "hat": "2"})
         for request_body in invalids:
             self.mock_group.update_config.return_value = None
