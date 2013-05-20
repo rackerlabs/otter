@@ -9,7 +9,7 @@ CASSANDRA_HOST ?= localhost
 CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
-CLOUDCAFE ?= $(shell find /mnt/hgfs/as_cloudcafe -name "test_repo")
+CLOUDCAFE ?= $(shell cafe-runner autoscale -l configs | grep dev)
 
 test: unit integration
 
