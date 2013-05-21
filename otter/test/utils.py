@@ -20,7 +20,10 @@ class matches(object):
     Example::
 
         mock_fun({'foo': 'bar', 'baz': 'bax'})
-        mock_fun.assert_called_once_with(matches(ContainsDict({'baz': 'bax'})))
+        mock_fun.assert_called_once_with(
+            matches(
+                ContainsDict(
+                    {'baz': Equals('bax')})))
 
     See `testtools.matchers <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
     for a complete list of matchers provided with testtools.
