@@ -10,7 +10,23 @@ from zope.interface import directlyProvides
 
 class matches(object):
     """
-    A helper for using testtools matchers with mock.
+    A helper for using `testtools matchers
+    <http://testtools.readthedocs.org/en/latest/for-test-authors.html#matchers>`_
+    with mock.
+
+    It allows testtools matchers to be used in places where comparisons for
+    equality would normally be used, such as the ``mock.Mock.assert_*`` methods.
+
+    Example::
+
+        mock_fun({'foo': 'bar', 'baz': 'bax'})
+        mock_fun.assert_called_once_with(matches(ContainsDict({'baz': 'bax'})))
+
+    See `testtools.matchers <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
+    for a complete list of matchers provided with testtools.
+
+    :param matcher: A testtools matcher that will be matched when this object
+        is compared to another object.
     """
     def __init__(self, matcher):
         self._matcher = matcher
