@@ -9,7 +9,7 @@ CASSANDRA_HOST ?= localhost
 CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
-CLOUDCAFE ?= $(shell which runner.py)
+CLOUDCAFE ?= $(shell cafe-runner autoscale -l configs | grep dev)
 
 test: unit integration
 
@@ -35,8 +35,8 @@ endif
 
 integration:
 ifneq ($(CLOUDCAFE), )
-	runner.py autoscale dev
-else
+	cafe-runner autoscale dev -p functional --parallel
+else 
 	@echo "Are you on the VM?  cloudcafe is not set up as desired."
 	@echo "So can't run integration tests."
 endif
