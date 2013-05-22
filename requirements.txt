@@ -1,5 +1,5 @@
 klein==0.2.0
-twisted==12.3
+twisted==13.0
 tryfer==0.2.2
 jsonschema==0.7
 yunomi==0.2.2
