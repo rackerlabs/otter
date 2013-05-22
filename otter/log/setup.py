@@ -5,35 +5,33 @@ import sys
 import socket
 
 from otter.log.formatters import (
-    GELFObserverWrapper,
     JSONObserverWrapper,
     StreamObserverWrapper,
     SystemFilterWrapper,
-    PEP3101FormattingWrapper
+    PEP3101FormattingWrapper,
 )
+
+from otter.log.graylog import GELFObserverWrapper
+
+
+def make_observer_chain(ultimate_observer):
+    """
+    Return our feature observers wrapped our the ultimate_observer
+    """
+    return PEP3101FormattingWrapper(
+        SystemFilterWrapper(
+            GELFObserverWrapper(
+                JSONObserverWrapper(
+                    ultimate_observer,
+                    sort_keys=True,
+                    indent=2),
+                hostname=socket.gethostname())))
 
 
 def observer_factory():
     """
-    Log JSON formatted GELF structures to sys.stdout.
-    """
-    return PEP3101FormattingWrapper(
-        SystemFilterWrapper(
-            GELFObserverWrapper(
-                JSONObserverWrapper(
-                    StreamObserverWrapper(sys.stdout)),
-                hostname=socket.gethostname())))
-
-
-def observer_factory_debug():
-    """
     Log pretty JSON formatted GELF structures to sys.stdout.
     """
-    return PEP3101FormattingWrapper(
-        SystemFilterWrapper(
-            GELFObserverWrapper(
-                JSONObserverWrapper(
-                    StreamObserverWrapper(sys.stdout),
-                    sort_keys=True,
-                    indent=2),
-                hostname=socket.gethostname())))
+    return make_observer_chain(StreamObserverWrapper(sys.stdout))
+
+observer_factory_debug = observer_factory

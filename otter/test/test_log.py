@@ -6,13 +6,11 @@ import json
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.python.failure import Failure
 
 from otter.log.bound import BoundLog
 
 from otter.log.formatters import JSONObserverWrapper
 from otter.log.formatters import StreamObserverWrapper
-from otter.log.formatters import GELFObserverWrapper
 from otter.log.formatters import SystemFilterWrapper
 from otter.log.formatters import PEP3101FormattingWrapper
 
@@ -155,152 +153,6 @@ class StreamObserverWrapperTests(TestCase):
         self.stream.write.assert_has_calls(
             [mock.call('foo'),
              mock.call('bar')])
-
-
-class _Subdict(object):
-    """
-    An object that compares equal to a dictionary if all keys in expected_items
-    exist in that dictionary and their values compare equal.
-    """
-    def __init__(self, expected_items):
-        self._expected_items = expected_items
-
-    def __eq__(self, other):
-        for key, value in self._expected_items.iteritems():
-            if key not in other or value != other[key]:
-                return False
-
-        return True
-
-    def __ne__(self, other):
-        return not self == other
-
-    def __repr__(self):
-        return '{0}({1!r})'.format(self.__class__.__name__, self._expected_items)
-
-
-class _Contains(object):
-    """
-    An object that compares equal to another object if it contains `expected_in`.
-    """
-    def __init__(self, expected_in):
-        self._expected_in = expected_in
-
-    def __eq__(self, other):
-        return self._expected_in in other
-
-    def __ne__(self, other):
-        return not self == other
-
-    def __repr__(self):
-        return '{0}({1!r})'.format(self.__class__.__name__, self._expected_in)
-
-
-class GELFObserverWrapperTests(TestCase):
-    """
-    Test the GELFObserverWrapper.
-    """
-    def setUp(self):
-        """
-        Set up a mock observer.
-        """
-        self.observer = mock.Mock()
-        self.seconds = mock.Mock(return_value=0)
-        self.gelf = GELFObserverWrapper(self.observer,
-                                        hostname='localhost',
-                                        seconds=self.seconds)
-
-    def test_formats_eventDict_a_gelf(self):
-        """
-        GELFObserverWrapper calls the wrapped observer with a dictionary
-        in the GELF format.
-        """
-        self.gelf({'message': ('Hello',)})
-
-        self.observer.assert_called_once_with({
-            'host': 'localhost',
-            'version': '1.0',
-            'short_message': 'Hello',
-            'full_message': 'Hello',
-            'facility': '',
-            'timestamp': 0,
-            'level': 6,
-        })
-
-    def test_failure_include_traceback_in_full_message(self):
-        """
-        The observer puts the traceback in the full_message key.
-        """
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'full_message': _Contains('Traceback')}))
-
-    def test_failure_repr_in_short_message(self):
-        """
-        The observer includes the repr of failure.value in short_message.
-        """
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
-        self.observer.assert_called_once_with(
-            _Subdict({'short_message': repr(ValueError())}))
-
-    def test_isError_with_message_instead_of_failure(self):
-        """
-        The observer should use message when there is no failure.
-        """
-        self.gelf({'message': ('uh oh',), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'short_message': 'uh oh',
-                      'full_message': 'uh oh'}))
-
-    def test_isError_sets_level_3(self):
-        """
-        The observer sets the level to 3 (syslog ERROR) when isError is true.
-        """
-
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'level': 3}))
-
-    def test_isError_includes_why_in_short_message(self):
-        """
-        The observer includes 'why' in the short_message when isError is true.
-        """
-        self.gelf({'failure': Failure(ValueError()),
-                   'isError': True,
-                   'why': 'Everything is terrible.'})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'short_message': _Contains('Everything is terrible.')}))
-
-    def test_includes_structured_data(self):
-        """
-        The observer includes arbitrary structured data prefixed with an _.
-        """
-        self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'_uri': 'http://example.com'}))
-
-    def test_includes_file(self):
-        """
-        The observer includes file if it is specified.
-        """
-        self.gelf({'message': 'hello', 'file': 'test.py'})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'file': 'test.py'}))
-
-    def test_includes_line(self):
-        """
-        The observer includes line if it is specified.
-        """
-        self.gelf({'line': 10, 'message': ''})
-
-        self.observer.assert_called_once_with(
-            _Subdict({'line': 10}))
 
 
 class SystemFilterWrapperTests(TestCase):
