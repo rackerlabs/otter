@@ -59,7 +59,7 @@ class GELFObserverWrapperTests(TestCase):
         self.gelf({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'full_message': Contains('Traceback')}))))
+            matches(ContainsDict({'full_message': Contains('Traceback')})))
 
     def test_failure_repr_in_short_message(self):
         """
@@ -67,7 +67,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         self.gelf({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'short_message': Equals(repr(ValueError()))}))))
+            matches(ContainsDict({'short_message': Equals(repr(ValueError()))})))
 
     def test_isError_with_message_instead_of_failure(self):
         """
@@ -87,7 +87,7 @@ class GELFObserverWrapperTests(TestCase):
         self.gelf({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'level': Equals(3)}))))
+            matches(ContainsDict({'level': Equals(3)})))
 
     def test_isError_includes_why_in_short_message(self):
         """
@@ -98,7 +98,7 @@ class GELFObserverWrapperTests(TestCase):
                    'why': 'Everything is terrible.'})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'short_message': Contains('Everything is terrible.')}))))
+            matches(ContainsDict({'short_message': Contains('Everything is terrible.')})))
 
     def test_includes_structured_data(self):
         """
@@ -107,7 +107,7 @@ class GELFObserverWrapperTests(TestCase):
         self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'_uri': Equals('http://example.com')}))))
+            matches(ContainsDict({'_uri': Equals('http://example.com')})))
 
     def test_includes_file(self):
         """
@@ -116,7 +116,7 @@ class GELFObserverWrapperTests(TestCase):
         self.gelf({'message': 'hello', 'file': 'test.py'})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'file': Equals('test.py')}))))
+            matches(ContainsDict({'file': Equals('test.py')})))
 
     def test_includes_line(self):
         """
@@ -125,7 +125,7 @@ class GELFObserverWrapperTests(TestCase):
         self.gelf({'line': 10, 'message': ''})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict(({'line': Equals(10)}))))
+            matches(ContainsDict({'line': Equals(10)})))
 
 
 class GraylogUDPPublisherTests(TestCase):
