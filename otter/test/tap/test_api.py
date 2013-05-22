@@ -196,3 +196,21 @@ class APIMakeServiceTests(TestCase):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
+
+    @mock.patch('otter.tap.api.GraylogUDPPublisher')
+    @mock.patch('otter.tap.api.log.addObserver')
+    def test_graylog(self, addObserver, GraylogUDPPublisher):
+        """
+        makeService configures adds log observer when graylog is in the config.
+        """
+        mock_config = test_config.copy()
+        mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
+
+        makeService(mock_config)
+
+        # It's pretty hard to actually tell what the observer is, so we assume
+        # if addObserver was called once, and GraylogUDPPublisher was called,
+        # we set things up correctly.
+        addObserver.assert_called_once_with(mock.ANY)
+
+        GraylogUDPPublisher.assert_called_once_with(**mock_config['graylog'])

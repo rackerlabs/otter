@@ -12,12 +12,14 @@ from twisted.application.strports import service
 from twisted.application.service import MultiService
 
 from twisted.web.server import Site
+from twisted.python import log
 
 from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
-
+from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
 from silverberg.cluster import RoundRobinCassandraCluster
+from otter.log.graylog import GraylogUDPPublisher
 
 
 class Options(usage.Options):
@@ -70,6 +72,13 @@ def makeService(config):
     Set up the otter-api service.
     """
     set_config_data(dict(config))
+
+    # Configure graylog.
+
+    if config_value('graylog'):
+        log.addObserver(
+            make_observer_chain(
+                GraylogUDPPublisher(**config_value('graylog'))))
 
     if not config_value('mock'):
         seed_endpoints = [

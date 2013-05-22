@@ -8,6 +8,45 @@ import os
 from zope.interface import directlyProvides
 
 
+class matches(object):
+    """
+    A helper for using `testtools matchers
+    <http://testtools.readthedocs.org/en/latest/for-test-authors.html#matchers>`_
+    with mock.
+
+    It allows testtools matchers to be used in places where comparisons for
+    equality would normally be used, such as the ``mock.Mock.assert_*`` methods.
+
+    Example::
+
+        mock_fun({'foo': 'bar', 'baz': 'bax'})
+        mock_fun.assert_called_once_with(
+            matches(
+                ContainsDict(
+                    {'baz': Equals('bax')})))
+
+    See `testtools.matchers <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
+    for a complete list of matchers provided with testtools.
+
+    :param matcher: A testtools matcher that will be matched when this object
+        is compared to another object.
+    """
+    def __init__(self, matcher):
+        self._matcher = matcher
+
+    def __eq__(self, other):
+        return self._matcher.match(other) is None
+
+    def __ne__(self, other):
+        return self != other
+
+    def __str__(self):
+        return str(self._matcher)
+
+    def __repr__(self):
+        return 'matches({0!s}'.format(self._matcher)
+
+
 class DeferredTestMixin(object):
     """
     Class that can be used for asserting whether a ``Deferred`` has fired or
