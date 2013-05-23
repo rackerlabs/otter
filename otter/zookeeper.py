@@ -4,6 +4,8 @@ Zookeeper utilities
 from txzookeeper.client import ZookeeperClient
 from twisted.internet import defer
 
+from otter.util.deferredutils import unwrap_first_error
+
 
 _zookeeper_client = None
 
