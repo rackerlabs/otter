@@ -27,7 +27,6 @@ import iso8601
 import json
 
 from twisted.internet import defer
-from txzookeeper.client import ZookeeperClient
 from txzookeeper.lock import Lock
 
 from otter import supervisor
@@ -36,6 +35,7 @@ from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
 from otter.auth import authenticate_tenant
+from otter.zookeeper import get_zookeeper_client
 
 
 class CannotExecutePolicyError(Exception):
@@ -48,53 +48,26 @@ class CannotExecutePolicyError(Exception):
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
 
 
-_zookeeper_client = None
-
 def acquire_group_lock(scaling_group):
-    global _zookeeper_client
-    if _zookeeper_client is None:
-        _zookeeper_client = ZookeeperClient(
-            config_value('zookeeper.servers'),
-            config_value('zookeeper.timeout'))
-
+    client = get_zookeeper_client()
     lock_path = '/scaling_group_lock/{0}'.format(scaling_group.uuid)
+
     def _check_lock_node_exists(ignored):
-        return _zookeeper_client.exists(lock_path)
+        return client.exists(lock_path)
+    deferred = _check_lock_node_exists(None)
 
     def _create_lock_node(result):
         if result is None:
-            return _zookeeper_client.create(lock_path)
+            return client.create(lock_path)
         else:
             return defer.succeed(True)
+    deferred.addCallback(create_lock_node)
 
     def _create_lock(ignored):
-        lock = Lock(lock_path, _zookeeper_client)
+        lock = Lock(lock_path, client)
         return lock.acquire()
-
-    if _zookeeper_client.connected:
-        deferred = _check_lock_node_exists(None)
-        deferred.addCallback(create_lock_node)
-        deferred.addCallback(_create_lock)
-        return deferred
-
-
-    # Connect the client first
-    deferred = _zookeeper_client.connect()
-
-    def _on_client_connect(client):
-        return client.exists('/scaling_group_lock')
-
-    deferred.addCallbacks(_on_client_connect, unwrap_first_error)
-
-    def _maybe_create_path(path):
-        if path is None:
-            return _zookeeper_client.create('/scaling_group_lock')
-        return defer.succeed(True)
-    deferred.addCallback(_maybe_create_path)
-
-    deferred.addCallback(_check_lock_node_exists)
-    deferred.addCallback(_create_lock_node)
     deferred.addCallback(_create_lock)
+
     return deferred
 
 
