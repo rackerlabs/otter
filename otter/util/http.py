@@ -44,20 +44,6 @@ class ConnectionError(Exception):
         return "ConnectionError[{0}, {1!s}, data={2!s}]".format(
             self.target, self.subFailure, self.data)
 
-    def __eq__(self, other):
-        """
-        Two :class:`ConnectionError` objects are equal if the failure, target,
-        and data are equal
-        """
-        return (self.subFailure == other.subFailure and
-                self.target == other.target and self.data == other.data)
-
-    def __ne__(self, other):
-        """
-        Not ``__eq__``
-        """
-        return not self.__eq__(other)
-
 
 def wrap_connection_error(failure, target, data=None):
     """

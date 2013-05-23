@@ -164,19 +164,6 @@ class HTTPUtilityTests(TestCase):
             str(e),
             "ConnectionError[xkcd.com, {}, data=stuff]".format(str(failure)))
 
-    def test_connection_error_comparison(self):
-        """
-        A :class:`ConnectionError` is only equal to another
-        :class:`ConnectionError` if the failures and targets are the same.
-        """
-        failure = Failure(Exception())
-        self.assertEqual(ConnectionError(failure, "xkcd.com"),
-                         ConnectionError(failure, "xkcd.com"))
-        self.assertNotEqual(ConnectionError(failure, "example.com"),
-                            ConnectionError(failure, "xkcd.com"))
-        self.assertNotEqual(ConnectionError(failure, "xkcd.com"),
-                            ConnectionError(Failure(Exception()), "xkcd.com"))
-
     def test_wrap_connection_error_ignores_extraneous_errors(self):
         """
         ``wrap_connection_error`` returns the failure if the failure does not
