@@ -5,7 +5,68 @@ HTTP utils, such as formulation of URLs
 from itertools import chain
 from urllib import quote
 
+from twisted.internet import error
+
 import treq
+
+
+class ConnectionError(Exception):
+    """
+    An error that wraps other errors (such a timeout error) that also
+    include the URL so we know what we failed to connect to.
+
+    :ivar Failure subFailure: The connection failure that is wrapped
+    :ivar str target: some representation of the connection endpoint -
+        e.g. a hostname or ip or a url
+    :ivar data: extra information that can be included - this will be
+        stringified in the ``repr`` and the ``str``, and can be anything
+        with a decent string output (``str``, ``dict``, ``list``, etc.)
+    """
+    def __init__(self, failure, target, data=None):
+        super(ConnectionError, self).__init__(failure, target)
+        self.subFailure = failure
+        self.target = target
+        self.data = data
+
+    def __repr__(self):
+        """
+        The ``repr`` of :class:`ConnectionError` includes the ``repr`` of the
+        wrapped failure's exception and the target
+        """
+        return "ConnectionError[{0}, {1!r}, data={2!s}]".format(
+            self.target, self.subFailure.value, self.data)
+
+    def __str__(self):
+        """
+        The ``str`` of :class:`ConnectionError` includes the ``str`` of the
+        wrapped failure and the target
+        """
+        return "ConnectionError[{0}, {1!s}, data={2!s}]".format(
+            self.target, self.subFailure, self.data)
+
+    def __eq__(self, other):
+        """
+        Two :class:`ConnectionError` objects are equal if the failure, target,
+        and data are equal
+        """
+        return (self.subFailure == other.subFailure and
+                self.target == other.target and self.data == other.data)
+
+    def __ne__(self, other):
+        """
+        Not ``__eq__``
+        """
+        return not self.__eq__(other)
+
+
+def wrap_connection_error(failure, target, data=None):
+    """
+    Connection timeouts aren't useful becuase they don't contain the target
+    that is timing out, so wrap the error.  Also wrap API errors.
+    """
+    if failure.check(error.TimeoutError, APIError):
+        raise ConnectionError(failure, target, data)
+    return failure
 
 
 def append_segments(uri, *segments):

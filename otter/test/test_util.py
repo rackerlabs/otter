@@ -6,9 +6,13 @@ import mock
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed
+from twisted.internet.error import TimeoutError
+from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
-from otter.util.http import append_segments, APIError, check_success, headers
+from otter.util.http import (
+    append_segments, APIError, check_success, ConnectionError, headers,
+    wrap_connection_error)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 
@@ -142,6 +146,54 @@ class HTTPUtilityTests(TestCase):
         auth token is given.
         """
         self.assertNotIn('x-auth-token', headers())
+
+    def test_connection_error(self):
+        """
+        A :class:`ConnectionError` instantiated with a netloc and a wrapped
+        failure expose both attributes and have a valid repr and str.
+        """
+        failure = Failure(Exception())
+        e = ConnectionError(failure, "xkcd.com", 'stuff')
+
+        self.assertEqual(e.subFailure, failure)
+        self.assertEqual(e.target, "xkcd.com")
+        self.assertEqual(
+            repr(e),
+            "ConnectionError[xkcd.com, {0!r}, data=stuff]".format(Exception()))
+        self.assertEqual(
+            str(e),
+            "ConnectionError[xkcd.com, {}, data=stuff]".format(str(failure)))
+
+    def test_connection_error_comparison(self):
+        """
+        A :class:`ConnectionError` is only equal to another
+        :class:`ConnectionError` if the failures and targets are the same.
+        """
+        failure = Failure(Exception())
+        self.assertEqual(ConnectionError(failure, "xkcd.com"),
+                         ConnectionError(failure, "xkcd.com"))
+        self.assertNotEqual(ConnectionError(failure, "example.com"),
+                            ConnectionError(failure, "xkcd.com"))
+        self.assertNotEqual(ConnectionError(failure, "xkcd.com"),
+                            ConnectionError(Failure(Exception()), "xkcd.com"))
+
+    def test_wrap_connection_error_ignores_extraneous_errors(self):
+        """
+        ``wrap_connection_error`` returns the failure if the failure does not
+        wrap a TimeoutError or an API error
+        """
+        failure = Failure(Exception())
+        self.assertEqual(wrap_connection_error(failure, 'url'), failure)
+
+    def test_wrap_connection_error_raises_ConnectionError(self):
+        """
+        ``wrap_connection_error`` raises a :class:`ConnectionError` of the
+        failure that gets passed is
+        """
+        for e in (APIError(body='meh', code=500), TimeoutError('meh')):
+            failure = Failure(e)
+            self.assertRaises(ConnectionError, wrap_connection_error,
+                              failure, 'url')
 
 
 class CapabilityTests(TestCase):
