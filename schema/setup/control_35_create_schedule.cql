@@ -22,7 +22,5 @@ CREATE TABLE scheduled_scaling (
     "groupId" ascii, 
     "policyId" ascii, 
     trigger timestamp,
-    PRIMARY KEY("tenantId", "groupId", "policyId")
+    PRIMARY KEY("policyId", "trigger")
     );
-    
-CREATE INDEX scheduled_scaling_trigger ON scheduled_scaling (trigger);
