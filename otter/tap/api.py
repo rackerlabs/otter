@@ -20,6 +20,7 @@ from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
 from silverberg.cluster import RoundRobinCassandraCluster
 from otter.log.graylog import GraylogUDPPublisher
+from otter.zookeeper import connect_zookeeper_client
 
 
 class Options(usage.Options):
@@ -97,6 +98,13 @@ def makeService(config):
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
-    api_service.setServiceParent(s)
+
+    def _zookeeper_ready(_ignored):
+        api_service.setServiceParent(s)
+
+    d = connect_zookeeper_client(
+        config_value('zookeeper.servers'),
+        config_value('zookeeper.timeout'))
+    d.addCallback(_zookeeper_ready)
 
     return s
