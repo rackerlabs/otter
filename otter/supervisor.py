@@ -41,12 +41,12 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     def when_authenticated((auth_token, service_catalog)):
         log.msg("Executing launch config.")
         return launch_server_v1.launch_server(
-                    log,
-                    config_value('region'),
-                    scaling_group,
-                    service_catalog,
-                    auth_token,
-                    launch_config['args'])
+            log,
+            config_value('region'),
+            scaling_group,
+            service_catalog,
+            auth_token,
+            launch_config['args'])
 
     d.addCallback(when_authenticated)
 
@@ -57,7 +57,9 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
         log.msg("Done executing launch config.",
                 instance_id=server_details['server']['id'])
         return {
-            'server': server_details,
+            'id': server_details['server']['id'],
+            'links': server_details['server']['links'],
+            'name': server_details['server']['name'],
             'lb_info': lb_info
         }
 
@@ -67,35 +69,41 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     return succeed((job_id, completion_d))
 
 
-def execute_delete_server(log, transaction_id, auth_function, scaling_group, job):
+class DeleteServerException(Exception):
+    """
+    An exception that is thrown when execute_delete_server fails
+    """
+    def __init__(self, exception, server_id):
+        self.exception = exception
+        self.server_id = server_id
+
+
+def execute_delete_server(log, transaction_id, auth_function, scaling_group, server):
     """
     Executes a single delete server
 
-    Return a Deferred that fires with job_id of server that gets deleted. On error,
-    the Failure instance passed on contains the job_id as well
+    Return a Deferred that fires with server_id of server that gets deleted. On error,
+    the Failure instance passed on contains the server_id as well
     """
-    job_id, server = job
+
     # authenticate for tenant
-    d = auth_function(scaling_group.tenant_id)
+    def on_delete_error(f):
+        raise DeleteServerException(f.value, server['id'])
 
     def when_authenticated((auth_token, service_catalog)):
+        log.bind(server_id=server['id']).msg('Deleting server')
         return launch_server_v1.delete_server(
-                        log,
-                        config_value('region'),
-                        service_catalog,
-                        auth_token,
-                        (server['server'], server['lb_info']))
+            log,
+            config_value('region'),
+            service_catalog,
+            auth_token,
+            (server['id'], server['lb_info']))
+
+    d = auth_function(scaling_group.tenant_id)
+    log.msg("Authenticating for tenant")
 
     d.addCallback(when_authenticated)
-
-    def when_deleted():
-        return job_id
-
-    def on_delete_error(f):
-        f.job_id = job_id
-        return f
-
-    d.addCallback(when_deleted)
+    d.addCallback(lambda _: server['id'])
     d.addErrback(on_delete_error)
 
     return d

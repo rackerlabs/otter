@@ -158,14 +158,22 @@ def maybe_execute_scaling_policy(
         if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(bound_log, state, config, policy)
             execute_bound_log = bound_log.bind(server_delta=delta)
-            if delta != 0:
+            if delta == 0:
+                execute_bound_log.msg("cooldowns checked, no change in servers")
+                error_msg = "Policy execution would violate min/max constraints."
+                raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                               scaling_group.uuid, policy_id,
+                                               error_msg)
+            if delta > 0:
                 execute_bound_log.msg("cooldowns checked, executing launch configs")
                 d = execute_launch_config(execute_bound_log, transaction_id, state,
                                           launch, scaling_group, delta)
-                return d.addCallback(mark_executed)
-
-            execute_bound_log.msg("cooldowns checked, no change in servers")
-            error_msg = "Policy execution would violate min/max constraints."
+            else:
+                # delta < 0 (scale down event)
+                execute_bound_log.msg("cooldowns checked, Scaling down")
+                d = exec_scale_down(execute_bound_log, transaction_id, state,
+                                    scaling_group, -delta)
+            return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
                                        scaling_group.uuid, policy_id,
@@ -247,52 +255,28 @@ def calculate_delta(log, state, config, policy):
 
 def find_pending_jobs_to_cancel(log, state, delta):
     """
-    Identify some jobs to cancel (usually for a scale down event)
+    Identify some pending jobs to cancel (usually for a scale down event)
     """
-    return []
+    if delta >= len(state.pending):  # don't bother sorting - return everything
+        return state.pending.keys()
+
+    sorted_jobs = sorted(state.pending.items(), key=lambda (id, s): from_timestamp(s['created']),
+                         reverse=True)
+    return [job_id for job_id, _job_info in sorted_jobs[:delta]]
 
 
 def find_servers_to_evict(log, state, delta):
     """
     Find the servers most appropriate to evict from the scaling group
 
-    Returns list of (job_id, server) tuple
+    Returns list of server ``dict``
     """
+    if delta >= len(state.active):  # don't bother sorting - return everything
+        return state.active.values()
+
     # return delta number of oldest server
-    sorted_jobs = state.active.items().sort(key=lambda (id, s): from_timestamp(s['created']))
-    return sorted_jobs[:delta]
-
-
-def cancel_pending_jobs(log, transaction_id, authenticate_tenant, scaling_group,
-                        delta, state):
-    """
-    Find pending jobs based on delta and cancel them
-
-    Returns a Deferred of 2-element tuple where first element is remaining number of servers
-    to be deleted and 2nd element is list of Deferred where each Deferred
-    corresponds to a cancellation operation and will be fired when cancelled
-    """
-
-    # Currently, we do not implement when servers are still getting built
-    if len(state.pending):
-        raise NotImplementedError('Temporarily not executing policy when servers are getting ' +
-                                  'built. Please try after they\'ve completed buuilding')
-    return delta, []
-
-    # -- Jobs cancelling implementation. PSEUDO CODE. NOT WORKING
-    # find jobs to cancel
-    jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
-    # cancel them
-    cancel_deferreds = [cancel_job(log, auth_token, state, job_id) for job_id in jobs_to_cancel]
-    # TODO: while cancelling them, delete those jobs and update the state
-    # what to do if the cancelling results in error? do we store it in error state and try again?
-    # do we just forget about it?
-
-    # Find number of active servers to be deleted if pending is not enough
-    remaining = delta - len(jobs_to_cancel)
-
-    return succeed((remaining, cancel_deferreds))
-    #return remaining, cancel_deferreds
+    sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
+    return sorted_servers[:delta]
 
 
 def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_group,
@@ -300,72 +284,49 @@ def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_grou
     """
     Start deleting active servers
 
-    Returns a Deferred that fires back with list of Deferreds corresponding to
-    deletion of a server. Each Deferred gets fired when that server is deleted
+    Returns a list of Deferreds corresponding to deletion of a server. Each Deferred
+    in the list gets fired when that server is deleted
     """
 
     # find servers to evict
     servers_to_evict = find_servers_to_evict(log, state, delta)
 
-    # move all the active servers to be deleted to pending
-    def _move(group, state, servers):
-        for job_id, server in servers:
-            state.remove_active(job_id)
-            state.add_job(job_id, server)
-        return state
-    d = scaling_group.modify_state(_move, servers_to_evict)
+    # remove all the active servers to be deleted
+    for server in servers_to_evict:
+        state.remove_active(server['id'])
 
     # then start deleting those servers
-    def _delete():
-        return [execute_delete_server(log, transaction_id, authenticate_tenant,
-                                      scaling_group, (job_id, server))
-                for job_id, server in servers_to_evict]
-
-    d.addCallback(_delete)
-
-    return d
+    return [supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
+                                             scaling_group, server_info)
+            for server_info in servers_to_evict]
 
 
-def exec_scale_down(log, transaction_id, authenticate_tenant, scaling_group, delta):
+def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     """
     Execute a scale down policy
     """
 
-    def _on_pending_job_success(group, state, job_id):
+    def _on_delete_success(server_id):
+        log.bind(server_id=server_id).msg('server deleted')
+
+    def _on_delete_fail(failure):
+        log.bind(server_id=failure.value.server_id).err(failure.value.exception)
+
+    # cancel pending jobs by removing them from the state. The servers will get
+    # deleted when they are finished building and their id is not found in pending
+    jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
+    for job_id in jobs_to_cancel:
         state.remove_job(job_id)
-        log.msg('pending job cancelled')
-        return state
 
-    def _on_pending_job_fail(group, state, f):
-        state.remove_job(f.job_id)
-        log.err(f.job_id)
-        return state
+    # delete active servers if pending jobs are not enough
+    remaining = delta - len(jobs_to_cancel)
+    if remaining > 0:
+        del_deferreds = delete_active_servers(log, transaction_id, authenticate_tenant,
+                                              scaling_group, remaining, state)
+        for d in del_deferreds:
+            d.addCallbacks(_on_delete_success, _on_delete_fail)
 
-    def _delete_servers((remaining, cancel_deferreds)):
-        d = delete_active_servers(log, transaction_id, authenticate_tenant,
-                                  scaling_group, remaining, state)
-        d.addCallback(lambda dd: dd, cancel_deferreds)
-        return d
-
-    def _setup_modify_state(delete_deferreds, cancel_deferreds):
-        for d in itertools.chain(cancel_deferreds, delete_deferreds):
-            d.addCallbacks(
-                partial(scaling_group.modify_state, _on_pending_job_success),
-                partial(scaling_group.modify_state, _on_pending_job_fail))
-
-    def _got_state(state):
-        d = cancel_pending_jobs(log, transaction_id, authenticate_tenant,
-                                scaling_group, delta, state)
-        d.addCallback(_delete_servers)
-        d.addCallback(_setup_modify_state)
-        return d
-
-    # get state
-    d = scaling_group.view_state()
-
-    d.addCallback(_got_state)
-
-    return d
+    return defer.succeed(None)
 
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
@@ -386,10 +347,19 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         # next_round_state is a new state blob passed to these functions by
         # modify_state.  By the time these are called, state may have changed.
         def _on_success(group, next_round_state, result):
-            next_round_state.remove_job(job_id)
-            next_round_state.add_active(result['id'], result)
-            job_log.bind(server_id=result['id']).msg(
-                "Job completed, resulting in an active server.")
+            if job_id not in next_round_state.pending:
+                # server was slated to be deleted when it completed building.
+                # So, deleting it now
+                d = supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
+                                                     scaling_group, result)
+                server_log = job_log.bind(server_id=result['id'])
+                d.addCallbacks(lambda _: server_log.msg('server deleted successfully'),
+                               server_log.err)
+            else:
+                next_round_state.remove_job(job_id)
+                next_round_state.add_active(result['id'], result)
+                job_log.bind(server_id=result['id']).msg(
+                    "Job completed, resulting in an active server.")
             return next_round_state
 
         def _on_failure(group, next_round_state, f):
@@ -422,9 +392,6 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
                                       scaling_group, launch)
             for i in range(delta)
         ]
-    else:
-        return exec_scale_down(log, transaction_id, authenticate_tenant,
-                               scaling_group, -delta)
 
     pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
     pendings_deferred.addCallback(_update_state)

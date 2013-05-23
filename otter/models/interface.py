@@ -114,9 +114,8 @@ class GroupState(object):
         :param str server_id:  the id of the server to delete
         :raises: :class:`AssertionError` if the server id does not exist
         """
-        assert server_id in self.active, "Server already exists: {}".format(server_id)
-        server_info.setdefault('created', self.now())
-        self.active[server_id] = server_info
+        assert server_id in self.active, "Server does not exists: {}".format(server_id)
+        del self.active[server_id]
 
     def mark_executed(self, policy_id):
         """

@@ -11,10 +11,12 @@ from otter.supervisor import execute_config
 from otter.test.utils import iMock, patch
 from otter.util.config import set_config_data
 
+from otter.supervisor import execute_delete_server, DeleteServerException
 
-class SupervisorExecuteTests(TestCase):
+
+class SupervisorTests(TestCase):
     """
-    Test supervisor worker execution.
+    Common stuff for tests in supervisor
     """
 
     def setUp(self):
@@ -34,15 +36,27 @@ class SupervisorExecuteTests(TestCase):
             'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh', 'metadata': {}}
         }
 
+        set_config_data({'region': 'ORD'})
+        self.addCleanup(set_config_data, {})
+
+
+class LaunchConfigTests(SupervisorTests):
+    """
+    Test supervisor worker execution.
+    """
+
+    def setUp(self):
+        """
+        mock worker functions and other dependant objects
+        """
+        super(LaunchConfigTests, self).setUp()
+
         self.launch_server = patch(self, 'otter.supervisor.launch_server_v1.launch_server',
                                    return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
         self.launch_config = {'type': 'launch_server',
                               'args': {'server': {}}}
-
-        set_config_data({'region': 'ORD'})
-        self.addCleanup(set_config_data, {})
 
     def test_only_allow_launch_server(self):
         """
@@ -90,7 +104,8 @@ class SupervisorExecuteTests(TestCase):
         (job_id, completed_d) = self.successResultOf(d)
 
         result = self.successResultOf(completed_d)
-        self.assertEqual(result, {'id': 'server_id', 'links': ['links'], 'name': 'meh'})
+        self.assertEqual(result, {'id': 'server_id', 'links': ['links'],
+                                  'name': 'meh', 'lb_info': {}})
 
         self.launch_server.assert_called_once_with(
             mock.ANY,
@@ -99,3 +114,72 @@ class SupervisorExecuteTests(TestCase):
             self.service_catalog,
             self.auth_token,
             {'server': {}})
+
+
+class DeleteServerTests(SupervisorTests):
+    """
+    Tests for func:``otter.supervisor.execute_delete_server``
+    """
+
+    def setUp(self):
+        """
+        mock worker functions and other dependant objects
+        """
+        super(DeleteServerTests, self).setUp()
+        self.delete_server = patch(self, 'otter.supervisor.launch_server_v1.delete_server',
+                                   return_value=succeed(None))
+
+        self.fake_server = self.fake_server_details['server']
+        self.fake_server['lb_info'] = {}
+
+    def test_execute_delete_calls_delete_worker(self):
+        """
+        ``launch_server_v1.delete_server`` is called with correct args
+        """
+        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                                  self.group, self.fake_server)
+        result = self.successResultOf(d)
+        self.assertEqual(result, self.fake_server['id'])
+        self.delete_server.assert_called_once_with(
+            self.log,
+            'ORD',
+            self.service_catalog,
+            self.auth_token,
+            (self.fake_server['id'], self.fake_server['lb_info']))
+
+    def test_execdel_error_wraps_serverid(self):
+        """
+        DeleteServerException is thrown with server_id when error occurs
+        """
+        expected = KeyError('some')
+        self.delete_server.return_value = fail(expected)
+        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                                  self.group, self.fake_server)
+        failure = self.failureResultOf(d)
+        failure.trap(DeleteServerException)
+        self.assertEquals(failure.value.exception, expected)
+        self.assertEquals(failure.value.server_id, self.fake_server['id'])
+
+    def test_execute_delete_auths(self):
+        """
+        ``execute_delete_server`` asks the provided authentication function for
+        credentials for the tenant_id that owns the group.
+        """
+        execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                              self.group, self.fake_server)
+
+        self.auth_function.assert_called_once_with(11111)
+
+    def test_execute_config_propogates_auth_error(self):
+        """
+        execute_delete_server will propogate any errors from the authentication function.
+        """
+        expected = ValueError('auth failure')
+        self.auth_function.return_value = fail(expected)
+
+        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                                  self.group, self.fake_server)
+
+        failure = self.failureResultOf(d)
+        failure.trap(DeleteServerException)
+        self.assertEquals(failure.value.exception, expected)
