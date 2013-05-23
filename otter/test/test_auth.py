@@ -8,7 +8,7 @@ from twisted.internet.defer import succeed, fail
 
 from otter.test.utils import patch, SameJSON
 
-from otter.util.http import APIError
+from otter.util.http import APIError, ConnectionError
 
 from otter.auth import authenticate_user
 from otter.auth import extract_token
@@ -81,9 +81,12 @@ class HelperTests(TestCase):
         d = authenticate_user('http://identity/v2.0', 'user', 'pass')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, 'error_body')
+        self.assertTrue(failure.check(ConnectionError))
+        real_failure = failure.value.subFailure
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
 
     def test_impersonate_user(self):
         """
@@ -152,9 +155,12 @@ class HelperTests(TestCase):
         d = impersonate_user('http://identity/v2.0', 'auth-token', 'foo', expire_in=60)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, 'error_body')
+        self.assertTrue(failure.check(ConnectionError))
+        real_failure = failure.value.subFailure
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
 
     def test_endpoints_for_token(self):
         """
@@ -184,9 +190,12 @@ class HelperTests(TestCase):
         d = endpoints_for_token('http://identity/v2.0', 'auth-token', 'user-token')
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, 'error_body')
+        self.assertTrue(failure.check(ConnectionError))
+        real_failure = failure.value.subFailure
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
 
     def test_user_for_tenant(self):
         """
@@ -218,9 +227,12 @@ class HelperTests(TestCase):
         d = user_for_tenant('http://identity/v2.0', 'username', 'password', 111111)
         failure = self.failureResultOf(d)
 
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, 'error_body')
+        self.assertTrue(failure.check(ConnectionError))
+        real_failure = failure.value.subFailure
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, 'error_body')
 
 
 class ImpersonatingAuthenticatorTests(TestCase):
