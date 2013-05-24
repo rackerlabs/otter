@@ -154,7 +154,7 @@ class HTTPUtilityTests(TestCase):
         failure = Failure(Exception())
         e = RequestError(failure, "xkcd.com", 'stuff')
 
-        self.assertEqual(e.subFailure, failure)
+        self.assertEqual(e.reason, failure)
         self.assertEqual(e.url, "xkcd.com")
         self.assertEqual(
             repr(e),

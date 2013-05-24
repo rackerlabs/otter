@@ -13,7 +13,7 @@ class RequestError(Exception):
     An error that wraps other errors (such a timeout error) that also
     include the URL so we know what we failed to connect to.
 
-    :ivar Failure subFailure: The connection failure that is wrapped
+    :ivar Failure reason: The connection failure that is wrapped
     :ivar str target: some representation of the connection endpoint -
         e.g. a hostname or ip or a url
     :ivar data: extra information that can be included - this will be
@@ -22,7 +22,7 @@ class RequestError(Exception):
     """
     def __init__(self, failure, url, data=None):
         super(RequestError, self).__init__(failure, url)
-        self.subFailure = failure
+        self.reason = failure
         self.url = url
         self.data = data
 
@@ -32,7 +32,7 @@ class RequestError(Exception):
         wrapped failure's exception and the target
         """
         return "RequestError[{0}, {1!r}, data={2!s}]".format(
-            self.url, self.subFailure.value, self.data)
+            self.url, self.reason.value, self.data)
 
     def __str__(self):
         """
@@ -40,7 +40,7 @@ class RequestError(Exception):
         wrapped failure and the target
         """
         return "RequestError[{0}, {1!s}, data={2!s}]".format(
-            self.url, self.subFailure, self.data)
+            self.url, self.reason, self.data)
 
 
 def wrap_request_error(failure, target, data=None):

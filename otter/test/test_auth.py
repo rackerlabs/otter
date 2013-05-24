@@ -82,7 +82,7 @@ class HelperTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.subFailure
+        real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
@@ -156,7 +156,7 @@ class HelperTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.subFailure
+        real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
@@ -191,7 +191,7 @@ class HelperTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.subFailure
+        real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
@@ -228,7 +228,7 @@ class HelperTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
-        real_failure = failure.value.subFailure
+        real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
