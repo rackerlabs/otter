@@ -73,8 +73,9 @@ def execute_delete_server(log, transaction_id, auth_function, scaling_group, ser
     """
     Executes a single delete server
 
-    Return a Deferred that fires with server_id of server that gets deleted. On error,
-    the Failure instance passed on contains the server_id as well
+    Return a Deferred that callbacks with None after the server deleted successfully.
+    None is also callback(ed) when server deletion fails in which case the error is logged
+    before callback(ing).
     """
 
     log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
