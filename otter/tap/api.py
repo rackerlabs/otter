@@ -22,6 +22,8 @@ from silverberg.cluster import RoundRobinCassandraCluster
 from otter.log.graylog import GraylogUDPPublisher
 from otter.zookeeper import connect_zookeeper_client
 
+from txairbrake.observers import AirbrakeLogObserver
+
 
 class Options(usage.Options):
     """
@@ -80,6 +82,15 @@ def makeService(config):
         log.addObserver(
             make_observer_chain(
                 GraylogUDPPublisher(**config_value('graylog'))))
+
+    if config_value('airbrake'):
+        airbrake = AirbrakeLogObserver(
+            config_value('airbrake.api_key'),
+            config_value('environment'),
+            use_ssl=True
+        )
+
+        airbrake.start()
 
     if not config_value('mock'):
         seed_endpoints = [
