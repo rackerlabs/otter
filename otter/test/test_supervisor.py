@@ -11,7 +11,7 @@ from otter.supervisor import execute_config
 from otter.test.utils import iMock, patch
 from otter.util.config import set_config_data
 
-from otter.supervisor import execute_delete_server, DeleteServerException
+from otter.supervisor import execute_delete_server
 
 
 class SupervisorTests(TestCase):
@@ -136,29 +136,28 @@ class DeleteServerTests(SupervisorTests):
         """
         ``launch_server_v1.delete_server`` is called with correct args
         """
-        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                                  self.group, self.fake_server)
-        result = self.successResultOf(d)
-        self.assertEqual(result, self.fake_server['id'])
+        execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                              self.group, self.fake_server)
         self.delete_server.assert_called_once_with(
-            self.log,
+            self.log.bind.return_value,
             'ORD',
             self.service_catalog,
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
 
-    def test_execdel_error_wraps_serverid(self):
+    def test_execdel_error_is_logged(self):
         """
-        DeleteServerException is thrown with server_id when error occurs
+        ``delete_server`` error is logged
         """
         expected = KeyError('some')
         self.delete_server.return_value = fail(expected)
-        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                                  self.group, self.fake_server)
-        failure = self.failureResultOf(d)
-        failure.trap(DeleteServerException)
-        self.assertEquals(failure.value.exception, expected)
-        self.assertEquals(failure.value.server_id, self.fake_server['id'])
+
+        execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                              self.group, self.fake_server)
+
+        args, kwargs = self.log.bind.return_value.err.call_args
+        self.assertEqual(args[0].value, expected)
+        self.assertEqual(args[1], 'Server deletion failed')
 
     def test_execute_delete_auths(self):
         """
@@ -177,9 +176,9 @@ class DeleteServerTests(SupervisorTests):
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
 
-        d = execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                                  self.group, self.fake_server)
+        execute_delete_server(self.log, 'transaction-id', self.auth_function,
+                              self.group, self.fake_server)
 
-        failure = self.failureResultOf(d)
-        failure.trap(DeleteServerException)
-        self.assertEquals(failure.value.exception, expected)
+        args, kwargs = self.log.bind.return_value.err.call_args
+        self.assertEqual(args[0].value, expected)
+        self.assertEqual(args[1], 'Server deletion failed')

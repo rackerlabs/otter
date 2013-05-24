@@ -69,15 +69,6 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
     return succeed((job_id, completion_d))
 
 
-class DeleteServerException(Exception):
-    """
-    An exception that is thrown when execute_delete_server fails
-    """
-    def __init__(self, exception, server_id):
-        self.exception = exception
-        self.server_id = server_id
-
-
 def execute_delete_server(log, transaction_id, auth_function, scaling_group, server):
     """
     Executes a single delete server
@@ -86,12 +77,11 @@ def execute_delete_server(log, transaction_id, auth_function, scaling_group, ser
     the Failure instance passed on contains the server_id as well
     """
 
-    # authenticate for tenant
-    def on_delete_error(f):
-        raise DeleteServerException(f.value, server['id'])
+    log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
 
+    # authenticate for tenant
     def when_authenticated((auth_token, service_catalog)):
-        log.bind(server_id=server['id']).msg('Deleting server')
+        log.msg('Deleting server')
         return launch_server_v1.delete_server(
             log,
             config_value('region'),
@@ -101,9 +91,8 @@ def execute_delete_server(log, transaction_id, auth_function, scaling_group, ser
 
     d = auth_function(scaling_group.tenant_id)
     log.msg("Authenticating for tenant")
-
     d.addCallback(when_authenticated)
-    d.addCallback(lambda _: server['id'])
-    d.addErrback(on_delete_error)
+    d.addCallback(lambda _: log.msg('Server deleted successfully'))
+    d.addErrback(log.err, 'Server deletion failed')
 
     return d

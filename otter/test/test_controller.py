@@ -726,28 +726,6 @@ class ExecScaleDownTests(TestCase):
         controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 3)
         self.assertFalse(self.del_active_servers.called)
 
-    def test_deferreds_success_fired(self):
-        """
-        ``delete_active_servers`` deferreds fired successfully are handled
-        """
-        self.del_active_servers.return_value = [defer.succeed(i) for i in range(2)]
-        self.find_pending_jobs_to_cancel.return_value = self.pending.keys()
-        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 7)
-        self.assertEqual(self.log.method_calls,
-                         [mock.call.bind(server_id=0), mock.call.bind(server_id=1)])
-
-    def test_deferreds_failure_fired(self):
-        """
-        ``delete_active_servers`` deferreds erred are handled
-        """
-        from otter.supervisor import DeleteServerException
-        self.del_active_servers.return_value = [defer.fail(DeleteServerException(ValueError, i))
-                                                for i in range(2)]
-        self.find_pending_jobs_to_cancel.return_value = self.pending.keys()
-        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 7)
-        self.assertEqual(self.log.method_calls,
-                         [mock.call.bind(server_id=0), mock.call.bind(server_id=1)])
-
 
 class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
     """

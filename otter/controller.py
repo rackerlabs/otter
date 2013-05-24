@@ -164,7 +164,7 @@ def maybe_execute_scaling_policy(
                 raise CannotExecutePolicyError(scaling_group.tenant_id,
                                                scaling_group.uuid, policy_id,
                                                error_msg)
-            if delta > 0:
+            elif delta > 0:
                 execute_bound_log.msg("cooldowns checked, executing launch configs")
                 d = execute_launch_config(execute_bound_log, transaction_id, state,
                                           launch, scaling_group, delta)
@@ -260,7 +260,7 @@ def find_pending_jobs_to_cancel(log, state, delta):
     if delta >= len(state.pending):  # don't bother sorting - return everything
         return state.pending.keys()
 
-    sorted_jobs = sorted(state.pending.items(), key=lambda (id, s): from_timestamp(s['created']),
+    sorted_jobs = sorted(state.pending.items(), key=lambda (_id, s): from_timestamp(s['created']),
                          reverse=True)
     return [job_id for job_id, _job_info in sorted_jobs[:delta]]
 
@@ -306,12 +306,6 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     Execute a scale down policy
     """
 
-    def _on_delete_success(server_id):
-        log.bind(server_id=server_id).msg('server deleted')
-
-    def _on_delete_fail(failure):
-        log.bind(server_id=failure.value.server_id).err(failure.value.exception)
-
     # cancel pending jobs by removing them from the state. The servers will get
     # deleted when they are finished building and their id is not found in pending
     jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
@@ -321,10 +315,8 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     # delete active servers if pending jobs are not enough
     remaining = delta - len(jobs_to_cancel)
     if remaining > 0:
-        del_deferreds = delete_active_servers(log, transaction_id, authenticate_tenant,
-                                              scaling_group, remaining, state)
-        for d in del_deferreds:
-            d.addCallbacks(_on_delete_success, _on_delete_fail)
+        delete_active_servers(log, transaction_id, authenticate_tenant,
+                              scaling_group, remaining, state)
 
     return defer.succeed(None)
 
