@@ -5,8 +5,6 @@ HTTP utils, such as formulation of URLs
 from itertools import chain
 from urllib import quote
 
-from twisted.internet import error
-
 import treq
 
 
@@ -51,9 +49,7 @@ def wrap_request_error(failure, target, data=None):
     contain the url that is timing out, so wrap the error in one that also has
     the url.
     """
-    if failure.check(error.TimeoutError, APIError):
-        raise RequestError(failure, target, data)
-    return failure
+    raise RequestError(failure, target, data)
 
 
 def append_segments(uri, *segments):

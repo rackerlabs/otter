@@ -6,7 +6,6 @@ import mock
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed
-from twisted.internet.error import TimeoutError
 from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
@@ -164,23 +163,14 @@ class HTTPUtilityTests(TestCase):
             str(e),
             "RequestError[xkcd.com, {}, data=stuff]".format(str(failure)))
 
-    def test_wrap_request_error_ignores_extraneous_errors(self):
-        """
-        ``wrap_request_error`` returns the failure if the failure does not
-        wrap a TimeoutError or an API error
-        """
-        failure = Failure(Exception())
-        self.assertEqual(wrap_request_error(failure, 'url'), failure)
-
     def test_wrap_request_error_raises_RequestError(self):
         """
         ``wrap_request_error`` raises a :class:`RequestError` of the
-        failure that gets passed is
+        failure that gets passed in
         """
-        for e in (APIError(body='meh', code=500), TimeoutError('meh')):
-            failure = Failure(e)
-            self.assertRaises(RequestError, wrap_request_error,
-                              failure, 'url')
+        failure = Failure(Exception())
+        self.assertRaises(RequestError, wrap_request_error,
+                          failure, 'url')
 
 
 class CapabilityTests(TestCase):
