@@ -108,7 +108,7 @@ class APIMakeServiceTests(TestCase):
         self.addCleanup(CassScalingGroupCollection_patcher.stop)
 
         # This doesn't work, WTF.
-        zk_patcher = mock.patch('otter.zookeeper.connect_zookeeper_client')
+        zk_patcher = mock.patch('otter.tap.api.connect_zookeeper_client')
         self.zk_patch = zk_patcher.start()
         self.addCleanup(zk_patcher.stop)
         self.zk_patch.return_value = defer.succeed(None)
