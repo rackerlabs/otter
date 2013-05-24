@@ -1,7 +1,7 @@
 CODEDIR=otter
 SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
-PYDIRS=${CODEDIR} ${SCRIPTSDIR}
+PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
 CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
 UNITTESTS ?= ${CODEDIR}
@@ -34,9 +34,11 @@ else
 endif
 
 integration:
-ifneq ($(CLOUDCAFE), )
+ifneq ($(and $(CLOUDCAFE),$(JENKINS_URL)), )
+	cafe-runner autoscale prod -p functional --parallel
+else ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
-else 
+else
 	@echo "Are you on the VM?  cloudcafe is not set up as desired."
 	@echo "So can't run integration tests."
 endif
