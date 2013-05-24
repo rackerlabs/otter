@@ -6,12 +6,13 @@ identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
 import json
+from urlparse import urlparse
 
 import treq
 
-from twisted.internet import defer, task
+from twisted.internet import defer, error, task
 
-from otter.util.http import append_segments, wrap_connection_error
+from otter.util.http import append_segments
 from otter.util.deferredutils import unwrap_first_error
 
 
@@ -19,6 +20,17 @@ default_identity = "https://staging.identity.api.rackspacecloud.com/v2.0/"
 
 content_type = {'content-type': ['application/json'],
                 'accept': ['application/json']}
+
+
+def wrap_connection_timeout(failure, url):
+    """
+    Connection timeouts aren't useful becuase they don't contain the netloc
+    that is timing out, so wrap the error.
+    """
+    if failure.check(error.TimeoutError):
+        raise Exception('Timed out trying to hit {0}'.format(
+            urlparse(url).netloc))
+    return failure
 
 
 def check_status_cb(purpose, expected=200):
@@ -49,7 +61,7 @@ def request(url, method='GET', data=None, auth_token=None):
         headers['x-auth-token'] = [auth_token]
 
     d = treq.request(method, url, headers=headers, data=data)
-    d.addErrback(wrap_connection_error, url)
+    d.addErrback(wrap_connection_timeout, url)
     return d
 
 
