@@ -11,8 +11,8 @@ from twisted.python.failure import Failure
 from twisted.web.http_headers import Headers
 
 from otter.util.http import (
-    append_segments, APIError, check_success, ConnectionError, headers,
-    wrap_connection_error)
+    append_segments, APIError, check_success, RequestError, headers,
+    wrap_request_error)
 from otter.util.hashkey import generate_capability
 from otter.util import timestamp, config
 
@@ -149,37 +149,37 @@ class HTTPUtilityTests(TestCase):
 
     def test_connection_error(self):
         """
-        A :class:`ConnectionError` instantiated with a netloc and a wrapped
+        A :class:`RequestError` instantiated with a netloc and a wrapped
         failure expose both attributes and have a valid repr and str.
         """
         failure = Failure(Exception())
-        e = ConnectionError(failure, "xkcd.com", 'stuff')
+        e = RequestError(failure, "xkcd.com", 'stuff')
 
         self.assertEqual(e.subFailure, failure)
-        self.assertEqual(e.target, "xkcd.com")
+        self.assertEqual(e.url, "xkcd.com")
         self.assertEqual(
             repr(e),
-            "ConnectionError[xkcd.com, {0!r}, data=stuff]".format(Exception()))
+            "RequestError[xkcd.com, {0!r}, data=stuff]".format(Exception()))
         self.assertEqual(
             str(e),
-            "ConnectionError[xkcd.com, {}, data=stuff]".format(str(failure)))
+            "RequestError[xkcd.com, {}, data=stuff]".format(str(failure)))
 
-    def test_wrap_connection_error_ignores_extraneous_errors(self):
+    def test_wrap_request_error_ignores_extraneous_errors(self):
         """
-        ``wrap_connection_error`` returns the failure if the failure does not
+        ``wrap_request_error`` returns the failure if the failure does not
         wrap a TimeoutError or an API error
         """
         failure = Failure(Exception())
-        self.assertEqual(wrap_connection_error(failure, 'url'), failure)
+        self.assertEqual(wrap_request_error(failure, 'url'), failure)
 
-    def test_wrap_connection_error_raises_ConnectionError(self):
+    def test_wrap_request_error_raises_RequestError(self):
         """
-        ``wrap_connection_error`` raises a :class:`ConnectionError` of the
+        ``wrap_request_error`` raises a :class:`RequestError` of the
         failure that gets passed is
         """
         for e in (APIError(body='meh', code=500), TimeoutError('meh')):
             failure = Failure(e)
-            self.assertRaises(ConnectionError, wrap_connection_error,
+            self.assertRaises(RequestError, wrap_request_error,
                               failure, 'url')
 
 

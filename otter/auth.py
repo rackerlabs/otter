@@ -43,7 +43,7 @@ import treq
 
 from otter.util.config import config_value
 from otter.util.http import (
-    headers, check_success, append_segments, wrap_connection_error)
+    headers, check_success, append_segments, wrap_request_error)
 
 
 def authenticate_tenant(tenant_id):
@@ -137,7 +137,7 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
     d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
                  headers=headers(identity_admin_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_connection_error, auth_endpoint, data='token_endpoints')
+    d.addErrback(wrap_request_error, auth_endpoint, data='token_endpoints')
     d.addCallback(treq.json_content)
     return d
 
@@ -158,7 +158,7 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id):
         auth=(username, password),
         allow_redirects=False)
     d.addCallback(check_success, [301])
-    d.addErrback(wrap_connection_error, auth_endpoint, data='mosso')
+    d.addErrback(wrap_request_error, auth_endpoint, data='mosso')
     d.addCallback(treq.json_content)
     d.addCallback(lambda user: user['user']['id'])
     return d
@@ -187,7 +187,7 @@ def authenticate_user(auth_endpoint, username, password):
             }),
         headers=headers())
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_connection_error, auth_endpoint,
+    d.addErrback(wrap_request_error, auth_endpoint,
                  data=('authenticating', username))
     d.addCallback(treq.json_content)
     return d
@@ -215,7 +215,7 @@ def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10
         }),
         headers=headers(identity_admin_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_connection_error, auth_endpoint, data='impersonation')
+    d.addErrback(wrap_request_error, auth_endpoint, data='impersonation')
     d.addCallback(treq.json_content)
     return d
 

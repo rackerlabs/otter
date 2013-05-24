@@ -10,7 +10,7 @@ from twisted.internet import error
 import treq
 
 
-class ConnectionError(Exception):
+class RequestError(Exception):
     """
     An error that wraps other errors (such a timeout error) that also
     include the URL so we know what we failed to connect to.
@@ -22,36 +22,37 @@ class ConnectionError(Exception):
         stringified in the ``repr`` and the ``str``, and can be anything
         with a decent string output (``str``, ``dict``, ``list``, etc.)
     """
-    def __init__(self, failure, target, data=None):
-        super(ConnectionError, self).__init__(failure, target)
+    def __init__(self, failure, url, data=None):
+        super(RequestError, self).__init__(failure, url)
         self.subFailure = failure
-        self.target = target
+        self.url = url
         self.data = data
 
     def __repr__(self):
         """
-        The ``repr`` of :class:`ConnectionError` includes the ``repr`` of the
+        The ``repr`` of :class:`RequestError` includes the ``repr`` of the
         wrapped failure's exception and the target
         """
-        return "ConnectionError[{0}, {1!r}, data={2!s}]".format(
-            self.target, self.subFailure.value, self.data)
+        return "RequestError[{0}, {1!r}, data={2!s}]".format(
+            self.url, self.subFailure.value, self.data)
 
     def __str__(self):
         """
-        The ``str`` of :class:`ConnectionError` includes the ``str`` of the
+        The ``str`` of :class:`RequestError` includes the ``str`` of the
         wrapped failure and the target
         """
-        return "ConnectionError[{0}, {1!s}, data={2!s}]".format(
-            self.target, self.subFailure, self.data)
+        return "RequestError[{0}, {1!s}, data={2!s}]".format(
+            self.url, self.subFailure, self.data)
 
 
-def wrap_connection_error(failure, target, data=None):
+def wrap_request_error(failure, target, data=None):
     """
-    Connection timeouts aren't useful becuase they don't contain the target
-    that is timing out, so wrap the error.  Also wrap API errors.
+    Some errors, such as connection timeouts, aren't useful becuase they don't
+    contain the url that is timing out, so wrap the error in one that also has
+    the url.
     """
     if failure.check(error.TimeoutError, APIError):
-        raise ConnectionError(failure, target, data)
+        raise RequestError(failure, target, data)
     return failure
 
 
