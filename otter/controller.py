@@ -31,7 +31,6 @@ from txzookeeper.lock import Lock
 
 from otter import supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.util.config import config_value
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
 from otter.auth import authenticate_tenant
@@ -61,7 +60,7 @@ def acquire_group_lock(scaling_group):
             return client.create(lock_path)
         else:
             return defer.succeed(True)
-    deferred.addCallback(create_lock_node)
+    deferred.addCallback(_create_lock_node)
 
     def _create_lock(ignored):
         lock = Lock(lock_path, client)

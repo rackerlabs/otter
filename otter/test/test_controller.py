@@ -8,13 +8,10 @@ import mock
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
-from txzookeeper.client import ZookeeperClient
 from txzookeeper.lock import Lock
 
 from otter import controller
 from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
-from otter.models.interface import IScalingGroup, NoSuchPolicyError
-from otter.util.config import set_config_data
 from otter.util.timestamp import MIN
 from otter.test.utils import DeferredTestMixin, iMock, patch
 
