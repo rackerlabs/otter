@@ -1,5 +1,5 @@
 klein==0.2.0
-twisted==12.3
+twisted==13.0
 tryfer==0.2.2
 jsonschema==0.7
 yunomi==0.2.2
@@ -11,3 +11,4 @@ pyOpenSSL==0.13
 jsonfig==0.1.1
 txgraylog2==0.11
 testtools==0.9.31
+txairbrake==0.2.0
