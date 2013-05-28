@@ -8,7 +8,7 @@ from twisted.internet import defer
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -67,7 +67,9 @@ _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
-
+_cql_fetch_batch_of_events = (
+    'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
+    'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -800,7 +802,7 @@ class CassScalingGroup(object):
         return d
 
 
-@implementer(IScalingGroupCollection)
+@implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
@@ -847,6 +849,7 @@ class CassScalingGroupCollection:
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
         self.state_table = "group_state"
+        self.event_table = "scheduled_scaling"
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
@@ -902,6 +905,24 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
+
+    def fetch_batch_of_events(self, now, size = 100):
+        """
+        Fetch a batch of scheduled events.
+
+        :param now: the current time
+        :type now: ``datetime``
+
+        :param size: the size of the request
+        :type size: ``int``
+
+        :return: An array containing dicts with keys for tenantId, groupId, policyId, and trigger time
+        """
+        d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
+                                    {"size": size, "now": now},
+                                    get_consistency_level('list','events'))
+        d.addCallback(_jsonize_cassandra_data)
+        return d
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

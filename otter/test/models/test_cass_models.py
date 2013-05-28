@@ -21,7 +21,8 @@ from otter.models.interface import (
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
-    IScalingGroupCollectionProviderMixin)
+    IScalingGroupCollectionProviderMixin,
+    IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch
 
@@ -1420,6 +1421,65 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
 # with this
 _S = namedtuple('_S', ['thing'])
+
+
+class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
+                                          TestCase):
+    """
+    Tests for :class:`CassScalingScheduleCollection`
+    """
+
+    def setUp(self):
+        """ Setup the mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
+
+        self.mock_log = mock.MagicMock()
+
+        self.collection = CassScalingGroupCollection(self.connection)
+        self.tenant_id = 'goo1234'
+        self.config = _de_identify({
+            'name': 'blah',
+            'cooldown': 600,
+            'minEntities': 0,
+            'maxEntities': 10,
+            'metadata': {}
+        })
+        self.launch = _de_identify(group_examples.launch_server_config()[0])
+
+        self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
+
+        # 'serializing' something just wraps it with a _S
+        self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
+                                 side_effect=lambda *args: _S(args[0]))
+
+    def test_fetch(self):
+        """
+        Tests that you can fetch a list of events
+        """
+        self.returns = [[]]
+
+        expectedData = {'now': 1234, 'size': 100}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scheduled_scaling '
+                       'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
+        self.mock_key.return_value = '12345678'
+
+        result = self.validate_fetch_batch_of_events(1234,100)
+        self.assertEqual(result, [])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

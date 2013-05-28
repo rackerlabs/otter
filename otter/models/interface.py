@@ -469,6 +469,23 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
         """
 
+class IScalingScheduleCollection(Interface):
+    """
+    A list of scaling events in the future
+    """
+
+    def fetch_batch_of_events(now, size = 100):
+        """
+        Fetch a batch of scheduled events.
+
+        :param now: the current time
+        :type now: ``datetime``
+
+        :param size: the size of the request
+        :type size: ``int``
+
+        :return: an array containing a tuple of (tenant_id, scaling_group_id, policy_id)
+        """
 
 class IScalingGroupCollection(Interface):
     """

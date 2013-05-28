@@ -12,7 +12,7 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.models.interface import (
-    GroupState, IScalingGroup, IScalingGroupCollection,
+    GroupState, IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection,
     NoSuchScalingGroupError)
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas
@@ -362,4 +362,33 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         """
         result = self.collection.get_scaling_group(*args, **kwargs)
         self.assertTrue(IScalingGroup.providedBy(result))
+        return result
+
+class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
+    """
+    Mixin that tests for anything that provides
+    :class:`IScalingScheduleCollection`.
+
+    :ivar collection: an instance of the :class:`IScalingScheduleCollection` provider
+    """
+
+    def test_implements_interface(self):
+        """
+        The provider correctly implements
+        :class:`otter.scaling_groups_interface.IScalingScheduleCollection`.
+        """
+        verifyObject(IScalingScheduleCollection, self.collection)
+
+    def validate_fetch_batch_of_events(self, *args, **kwargs):
+        """
+        Calls ``list_scaling_group_states()`` and validates that it returns a
+        list of :class:`GroupState`
+
+        :return: the return value of ``list_scaling_group_states()``
+        """
+        result = self.assert_deferred_succeeded(
+            self.collection.fetch_batch_of_events(*args, **kwargs))
+
+        self.assertEqual(type(result), list)
+        
         return result
