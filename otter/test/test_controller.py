@@ -991,11 +991,12 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
 
     @mock.patch('otter.supervisor.execute_delete_server', return_value=defer.succeed(None))
-    def test_pending_server_delete_success(self, exec_del_server):
+    def test_pending_server_delete(self, exec_del_server):
         """
-        ``execute_launch_config`` notices pending job_id is not there and calls
-        ``execute_delete_server`` to delete the server. It is also logged when it
-        succeeds.
+        When a pending job is cancelled, it is deleted from the job list. When the server finishes
+        building, then ``execute_launch_config`` is called to remove the job from pending job list.
+        It then notices that pending job_id is not there in job list and calls ``execute_delete_server``
+        to delete the server.
         """
         s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
 
@@ -1011,35 +1012,6 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         exec_del_server.assert_called_once_with(self.log, '1', self.authenticate_tenant,
                                                 self.group, {'id': 's1'})
-
-        self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
-
-    @mock.patch('otter.supervisor.execute_delete_server', return_value=defer.fail(ValueError))
-    def test_pending_server_delete_fail(self, exec_del_server):
-        """
-        ``execute_launch_config`` notices pending job_id is not there and calls
-        ``execute_delete_server`` to delete the server. It is also logged when it
-        fails.
-        """
-        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
-
-        def fake_modify_state(callback, *args, **kwargs):
-            callback(self.group, s, *args, **kwargs)
-
-        self.group.modify_state.side_effect = fake_modify_state
-        controller.execute_launch_config(self.log, '1', self.fake_state,
-                                         'launch', self.group, 1)
-
-        s.remove_job('1')
-        self.execute_config_deferreds[0].callback({'id': 's1'})
-
-        self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind.return_value.bind().err.call_count, 1)
-        eargs, _ = self.log.bind.return_value.bind.return_value.err.call_args
-        self.assertEqual(eargs[0].value, ValueError)
 
     def test_job_failure(self):
         """

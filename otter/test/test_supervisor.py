@@ -134,7 +134,7 @@ class DeleteServerTests(SupervisorTests):
 
     def test_execute_delete_calls_delete_worker(self):
         """
-        ``launch_server_v1.delete_server`` is called with correct args
+        ``launch_server_v1.delete_server`` is called with correct args. It is also logged
         """
         execute_delete_server(self.log, 'transaction-id', self.auth_function,
                               self.group, self.fake_server)
@@ -144,10 +144,12 @@ class DeleteServerTests(SupervisorTests):
             self.service_catalog,
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
+        args, _ = self.log.bind.return_value.msg.call_args
+        self.assertEqual(args[0], 'Server deleted successfully')
 
-    def test_execdel_error_is_logged(self):
+    def test_execute_delete_error_is_logged(self):
         """
-        ``delete_server`` error is logged
+        ``launch_server_v1.delete_server`` error is logged
         """
         expected = KeyError('some')
         self.delete_server.return_value = fail(expected)
@@ -169,9 +171,9 @@ class DeleteServerTests(SupervisorTests):
 
         self.auth_function.assert_called_once_with(11111)
 
-    def test_execute_config_propogates_auth_error(self):
+    def test_execute_delete_propogates_auth_error(self):
         """
-        execute_delete_server will propogate any errors from the authentication function.
+        ``execute_delete_server`` will propogate any errors from the authentication function.
         """
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)

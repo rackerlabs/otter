@@ -342,11 +342,9 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
             if job_id not in next_round_state.pending:
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
-                d = supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
-                                                     scaling_group, result)
-                server_log = job_log.bind(server_id=result['id'])
-                d.addCallbacks(lambda _: server_log.msg('server deleted successfully'),
-                               server_log.err)
+                job_log.msg('Job removed. Deleting server')
+                supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
+                                                 scaling_group, result)
             else:
                 next_round_state.remove_job(job_id)
                 next_round_state.add_active(result['id'], result)
