@@ -5,18 +5,17 @@ Basic test to make sure repose is set up mostly correctly to auth against an
 identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
-import json
 from urlparse import urlparse
 
 import treq
 
 from twisted.internet import defer, error, task
 
+from otter.auth import authenticate_user
 from otter.util.http import append_segments
-from otter.util.deferredutils import unwrap_first_error
 
 
-default_identity = "https://staging.identity.api.rackspacecloud.com/v2.0/"
+default_identity = "https://identity.api.rackspacecloud.com/v2.0/"
 
 content_type = {'content-type': ['application/json'],
                 'accept': ['application/json']}
@@ -33,7 +32,7 @@ def wrap_connection_timeout(failure, url):
     return failure
 
 
-def check_status_cb(purpose, expected=200):
+def check_status_cbs(purpose, expected=200):
     """
     Get a callback that can be used to check the status of a response and
     print a nice error message.
@@ -43,7 +42,14 @@ def check_status_cb(purpose, expected=200):
             raise Exception(
                 "{p} should result in a {e}.  Got {r} instead.".format(
                     p=purpose, e=expected, r=response.code))
-    return check_status
+        print '{}... ok!'.format(purpose)
+        return response
+
+    def print_err_message(failure):
+        print '{0} failed:\n{1!s}'.format(purpose, failure)
+        return failure
+
+    return check_status, print_err_message
 
 
 def request(url, method='GET', data=None, auth_token=None):
@@ -73,8 +79,8 @@ def test_webhook_doesnt_need_authentication(repose_endpoint):
     """
     url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', 'random')
     d = request(url, method='POST')
-    d.addCallback(check_status_cb('Executing a webhook without authentication',
-                                  expected=202))
+    d.addCallbacks(*check_status_cbs('Executing a webhook without authentication',
+                                     expected=202))
     return d
 
 
@@ -84,8 +90,8 @@ def test_list_groups_unauthenticated(repose_endpoint, tenant_id):
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
     d = request(url)
-    d.addCallback(check_status_cb("Listing groups with authentication",
-                                  expected=401))
+    d.addCallbacks(*check_status_cbs("Listing groups with authentication",
+                                     expected=401))
     return d
 
 
@@ -95,7 +101,7 @@ def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
     d = request(url, auth_token=auth_token)
-    d.addCallback(check_status_cb("Listing groups with authentication"))
+    d.addCallbacks(*check_status_cbs("Listing groups with authentication"))
     return d
 
 
@@ -107,39 +113,28 @@ def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
     """
     url = append_segments(repose_endpoint, 'v10.6', tenant_id, 'groups')
     d = request(url, auth_token=auth_token)
-    d.addCallback(check_status_cb("Hitting an invalid url even with authentication",
-                                  expected=401))
+    d.addCallbacks(*check_status_cbs("Hitting an invalid url even with authentication",
+                                     expected=401))
     return d
 
 
-def get_user_info(identity_endpoint, username, api_key):
+def get_remaining_rate_limit(repose_endpoint, tenant_id, auth_token):
     """
-    Hit auth manually to get a valid auth token (and the tenant ID) with which
-    to test repose
+    Get the remaining number of times a GET request can be made (since in these
+    tests they are all GETs)
     """
-    data = {
-        "auth": {
-            "RAX-KSKEY:apiKeyCredentials": {
-                "username": username,
-                "apiKey": api_key
-            }
-        }
-    }
+    def get_GET_limit(limits_dictionary):
+        rates = [rate for rate in limits_dictionary['limits']['rates']
+                 if rate['verb'] == 'GET']
+        remaining = rates[0]['remaining']
+        print 'Rate info: {0} GETs remaining'.format(remaining)
+        return remaining
 
-    url = append_segments(identity_endpoint, 'tokens')
-    d = request(url, method='POST', data=json.dumps(data))
-
-    def extract_token_and_tenant(response):
-        if response.code == 200:
-            contents = treq.content(response)
-            contents.addCallback(json.loads)
-            contents.addCallback(lambda blob: (
-                blob['access']['token']['id'].encode('ascii'),
-                blob['access']['token']['tenant']['id'].encode('ascii')))
-            return contents
-        raise Exception('User {0} unauthorized.'.format(username))
-
-    d.addCallback(extract_token_and_tenant)
+    url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'limits')
+    d = request(url, auth_token=auth_token)
+    d.addCallbacks(*check_status_cbs("Getting the rate limit info", expected=200))
+    d.addCallback(treq.json_content)
+    d.addCallback(get_GET_limit)
     return d
 
 
@@ -161,9 +156,11 @@ def run_tests(_, args):
              test_webhook_doesnt_need_authentication(args.repose)],
             consumeErrors=True)
 
-    d = get_user_info(args.identity, args.username, args.apikey)
+    d = authenticate_user(args.identity, args.username, args.password)
+    d.addCallback(lambda blob: (
+        blob['access']['token']['id'].encode('ascii'),
+        blob['access']['token']['tenant']['id'].encode('ascii')))
     d.addCallback(_do_tests)
-    d.addErrback(unwrap_first_error)  # get the actual error returned
     return d
 
 
@@ -177,8 +174,8 @@ def cli():
         help='Username of user with credentials on identity service')
 
     parser.add_argument(
-        'apikey', type=str,
-        help='API key of user with credentials on identity service')
+        'password', type=str,
+        help='Password of the user with credentials on identity service')
 
     parser.add_argument(
         'repose', type=str, help='URL that points at repose.')
