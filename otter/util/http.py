@@ -8,6 +8,50 @@ from urllib import quote
 import treq
 
 
+class RequestError(Exception):
+    """
+    An error that wraps other errors (such a timeout error) that also
+    include the URL so we know what we failed to connect to.
+
+    :ivar Failure reason: The connection failure that is wrapped
+    :ivar str target: some representation of the connection endpoint -
+        e.g. a hostname or ip or a url
+    :ivar data: extra information that can be included - this will be
+        stringified in the ``repr`` and the ``str``, and can be anything
+        with a decent string output (``str``, ``dict``, ``list``, etc.)
+    """
+    def __init__(self, failure, url, data=None):
+        super(RequestError, self).__init__(failure, url)
+        self.reason = failure
+        self.url = url
+        self.data = data
+
+    def __repr__(self):
+        """
+        The ``repr`` of :class:`RequestError` includes the ``repr`` of the
+        wrapped failure's exception and the target
+        """
+        return "RequestError[{0}, {1!r}, data={2!s}]".format(
+            self.url, self.reason.value, self.data)
+
+    def __str__(self):
+        """
+        The ``str`` of :class:`RequestError` includes the ``str`` of the
+        wrapped failure and the target
+        """
+        return "RequestError[{0}, {1!s}, data={2!s}]".format(
+            self.url, self.reason, self.data)
+
+
+def wrap_request_error(failure, target, data=None):
+    """
+    Some errors, such as connection timeouts, aren't useful becuase they don't
+    contain the url that is timing out, so wrap the error in one that also has
+    the url.
+    """
+    raise RequestError(failure, target, data)
+
+
 def append_segments(uri, *segments):
     """
     Append segments to URI in a reasonable way.
