@@ -325,7 +325,7 @@ DELETE /{tenantId}/groups/{groupId}
 
 
 Get the current state of the scaling group, including the current set of
-active entities, the number of pending entities, the and the desired number
+active entities, the number of pending entities, and the desired number
 of entities.  This data is returned in the body of the response in JSON format.
 GET /{tenantId}/groups/{groupId}/state
 < 200
