@@ -526,7 +526,7 @@ class ObeyConfigChangeTestCase(TestCase):
             scaling_group=self.group, delta=5)
 
 
-class CancellablePendingServersTestCase(TestCase):
+class FindPendingJobsToCancelTests(TestCase):
     """
     Tests for :func:`otter.controller.find_pending_jobs_to_cancel`
     """
@@ -545,7 +545,7 @@ class CancellablePendingServersTestCase(TestCase):
 
         self.cancellable_state = GroupState('t', 'g', {}, self.data, None, {}, False)
 
-    def test_cancelable_returns_most_recent_jobs(self):
+    def test_returns_most_recent_jobs(self):
         """
         ``find_pending_jobs_to_cancel`` returns the top ``delta`` recent jobs.
         """
@@ -553,7 +553,7 @@ class CancellablePendingServersTestCase(TestCase):
             controller.find_pending_jobs_to_cancel(mock.ANY, self.cancellable_state, 3),
             ['5', '2', '3'])
 
-    def test_cancelable_returns_all_jobs_if_delta_is_high(self):
+    def test_returns_all_jobs_if_delta_is_high(self):
         """
         ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
         than the length of the jobs
@@ -564,7 +564,7 @@ class CancellablePendingServersTestCase(TestCase):
             ['1', '2', '3', '4', '5'])
 
 
-class DeletableActiveServersTestCase(TestCase):
+class FindServersToEvictTests(TestCase):
     """
     Tests for :func:`otter.controller.find_servers_to_evict`
     """
@@ -583,7 +583,7 @@ class DeletableActiveServersTestCase(TestCase):
 
         self.deletable_state = GroupState('t', 'g', self.data, {}, None, {}, False)
 
-    def test_deletable_returns_oldest_servers(self):
+    def test_returns_oldest_servers(self):
         """
         ``find_servers_to_evict`` returns the top ``delta`` oldest jobs.
         """
@@ -591,7 +591,7 @@ class DeletableActiveServersTestCase(TestCase):
             controller.find_servers_to_evict(mock.ANY, self.deletable_state, 3),
             [self.data['1'], self.data['4'], self.data['3']])
 
-    def test_cancelable_returns_all_jobs_if_delta_is_high(self):
+    def test_returns_all_jobs_if_delta_is_high(self):
         """
         ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
         than the length of the jobs
@@ -602,7 +602,7 @@ class DeletableActiveServersTestCase(TestCase):
             sorted(self.data.values()))
 
 
-class DeleteActiveServersTests(DeferredTestMixin, TestCase):
+class DeleteActiveServersTests(TestCase):
     """
     Tests for :func:`otter.controller.delete_active_servers`
     """
@@ -774,11 +774,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
 
-    def test_maybe_execute_scaling_policy_success(self):
+    def test_execute_launch_config_success_on_positive_delta(self):
         """
-        If lock is acquired, all cooldowns are all fine, the delta is not zero,
-        and ``execute_launch_config`` does not fail, return value is the updated
-        state.
+        If lock is acquired, all cooldowns are all fine, ``calculate_delta`` returns positive
+        delta then ``execute_launch_config`` gets called and if does not fail,
+        return value is the updated state.
         """
         self.mocks['execute_launch_config'].return_value = defer.succeed(
             'this should be returned')
@@ -805,6 +805,36 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # state should have been updated
         self.mock_state.mark_executed.assert_called_once_with('pol1')
+
+    def test_execute_launch_config_failure_on_positive_delta(self):
+        """
+        If ``execute_launch_config`` fails for some reason, then state should not be
+        marked as executed
+        """
+        expected = ValueError('some failure')
+        self.mocks['execute_launch_config'].return_value = defer.fail(expected)
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, self.mock_state,
+                                                    'pol1')
+        failure = self.failureResultOf(d)
+        self.assertEqual(failure.value, expected)
+
+        # log should have been updated
+        self.mock_log.bind.assert_called_once_with(
+            scaling_group=self.group.uuid, policy_id='pol1')
+
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
+        self.mocks['execute_launch_config'].assert_called_once_with(
+            self.mock_log.bind.return_value.bind.return_value,
+            'transaction', self.mock_state, "launch", self.group,
+            self.mocks['calculate_delta'].return_value)
+
+        # state should not have been updated
+        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """
@@ -848,9 +878,10 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             self.mock_log.bind.return_value, self.mock_state, "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
 
-    def test_execute_scale_down_called(self):
+    def test_exec_scale_down_success_when_delta_negative(self):
         """
-        ``exec_scale_down`` executed when delta < 0
+        ``exec_scale_down`` gets called when ``calculate_delta`` returns value < 0.
+        The state is marked as executed
         """
         self.mocks['calculate_delta'].return_value = -3
 
@@ -865,6 +896,9 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mocks['calculate_delta'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+
+        # state should have been updated
+        self.mock_state.mark_executed.assert_called_once_with('pol1')
 
 
 class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
