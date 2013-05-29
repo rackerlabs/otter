@@ -5,13 +5,15 @@ Wrapper for handling faults in a scalable fashion
 from functools import wraps
 import json
 
-import jsonschema
+from jsonschema import ValidationError
 
 from twisted.internet import defer
 from twisted.python import reflect
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
 from otter.log import log
+
+from otter.json_schema import validate
 
 
 def fails_with(mapping):
@@ -141,10 +143,10 @@ def validate_body(schema):
             try:
                 request.content.seek(0)
                 data = json.loads(request.content.read())
-                jsonschema.validate(data, schema)
+                validate(data, schema)
             except ValueError as e:
                 return defer.fail(InvalidJsonError())
-            except jsonschema.ValidationError, e:
+            except ValidationError, e:
                 return defer.fail(e)
             kwargs['data'] = data
             return f(request, *args, **kwargs)

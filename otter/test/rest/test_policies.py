@@ -5,7 +5,7 @@ for a scaling group.
 """
 
 import json
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 import mock
 
@@ -14,7 +14,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.controller import CannotExecutePolicyError
 from otter.json_schema.group_examples import policy as policy_examples
-from otter.json_schema import rest_schemas
+from otter.json_schema import rest_schemas, validate
 from otter.models.interface import NoSuchPolicyError
 from otter.rest.decorators import InvalidJsonError
 

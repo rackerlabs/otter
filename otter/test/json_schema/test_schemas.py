@@ -4,8 +4,9 @@ Tests for :mod:`otter.jsonschema.group_schemas`
 from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
-from jsonschema import Draft3Validator, validate, ValidationError
+from jsonschema import Draft3Validator, ValidationError
 
+from otter.json_schema import validate
 from otter.json_schema import group_schemas, group_examples, rest_schemas
 
 

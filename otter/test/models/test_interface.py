@@ -2,7 +2,7 @@
 Tests for :mod:`otter.models.interface`
 """
 from collections import namedtuple
-from jsonschema import validate
+
 
 import mock
 
@@ -15,7 +15,7 @@ from otter.models.interface import (
     GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError)
 from otter.json_schema.group_schemas import launch_config
-from otter.json_schema import model_schemas
+from otter.json_schema import model_schemas, validate
 from otter.test.utils import DeferredTestMixin
 
 
