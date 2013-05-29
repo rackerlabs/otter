@@ -906,7 +906,7 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def fetch_batch_of_events(self, now, size = 100):
+    def fetch_batch_of_events(self, now, size=100):
         """
         Fetch a batch of scheduled events.
 
@@ -920,7 +920,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
-                                    get_consistency_level('list','events'))
+                                    get_consistency_level('list' , 'events'))
         d.addCallback(_jsonize_cassandra_data)
         return d
 

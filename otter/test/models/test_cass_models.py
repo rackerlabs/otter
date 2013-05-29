@@ -1468,7 +1468,10 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         Tests that you can fetch a list of events
         """
-        self.returns = [[]]
+
+        self.returns = [_cassandrify_data(
+            [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100}, 
+             {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
 
         expectedData = {'now': 1234, 'size': 100}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scheduled_scaling '
@@ -1476,7 +1479,9 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.mock_key.return_value = '12345678'
 
         result = self.validate_fetch_batch_of_events(1234,100)
-        self.assertEqual(result, [])
+        self.assertEqual(result, [{'groupId': 'gr2', 'policyId': 'ef', 'tenantId': '1d2', 'trigger': 100},
+                                  {'groupId': 'gr2', 'policyId': 'ex', 'tenantId': '1d2', 'trigger': 122}
+                                   ])
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
