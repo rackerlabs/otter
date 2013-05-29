@@ -42,7 +42,7 @@ def check_status_cbs(purpose, expected=200):
             raise Exception(
                 "{p} should result in a {e}.  Got {r} instead.".format(
                     p=purpose, e=expected, r=response.code))
-        print '{}... ok!'.format(purpose)
+        print '{} --> {}... ok!'.format(purpose, expected)
         return response
 
     def print_err_message(failure):
@@ -90,7 +90,7 @@ def test_list_groups_unauthenticated(repose_endpoint, tenant_id):
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
     d = request(url)
-    d.addCallbacks(*check_status_cbs("Listing groups with authentication",
+    d.addCallbacks(*check_status_cbs("Listing groups without authentication",
                                      expected=401))
     return d
 
