@@ -87,16 +87,16 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     :return: a ``Deferred`` that fires with the updated (or not)
         :class:`otter.models.interface.GroupState` if successful
     """
-    bound_log = log.bind(scaling_group=scaling_group.uuid)
+    bound_log = log.bind(scaling_group_id=scaling_group.uuid)
 
     # XXX:  this is a hack to create an internal zero-change policy so
     # calculate delta will work
     delta = calculate_delta(bound_log, state, config, {'change': 0})
     if delta != 0:
         deferred = scaling_group.view_launch_config()
-        deferred.addCallback(partial(execute_launch_config, log, transaction_id,
-                                     state, scaling_group=scaling_group,
-                                     delta=delta))
+        deferred.addCallback(partial(execute_launch_config, bound_log,
+                                     transaction_id, state,
+                                     scaling_group=scaling_group, delta=delta))
         deferred.addCallback(lambda _: state)
         return deferred
 
@@ -129,7 +129,7 @@ def maybe_execute_scaling_policy(
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
