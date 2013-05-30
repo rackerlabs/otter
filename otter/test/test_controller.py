@@ -842,6 +842,7 @@ class AcquireGroupLockTestCase(DeferredTestMixin, TestCase):
     """
 
     def setUp(self):
+        self.LOCK_PATH = '/scaling_group_lock/group'
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
 
         self.lock = patch(self, 'txzookeeper.lock.Lock', spec=['acquire'])
@@ -862,11 +863,10 @@ class AcquireGroupLockTestCase(DeferredTestMixin, TestCase):
         self.addCleanup(patcher.stop)
         self.get_zookeeper_client.return_value = self.client
 
-    def test_acquire_group_lock_client_exists(self):
+    def test_acquire_group_lock(self):
         """
-        Test that acquire_group_lock calls client.exists
+        Test the happy path for acquire_group_lock.
         """
-        LOCK_PATH = '/scaling_group_lock/group'
         d = controller.acquire_group_lock(self.group)
 
         result = self.successResultOf(d)
@@ -875,8 +875,30 @@ class AcquireGroupLockTestCase(DeferredTestMixin, TestCase):
 
         self.get_zookeeper_client.assert_called_once_with()
 
-        self.client.exists.assert_called_once_with(LOCK_PATH)
-        self.client.create.assert_called_once_with(LOCK_PATH)
+        self.client.exists.assert_called_once_with(self.LOCK_PATH)
+        self.client.create.assert_called_once_with(self.LOCK_PATH)
 
-        self.Lock.assert_called_once_with(LOCK_PATH, self.client)
+        self.Lock.assert_called_once_with(self.LOCK_PATH, self.client)
+        self.lock.acquire.assert_called_once_with()
+
+    def test_acquire_group_node_exists(self):
+        """
+        If the child node to lock already exists, don't call create().
+        """
+        # A call to exists returns a dictionary with node metadata.
+        self.client.exists.return_value = defer.succeed({})
+
+        d = controller.acquire_group_lock(self.group)
+
+        result = self.successResultOf(d)
+
+        self.assertEqual(result, self.lock)
+
+        self.get_zookeeper_client.assert_called_once_with()
+
+        self.client.exists.assert_called_once_with(self.LOCK_PATH)
+
+        self.assertFalse(self.client.create.called)
+
+        self.Lock.assert_called_once_with(self.LOCK_PATH, self.client)
         self.lock.acquire.assert_called_once_with()
