@@ -834,3 +834,49 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         self.log.bind.return_value.err.assert_called_once_with(
             _CheckFailure(AssertionError))
+
+
+class AcquireGroupLockTestCase(DeferredTestMixin, TestCase):
+    """
+    Tests for :func:`otter.controller.acquire_group_lock`
+    """
+
+    def setUp(self):
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+
+        self.lock = patch(self, 'txzookeeper.lock.Lock', spec=['acquire'])
+        self.lock.acquire.return_value = defer.succeed(self.lock)
+
+        Lock_patcher = mock.patch('otter.controller.Lock')
+        self.Lock = Lock_patcher.start()
+        self.addCleanup(Lock_patcher.stop)
+        self.Lock.return_value = self.lock
+
+        self.client = patch(self, 'otter.zookeeper.ZookeeperClient',
+                            spec=['exists', 'create'])
+        self.client.exists.return_value = defer.succeed(None)
+        self.client.create.return_value = defer.succeed(True)
+
+        patcher = mock.patch('otter.controller.get_zookeeper_client')
+        self.get_zookeeper_client = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.get_zookeeper_client.return_value = self.client
+
+    def test_acquire_group_lock_client_exists(self):
+        """
+        Test that acquire_group_lock calls client.exists
+        """
+        LOCK_PATH = '/scaling_group_lock/group'
+        d = controller.acquire_group_lock(self.group)
+
+        result = self.successResultOf(d)
+
+        self.assertEqual(result, self.lock)
+
+        self.get_zookeeper_client.assert_called_once_with()
+
+        self.client.exists.assert_called_once_with(LOCK_PATH)
+        self.client.create.assert_called_once_with(LOCK_PATH)
+
+        self.Lock.assert_called_once_with(LOCK_PATH, self.client)
+        self.lock.acquire.assert_called_once_with()
