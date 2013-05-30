@@ -5,31 +5,19 @@ Basic test to make sure repose is set up mostly correctly to auth against an
 identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
-from urlparse import urlparse
 
 import treq
 
-from twisted.internet import defer, error, task
+from twisted.internet import defer, task
 
 from otter.auth import authenticate_user
-from otter.util.http import append_segments
+from otter.util.http import append_segments, wrap_request_error
 
 
 default_identity = "https://identity.api.rackspacecloud.com/v2.0/"
 
 content_type = {'content-type': ['application/json'],
                 'accept': ['application/json']}
-
-
-def wrap_connection_timeout(failure, url):
-    """
-    Connection timeouts aren't useful becuase they don't contain the netloc
-    that is timing out, so wrap the error.
-    """
-    if failure.check(error.TimeoutError):
-        raise Exception('Timed out trying to hit {0}'.format(
-            urlparse(url).netloc))
-    return failure
 
 
 def check_status_cbs(purpose, expected=200):
@@ -67,7 +55,7 @@ def request(url, method='GET', data=None, auth_token=None):
         headers['x-auth-token'] = [auth_token]
 
     d = treq.request(method, url, headers=headers, data=data)
-    d.addErrback(wrap_connection_timeout, url)
+    d.addErrback(wrap_request_error, url, data=headers)
     return d
 
 
