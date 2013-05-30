@@ -141,14 +141,14 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
     :type outpolicies: ``dict``
     """
     if policies is not None:
-        for i in range(len(policies)):
+        for i, policy in enumerate(policies):
             polname = "policy{}".format(i)
             polId = generate_key_str('policy')
             queries.append(_cql_insert_policy.format(cf=policies_table,
                                                      name=':' + polname))
-            data[polname] = serialize_json_data(policies[i], 1)
+            data[polname] = serialize_json_data(policy, 1)
             data[polname + "Id"] = polId
-            outpolicies[polId] = policies[i]
+            outpolicies[polId] = policy
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
