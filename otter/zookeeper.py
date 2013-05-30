@@ -32,6 +32,4 @@ def connect_zookeeper_client(servers, timeout):
         return defer.succeed(True)
     deferred.addCallback(_maybe_create_path)
 
-    def _return_client(_ignored):
-        return _zookeeper_client
-    return deferred.addCallback(_return_client)
+    return deferred.addCallback(lambda _: _zookeeper_client)

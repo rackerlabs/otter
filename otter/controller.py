@@ -51,15 +51,13 @@ def acquire_group_lock(scaling_group):
     client = get_zookeeper_client()
     lock_path = '/scaling_group_lock/{0}'.format(scaling_group.uuid)
 
-    def _check_lock_node_exists(ignored):
-        return client.exists(lock_path)
-    deferred = _check_lock_node_exists(None)
+    deferred = client.exists(lock_path)
 
     def _create_lock_node(result):
         if result is None:
             return client.create(lock_path)
         else:
-            return defer.succeed(True)
+            return defer.succeed(None)
     deferred.addCallback(_create_lock_node)
 
     def _create_lock(ignored):
@@ -209,7 +207,7 @@ def maybe_execute_scaling_policy(
     def _execute_policy():
         # make sure that the policy (and the group) exists before doing
         # anything else
-        deferred =  scaling_group.get_policy(policy_id)
+        deferred = scaling_group.get_policy(policy_id)
         deferred.addCallbacks(_do_get_configs, unwrap_first_error)
         return deferred.addCallback(_do_maybe_execute)
 
