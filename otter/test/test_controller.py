@@ -830,7 +830,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # log should have been updated
         self.mock_log.bind.assert_called_once_with(
-            scaling_group=self.group.uuid, policy_id='pol1')
+            scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
