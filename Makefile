@@ -9,7 +9,7 @@ CASSANDRA_HOST ?= localhost
 CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
-CLOUDCAFE ?= $(shell which shell cafe-runner)
+CLOUDCAFE ?= $(shell which cafe-runner)
 
 test: unit integration
 
