@@ -479,6 +479,9 @@ class ObeyConfigChangeTestCase(TestCase):
         self.execute_launch_config = patch(
             self, 'otter.controller.execute_launch_config',
             return_value=defer.succeed(None))
+        self.exec_scale_down = patch(
+            self, 'otter.controller.exec_scale_down',
+            return_value=defer.succeed(None))
 
         self.log = mock.MagicMock()
         self.state = mock.MagicMock(spec=[])  # so calling anything will fail
@@ -505,9 +508,9 @@ class ObeyConfigChangeTestCase(TestCase):
         self.assertIs(self.successResultOf(d), self.state)
         self.assertEqual(self.execute_launch_config.call_count, 0)
 
-    def test_nonzero_delta_state_is_returned_if_execute_successful(self):
+    def test_positive_delta_state_is_returned_if_execute_successful(self):
         """
-        If the delta is nonzero, ``execute_launch_config`` is called and if
+        If the delta is positive, ``execute_launch_config`` is called and if
         it is successful, ``obey_config_change`` returns the current state
         """
         self.calculate_delta.return_value = 5
@@ -532,6 +535,31 @@ class ObeyConfigChangeTestCase(TestCase):
         self.execute_launch_config.assert_called_once_with(
             self.log.bind.return_value, 'transaction-id', self.state, 'launch',
             scaling_group=self.group, delta=5)
+
+    def test_negative_delta_state_is_returned_if_execute_successful(self):
+        """
+        If the delta is negative, ``exec_scale_down`` is called and if
+        it is successful, ``obey_config_change`` returns the current state
+        """
+        self.calculate_delta.return_value = -5
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        self.exec_scale_down.assert_called_once_with(
+            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
+
+    def test_negative_delta_execute_errors_propagated(self):
+        """
+        ``obey_config_change`` propagates any errors ``exec_scale_down`` raises
+        """
+        self.calculate_delta.return_value = -5
+        self.exec_scale_down.return_value = defer.fail(Exception('meh'))
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(Exception))
+        self.exec_scale_down.assert_called_once_with(
+            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
 
 
 class FindPendingJobsToCancelTests(TestCase):

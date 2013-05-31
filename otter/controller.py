@@ -73,7 +73,7 @@ def resume_scaling_group(log, transaction_id, scaling_group):
 
 def obey_config_change(log, transaction_id, config, scaling_group, state):
     """
-    Given the config change, do servers need to be started or deleted?
+    Given the config change, do servers need to be started or deleted
 
     Ignore all cooldowns.
 
@@ -92,15 +92,21 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     # XXX:  this is a hack to create an internal zero-change policy so
     # calculate delta will work
     delta = calculate_delta(bound_log, state, config, {'change': 0})
-    if delta != 0:
+
+    if delta == 0:
+        return defer.succeed(state)
+    elif delta > 0:
         deferred = scaling_group.view_launch_config()
         deferred.addCallback(partial(execute_launch_config, bound_log,
                                      transaction_id, state,
                                      scaling_group=scaling_group, delta=delta))
         deferred.addCallback(lambda _: state)
         return deferred
-
-    return defer.succeed(state)
+    else:
+        # delta < 0 (scale down)
+        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
+        deferred.addCallback(lambda _: state)
+        return deferred
 
 
 def maybe_execute_scaling_policy(
