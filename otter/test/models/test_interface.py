@@ -364,6 +364,7 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         self.assertTrue(IScalingGroup.providedBy(result))
         return result
 
+
 class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
     """
     Mixin that tests for anything that provides
@@ -390,5 +391,5 @@ class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
             self.collection.fetch_batch_of_events(*args, **kwargs))
 
         self.assertEqual(type(result), list)
-        
+
         return result

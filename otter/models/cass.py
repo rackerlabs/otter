@@ -68,7 +68,7 @@ _cql_update_group_state = (
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
-               'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
+                     'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
@@ -920,19 +920,11 @@ class CassScalingGroupCollection:
 
     def fetch_batch_of_events(self, now, size=100):
         """
-        Fetch a batch of scheduled events.
-
-        :param now: the current time
-        :type now: ``datetime``
-
-        :param size: the size of the request
-        :type size: ``int``
-
-        :return: An array containing dicts with keys for tenantId, groupId, policyId, and trigger time
+        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
         """
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
-                                    get_consistency_level('list' , 'events'))
+                                    get_consistency_level('list', 'events'))
         d.addCallback(_jsonize_cassandra_data)
         return d
 

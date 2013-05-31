@@ -620,19 +620,23 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
 
 class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
-                                          TestCase):
+                                            TestCase):
     """
     Tests for :class:`MockScalingGroupCollection`
     """
 
     def setUp(self):
+        """ Set up the mocks """
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
-        self.mock_log = mock.MagicMock() 
+        self.mock_log = mock.MagicMock()
 
     def test_list_events(self):
-        deferred = self.collection.fetch_batch_of_events(1234,100)
-        self.assertEqual(self.assert_deferred_succeeded(deferred),[])
+        """
+        Test that the 'list all events' method works.
+        """
+        deferred = self.collection.fetch_batch_of_events(1234, 100)
+        self.assertEqual(self.assert_deferred_succeeded(deferred), [])
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

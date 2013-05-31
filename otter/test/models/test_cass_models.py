@@ -758,15 +758,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.returns = [cass_response, None]
 
-        pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10, 'args': {'at': 12345}}
+        pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
+               'args': {'at': 12345}}
         d = self.group.create_policies([pol])
         result = self.assert_deferred_succeeded(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
-                       'INSERT INTO scheduled_scaling("tenantId", "groupId", "policyId", trigger) VALUES '
-                       '(:tenantId, :groupId, :policy0, :policy0Trigger) '
+                       'INSERT INTO scheduled_scaling("tenantId", "groupId", "policyId", trigger) '
+                       'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
                        'APPLY BATCH;')
-        expectedData = {"policy0": '{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}',
+        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": '
+                                    '5, "_ver": 1, "type": "schedule", "change": 10}'),
                         "groupId": '12345678g',
                         "policy0Id": '12345678',
                         "policy0Trigger": 12345,
@@ -1456,7 +1458,7 @@ _S = namedtuple('_S', ['thing'])
 
 
 class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
-                                          TestCase):
+                                            TestCase):
     """
     Tests for :class:`CassScalingScheduleCollection`
     """
@@ -1502,7 +1504,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
 
         self.returns = [_cassandrify_data(
-            [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100}, 
+            [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100},
              {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
 
         expectedData = {'now': 1234, 'size': 100}
@@ -1510,10 +1512,11 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                        'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
         self.mock_key.return_value = '12345678'
 
-        result = self.validate_fetch_batch_of_events(1234,100)
-        self.assertEqual(result, [{'groupId': 'gr2', 'policyId': 'ef', 'tenantId': '1d2', 'trigger': 100},
-                                  {'groupId': 'gr2', 'policyId': 'ex', 'tenantId': '1d2', 'trigger': 122}
-                                   ])
+        result = self.validate_fetch_batch_of_events(1234, 100)
+        self.assertEqual(result, [{'groupId': 'gr2', 'policyId': 'ef', 'tenantId': '1d2',
+                                   'trigger': 100},
+                                  {'groupId': 'gr2', 'policyId': 'ex', 'tenantId': '1d2',
+                                   'trigger': 122}])
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

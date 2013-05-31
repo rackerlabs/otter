@@ -422,17 +422,9 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, self, None)
 
-    def fetch_batch_of_events(self, now, size = 100):
+    def fetch_batch_of_events(self, now, size=100):
         """
-        Fetch a batch of scheduled events.
-
-        :param now: the current time
-        :type now: ``datetime``
-
-        :param size: the size of the request
-        :type size: ``int``
-
-        :return: an array containing a tuple of (tenant_id, scaling_group_id, policy_id)
+        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
         """
         return defer.succeed([])
 
