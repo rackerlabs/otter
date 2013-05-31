@@ -26,7 +26,7 @@ from otter.worker.launch_server_v1 import (
 
 
 from otter.test.utils import patch
-from otter.util.http import APIError
+from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
 
@@ -171,8 +171,11 @@ class LoadBalancersTests(TestCase):
                                  '192.168.1.1')
 
         failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
@@ -229,8 +232,12 @@ class LoadBalancersTests(TestCase):
 
         d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
         failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
+
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
 
 
 class ServerTests(TestCase):
@@ -284,8 +291,11 @@ class ServerTests(TestCase):
         d = server_details('http://url/', 'my-auth-token', 'serverId')
 
         failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
 
     def test_create_server(self):
         """
@@ -322,8 +332,11 @@ class ServerTests(TestCase):
         d = create_server('http://url/', 'my-auth-token', {})
 
         failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(APIError))
-        self.assertEqual(failure.value.code, 500)
+        self.assertTrue(failure.check(RequestError))
+        real_failure = failure.value.reason
+
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_status(self, server_details):
@@ -437,7 +450,8 @@ class ServerTests(TestCase):
         """
         launch_server will propagate any errors from create_server.
         """
-        create_server.return_value = fail(APIError(500, "Oh noes"))
+        create_server.return_value = fail(
+            APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
         d = launch_server(self.log,
                           'DFW',
@@ -447,10 +461,12 @@ class ServerTests(TestCase):
                           {'server': {}})
 
         failure = self.failureResultOf(d)
-        failure.trap(APIError)
+        failure.trap(RequestError)
+        real_failure = failure.value.reason
 
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, "Oh noes")
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, "Oh noes")
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -470,7 +486,8 @@ class ServerTests(TestCase):
 
         create_server.return_value = succeed(server_details)
 
-        wait_for_status.return_value = fail(APIError(500, "Oh noes"))
+        wait_for_status.return_value = fail(
+            APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
         d = launch_server(self.log,
                           'DFW',
@@ -480,10 +497,12 @@ class ServerTests(TestCase):
                           launch_config)
 
         failure = self.failureResultOf(d)
-        failure.trap(APIError)
+        failure.trap(RequestError)
+        real_failure = failure.value.reason
 
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, "Oh noes")
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, "Oh noes")
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -505,7 +524,8 @@ class ServerTests(TestCase):
 
         wait_for_status.return_value = succeed(server_details)
 
-        add_to_load_balancers.return_value = fail(APIError(500, "Oh noes"))
+        add_to_load_balancers.return_value = fail(
+            APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
         d = launch_server(self.log,
                           'DFW',
@@ -515,10 +535,12 @@ class ServerTests(TestCase):
                           launch_config)
 
         failure = self.failureResultOf(d)
-        failure.trap(APIError)
+        failure.trap(RequestError)
+        real_failure = failure.value.reason
 
-        self.assertEqual(failure.value.code, 500)
-        self.assertEqual(failure.value.body, "Oh noes")
+        self.assertTrue(real_failure.check(APIError))
+        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.body, "Oh noes")
 
 
 class ConfigPreparationTests(TestCase):
@@ -686,12 +708,13 @@ class DeleteServerTests(TestCase):
         delete_server propagates any errors from removing server from load
         balancers
         """
-        remove_from_load_balancer.return_value = fail(APIError(500, ''))
+        remove_from_load_balancer.return_value = fail(
+            APIError(500, '')).addErrback(wrap_request_error, 'url')
 
         d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
-        self.assertEqual(failure.value.code, 500)
+        self.assertEqual(failure.value.reason.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
     def test_delete_server_propagates_delete_server_api_failures(self, remove_from_load_balancer):
@@ -710,4 +733,4 @@ class DeleteServerTests(TestCase):
         d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
         failure = self.failureResultOf(d)
 
-        self.assertEqual(failure.value.code, 500)
+        self.assertEqual(failure.value.reason.value.code, 500)

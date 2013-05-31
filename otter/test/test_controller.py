@@ -486,6 +486,14 @@ class ObeyConfigChangeTestCase(TestCase):
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.group.view_launch_config.return_value = defer.succeed("launch")
 
+    def test_parameters_bound_to_log(self):
+        """
+        Relevant values are bound to the log.
+        """
+        controller.obey_config_change(self.log, 'transaction-id',
+                                      'config', self.group, self.state)
+        self.log.bind.assert_called_once_with(scaling_group_id=self.group.uuid)
+
     def test_zero_delta_nothing_happens_state_is_returned(self):
         """
         If the delta is zero, ``execute_launch_config`` is not called and
@@ -507,7 +515,7 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state)
         self.assertIs(self.successResultOf(d), self.state)
         self.execute_launch_config.assert_called_once_with(
-            self.log, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
             scaling_group=self.group, delta=5)
 
     def test_nonzero_delta_execute_errors_propagated(self):
@@ -522,7 +530,7 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.execute_launch_config.assert_called_once_with(
-            self.log, 'transaction-id', self.state, 'launch',
+            self.log.bind.return_value, 'transaction-id', self.state, 'launch',
             scaling_group=self.group, delta=5)
 
 
@@ -792,7 +800,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # log should have been updated
         self.mock_log.bind.assert_called_once_with(
-            scaling_group=self.group.uuid, policy_id='pol1')
+            scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')

@@ -26,7 +26,8 @@ from twisted.internet.task import LoopingCall
 import treq
 
 from otter.util.config import config_value
-from otter.util.http import append_segments, headers, check_success
+from otter.util.http import (append_segments, headers, check_success,
+                             wrap_request_error)
 from otter.util.hashkey import generate_server_name
 
 
@@ -45,6 +46,7 @@ def server_details(server_endpoint, auth_token, server_id):
     d = treq.get(append_segments(server_endpoint, 'servers', server_id),
                  headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_request_error, server_endpoint, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -117,6 +119,7 @@ def create_server(server_endpoint, auth_token, server_config):
                   headers=headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
+    d.addErrback(wrap_request_error, server_endpoint, 'server_create')
     return d.addCallback(treq.json_content)
 
 
@@ -146,6 +149,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
                                               "condition": "ENABLED",
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
+    d.addErrback(wrap_request_error, endpoint, 'add')
     return d.addCallback(treq.json_content)
 
 
@@ -341,6 +345,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
     d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
+    d.addErrback(wrap_request_error, endpoint, 'remove')
     d.addCallback(lambda _: None)
     return d
 
@@ -399,9 +404,11 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        return treq.delete(
-            append_segments(server_endpoint, 'servers', server_id),
-            headers=headers(auth_token)).addCallback(check_success, [204])
+        d = treq.delete(append_segments(server_endpoint, 'servers', server_id,
+                                        headers=headers(auth_token))
+        d.addCallback(check_success, [204])
+        d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+        return d
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
