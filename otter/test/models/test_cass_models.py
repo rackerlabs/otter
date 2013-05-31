@@ -744,6 +744,38 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.assertEqual(result, {self.mock_key.return_value: {'b': 'lah'}})
 
+    def test_add_scaling_policy_at(self):
+        """
+        Test that you can add a scaling policy, and what is returned is a
+        dictionary of the ids to the scaling policies
+        """
+        cass_response = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{}',
+                       'ttl': None}],
+             'key': ''}]
+
+        self.returns = [cass_response, None]
+
+        pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10, 'args': {'at': 12345}}
+        d = self.group.create_policies([pol])
+        result = self.assert_deferred_succeeded(d)
+        expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
+                       'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
+                       'INSERT INTO scheduled_scaling("tenantId", "groupId", "policyId", trigger) VALUES '
+                       '(:tenantId, :groupId, :policy0, :policy0Trigger) '
+                       'APPLY BATCH;')
+        expectedData = {"policy0": '{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}',
+                        "groupId": '12345678g',
+                        "policy0Id": '12345678',
+                        "policy0Trigger": 12345,
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+        self.assertEqual(result, {self.mock_key.return_value: pol})
+
     def test_add_first_checks_view_config(self):
         """
         Before a policy is added, `view_config` is first called to determine

@@ -67,6 +67,8 @@ _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
+_cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
+               'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
@@ -117,7 +119,7 @@ def get_consistency_level(operation, resource):
     return ConsistencyLevel.ONE
 
 
-def _build_policies(policies, policies_table, queries, data, outpolicies):
+def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -146,8 +148,17 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
             polId = generate_key_str('policy')
             queries.append(_cql_insert_policy.format(cf=policies_table,
                                                      name=':' + polname))
+
             data[polname] = serialize_json_data(policy, 1)
             data[polname + "Id"] = polId
+
+            if "type" in policy:
+                if policy["type"] == 'schedule':
+                    queries.append(_cql_insert_event.format(cf=event_table,
+                                                            name=':' + polname))
+                    # Only handling the at-trigger case right now
+
+                    data[polname + "Trigger"] = policy["args"]["at"]
             outpolicies[polId] = policy
 
 
@@ -336,6 +347,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
+        self.event_table = "scheduled_scaling"
 
     def view_manifest(self):
         """
@@ -527,7 +539,7 @@ class CassScalingGroup(object):
                        "groupId": self.uuid}
             outpolicies = {}
 
-            _build_policies(data, self.policies_table, queries, cqldata,
+            _build_policies(data, self.policies_table, self.event_table, queries, cqldata,
                             outpolicies)
 
             b = Batch(queries, cqldata,
@@ -871,7 +883,7 @@ class CassScalingGroupCollection:
                 }
 
         outpolicies = {}
-        _build_policies(policies, self.policies_table, queries, data,
+        _build_policies(policies, self.policies_table, self.event_table, queries, data,
                         outpolicies)
 
         b = Batch(queries, data,
