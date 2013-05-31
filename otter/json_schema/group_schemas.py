@@ -304,3 +304,6 @@ webhook = {
     },
     "additionalProperties": False
 }
+
+update_webhook = deepcopy(webhook)
+update_webhook['properties']['metadata']['required'] = True
