@@ -385,12 +385,11 @@ class CalculateDeltaTestCase(TestCase):
         fake_state = self.get_state({}, {})
         controller.calculate_delta(self.mock_log, fake_state, fake_config,
                                    fake_policy)
-        self.assertEqual(
-            self.mock_log.bind.call_args_list,
-            [(matches(ContainsDict({
-                'server_delta': Equals(1),
-                'constrained_desired_capacity': Equals(1)})),)])
-        self.mock_log.bind.return_value.msg.assert_called_with('calculating delta')
+        args, kwargs = self.mock_log.msg.call_args
+        self.assertEqual(args, ('calculating delta',))
+        self.assertEqual(kwargs, matches(ContainsDict({
+            'server_delta': Equals(1),
+            'constrained_desired_capacity': Equals(1)})))
 
 
 class CheckCooldownsTestCase(TestCase):
