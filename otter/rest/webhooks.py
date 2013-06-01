@@ -9,7 +9,7 @@ policy.
 from functools import partial
 import json
 
-from otter.json_schema.group_schemas import webhook
+from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
@@ -249,7 +249,7 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-@validate_body(webhook)
+@validate_body(group_schemas.update_webhook)
 def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
     """
     Update a particular webhook.
