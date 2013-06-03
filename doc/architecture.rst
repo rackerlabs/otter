@@ -5,30 +5,12 @@ Architecture
 "The glue between monitoring and workflow"
 -- David Reid, Esquire
 
-Why do we need Auto-Scaling
----------------------------
-
-* It represents a hole in our offering and customers want it
-* It gives our users a fanatical experience without a corresponding increase in support staffing
-* It will help us sell more cloud servers.
-
-Limits on scope?
-----------------
-
-* There's already groups inside Rackspace working on full workflow (and that's a big problem of itself)
-* MaaS already gives us a lot of monitoring and event-processing
-* Customers can create a custom image that will handle the details of running chef, adding the server
-  to the load balancer once it's done, etc.  This is how AWS works, more or less.
-* It is assumed that the user is either going to manually handle scaling of the data storage or use
-  DBaaS/CloudFiles for persistance.  There are products out there that will scale in a more complex
-  fashion, but...
-
 Important thoughts
 ------------------
 
 * Properly provisioning a server is both complicated and time-consuming.  Especially if you start from
   a stock image (e.g. Ubuntu 10.04 LTS).  Image loading is very much necessary and requiring the user
-  to self-provision makes our mini-workflow system much simpler.
+  to self-provision makes the system much simpler.
 * Large custom images can take a long time.  Small images can usually spin up fairly quickly.  Only so
   much we can do about this, however.
 * Sometimes OpenStack fires up images and they end up in error state.
@@ -46,7 +28,7 @@ Inputs
 ------
 
 * User input to configure scaling groups
-* Scale-up/Scale-down events (produced by a MaaS alert, by a scheduler, or by the customer)
+* Scale-up/Scale-down events (produced by a Monitoring alert, by a scheduler, or by the customer)
 
 Scaling Supervisor
 ------------------
@@ -68,7 +50,7 @@ Stored Data
 Scaling Worker
 --------------
 
-* Server creation requests against NOVA
+* Server creation requests against Nova
 * Triggering customer workflow via webhook
 * Triggering eventual workflow systems
 
@@ -107,25 +89,6 @@ Prior art
 * RightScale
 * Scalr
 
-Cross-colo resiliency story
----------------------------
-
-* Like MaaS, this really needs to be something users can count on in a crunch.  Thus, we need to be
-  able to fire up servers as long as Nova is responding in that colo.
-* One API endpoint sounds like an awfully nice idea.
-* Cassandra and ElasticSearch both have built-in cross-colo resiliency stories.
-
-Workflow story
---------------
-
-Depending on MVP requirements vs. other teams vs. etc we have three options, ranked in order of
-complexity:
-
-1. Server's startup script does most everything.  Perhaps we add it to load balancers and the health
-   check for load balancers handles the rest.
-2. We do a simple serialized workflow.  Create server, wait for it to come up, run ssh script, add to
-   MaaS and LBaaS.  Steps can be skipped
-3. Full-fledged workflow, either we write it or another team writes it
 
 Fine-grained access control story
 ---------------------------------
@@ -134,7 +97,6 @@ Fine-grained access control story
 
 * CRUD scaling groups
 * Manually trigger scale-up/scale-down/rebuild tasks
-* Manually exceed scaling limits
 
 PQ, dreid, & Ken discussed this briefly. If you impersonate the user who created the group, this creates
 a problem if some company hires J. Junior Sysadmin to manage their servers, then replaces him with S.

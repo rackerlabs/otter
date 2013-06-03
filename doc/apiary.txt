@@ -692,12 +692,16 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
 
 
 --
+Execute Resource
+
+
+--
 Webhooks Resource
 Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the webhooks associated with a particular scaling group's particular scaling
 policy.
 
-(/tenantId/groups/groupId/policy/policyId/webhooks
+(/tenantId/groups/groupId/policy/policyId/webhooks and
 /tenantId/groups/groupId/policy/policyId/webhooks/webhookId)
 --
 
