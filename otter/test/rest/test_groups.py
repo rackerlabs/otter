@@ -3,7 +3,7 @@ Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
 all scaling groups, and creating/viewing/deleting a scaling group.
 """
 import json
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 import mock
 
@@ -15,7 +15,7 @@ from otter.json_schema.group_examples import (
     config as config_examples,
     policy as policy_examples)
 
-from otter.json_schema import rest_schemas
+from otter.json_schema import rest_schemas, validate
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
