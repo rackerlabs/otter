@@ -17,7 +17,7 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
-CREATE TABLE scheduled_scaling (
+CREATE TABLE scaling_schedule (
     "tenantId" ascii,
     "groupId" ascii, 
     "policyId" ascii, 

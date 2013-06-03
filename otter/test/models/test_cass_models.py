@@ -764,7 +764,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.assert_deferred_succeeded(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
-                       'INSERT INTO scheduled_scaling("tenantId", "groupId", "policyId", trigger) '
+                       'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                        'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
                        'APPLY BATCH;')
         expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": '
@@ -1508,7 +1508,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
              {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
 
         expectedData = {'now': 1234, 'size': 100}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scheduled_scaling '
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scaling_schedule '
                        'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
         self.mock_key.return_value = '12345678'
 

@@ -347,7 +347,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
-        self.event_table = "scheduled_scaling"
+        self.event_table = "scaling_schedule"
 
     def view_manifest(self):
         """
@@ -861,7 +861,7 @@ class CassScalingGroupCollection:
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
         self.state_table = "group_state"
-        self.event_table = "scheduled_scaling"
+        self.event_table = "scaling_schedule"
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
