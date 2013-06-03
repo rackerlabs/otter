@@ -35,12 +35,12 @@ endif
 
 integration:
 ifneq ($(and $(CLOUDCAFE),$(JENKINS_URL)), )
-	cafe-runner autoscale prod -p functional --parallel
+	@echo "Waiting on preprod node before running tests here."
+#	cafe-runner autoscale prod -p functional --parallel
 else ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
 else
-	@echo "Are you on the VM?  cloudcafe is not set up as desired."
-	@echo "So can't run integration tests."
+	@echo "Cloudcafe is not set up as desired, so can't run those tests."
 endif
 
 coverage:
