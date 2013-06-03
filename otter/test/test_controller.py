@@ -5,6 +5,8 @@ from datetime import timedelta, datetime
 
 import mock
 
+from testtools.matchers import ContainsDict, Equals
+
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
@@ -12,7 +14,7 @@ from twisted.trial.unittest import TestCase
 from otter import controller
 from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
 from otter.util.timestamp import MIN
-from otter.test.utils import DeferredTestMixin, iMock, patch
+from otter.test.utils import DeferredTestMixin, iMock, matches, patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -372,6 +374,22 @@ class CalculateDeltaTestCase(TestCase):
 
         self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state,
                                                         fake_config, fake_policy))
+
+    def test_logs_relevant_information(self):
+        """
+        Log is called with at least the constrained desired capacity and the
+        delta
+        """
+        fake_policy = {'change': 0}
+        fake_config = {'minEntities': 1, 'maxEntities': 10}
+        fake_state = self.get_state({}, {})
+        controller.calculate_delta(self.mock_log, fake_state, fake_config,
+                                   fake_policy)
+        args, kwargs = self.mock_log.msg.call_args
+        self.assertEqual(args, ('calculating delta',))
+        self.assertEqual(kwargs, matches(ContainsDict({
+            'server_delta': Equals(1),
+            'constrained_desired_capacity': Equals(1)})))
 
 
 class CheckCooldownsTestCase(TestCase):

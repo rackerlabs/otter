@@ -233,15 +233,6 @@ def calculate_delta(log, state, config, policy):
 
     :return: C{int} representing the desired change - can be 0
     """
-    def constrain(desired):
-        max_entities = config['maxEntities']
-        if max_entities is None:
-            max_entities = MAX_ENTITIES
-        log.bind(desired_change=desired, max_entities=max_entities,
-                 min_entities=config['minEntities'], active=len(state.active),
-                 pending=len(state.pending)).msg("calculating delta")
-        return max(min(desired, max_entities), config['minEntities'])
-
     current = len(state.active) + len(state.pending)
     if "change" in policy:
         desired = current + policy['change']
@@ -256,7 +247,20 @@ def calculate_delta(log, state, config, policy):
             "Policy doesn't have attributes 'change', 'changePercent', or "
             "'desiredCapacity: {0}".format(json.dumps(policy)))
 
-    return constrain(desired) - current
+    # constrain the desired
+    max_entities = config['maxEntities']
+    if max_entities is None:
+        max_entities = MAX_ENTITIES
+    constrained = max(min(desired, max_entities), config['minEntities'])
+    delta = constrained - current
+
+    log.msg("calculating delta",
+            unconstrained_desired_capacity=desired,
+            constrained_desired_capacity=constrained,
+            max_entities=max_entities, min_entities=config['minEntities'],
+            server_delta=delta, current_active=len(state.active),
+            current_pending=len(state.pending))
+    return delta
 
 
 def find_pending_jobs_to_cancel(log, state, delta):
