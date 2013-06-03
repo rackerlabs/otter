@@ -318,7 +318,7 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
                                       content=self.request_content)
 
         self.validate_patch = mock.patch(
-            'otter.rest.decorators.jsonschema.validate')
+            'otter.rest.decorators.validate')
         self.mock_validate = self.validate_patch.start()
         self.addCleanup(self.validate_patch.stop)
 

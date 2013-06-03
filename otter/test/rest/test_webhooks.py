@@ -4,14 +4,14 @@ webhooks, and creating/viewing/deleting webhooks.
 """
 
 import json
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 import mock
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema import rest_schemas
+from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
