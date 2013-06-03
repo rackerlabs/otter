@@ -25,7 +25,7 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
         """
         super(UpdateWebhook, cls).tearDownClass()
 
-    @unittest.skip("AUTO-303 equivalent for webhooks")
+    #@unittest.skip("AUTO-303 equivalent for webhooks")
     def test_update_webhook_name_only(self):
         """
         Update webhook with only name in the request and verify.
@@ -75,7 +75,7 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
             upd_metadata,
             msg='Metadata of the webhook did not update')
 
-    @unittest.skip("AUTO-303 equivalent for webhooks")
+    #@unittest.skip("AUTO-303 equivalent for webhooks")
     def test_update_webhook_without_metadata_successfully(self):
         """
         Update webhook with only name in the request without metadata and verify.

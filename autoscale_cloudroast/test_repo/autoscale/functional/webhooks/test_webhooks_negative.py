@@ -114,7 +114,8 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             policy_id=self.policy[
                 'id'],
             webhook_id=webhook,
-            name=self.wb_name)
+            name=self.wb_name,
+            metadata={})
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
                           msg='Create webhooks succeeded with invalid request: %s'
@@ -184,7 +185,8 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
                 'id'],
             webhook_id=webhook[
                 'id'],
-            name=self.wb_name)
+            name=self.wb_name,
+            metadata={})
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
                           msg='Create webhooks succeeded with invalid request: %s'
