@@ -33,6 +33,7 @@ class AutoscaleBehaviors(BaseBehavior):
         self.lc_name = self.autoscale_config.lc_name
         self.lc_flavor_ref = self.autoscale_config.lc_flavor_ref
         self.lc_image_ref = self.autoscale_config.lc_image_ref
+        self.lc_image_ref_alt = self.autoscale_config.lc_image_ref_alt
         self.sp_name = rand_name(self.autoscale_config.sp_name)
         self.sp_cooldown = int(self.autoscale_config.sp_cooldown)
         self.sp_change = int(self.autoscale_config.sp_change)
@@ -44,6 +45,8 @@ class AutoscaleBehaviors(BaseBehavior):
         self.lc_load_balancers = self.autoscale_config.lc_load_balancers
         self.sp_list = self.autoscale_config.sp_list
         self.wb_name = rand_name(self.autoscale_config.wb_name)
+        self.interval_time = int(self.autoscale_config.interval_time)
+        self.timeout = int(self.autoscale_config.timeout)
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
@@ -134,8 +137,8 @@ class AutoscaleBehaviors(BaseBehavior):
         @return: returns the list of active servers in the group
         @rtype: returns the active server list
         """
-        interval_time = interval_time or self.autoscale_config.status_interval
-        timeout = timeout or self.autoscale_config.server_build_timeout
+        interval_time = interval_time or self.interval_time
+        timeout = timeout or self.timeout
         end_time = time.time() + timeout
 
         while time.time() < end_time:

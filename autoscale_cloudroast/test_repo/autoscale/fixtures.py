@@ -58,6 +58,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_name = cls.autoscale_config.lc_name
         cls.lc_flavor_ref = cls.autoscale_config.lc_flavor_ref
         cls.lc_image_ref = cls.autoscale_config.lc_image_ref
+        cls.lc_image_ref_alt = cls.autoscale_config.lc_image_ref_alt
         cls.sp_name = rand_name(cls.autoscale_config.sp_name)
         cls.sp_cooldown = int(cls.autoscale_config.sp_cooldown)
         cls.sp_change = int(cls.autoscale_config.sp_change)
@@ -68,6 +69,8 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
+        cls.interval_time = int(cls.autoscale_config.interval_time)
+        cls.timeout = int(cls.autoscale_config.timeout)
 
     def validate_headers(self, headers):
         """

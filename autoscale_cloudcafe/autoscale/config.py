@@ -81,6 +81,13 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('lc_image_ref')
 
     @property
+    def lc_image_ref_alt(self):
+        """
+        Alternate launch configuration server image id
+        """
+        return self.get('lc_image_ref_alt')
+
+    @property
     def sp_name(self):
         """
         scaling policy name
@@ -149,6 +156,20 @@ class AutoscaleConfig(ConfigSectionInterface):
         Webhook name
         """
         return self.get('wb_name')
+
+    @property
+    def interval_time(self):
+        """
+        Interval time for polling group state table for active servers
+        """
+        return self.get('interval_time')
+
+    @property
+    def timeout(self):
+        """
+        Timeout is the wait time for all servers on that group to be active
+        """
+        return self.get('timeout')
 
     @property
     def autoscale_endpoint_name(self):

@@ -142,18 +142,17 @@ class LaunchConfigFixture(ScalingGroupWebhookFixture):
     #     self.assertEqual(group_state.desiredCapacity, self.gc_min_entities,
     # msg='Desired capacity is not equal to expected number of servers')
 
-    # def test_system_update_launchconfig_scale_up(self):
-    #     """
-    #     Verify execute policies to scale up with multiple updates to launch config.
-    #     """
-        # create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-        #     gc_min_entities=1)
-        # group = create_group_response.entity
-        # resp = self.autoscale_behaviors.wait_for_active_list_in_group_state(
-        #     group_id=group.id,
-        #     active_servers=1,
-        #     interval_time=5,
-        #     timeout=30000)
+    def test_system_update_launchconfig_scale_up(self):
+        """
+        Verify execute policies to scale up with multiple updates to launch config.
+        """
+        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=1)
+        group = create_group_response.entity
+        resp = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+            group_id=group.id,
+            active_servers=1)
+        print resp
         # execute_policy_response = self.autoscale_client.execute_policy(
         #     group_id=self.group.id,
         #     policy_id=self.policy['id'])
