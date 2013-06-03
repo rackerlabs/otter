@@ -27,12 +27,14 @@ import iso8601
 import json
 
 from twisted.internet import defer
+from txzookeeper.lock import Lock
 
 from otter import supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
 from otter.auth import authenticate_tenant
+from otter.zookeeper import get_zookeeper_client
 
 
 class CannotExecutePolicyError(Exception):
@@ -43,6 +45,41 @@ class CannotExecutePolicyError(Exception):
         super(CannotExecutePolicyError, self).__init__(
             "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
             .format(t=tenant_id, g=group_id, p=policy_id, w=why))
+
+
+def acquire_group_lock(scaling_group):
+    client = get_zookeeper_client()
+    lock_path = '/scaling_group_lock/{0}'.format(scaling_group.uuid)
+
+    deferred = client.exists(lock_path)
+
+    def _create_lock_node(result):
+        if result is None:
+            return client.create(lock_path)
+        else:
+            return defer.succeed(None)
+    deferred.addCallback(_create_lock_node)
+
+    def _create_lock(ignored):
+        lock = Lock(lock_path, client)
+        return lock.acquire()
+    deferred.addCallback(_create_lock)
+
+    return deferred
+
+
+def with_group_lock(scaling_group, func):
+    deferred = acquire_group_lock(scaling_group)
+
+    def release_lock(result, lock):
+        deferred = lock.release()
+        return deferred.addCallback(lambda x: result)
+
+    def lock_acquired(lock):
+        return defer.maybeDeferred(func).addBoth(release_lock, lock)
+
+    deferred.addCallback(lock_acquired)
+    return deferred
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -133,16 +170,12 @@ def maybe_execute_scaling_policy(
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
-    deferred = scaling_group.get_policy(policy_id)
-
     def _do_get_configs(policy):
         deferred = defer.gatherResults([
             scaling_group.view_config(),
             scaling_group.view_launch_config()
         ])
         return deferred.addCallback(lambda results: results + [policy])
-
-    deferred.addCallbacks(_do_get_configs, unwrap_first_error)
 
     def _do_maybe_execute(config_launch_policy):
         """
@@ -171,7 +204,14 @@ def maybe_execute_scaling_policy(
                                        scaling_group.uuid, policy_id,
                                        error_msg)
 
-    return deferred.addCallback(_do_maybe_execute)
+    def _execute_policy():
+        # make sure that the policy (and the group) exists before doing
+        # anything else
+        deferred = scaling_group.get_policy(policy_id)
+        deferred.addCallbacks(_do_get_configs, unwrap_first_error)
+        return deferred.addCallback(_do_maybe_execute)
+
+    return with_group_lock(scaling_group, _execute_policy)
 
 
 def check_cooldowns(log, state, config, policy, policy_id):

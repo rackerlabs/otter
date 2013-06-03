@@ -12,3 +12,5 @@ jsonfig==0.1.1
 txgraylog2==0.11
 testtools==0.9.31
 txairbrake==0.2.0
+txzookeeper==0.9.7
+zkpython==0.4.2

@@ -8,6 +8,7 @@ import mock
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
+from txzookeeper.lock import Lock
 
 from otter import controller
 from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
@@ -548,8 +549,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         things_and_return_vals = {
             'check_cooldowns': True,
             'calculate_delta': 1,
-            'execute_launch_config': defer.succeed(None)
+            'execute_launch_config': defer.succeed(None),
         }
+        lock = Lock('', None)
+        lock.release = mock.MagicMock(return_value=defer.succeed(None))
+        things_and_return_vals['acquire_group_lock'] = defer.succeed(lock)
 
         for thing, return_val in things_and_return_vals.iteritems():
             self.mocks[thing] = patch(self, 'otter.controller.{0}'.format(thing),
@@ -838,3 +842,71 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         self.log.bind.return_value.err.assert_called_once_with(
             _CheckFailure(AssertionError))
+
+
+class AcquireGroupLockTestCase(DeferredTestMixin, TestCase):
+    """
+    Tests for :func:`otter.controller.acquire_group_lock`
+    """
+
+    def setUp(self):
+        self.LOCK_PATH = '/scaling_group_lock/group'
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+
+        self.lock = patch(self, 'txzookeeper.lock.Lock', spec=['acquire'])
+        self.lock.acquire.return_value = defer.succeed(self.lock)
+
+        Lock_patcher = mock.patch('otter.controller.Lock')
+        self.Lock = Lock_patcher.start()
+        self.addCleanup(Lock_patcher.stop)
+        self.Lock.return_value = self.lock
+
+        self.client = patch(self, 'otter.zookeeper.ZookeeperClient',
+                            spec=['exists', 'create'])
+        self.client.exists.return_value = defer.succeed(None)
+        self.client.create.return_value = defer.succeed(True)
+
+        patcher = mock.patch('otter.controller.get_zookeeper_client')
+        self.get_zookeeper_client = patcher.start()
+        self.addCleanup(patcher.stop)
+        self.get_zookeeper_client.return_value = self.client
+
+    def test_acquire_group_lock(self):
+        """
+        Test the happy path for acquire_group_lock.
+        """
+        d = controller.acquire_group_lock(self.group)
+
+        result = self.successResultOf(d)
+
+        self.assertEqual(result, self.lock)
+
+        self.get_zookeeper_client.assert_called_once_with()
+
+        self.client.exists.assert_called_once_with(self.LOCK_PATH)
+        self.client.create.assert_called_once_with(self.LOCK_PATH)
+
+        self.Lock.assert_called_once_with(self.LOCK_PATH, self.client)
+        self.lock.acquire.assert_called_once_with()
+
+    def test_acquire_group_node_exists(self):
+        """
+        If the child node to lock already exists, don't call create().
+        """
+        # A call to exists returns a dictionary with node metadata.
+        self.client.exists.return_value = defer.succeed({})
+
+        d = controller.acquire_group_lock(self.group)
+
+        result = self.successResultOf(d)
+
+        self.assertEqual(result, self.lock)
+
+        self.get_zookeeper_client.assert_called_once_with()
+
+        self.client.exists.assert_called_once_with(self.LOCK_PATH)
+
+        self.assertFalse(self.client.create.called)
+
+        self.Lock.assert_called_once_with(self.LOCK_PATH, self.client)
+        self.lock.acquire.assert_called_once_with()

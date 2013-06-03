@@ -5,7 +5,7 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
-from twisted.internet import reactor
+from twisted.internet import defer, reactor
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
@@ -17,6 +17,10 @@ test_config = {
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
         'keyspace': 'otter_test'
+    },
+    'zookeeper': {
+        'servers': '127.0.0.1:2181',
+        'timeout': 100
     }
 }
 
@@ -34,6 +38,7 @@ class APIOptionsTests(TestCase):
         self.addCleanup(jsonfig_patcher.stop)
 
         self.jsonfig.from_path.return_value = test_config
+
 
     def test_port_options(self):
         """
@@ -101,6 +106,13 @@ class APIMakeServiceTests(TestCase):
         CassScalingGroupCollection_patcher = mock.patch('otter.tap.api.CassScalingGroupCollection')
         self.CassScalingGroupCollection = CassScalingGroupCollection_patcher.start()
         self.addCleanup(CassScalingGroupCollection_patcher.stop)
+
+        # This doesn't work, WTF.
+        zk_patcher = mock.patch('otter.tap.api.connect_zookeeper_client')
+        self.zk_patch = zk_patcher.start()
+        self.addCleanup(zk_patcher.stop)
+        self.zk_patch.return_value = defer.succeed(None)
+
 
     def test_service_site_on_port(self):
         """
