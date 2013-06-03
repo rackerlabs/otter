@@ -359,15 +359,12 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     :param str region: A rackspace region as found in the service catalog.
     :param list service_catalog: A list of services as returned by the auth apis.
     :param str auth_token: The user's auth token.
-    :param tuple instance_details: A 2-tuple of server details and a list of
+    :param tuple instance_details: A 2-tuple of server_id and a list of
         load balancer Add Node responses.
 
         Example::
 
-        ({'server':
-            {'id': 1,
-             'ip_addresses': ...,
-             'imageRef': ...}},
+        ('da08965f-4c2d-41aa-b492-a3c02706202f',
          [('12345',
            {'nodes': [{'id': 'a', 'address': ... }]}),
           ('54321',
@@ -396,7 +393,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    (server_details, loadbalancer_details) = instance_details
+    (server_id, loadbalancer_details) = instance_details
 
     node_info = itertools.chain(
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
@@ -407,8 +404,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        d = treq.delete(append_segments(server_endpoint, 'servers',
-                                        server_details['server']['id']),
+        d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
                         headers=headers(auth_token))
         d.addCallback(check_success, [204])
         d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
