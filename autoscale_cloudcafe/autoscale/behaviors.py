@@ -1,9 +1,13 @@
 """
 Behaviors for Autoscale
 """
+import time
+
+
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.compute.common.datagen import rand_name
 from autoscale.models.servers import Metadata
+from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -21,6 +25,25 @@ class AutoscaleBehaviors(BaseBehavior):
         super(AutoscaleBehaviors, self).__init__()
         self.autoscale_config = autoscale_config
         self.autoscale_client = autoscale_client
+        self.gc_name = self.autoscale_config.gc_name
+        self.gc_cooldown = int(self.autoscale_config.gc_cooldown)
+        self.gc_min_entities = int(self.autoscale_config.gc_min_entities)
+        self.gc_min_entities_alt = int(
+            self.autoscale_config.gc_min_entities_alt)
+        self.lc_name = self.autoscale_config.lc_name
+        self.lc_flavor_ref = self.autoscale_config.lc_flavor_ref
+        self.lc_image_ref = self.autoscale_config.lc_image_ref
+        self.sp_name = rand_name(self.autoscale_config.sp_name)
+        self.sp_cooldown = int(self.autoscale_config.sp_cooldown)
+        self.sp_change = int(self.autoscale_config.sp_change)
+        self.sp_change_percent = int(self.autoscale_config.sp_change_percent)
+        self.sp_desired_capacity = int(
+            self.autoscale_config.sp_desired_capacity)
+        self.sp_policy_type = self.autoscale_config.sp_policy_type
+        self.upd_sp_change = int(self.autoscale_config.upd_sp_change)
+        self.lc_load_balancers = self.autoscale_config.lc_load_balancers
+        self.sp_list = self.autoscale_config.sp_list
+        self.wb_name = rand_name(self.autoscale_config.wb_name)
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
@@ -99,6 +122,43 @@ class AutoscaleBehaviors(BaseBehavior):
             lc_load_balancers=lc_load_balancers,
             sp_list=sp_list)
         return create_response
+
+    def wait_for_active_list_in_group_state(self, group_id, active_servers,
+                                            interval_time=None, timeout=None):
+        """
+        @summary: waits for the specified number of servers to be active on a group
+        @param group_id: Group id
+        @param active_servers: Total active servers expected on the group
+        @param interval_time: Time to wait during polling group state
+        @param timeout: Time to wait before exiting this function
+        @return: returns the list of active servers in the group
+        @rtype: returns the active server list
+        """
+        interval_time = interval_time or self.autoscale_config.status_interval
+        timeout = timeout or self.autoscale_config.server_build_timeout
+        end_time = time.time() + timeout
+
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+            print group_state
+
+            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
+                raise BuildErrorException(
+                    'Group Id %s failed to attempt server creation. Group has no servers'
+                    % group_id)
+
+            if len(active_list) == active_servers:
+                break
+            time.sleep(interval_time)
+        else:
+            raise TimeoutException(
+                "wait_for_active_list_in_group_state ran for {0} seconds and did not "
+                "observe the active server list achieving the expected servers count: {1}.".format(
+                    timeout, active_servers))
+
+        return active_list
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
