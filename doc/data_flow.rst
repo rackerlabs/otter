@@ -127,7 +127,7 @@ User modifies the config
 User deletes a server from Nova (not implemented)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* The AtomHopper poller notices that a server has been deleted, and notifies
+* The Event Feed poller notices that a server has been deleted, and notifies
   the controller.
 
 * The controller looks up/verifies which group the server belongs to.

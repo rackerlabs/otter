@@ -646,7 +646,7 @@ class ConfigPreparationTests(TestCase):
 
 # An instance associated with a single load balancer.
 instance_details = (
-    {'server': {'id': 'a'}},
+    'a',
     [(12345, {'nodes': [{'id': 1}]}),
      (54321, {'nodes': [{'id': 2}]})])
 

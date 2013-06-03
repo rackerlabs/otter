@@ -497,6 +497,9 @@ class ObeyConfigChangeTestCase(TestCase):
         self.execute_launch_config = patch(
             self, 'otter.controller.execute_launch_config',
             return_value=defer.succeed(None))
+        self.exec_scale_down = patch(
+            self, 'otter.controller.exec_scale_down',
+            return_value=defer.succeed(None))
 
         self.log = mock.MagicMock()
         self.state = mock.MagicMock(spec=[])  # so calling anything will fail
@@ -523,9 +526,9 @@ class ObeyConfigChangeTestCase(TestCase):
         self.assertIs(self.successResultOf(d), self.state)
         self.assertEqual(self.execute_launch_config.call_count, 0)
 
-    def test_nonzero_delta_state_is_returned_if_execute_successful(self):
+    def test_positive_delta_state_is_returned_if_execute_successful(self):
         """
-        If the delta is nonzero, ``execute_launch_config`` is called and if
+        If the delta is positive, ``execute_launch_config`` is called and if
         it is successful, ``obey_config_change`` returns the current state
         """
         self.calculate_delta.return_value = 5
@@ -551,6 +554,232 @@ class ObeyConfigChangeTestCase(TestCase):
             self.log.bind.return_value, 'transaction-id', self.state, 'launch',
             scaling_group=self.group, delta=5)
 
+    def test_negative_delta_state_is_returned_if_execute_successful(self):
+        """
+        If the delta is negative, ``exec_scale_down`` is called and if
+        it is successful, ``obey_config_change`` returns the current state
+        """
+        self.calculate_delta.return_value = -5
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        self.exec_scale_down.assert_called_once_with(
+            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
+
+    def test_negative_delta_execute_errors_propagated(self):
+        """
+        ``obey_config_change`` propagates any errors ``exec_scale_down`` raises
+        """
+        self.calculate_delta.return_value = -5
+        self.exec_scale_down.return_value = defer.fail(Exception('meh'))
+        d = controller.obey_config_change(self.log, 'transaction-id',
+                                          'config', self.group, self.state)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(Exception))
+        self.exec_scale_down.assert_called_once_with(
+            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
+
+
+class FindPendingJobsToCancelTests(TestCase):
+    """
+    Tests for :func:`otter.controller.find_pending_jobs_to_cancel`
+    """
+    def setUp(self):
+        """
+        Sets up a dictionary of job ID to creation dates in order to test
+        sorting.
+        """
+        self.data = {
+            '1': {'created': '0001-01-01T00:00:05Z.0001'},
+            '2': {'created': '0001-01-04T00:02:02Z'},
+            '3': {'created': '0001-01-04T00:00:10Z'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513'},
+            '5': {'created': '0001-01-05T00:00:00Z'}
+        }  # ascending order by time would be: 1, 4, 3, 2, 5
+
+        self.cancellable_state = GroupState('t', 'g', {}, self.data, None, {}, False)
+
+    def test_returns_most_recent_jobs(self):
+        """
+        ``find_pending_jobs_to_cancel`` returns the top ``delta`` recent jobs.
+        """
+        self.assertEqual(
+            controller.find_pending_jobs_to_cancel(mock.ANY, self.cancellable_state, 3),
+            ['5', '2', '3'])
+
+    def test_returns_all_jobs_if_delta_is_high(self):
+        """
+        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
+        than the length of the jobs
+        """
+        self.assertEqual(
+            sorted(controller.find_pending_jobs_to_cancel(
+                mock.ANY, self.cancellable_state, 100)),
+            ['1', '2', '3', '4', '5'])
+
+
+class FindServersToEvictTests(TestCase):
+    """
+    Tests for :func:`otter.controller.find_servers_to_evict`
+    """
+    def setUp(self):
+        """
+        Sets up a dictionary of job ID to creation dates in order to test
+        sorting.
+        """
+        self.data = {
+            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+        }  # ascending order by time would be: 1, 4, 3, 2, 5
+
+        self.deletable_state = GroupState('t', 'g', self.data, {}, None, {}, False)
+
+    def test_returns_oldest_servers(self):
+        """
+        ``find_servers_to_evict`` returns the top ``delta`` oldest jobs.
+        """
+        self.assertEqual(
+            controller.find_servers_to_evict(mock.ANY, self.deletable_state, 3),
+            [self.data['1'], self.data['4'], self.data['3']])
+
+    def test_returns_all_jobs_if_delta_is_high(self):
+        """
+        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
+        than the length of the jobs
+        """
+        self.assertEqual(
+            sorted(controller.find_servers_to_evict(
+                mock.ANY, self.deletable_state, 100)),
+            sorted(self.data.values()))
+
+
+class DeleteActiveServersTests(TestCase):
+    """
+    Tests for :func:`otter.controller.delete_active_servers`
+    """
+
+    def setUp(self):
+        """
+        mock all the dependent functions and data
+        """
+        self.log = mock.Mock()
+        self.data = {
+            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+        }  # ascending order by time would be: 1, 4, 3, 2, 5
+        self.fake_state = GroupState('t', 'g', self.data, {}, False, False, False)
+        self.find_servers_to_evict = patch(self, 'otter.controller.find_servers_to_evict',
+                                           return_value=[self.data[id]
+                                                         for id in ('1', '4', '3')])
+        self.exec_del_server = patch(self, 'otter.supervisor.execute_delete_server',
+                                     side_effect=[defer.succeed(id) for id in range(3)])
+
+    def test_supervisor_called(self):
+        """
+        ``otter.supervisor.execute_delete_server`` is called
+        """
+        # caching as self.data will get changed from delete_active_servers
+        d1, d2, d3 = self.data['1'], self.data['4'], self.data['3']
+        controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
+                                         3, self.fake_state)
+        self.assertEqual(self.exec_del_server.mock_calls,
+                         [mock.call(self.log, 'trans-id', 'auth', 'group', d1),
+                          mock.call(self.log, 'trans-id', 'auth', 'group', d2),
+                          mock.call(self.log, 'trans-id', 'auth', 'group', d3)])
+
+    def test_active_servers_removed(self):
+        """
+        active servers to be deleted are removed from GroupState
+        """
+        controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
+                                         3, self.fake_state)
+        for id in ('1', '4', '3'):
+            self.assertNotIn(id, self.fake_state.active)
+
+    def test_deferreds_returned(self):
+        """
+        List of Deferreds are returned with expected values
+        """
+        dl = controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
+                                              3, self.fake_state)
+        for i, d in enumerate(dl):
+            result = self.successResultOf(d)
+            self.assertEqual(result, i)
+
+    def test_max_delta(self):
+        """
+        All the servers are deleted when delta is max
+        """
+        self.exec_del_server.side_effect = None
+        self.find_servers_to_evict.return_value = self.data.values()
+        controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
+                                         5, self.fake_state)
+        self.assertEqual(len(self.fake_state.active), 0)
+
+
+class ExecScaleDownTests(TestCase):
+    """
+    Tests for :func:`otter.controller.exec_scale_down`
+    """
+
+    def setUp(self):
+        """
+        mock dependent objects and functions
+        """
+        self.log = mock.Mock()
+        self.pending = {
+            '1': {'created': '0001-01-01T00:00:05Z.0001'},
+            '2': {'created': '0001-01-04T00:02:02Z'},
+            '3': {'created': '0001-01-04T00:00:10Z'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513'},
+            '5': {'created': '0001-01-05T00:00:00Z'}
+        }  # descending order by time would be: 5, 2, 3, 4, 1
+        self.active = {
+            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            'a2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
+            'a3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
+            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
+        }  # ascending order by time would be: a1, a4, a3, a2, a5
+        self.fake_state = GroupState('t', 'g', self.active, self.pending, False, False, False)
+        self.find_pending_jobs_to_cancel = patch(self, 'otter.controller.find_pending_jobs_to_cancel')
+        self.del_active_servers = patch(self, 'otter.controller.delete_active_servers')
+        self.fake_auth_tenant = patch(self, 'otter.controller.authenticate_tenant')
+
+    def test_pending_jobs_removed(self):
+        """
+        Pending jobs are removed from state
+        """
+        exp_pending_jobs = ['5', '2', '3']
+        self.find_pending_jobs_to_cancel.return_value = exp_pending_jobs
+        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 3)
+        for job_id in exp_pending_jobs:
+            self.assertNotIn(job_id, self.fake_state.pending)
+
+    def test_del_active_servers_called(self):
+        """
+        ``delete_active_servers`` is called with correct arguments
+        """
+        self.find_pending_jobs_to_cancel.return_value = self.pending.keys()
+        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 7)
+        self.del_active_servers.assert_called_once_with(self.log, 'tid',
+                                                        self.fake_auth_tenant,
+                                                        'g', 2, self.fake_state)
+
+    def test_del_active_servers_not_called(self):
+        """
+        ``delete_active_servers`` is not called when pending jobs are enough
+        """
+        self.find_pending_jobs_to_cancel.return_value = ['5', '2', '3']
+        controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 3)
+        self.assertFalse(self.del_active_servers.called)
+
 
 class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
     """
@@ -566,6 +795,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         things_and_return_vals = {
             'check_cooldowns': True,
             'calculate_delta': 1,
+            'exec_scale_down': defer.succeed(None),
             'execute_launch_config': defer.succeed(None)
         }
 
@@ -598,11 +828,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
 
-    def test_maybe_execute_scaling_policy_success(self):
+    def test_execute_launch_config_success_on_positive_delta(self):
         """
-        If lock is acquired, all cooldowns are all fine, the delta is not zero,
-        and ``execute_launch_config`` does not fail, return value is the updated
-        state.
+        If lock is acquired, all cooldowns are all fine, ``calculate_delta`` returns positive
+        delta then ``execute_launch_config`` gets called and if does not fail,
+        return value is the updated state.
         """
         self.mocks['execute_launch_config'].return_value = defer.succeed(
             'this should be returned')
@@ -629,6 +859,36 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # state should have been updated
         self.mock_state.mark_executed.assert_called_once_with('pol1')
+
+    def test_execute_launch_config_failure_on_positive_delta(self):
+        """
+        If ``execute_launch_config`` fails for some reason, then state should not be
+        marked as executed
+        """
+        expected = ValueError('some failure')
+        self.mocks['execute_launch_config'].return_value = defer.fail(expected)
+
+        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                    self.group, self.mock_state,
+                                                    'pol1')
+        failure = self.failureResultOf(d)
+        self.assertEqual(failure.value, expected)
+
+        # log should have been updated
+        self.mock_log.bind.assert_called_once_with(
+            scaling_group_id=self.group.uuid, policy_id='pol1')
+
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
+        self.mocks['execute_launch_config'].assert_called_once_with(
+            self.mock_log.bind.return_value.bind.return_value,
+            'transaction', self.mock_state, "launch", self.group,
+            self.mocks['calculate_delta'].return_value)
+
+        # state should not have been updated
+        self.assertEqual(self.mock_state.mark_executed.call_count, 0)
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """
@@ -671,6 +931,28 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mocks['calculate_delta'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config", "policy")
         self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+
+    def test_exec_scale_down_success_when_delta_negative(self):
+        """
+        ``exec_scale_down`` gets called when ``calculate_delta`` returns value < 0.
+        The state is marked as executed
+        """
+        self.mocks['calculate_delta'].return_value = -3
+
+        controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
+                                                self.group, self.mock_state,
+                                                'pol1')
+        self.mocks['exec_scale_down'].assert_called_once_with(
+            self.mock_log.bind.return_value.bind.return_value, 'transaction',
+            self.mock_state, self.group, 3)
+        self.mocks['check_cooldowns'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+        self.mocks['calculate_delta'].assert_called_once_with(
+            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
+        self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+
+        # state should have been updated
+        self.mock_state.mark_executed.assert_called_once_with('pol1')
 
 
 class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
@@ -734,16 +1016,6 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(ExecuteException))
 
-    def test_negative_delta_not_implemented(self):
-        """
-        ``execute_launch_config`` raises ``NotImplementedError`` if the delta
-        is not positive
-        """
-        self.assertRaises(
-            NotImplementedError,
-            controller.execute_launch_config,
-            self.log, '1', self.fake_state, 'launch', self.group, -5)
-
     def test_add_job_called_with_new_jobs(self):
         """
         ``execute_launch_config`` calls ``add_job`` on the state for every job
@@ -805,6 +1077,29 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.log.bind.assert_called_once_with(job_id='1')
         self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
         self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
+
+    @mock.patch('otter.supervisor.execute_delete_server', return_value=defer.succeed(None))
+    def test_pending_server_delete(self, exec_del_server):
+        """
+        When a pending job is cancelled, it is deleted from the job list. When the server finishes
+        building, then ``execute_launch_config`` is called to remove the job from pending job list.
+        It then notices that pending job_id is not there in job list and calls ``execute_delete_server``
+        to delete the server.
+        """
+        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+
+        def fake_modify_state(callback, *args, **kwargs):
+            callback(self.group, s, *args, **kwargs)
+
+        self.group.modify_state.side_effect = fake_modify_state
+        controller.execute_launch_config(self.log, '1', self.fake_state,
+                                         'launch', self.group, 1)
+
+        s.remove_job('1')
+        self.execute_config_deferreds[0].callback({'id': 's1'})
+
+        exec_del_server.assert_called_once_with(self.log, '1', self.authenticate_tenant,
+                                                self.group, {'id': 's1'})
 
     def test_job_failure(self):
         """
