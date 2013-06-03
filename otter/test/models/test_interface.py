@@ -148,6 +148,23 @@ class GroupStateTestCase(TestCase):
         self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
         self.assertEqual(state.active, {'1': {}})
 
+    def test_remove_active_success(self):
+        """
+        If the server ID is in the active list, ``remove_active`` removes it.
+        """
+        state = GroupState('tid', 'gid', {'1': {}}, {}, None, {}, True)
+        state.remove_active('1')
+        self.assertEqual(state.active, {})
+
+    def test_remove_active_fails(self):
+        """
+        If the server ID is not in the active list, ``remove_active`` raises an
+        AssertionError.
+        """
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True)
+        self.assertRaises(AssertionError, state.remove_active, '1')
+        self.assertEqual(state.active, {})
+
     def test_mark_executed_updates_policy_and_group(self):
         """
         Marking executed updates the policy touched and group touched to the
