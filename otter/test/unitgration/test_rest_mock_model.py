@@ -500,7 +500,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         Updating a webhook returns with a 204 no content.  When viewing
         the webhook again, it should contain the updated version.
         """
-        request_body = {'name': 'updated_webhook'}
+        request_body = {'name': 'updated_webhook', 'metadata': {'foo': 'bar'}}
         wrapper = self.assert_deferred_succeeded(
             request(root, 'PUT', path, body=json.dumps(request_body)))
         self.assertEqual(wrapper.response.code, 204,
@@ -526,7 +526,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         del updated['id']
         del updated['links']
 
-        self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {}})
+        self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {'foo': 'bar'}})
 
     def delete_and_view_webhook(self, path):
         """
