@@ -12,10 +12,10 @@ The code is open source as a reference, but requires dependencies not available 
 
 ## Make Tasks:
 
-make coverage
-make docs 
-make cleandocs
-make schema
-make schema-setup
-make schema-teardown
-make clean
+- make coverage
+- make docs 
+- make cleandocs
+- make schema
+- make schema-setup
+- make schema-teardown
+- make clean
