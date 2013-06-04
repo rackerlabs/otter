@@ -42,7 +42,8 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
         update_webhook_resp = self.autoscale_client.update_webhook(group_id=self.group.id,
                                                                    policy_id=self.policy['id'],
                                                                    webhook_id=self.webhook['id'],
-                                                                   name='update_execute_webhook')
+                                                                   name='update_execute_webhook',
+                                                                   metadata={})
         self.assertEquals(update_webhook_resp.status_code, 204,
                           msg='Update webhook failed with %s'
                           % update_webhook_resp.status_code)
