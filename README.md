@@ -9,6 +9,12 @@
 This codebase is not able to be deployed independently. 
 The code is open source as a reference, but requires dependencies not available within this repository.
 
+Talk with us! Join us in:
+
+irc.freenode.net #rackspace
+
+fsargent, wirehead_, oubiwann, dreid, cyli
+
 
 ## Make Tasks:
 
