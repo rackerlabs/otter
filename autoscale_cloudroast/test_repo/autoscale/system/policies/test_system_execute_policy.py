@@ -48,3 +48,15 @@ class ExecutePoliciesFixture(AutoscaleFixture):
         self.assertEquals(execute_policy_response.status_code, 403,
                           msg='scaling policy was executed with status %s'
                           % execute_policy_response.status_code)
+
+    def test_system_negative_execute_scale_down_on_newly_created_group(self):
+        """
+        Verify executing scale down on a newly created scaling group
+        """
+        pass
+
+    # def test_system_scaling_group_lbaas_draining_disabled(self):
+    #     """
+    #     Verify execute policy with lbaas draining or disabled
+    #     """
+    #     pass

@@ -2,7 +2,6 @@
 System tests for account with multiple scaling groups
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-#from time import sleep
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -77,16 +76,13 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             webhook_third.entity)
         execute_webhook1 = self.autoscale_client.execute_webhook(
             webhook_one['links'].capability)
-        #sleep(3)
         self.assertEquals(execute_webhook1.status_code, 202)
         execute_webhook2 = self.autoscale_client.execute_webhook(
             webhook_two['links'].capability)
         self.assertEquals(execute_webhook2.status_code, 202)
-        #sleep(3)
         execute_webhook3 = self.autoscale_client.execute_webhook(
             webhook_three['links'].capability)
         self.assertEquals(execute_webhook3.status_code, 202)
-        #sleep(3)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             self.first_scaling_group.id)
         self.assertEquals(group_state_response.status_code, 200)

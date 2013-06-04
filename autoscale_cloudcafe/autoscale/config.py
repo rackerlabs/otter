@@ -174,6 +174,13 @@ class AutoscaleConfig(ConfigSectionInterface):
     @property
     def autoscale_endpoint_name(self):
         """
-        AUtoscale endpoint name in the service catalog
+        Autoscale endpoint name in the service catalog
         """
         return self.get('autoscale_endpoint_name')
+
+    @property
+    def server_endpoint_name(self):
+        """
+        server endpoint name in the service catalog
+        """
+        return self.get('server_endpoint_name')

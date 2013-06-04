@@ -27,7 +27,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
 
     def test_webhooks_nonexistant(self):
         """
-        Negative Test: Verify no webhooks on a newly cerated policy.
+        Negative Test: Verify no webhooks on a newly created policy.
         """
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         group = create_resp.entity

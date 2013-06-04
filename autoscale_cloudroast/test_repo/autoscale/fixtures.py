@@ -12,6 +12,8 @@ from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
 from autoscale.client import AutoscalingAPIClient
 from cloudcafe.auth.provider import AuthProvider
+from cloudcafe.compute.servers_api.client import ServersClient
+
 import os
 
 
@@ -37,18 +39,28 @@ class AutoscaleFixture(BaseTestFixture):
         autoscale_service = access_data.get_service(
             cls.autoscale_config.autoscale_endpoint_name)
 
+        server_service = access_data.get_service(
+            cls.autoscale_config.server_endpoint_name)
+        server_url = server_service.get_endpoint(
+            cls.autoscale_config.region).public_url
+
         cls.tenant_id = cls.autoscale_config.tenant_id
         env = os.environ['OSTNG_CONFIG_FILE']
         if 'dev' in env.lower():
             url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
         elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(cls.tenant_id)
+            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
+                cls.tenant_id)
         else:
             url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
 
-        cls.autoscale_client = AutoscalingAPIClient(url, access_data.token.id_,
-                                                    'json', 'json')
+        cls.autoscale_client = AutoscalingAPIClient(
+            url, access_data.token.id_,
+            'json', 'json')
+        cls.server_client = ServersClient(
+            server_url, access_data.token.id_,
+            'json', 'json')
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
         cls.gc_name = cls.autoscale_config.gc_name

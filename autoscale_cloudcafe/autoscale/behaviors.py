@@ -153,6 +153,9 @@ class AutoscaleBehaviors(BaseBehavior):
                     % group_id)
 
             if len(active_list) == active_servers:
+                active_sever_id_list = []
+                for each in active_list:
+                    active_sever_id_list.append(each.id)
                 break
             time.sleep(interval_time)
         else:
@@ -161,7 +164,7 @@ class AutoscaleBehaviors(BaseBehavior):
                 "observe the active server list achieving the expected servers count: {1}.".format(
                     timeout, active_servers))
 
-        return active_list
+        return active_sever_id_list
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
