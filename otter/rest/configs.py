@@ -1,5 +1,3 @@
-from otter.rest.errors import InvalidMinEntities
-from otter.rest.decorators import InvalidJsonError
 """
 Autoscale REST endpoints having to do with editing/modifying the configuration
 or launch configuration for a scaling group.
@@ -16,6 +14,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, transaction_id
 
 from otter import controller
+from otter.rest.errors import InvalidMinEntities
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/config/',
