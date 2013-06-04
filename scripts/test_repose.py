@@ -99,7 +99,7 @@ def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
     because it is neither in the repose client-auth authenticated regex nor is
     it in the repose client-auth whitelist regex.
     """
-    url = append_segments(repose_endpoint, 'v10.6', tenant_id, 'groups')
+    url = append_segments(repose_endpoint, 'v106', tenant_id, 'groups')
     d = request(url, auth_token=auth_token)
     d.addCallbacks(*check_status_cbs("Hitting an invalid url even with authentication",
                                      expected=401))
