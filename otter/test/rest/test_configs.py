@@ -250,7 +250,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             self.assertFalse(self.mock_group.update_config.called)
             self.flushLoggedErrors(ValidationError)
 
-    def test_group_modify_minEntities_lteq_maxEntities_400(self):
+    def test_group_modify_maxEntities_lt_minEntities_400(self):
         """
         minEntities > maxEntities results in a 400.
         """
@@ -265,6 +265,18 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
+
+    def test_group_modify_minEntities_eq_maxEntities_204(self):
+        """
+        minEntities == maxEntities results in a 204 (it's ok).
+        """
+        invalid = {'name': '1',
+                   'minEntities': 10,
+                   'maxEntities': 10,
+                   'cooldown': 1,
+                   'metadata': {}}
+
+        self.assert_status_code(204, method='PUT', body=json.dumps(invalid))
 
 
 class LaunchConfigTestCase(RestAPITestMixin, TestCase):

@@ -207,7 +207,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    def test_group_create_minEntites_lteq_maxEntities_invalid_400(self):
+    def test_group_create_maxEntites_lt_minEntities_invalid_400(self):
         """
         minEntities > maxEntities results in a 400.
         """
@@ -290,6 +290,21 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 "rel": "self"
             }])
         self.assertEqual(resp_policies, policies)
+
+    def test_group_create_maxEntities_eq_minEntities_valid(self):
+        """
+        A scaling group in which the minEntities == maxEntities validates
+        """
+        self._test_successful_create({
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 10,
+                "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        })
 
     def test_group_create_one_policy(self):
         """
