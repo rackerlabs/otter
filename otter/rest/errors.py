@@ -13,7 +13,14 @@ from otter.models.interface import (
 from otter.rest.decorators import InvalidJsonError
 
 
+class InvalidMinEntities(Exception):
+    """
+    Something is wrong with the minEntities values.
+    """
+
+
 exception_codes = {
+    InvalidMinEntities: 400,
     ValidationError: 400,
     InvalidJsonError: 400,
     NoSuchScalingGroupError: 404,
