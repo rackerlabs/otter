@@ -5,25 +5,26 @@ Basic test to make sure repose is set up mostly correctly to auth against an
 identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
+import json
 
 import treq
 
 from twisted.internet import defer, task
 
 from otter.auth import authenticate_user
-from otter.util.http import append_segments, wrap_request_error
+from otter.util.http import append_segments, headers, wrap_request_error
 
 
 default_identity = "https://identity.api.rackspacecloud.com/v2.0/"
 
-content_type = {'content-type': ['application/json'],
-                'accept': ['application/json']}
 
-
-def check_status_cbs(purpose, expected=200):
+def request(url, purpose, method='GET', data=None, auth_token=None, expected=200):
     """
-    Get a callback that can be used to check the status of a response and
-    print a nice error message.
+    Makes a treq GET request with the given method and URL.  For headers, takes
+    the content type headers and possibly adds an auth token bit, if provided.
+
+    Also checks that the status is the expected status, and wraps any timeouts
+    to have a more useful error message.
     """
     def check_status(response):
         if response.code != expected:
@@ -37,50 +38,29 @@ def check_status_cbs(purpose, expected=200):
         print '{0} failed:\n{1!s}'.format(purpose, failure)
         return failure
 
-    return check_status, print_err_message
-
-
-def request(url, method='GET', data=None, auth_token=None):
-    """
-    Makes a treq GET request with the given method and URL.  For headers, takes
-    the content type headers and possibly adds an auth token bit, if provided.
-
-    Also checks that the status is the expected status, and wraps any timeouts
-    to have a more useful error message.
-    """
-    if auth_token is None:
-        headers = content_type
-    else:
-        headers = content_type.copy()
-        headers['x-auth-token'] = [auth_token]
-
-    d = treq.request(method, url, headers=headers, data=data)
-    d.addErrback(wrap_request_error, url, data=headers)
+    d = treq.request(method, url, headers=headers(auth_token), data=data)
+    d.addErrback(wrap_request_error, url, data=auth_token)
+    d.addCallbacks(check_status, print_err_message)
     return d
 
 
-def test_webhook_doesnt_need_authentication(repose_endpoint):
+def test_webhook_doesnt_need_authentication(repose_endpoint, tenant_id, auth_token):
     """
     Trying to execute a webhook does not need any authentication.  Even if the
     webhook doesn't exist, a 202 is returned.  But a 4XX certainly shouldn't
     be returned.
     """
-    url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', 'random')
-    d = request(url, method='POST')
-    d.addCallbacks(*check_status_cbs('Executing a webhook without authentication',
-                                     expected=202))
-    return d
+    url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', tenant_id)
+    return request(url, 'Executing a webhook without authentication',
+                   method='POST', expected=202)
 
 
-def test_list_groups_unauthenticated(repose_endpoint, tenant_id):
+def test_list_groups_unauthenticated(repose_endpoint, tenant_id, auth_token):
     """
     Try to get groups, which returns with a 401 because it is unauthenticated
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
-    d = request(url)
-    d.addCallbacks(*check_status_cbs("Listing groups without authentication",
-                                     expected=401))
-    return d
+    return request(url, "Listing groups without authentication", expected=401)
 
 
 def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
@@ -88,9 +68,8 @@ def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
     Try to get groups, which returns with a 200 because it is authenticated.
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
-    d = request(url, auth_token=auth_token)
-    d.addCallbacks(*check_status_cbs("Listing groups with authentication"))
-    return d
+    return request(url, "Listing groups with authentication",
+                   auth_token=auth_token)
 
 
 def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
@@ -100,10 +79,8 @@ def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
     it in the repose client-auth whitelist regex.
     """
     url = append_segments(repose_endpoint, 'v106', tenant_id, 'groups')
-    d = request(url, auth_token=auth_token)
-    d.addCallbacks(*check_status_cbs("Hitting an invalid url even with authentication",
-                                     expected=401))
-    return d
+    return request(url, "Hitting an invalid url even with authentication",
+                   auth_token=auth_token, expected=401)
 
 
 def get_remaining_rate_limit(repose_endpoint, tenant_id, auth_token):
@@ -111,45 +88,47 @@ def get_remaining_rate_limit(repose_endpoint, tenant_id, auth_token):
     Get the remaining number of times a GET request can be made (since in these
     tests they are all GETs)
     """
-    def get_GET_limit(limits_dictionary):
-        rates = [rate for rate in limits_dictionary['limits']['rates']
-                 if rate['verb'] == 'GET']
-        remaining = rates[0]['remaining']
-        print 'Rate info: {0} GETs remaining'.format(remaining)
-        return remaining
+    def get_limits(limits_dictionary):
+        regexes = limits_dictionary['limits']['rate']
+        rates = dict([(
+            regex['regex'],
+            dict([(rate['verb'], rate['remaining']) for rate in regex['limit']]))
+            for regex in regexes])
+
+        info = '\tRate info (by regex): {0}'.format(json.dumps(rates, indent=4))
+        print '\n\t'.join(info.split('\n'))
+        return rates
 
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'limits')
-    d = request(url, auth_token=auth_token)
-    d.addCallbacks(*check_status_cbs("Getting the rate limit info", expected=200))
+    d = request(url, "Getting the rate limit info", auth_token=auth_token,
+                expected=200)
     d.addCallback(treq.json_content)
-    d.addCallback(get_GET_limit)
+    d.addCallback(get_limits)
     return d
 
 
+@defer.inlineCallbacks
 def run_tests(_, args):
     """
-    Run the authenticated and unauthenticated tests.
+    Run the authenticated and unauthenticated tests.  Using inlinecallbacks
+    because the logic is just easier to understand in this case.
     """
+    blob = yield authenticate_user(args.identity, args.username, args.password)
+    auth_token = blob['access']['token']['id'].encode('ascii')
+    tenant_id = blob['access']['token']['tenant']['id'].encode('ascii')
 
-    def _do_tests(token_and_tenant):
-        """
-        Run the tests that require the user to be authenticated
-        """
-        auth_token, tenant_id = token_and_tenant
+    params = (args.repose, tenant_id, auth_token)
 
-        return defer.gatherResults(
-            [test_random_url_authenticated(args.repose, tenant_id, auth_token),
-             test_list_groups_authenticated(args.repose, tenant_id, auth_token),
-             test_list_groups_unauthenticated(args.repose, tenant_id),
-             test_webhook_doesnt_need_authentication(args.repose)],
-            consumeErrors=True)
+    yield get_remaining_rate_limit(*params)
 
-    d = authenticate_user(args.identity, args.username, args.password)
-    d.addCallback(lambda blob: (
-        blob['access']['token']['id'].encode('ascii'),
-        blob['access']['token']['tenant']['id'].encode('ascii')))
-    d.addCallback(_do_tests)
-    return d
+    yield defer.gatherResults([
+        # test_random_url_authenticated(*params),
+        # test_list_groups_authenticated(*params),
+        # test_list_groups_unauthenticated(*params),
+        test_webhook_doesnt_need_authentication(*params)
+    ], consumeErrors=True)
+
+    yield get_remaining_rate_limit(*params)
 
 
 def cli():
@@ -176,4 +155,5 @@ def cli():
     task.react(run_tests, [parser.parse_args()])
 
 
-cli()
+if __name__ == "__main__":
+    cli()
