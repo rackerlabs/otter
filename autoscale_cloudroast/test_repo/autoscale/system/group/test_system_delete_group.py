@@ -2,8 +2,6 @@
 System tests for delete scaling group
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
-import unittest
-#from time import sleep
 
 
 class DeleteGroupTest(ScalingGroupFixture):

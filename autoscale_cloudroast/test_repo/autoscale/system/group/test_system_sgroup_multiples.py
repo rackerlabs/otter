@@ -64,14 +64,14 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         group_state_response = self.autoscale_client.list_status_entities_sgroups(group.id)
         self.assertEquals(group_state_response.status_code, 200)
         group_state = group_state_response.entity
-        servers_policy1 = self.gc_min_entities + change
-        servers_policy2 = servers_policy1 + int((servers_policy1 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
-        servers_policy3 = servers_policy2 + int((servers_policy2 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        sp1 = self.gc_min_entities + change
+        sp2 = sp1 + int((sp1 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        sp3 = sp2 + int((sp2 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
-            servers_policy3,
+            sp3,
             msg="Active + Pending servers are not equal to the total expected servers")
-        self.assertEqual(group_state.desiredCapacity, servers_policy3,
+        self.assertEqual(group_state.desiredCapacity, sp3,
                          msg="Desired capacity are not equal to the total expected servers")
 
     def test_system_create_policy_with_multiple_webhooks(self):

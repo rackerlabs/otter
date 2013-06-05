@@ -3,7 +3,6 @@ Test to update launch config.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 from cloudcafe.compute.common.datagen import rand_name
-import unittest
 
 
 class UpdateLaunchConfigTest(ScalingGroupFixture):

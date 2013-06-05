@@ -442,8 +442,8 @@ class GroupFixture(AutoscaleFixture):
             sp_list=splist)
         group = create_group_response.entity
         self.assertEquals(create_group_response.status_code, 201,
-            msg='Scaling group with min=max not created because %s'
-            % create_group_response.content)
+                          msg='Scaling group with min=max not created because %s'
+                          % create_group_response.content)
         policy = self.autoscale_behaviors.get_policy_properties(
             group.scalingPolicies)
         execute_policy_response = self.autoscale_client.execute_policy(
