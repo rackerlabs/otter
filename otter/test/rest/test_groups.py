@@ -3,7 +3,7 @@ Tests for :mod:`otter.rest.groups`, which include the endpoints for listing
 all scaling groups, and creating/viewing/deleting a scaling group.
 """
 import json
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 import mock
 
@@ -15,7 +15,7 @@ from otter.json_schema.group_examples import (
     config as config_examples,
     policy as policy_examples)
 
-from otter.json_schema import rest_schemas
+from otter.json_schema import rest_schemas, validate
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
@@ -91,6 +91,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        patch(self, 'otter.rest.application.get_url_root', return_value="")
 
     def test_list_unknown_error_is_500(self):
         """
@@ -205,6 +206,36 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
+
+    def test_group_create_minEntites_lteq_maxEntities_invalid_400(self):
+        """
+        minEntities > maxEntities results in a 400.
+        """
+        expected_config = {
+            "name": "group",
+            "minEntities": 20,
+            "maxEntities": 10,
+            "cooldown": 10,
+            "metadata": {}
+        }
+
+        rval = {
+            'groupConfiguration': expected_config,
+            'launchConfiguration': launch_examples()[0],
+            'scalingPolicies': {},
+            'id': '1'
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
+        invalid = {
+            'groupConfiguration': expected_config,
+            'launchConfiguration': launch_examples()[0],
+            'scalingPolicies': [],
+        }
+        resp_body = self.assert_status_code(400, self.endpoint, 'POST', json.dumps(invalid))
+        resp = json.loads(resp_body)
+        self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):

@@ -1,4 +1,4 @@
-HOST: https://{region}.autoscale.api.rackspacecloud.com/
+HOST: https://{region}.autoscale.api.rackspacecloud.com/v1.0/
 
 --- Rackspace Autoscale ---
 ---
@@ -683,16 +683,27 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
 < 204
 
 
-Execute a scaling policy. If successful, a response body will be returned. (TBD)
+Execute a scaling policy. If successful, a response body will be returned.
 POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
-> Accepts: application/json
 < 202
 < Content-Type: application/json
-{}}
+{}
 
 
 --
 Execute Resource
+Autoscale REST Endpoints having to do with executing policies without
+authentication.
+
+(/execute/{capability_version}/{capability_hash}/)
+--
+
+Execute a webhook
+POST /execute/{capability_version}/{capability_hash}/
+< 202
+< Content-Type: application/json
+{}
+
 
 
 --
