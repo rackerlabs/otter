@@ -66,7 +66,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
         if lc_name is None:
-            lc_name = rand_name('test_lc_srv_hmm')
+            lc_name = rand_name('test_lc_srv')
         else:
             lc_name = rand_name(str(lc_name))
         if lc_image_ref is None:
@@ -145,7 +145,6 @@ class AutoscaleBehaviors(BaseBehavior):
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
-            print group_state
 
             if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
                 raise BuildErrorException(
@@ -158,6 +157,7 @@ class AutoscaleBehaviors(BaseBehavior):
                     active_sever_id_list.append(each.id)
                 break
             time.sleep(interval_time)
+            print "waiting for servers to be active..."
         else:
             raise TimeoutException(
                 "wait_for_active_list_in_group_state ran for {0} seconds and did not "

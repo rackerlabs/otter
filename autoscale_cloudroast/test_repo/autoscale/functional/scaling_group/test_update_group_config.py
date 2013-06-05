@@ -65,7 +65,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
                           msg='Update failed with %s as it does not include full request'
                           % upd_group_resp.status_code)
 
-    @unittest.skip('AUTO-302')
     def test_update_minentities_over_maxentities(self):
         """
         Verify update with in incomplete request containing minentities over maxentities
@@ -83,7 +82,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
                           msg='Update failed with %s as it does not include full request'
                           % upd_group_resp.status_code)
 
-    @unittest.skip('AUTO-302')
     def test_update_maxentities_lessthan_minentities(self):
         """
         Verify update with in incomplete request containing maxentities over minentities

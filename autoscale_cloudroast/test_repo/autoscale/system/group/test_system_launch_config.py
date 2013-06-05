@@ -1,10 +1,10 @@
 """
 System tests for launch config
 """
-from test_repo.autoscale.fixtures import AutoscaleFixture
+from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 
 
-class LaunchConfigFixture(AutoscaleFixture):
+class LaunchConfigFixture(ScalingGroupWebhookFixture):
 
     """
     System tests to verify launch config
@@ -16,7 +16,6 @@ class LaunchConfigFixture(AutoscaleFixture):
         Instantiate client and configs
         """
         super(LaunchConfigFixture, cls).setUpClass()
-        cls.invalid_lbaas = [{'loadBalancerId': 0000, 'port': 0000}]
 
     @classmethod
     def tearDownClass(cls):
@@ -24,123 +23,6 @@ class LaunchConfigFixture(AutoscaleFixture):
         Delete the scaling group
         """
         super(LaunchConfigFixture, cls).tearDownClass()
-
-    def test_system_create_delete_scaling_group_invalid_imageid(self):
-        """
-        Verify create and delete scaling group with invalid server image id
-        TBD: Verify the group state updates to be 0 when server image is invalid
-        """
-        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=self.gc_min_entities_alt,
-            lc_image_ref="INVALIDIMAGEID")
-        group = create_group_response.entity
-        self.assertEquals(create_group_response.status_code, 201,
-                          msg='Create group with invalid server image id failed with %s'
-                          % create_group_response.status_code)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity +
-            group_state.activeCapacity, self.gc_min_entities_alt,
-            msg='Group failed to attempt to create server with invalid image. Active+pending != min')
-        self.assertEqual(group_state.desiredCapacity, self.gc_min_entities_alt,
-                         msg='Desired capacity is not equal to the minentities on the group')
-        delete_group_response = self.autoscale_client.delete_scaling_group(
-            group.id)
-        self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group failed for a group with invalid server image ID with %s'
-                          % delete_group_response.status_code)
-
-    def test_system_execute_policy_with_invalid_imageid(self):
-        """
-        Verify execute policy with invalid server image id
-        TBD: Verify the group state updates to be 0 when server image is invalid
-        """
-        update_launch_config_response = self.autoscale_client.update_launch_config(
-            group_id=self.group.id,
-            name=self.group.launchConfiguration.server.name,
-            image_ref="INVALIDIMAGEID",
-            flavor_ref=self.group.launchConfiguration.server.flavorRef)
-        self.assertEquals(update_launch_config_response.status_code, 204,
-                          msg='Updating launch config with invalid image id faile with %s'
-                          % update_launch_config_response)
-        execute_policy_response = self.autoscale_client.execute_policy(
-            group_id=self.group.id,
-            policy_id=self.policy['id'])
-        self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='policy executed with an invalid server image id with status %s'
-                          % execute_policy_response.status_code)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            self.group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            self.gc_min_entities,
-            msg='Active + Pending servers is not equal to expected number of servers')
-        self.assertEqual(group_state.desiredCapacity, self.gc_min_entities,
-    msg='Desired capacity is not equal to expected number of servers')
-
-    def test_system_create_delete_scaling_group_invalid_lbaasid(self):
-        """
-        Verify create and delete scaling group with invalid lbaas id
-        TBD : Do we not create a server when lbaas ID is invalid
-        """
-        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=self.gc_min_entities_alt,
-            lc_load_balancers=invalid_lbaas)
-        group = create_group_response.entity
-        self.assertEquals(create_group_response.status_code, 201,
-                          msg='Create group with invalid lbaas id failed with %s'
-                          % create_group_response.status_code)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity +
-            group_state.activeCapacity, self.gc_min_entities_alt,
-            msg='Group failed to attempt to create server with invalid lbaas id. Active+pending != min')
-        self.assertEqual(group_state.desiredCapacity, self.gc_min_entities_alt,
-                         msg='Desired capacity is not equal to the minentities on the group')
-        delete_group_response = self.autoscale_client.delete_scaling_group(
-            group.id)
-        self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group failed for a group with invalid lbaas id with %s %s'
-                          % (delete_group_response.status_code, delete_group_response.message))
-
-    def test_system_execute_policy_with_invalid_lbaasid(self):
-        """
-        Verify execute policy with invalid lbaas id
-        TBD: Verify the group state updates to be 0 when lbaas data is invalid
-        """
-        update_launch_config_response = self.autoscale_client.update_launch_config(
-            group_id=self.group.id,
-            name=self.group.launchConfiguration.server.name,
-            image_ref=self.group.launchConfiguration.server.imageRef,
-            flavor_ref=self.group.launchConfiguration.server.flavorRef,
-            load_balancers=self.invalid_lbaas)
-        self.assertEquals(update_launch_config_response.status_code, 204,
-                          msg='Updating launch config with invalid lbaas id failed with %s'
-                          % update_launch_config_response)
-        execute_policy_response = self.autoscale_client.execute_policy(
-            group_id=self.group.id,
-            policy_id=self.policy['id'])
-        self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='Policy executed with an invalid lbaas id with status %s'
-                          % execute_policy_response.status_code)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            self.group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            self.gc_min_entities,
-            msg='Active + Pending servers is not equal to expected number of servers')
-        self.assertEqual(group_state.desiredCapacity, self.gc_min_entities,
-    msg='Desired capacity is not equal to expected number of servers')
 
     def test_system_update_launchconfig_scale_up(self):
         """
@@ -170,8 +52,7 @@ class LaunchConfigFixture(AutoscaleFixture):
         active_servers_1 = minentities
         active_list_b4_upd = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=group.id,
-            active_servers=active_servers_1,
-            interval_time=60)
+            active_servers=active_servers_1)
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=group.id,
             policy_id=policy['id'])
@@ -181,8 +62,7 @@ class LaunchConfigFixture(AutoscaleFixture):
         active_servers = minentities + (1 * self.sp_change)
         active_list_after_upd = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=group.id,
-            active_servers=active_servers,
-            interval_time=60)
+            active_servers=active_servers)
         upd_lc_server = set(active_list_after_upd) - set(active_list_b4_upd)
         for each in list(upd_lc_server):
             get_server_resp = self.server_client.get_server(each)
@@ -241,7 +121,8 @@ class LaunchConfigFixture(AutoscaleFixture):
         active_list_after_down = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=group.id,
             active_servers=server_after_down)
-        self.assertEqual(set(active_list_after_down), (set(active_list_b4_upd)-set(first_server)))
+        self.assertEqual(set(active_list_after_down), (
+            set(active_list_b4_upd) - set(first_server)))
         for each in list(active_list_after_down):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
@@ -315,7 +196,8 @@ class LaunchConfigFixture(AutoscaleFixture):
         active_list_after_down = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=group.id,
             active_servers=server_after_down)
-        self.assertEqual(set(active_list_after_down), (set(active_list_after_up)-set(first_server)))
+        self.assertEqual(set(active_list_after_down), (
+            set(active_list_after_up) - set(first_server)))
 
     def test_system_server_details_name_and_metadata(self):
         """
@@ -334,8 +216,10 @@ class LaunchConfigFixture(AutoscaleFixture):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
             metadata = self.autoscale_behaviors.to_data(server.metadata)
-            self.assertEquals(server.image.id, group.launchConfiguration.server.imageRef)
-            self.assertEquals(server.flavor.id, group.launchConfiguration.server.flavorRef)
+            self.assertEquals(
+                server.image.id, group.launchConfiguration.server.imageRef)
+            self.assertEquals(
+                server.flavor.id, group.launchConfiguration.server.flavorRef)
             self.assertEquals(metadata, expected_metadata)
             self.assertTrue(server_name in server.name)
 
@@ -364,8 +248,10 @@ class LaunchConfigFixture(AutoscaleFixture):
         for each in servers_list:
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
-            self.assertEquals(server.image.id, group.launchConfiguration.server.imageRef)
-            self.assertEquals(server.flavor.id, group.launchConfiguration.server.flavorRef)
+            self.assertEquals(
+                server.image.id, group.launchConfiguration.server.imageRef)
+            self.assertEquals(
+                server.flavor.id, group.launchConfiguration.server.flavorRef)
 
     def test_system_update_launchconfig_group_minentities(self):
         """
@@ -382,8 +268,10 @@ class LaunchConfigFixture(AutoscaleFixture):
         for each in servers_first_list:
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
-            self.assertEquals(server.image.id, group.launchConfiguration.server.imageRef)
-            self.assertEquals(server.flavor.id, group.launchConfiguration.server.flavorRef)
+            self.assertEquals(
+                server.image.id, group.launchConfiguration.server.imageRef)
+            self.assertEquals(
+                server.flavor.id, group.launchConfiguration.server.flavorRef)
         upd_server_name = "upd_lc_config"
         upd_image_ref = self.lc_image_ref_alt
         upd_flavor_ref = "3"

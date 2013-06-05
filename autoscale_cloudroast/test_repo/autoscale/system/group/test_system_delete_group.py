@@ -3,6 +3,7 @@ System tests for delete scaling group
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 import unittest
+#from time import sleep
 
 
 class DeleteGroupTest(ScalingGroupFixture):
@@ -27,7 +28,6 @@ class DeleteGroupTest(ScalingGroupFixture):
         """
         super(DeleteGroupTest, cls).tearDownClass()
 
-    @unittest.skip('fails due to AUTO-284')
     def test_system_delete_group_with_minentities_over_zero(self):
         """
         Verify delete scaling group when minentities more than zero
@@ -68,13 +68,13 @@ class DeleteGroupTest(ScalingGroupFixture):
         group_state = group_state_response.entity
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
-            minentities,
+            self.minentities,
             msg='Active + Pending servers over min entities')
-        self.assertEqual(group_state.desiredCapacity, minentities,
+        self.assertEqual(group_state.desiredCapacity, self.minentities,
                          msg='Desired capacity not same as min entities upon group creation')
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group.id)
-        self.assertEquals(delete_group_response.status_code, 204,
+        self.assertEquals(delete_group_response.status_code, 403,
                           msg='Deleted group was unsuccessful %s'
                           % delete_group_response.content)
 
@@ -102,6 +102,7 @@ class DeleteGroupTest(ScalingGroupFixture):
     def test_system_delete_group_zero_minentities_execute_webhook(self):
         """
         Verify delete group when group has 0 minentities and webhook has been executed.
+        Note : Failing in dev vm cause group state is updating late
         """
         minentities = 0
         sp_list = [{
@@ -125,6 +126,7 @@ class DeleteGroupTest(ScalingGroupFixture):
         execute_policy = self.autoscale_client.execute_webhook(
             webhook['links'].capability)
         self.assertEquals(execute_policy.status_code, 202)
+        #sleep(5)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group.id)
         self.assertEquals(group_state_response.status_code, 200)
@@ -132,7 +134,7 @@ class DeleteGroupTest(ScalingGroupFixture):
         self.assertEquals(
             group_state.desiredCapacity,
             policy['change'],
-            msg='scaling policy executed, but desired capacity does not match')
+            msg='Desired capacity does not match scale up that was executed')
         delete_group_response = self.autoscale_client.delete_scaling_group(
             group.id)
         self.assertEquals(delete_group_response.status_code, 403,

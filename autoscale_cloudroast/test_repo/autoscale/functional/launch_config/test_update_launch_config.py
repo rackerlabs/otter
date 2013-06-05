@@ -91,7 +91,6 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
                 lc_load_balancers),
             msg='Load balancers in the launch config did not update')
 
-    @unittest.skip("AUTO-332")
     def test_partial_update_launch_config(self):
         """
         Verify update luanch config with partial request
