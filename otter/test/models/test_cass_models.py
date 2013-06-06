@@ -202,7 +202,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.view_config()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -379,7 +379,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.view_config()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
 
     def test_view_launch(self):
@@ -395,7 +395,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM launch_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -446,7 +446,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
 
     def test_update_config(self):
@@ -463,7 +463,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.returns = [cass_response, None]
         d = self.group.update_config({"b": "lah"})
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
+        self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", "groupId", data) VALUES '
                        '(:tenantId, :groupId, :scaling) APPLY BATCH;')
         expectedData = {"scaling": '{"_ver": 1, "b": "lah"}',
@@ -486,7 +486,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.returns = [cass_response, None]
         d = self.group.update_launch_config({"b": "lah"})
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
+        self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = ('BEGIN BATCH INSERT INTO launch_config("tenantId", "groupId", data) VALUES '
                        '(:tenantId, :groupId, :launch) APPLY BATCH;')
         expectedData = {"launch": '{"_ver": 1, "b": "lah"}',
@@ -528,7 +528,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.get_policy("3444")
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
@@ -579,7 +579,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'key': ''}]
         self.returns = [cass_response]
         d = self.group.get_policy("3444")
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
 
     def test_naive_list_policies_with_policies(self):
@@ -595,7 +595,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedCql = ('SELECT "policyId", data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND deleted = False;')
         d = self.group._naive_list_policies()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {'policy1': {}, 'policy2': {}})
 
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -611,7 +611,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.returns = [[]]
         d = self.group._naive_list_policies()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
@@ -627,7 +627,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         mock_naive.return_value = defer.succeed(expected_result)
 
         d = self.group.list_policies()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, expected_result)
 
         mock_naive.assert_called_once_with()
@@ -645,7 +645,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         view config doesn't raise an error.
         """
         d = self.group.list_policies()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
 
         mock_naive.assert_called_once_with()
@@ -713,7 +713,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'value': '{"_ver": 2}', 'ttl': None}], 'key': ''}]
         self.returns = [cass_response]
         d = self.group.list_policies()
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {'group1': {}, 'group3': {}})
 
     def test_add_scaling_policy(self):
@@ -730,7 +730,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.returns = [cass_response, None]
         d = self.group.create_policies([{"b": "lah"}])
-        result = self.assert_deferred_succeeded(d)
+        result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'APPLY BATCH;')
@@ -751,7 +751,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
         self.returns = [None]
         d = self.group.create_policies([{"b": "lah"}])
-        self.assert_deferred_succeeded(d)
+        self.successResultOf(d)
         self.group.view_config.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
@@ -842,7 +842,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         d = self.group.delete_policy('3222')
         # delete returns None
-        self.assertIsNone(self.assert_deferred_succeeded(d))
+        self.assertIsNone(self.successResultOf(d))
         mock_get_policy.assert_called_once_with('3222')
         mock_naive.assert_called_once_with('3222', ConsistencyLevel.TWO)
 
@@ -875,7 +875,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah"})
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # update returns None
+        self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = (
             'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
             'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
@@ -1054,7 +1054,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedCql = ('SELECT "webhookId", data, capability FROM policy_webhooks '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND deleted = False;')
-        r = self.assert_deferred_succeeded(
+        r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
 
         expected_data['capability'] = {
@@ -1077,7 +1077,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         even if the policy were invalid
         """
         self.returns = [[]]
-        r = self.assert_deferred_succeeded(
+        r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
         self.assertEqual(r, {})
         self.assertEqual(len(mock_get_policy.mock_calls), 0)
@@ -1143,7 +1143,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [_cassandrify_data(
             [{'data': '{"name": "pokey"}', 'capability': '{"1": "h"}'}])]
         d = self.group.get_webhook("3444", "4555")
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         expectedCql = ('SELECT data, capability FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND "webhookId" = :webhookId AND '
@@ -1179,7 +1179,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.returns = [_cassandrify_data([{'data': '{"_ver": 5}'}])]
         d = self.group.get_policy("3444")
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, {})
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_webhook')
@@ -1197,7 +1197,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }
 
         d = self.group.update_webhook('3444', '4555', new_webhook_data)
-        self.assertIsNone(self.assert_deferred_succeeded(d))
+        self.assertIsNone(self.successResultOf(d))
 
         expectedCql = (
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", '
@@ -1228,7 +1228,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.returns = [None]
 
         d = self.group.update_webhook('3444', '4555', {'name': 'newname'})
-        self.assertIsNone(self.assert_deferred_succeeded(d))
+        self.assertIsNone(self.successResultOf(d))
 
         self.assertEqual(
             json.loads(self.connection.execute.call_args[0][1]['data']),
@@ -1256,7 +1256,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             _cassandrify_data([{'data': '{}', 'capability': '{"1": "h"}'}]),
             None]
         d = self.group.delete_webhook('3444', '4555')
-        self.assertIsNone(self.assert_deferred_succeeded(d))  # delete returns None
+        self.assertIsNone(self.successResultOf(d))  # delete returns None
         expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND "webhookId" = :webhookId')
@@ -1649,7 +1649,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.assertEqual(r, ('123', 'group1', 'pol1'))
         self.connection.execute.assert_called_any(expectedCql,
                                                   expectedData,
