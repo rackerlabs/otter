@@ -926,6 +926,9 @@ class CassScalingGroupCollection:
                                     {"size": size, "now": now},
                                     get_consistency_level('list', 'events'))
         d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
+                                     row['policyId'], row['trigger'])
+                                    for row in rows])
         return d
 
     def webhook_info_by_hash(self, log, capability_hash):

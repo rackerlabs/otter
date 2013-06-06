@@ -1513,10 +1513,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.mock_key.return_value = '12345678'
 
         result = self.validate_fetch_batch_of_events(1234, 100)
-        self.assertEqual(result, [{'groupId': 'gr2', 'policyId': 'ef', 'tenantId': '1d2',
-                                   'trigger': 100},
-                                  {'groupId': 'gr2', 'policyId': 'ex', 'tenantId': '1d2',
-                                   'trigger': 122}])
+        self.assertEqual(result, [('1d2', 'gr2', 'ef', 100),
+                                  ('1d2', 'gr2', 'ex', 122)])
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

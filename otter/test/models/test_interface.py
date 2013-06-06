@@ -399,14 +399,17 @@ class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
 
     def validate_fetch_batch_of_events(self, *args, **kwargs):
         """
-        Calls ``list_scaling_group_states()`` and validates that it returns a
-        list of :class:`GroupState`
+        Calls ``fetch_batch_of_events()`` and validates that it returns a
+        list of (tenant_id, scaling_group_id, policy_id, trigger time) tuples
 
-        :return: the return value of ``list_scaling_group_states()``
+        :return: the return value of ``fetch_batch_of_events()``
         """
         result = self.assert_deferred_succeeded(
             self.collection.fetch_batch_of_events(*args, **kwargs))
 
         self.assertEqual(type(result), list)
+        for elem in result:
+            self.assertEqual(type(elem), tuple)
+            self.assertEqual(len(elem), 4)
 
         return result
