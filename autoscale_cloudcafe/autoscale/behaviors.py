@@ -25,28 +25,6 @@ class AutoscaleBehaviors(BaseBehavior):
         super(AutoscaleBehaviors, self).__init__()
         self.autoscale_config = autoscale_config
         self.autoscale_client = autoscale_client
-        # self.gc_name = self.autoscale_config.gc_name
-        # self.gc_cooldown = int(self.autoscale_config.gc_cooldown)
-        # self.gc_min_entities = int(self.autoscale_config.gc_min_entities)
-        # self.gc_min_entities_alt = int(
-        #     self.autoscale_config.gc_min_entities_alt)
-        # self.lc_name = self.autoscale_config.lc_name
-        # self.lc_flavor_ref = self.autoscale_config.lc_flavor_ref
-        # self.lc_image_ref = self.autoscale_config.lc_image_ref
-        # self.lc_image_ref_alt = self.autoscale_config.lc_image_ref_alt
-        # self.sp_name = rand_name(self.autoscale_config.sp_name)
-        # self.sp_cooldown = int(self.autoscale_config.sp_cooldown)
-        # self.sp_change = int(self.autoscale_config.sp_change)
-        # self.sp_change_percent = int(self.autoscale_config.sp_change_percent)
-        # self.sp_desired_capacity = int(
-        #     self.autoscale_config.sp_desired_capacity)
-        # self.sp_policy_type = self.autoscale_config.sp_policy_type
-        # self.upd_sp_change = int(self.autoscale_config.upd_sp_change)
-        # self.lc_load_balancers = self.autoscale_config.lc_load_balancers
-        # self.sp_list = self.autoscale_config.sp_list
-        # self.wb_name = rand_name(self.autoscale_config.wb_name)
-        # self.interval_time = int(self.autoscale_config.interval_time)
-        # self.timeout = int(self.autoscale_config.timeout)
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
