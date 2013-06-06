@@ -53,14 +53,6 @@ class DeferredTestMixin(object):
     failed
     """
 
-    def assert_deferred_succeeded(self, deferred):
-        """
-        Synonym for self.successResultOf - provided for compatibility and
-        because self.assert_deferred_failed is still needed to check for
-        expected failures.
-        """
-        return self.successResultOf(deferred)
-
     def assert_deferred_failed(self, deferred, *expected_failures):
         """
         Asserts that the deferred should have errbacked with the given

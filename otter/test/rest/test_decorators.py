@@ -73,7 +73,7 @@ class TransactionIdTestCase(DeferredTestMixin, TestCase):
             return defer.succeed('hello')
 
         d = doWork(self.mockRequest)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
 
         self.mock_log_patch.bind.assert_called_once_with(
             system='otter.test.rest.test_decorators.doWork',
@@ -114,7 +114,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.succeed('hello')
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
 
         self.mockLog.bind.assert_called_once_with(code=204, uri='/')
@@ -134,7 +134,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.succeed('hello')
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.mockLog.bind.assert_called_once_with(code=204, uri='/')
         self.mockLog.bind().msg.assert_called_once_with('Request succeeded')
@@ -152,7 +152,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(BlahError('fail'))
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         self.mockLog.bind.assert_called_once_with(code=404, uri='/',
@@ -180,7 +180,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(DetailsError('fail'))
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         self.mockLog.bind.assert_called_once_with(code=404, uri='/',
@@ -209,7 +209,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(DetailsError('fail'))
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
         # Not testing the logging here; if you do it out of order, it still
@@ -247,7 +247,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(BlahError('fail'))
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
         self.mockLog.bind.assert_called_once_with(code=400, uri='/',
@@ -278,7 +278,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
             return defer.fail(blah)
 
         d = doWork(self.mockRequest, self.mockLog)
-        r = self.assert_deferred_succeeded(d)
+        r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 
         class _CmpFailure(object):
@@ -343,7 +343,7 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         kwargs = {'one': 'two'}
 
         d = handle_body(self.request, *args, **kwargs)
-        result = self.assert_deferred_succeeded(d)
+        result = self.successResultOf(d)
 
         # assert that it was validated
         self.mock_validate.assert_called_once_with(expected_value, schema)

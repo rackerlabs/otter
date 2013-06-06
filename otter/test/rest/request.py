@@ -223,7 +223,7 @@ class RequestTestMixin(DeferredTestMixin):
 
         :return: the response body as a string
         """
-        response_wrapper = self.assert_deferred_succeeded(
+        response_wrapper = self.successResultOf(
             request(root, method, endpoint or self.endpoint, body=body))
 
         self.assert_response(response_wrapper, expected_status)
