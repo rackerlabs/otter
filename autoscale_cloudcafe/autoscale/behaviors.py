@@ -25,28 +25,28 @@ class AutoscaleBehaviors(BaseBehavior):
         super(AutoscaleBehaviors, self).__init__()
         self.autoscale_config = autoscale_config
         self.autoscale_client = autoscale_client
-        self.gc_name = self.autoscale_config.gc_name
-        self.gc_cooldown = int(self.autoscale_config.gc_cooldown)
-        self.gc_min_entities = int(self.autoscale_config.gc_min_entities)
-        self.gc_min_entities_alt = int(
-            self.autoscale_config.gc_min_entities_alt)
-        self.lc_name = self.autoscale_config.lc_name
-        self.lc_flavor_ref = self.autoscale_config.lc_flavor_ref
-        self.lc_image_ref = self.autoscale_config.lc_image_ref
-        self.lc_image_ref_alt = self.autoscale_config.lc_image_ref_alt
-        self.sp_name = rand_name(self.autoscale_config.sp_name)
-        self.sp_cooldown = int(self.autoscale_config.sp_cooldown)
-        self.sp_change = int(self.autoscale_config.sp_change)
-        self.sp_change_percent = int(self.autoscale_config.sp_change_percent)
-        self.sp_desired_capacity = int(
-            self.autoscale_config.sp_desired_capacity)
-        self.sp_policy_type = self.autoscale_config.sp_policy_type
-        self.upd_sp_change = int(self.autoscale_config.upd_sp_change)
-        self.lc_load_balancers = self.autoscale_config.lc_load_balancers
-        self.sp_list = self.autoscale_config.sp_list
-        self.wb_name = rand_name(self.autoscale_config.wb_name)
-        self.interval_time = int(self.autoscale_config.interval_time)
-        self.timeout = int(self.autoscale_config.timeout)
+        # self.gc_name = self.autoscale_config.gc_name
+        # self.gc_cooldown = int(self.autoscale_config.gc_cooldown)
+        # self.gc_min_entities = int(self.autoscale_config.gc_min_entities)
+        # self.gc_min_entities_alt = int(
+        #     self.autoscale_config.gc_min_entities_alt)
+        # self.lc_name = self.autoscale_config.lc_name
+        # self.lc_flavor_ref = self.autoscale_config.lc_flavor_ref
+        # self.lc_image_ref = self.autoscale_config.lc_image_ref
+        # self.lc_image_ref_alt = self.autoscale_config.lc_image_ref_alt
+        # self.sp_name = rand_name(self.autoscale_config.sp_name)
+        # self.sp_cooldown = int(self.autoscale_config.sp_cooldown)
+        # self.sp_change = int(self.autoscale_config.sp_change)
+        # self.sp_change_percent = int(self.autoscale_config.sp_change_percent)
+        # self.sp_desired_capacity = int(
+        #     self.autoscale_config.sp_desired_capacity)
+        # self.sp_policy_type = self.autoscale_config.sp_policy_type
+        # self.upd_sp_change = int(self.autoscale_config.upd_sp_change)
+        # self.lc_load_balancers = self.autoscale_config.lc_load_balancers
+        # self.sp_list = self.autoscale_config.sp_list
+        # self.wb_name = rand_name(self.autoscale_config.wb_name)
+        # self.interval_time = int(self.autoscale_config.interval_time)
+        # self.timeout = int(self.autoscale_config.timeout)
 
     def create_scaling_group_min(self, gc_name=None,
                                  gc_cooldown=None,
@@ -129,7 +129,8 @@ class AutoscaleBehaviors(BaseBehavior):
     def wait_for_active_list_in_group_state(self, group_id, active_servers,
                                             interval_time=None, timeout=None):
         """
-        @summary: waits for the specified number of servers to be active on a group
+        @summary: verify the desired capacity in group state is equal to active servers
+         and waits for the specified number of servers to be active on a group
         @param group_id: Group id
         @param active_servers: Total active servers expected on the group
         @param interval_time: Time to wait during polling group state
@@ -137,10 +138,17 @@ class AutoscaleBehaviors(BaseBehavior):
         @return: returns the list of active servers in the group
         @rtype: returns the active server list
         """
-        interval_time = interval_time or self.interval_time
-        timeout = timeout or self.timeout
+        interval_time = interval_time or int(self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
         end_time = time.time() + timeout
 
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if group_state.desiredCapacity != active_servers:
+            raise BuildErrorException(
+                'Group should have %s servers, but is trying to build %s servers'
+                % (active_servers, group_state.desiredCapacity))
         while time.time() < end_time:
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
@@ -238,7 +246,9 @@ class AutoscaleBehaviors(BaseBehavior):
         @param: group id
         @param: dict of policy details such as change type,
                 change integer/number, cooldown(optional)
-        @return: dict containing policy id and its webhook id
+                Eg: {'change_percent': 100, 'cooldown': 200}
+        @return: dict containing policy id and its webhook id and
+                 capability url
         @rtye: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
@@ -261,7 +271,8 @@ class AutoscaleBehaviors(BaseBehavior):
             name=wb_name)
         webhook = AutoscaleBehaviors.get_webhooks_properties(
             self, create_webhook.entity)
-        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'])
+        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'],
+                     webhook_url=webhook['links'].capability)
         return rdata
 
     def to_data(self, data):

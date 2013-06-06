@@ -4,7 +4,7 @@ System tests for launch config
 from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 
 
-class LaunchConfigFixture(ScalingGroupWebhookFixture):
+class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     """
     System tests to verify launch config
@@ -15,14 +15,14 @@ class LaunchConfigFixture(ScalingGroupWebhookFixture):
         """
         Instantiate client and configs
         """
-        super(LaunchConfigFixture, cls).setUpClass()
+        super(LaunchConfigTest, cls).setUpClass()
 
     @classmethod
     def tearDownClass(cls):
         """
         Delete the scaling group
         """
-        super(LaunchConfigFixture, cls).tearDownClass()
+        super(LaunchConfigTest, cls).tearDownClass()
 
     def test_system_update_launchconfig_scale_up(self):
         """
@@ -117,7 +117,7 @@ class LaunchConfigFixture(ScalingGroupWebhookFixture):
         self.assertEquals(execute_policy_down_response.status_code, 202,
                           msg='Scale down policy failed to execute with status %s'
                           % execute_policy_response.status_code)
-        server_after_down = active_list_b4_upd + scale_down_change
+        server_after_down = len(active_list_b4_upd) + scale_down_change
         active_list_after_down = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=group.id,
             active_servers=server_after_down)
