@@ -8,7 +8,7 @@ from twisted.internet import defer
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
@@ -67,7 +67,11 @@ _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
-
+_cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
+                     'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
+_cql_fetch_batch_of_events = (
+    'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
+    'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -115,7 +119,7 @@ def get_consistency_level(operation, resource):
     return ConsistencyLevel.ONE
 
 
-def _build_policies(policies, policies_table, queries, data, outpolicies):
+def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -139,14 +143,23 @@ def _build_policies(policies, policies_table, queries, data, outpolicies):
     :type outpolicies: ``dict``
     """
     if policies is not None:
-        for i in range(len(policies)):
+        for i, policy in enumerate(policies):
             polname = "policy{}".format(i)
             polId = generate_key_str('policy')
             queries.append(_cql_insert_policy.format(cf=policies_table,
                                                      name=':' + polname))
-            data[polname] = serialize_json_data(policies[i], 1)
+
+            data[polname] = serialize_json_data(policy, 1)
             data[polname + "Id"] = polId
-            outpolicies[polId] = policies[i]
+
+            if "type" in policy:
+                if policy["type"] == 'schedule':
+                    queries.append(_cql_insert_event.format(cf=event_table,
+                                                            name=':' + polname))
+                    # Only handling the at-trigger case right now
+
+                    data[polname + "Trigger"] = policy["args"]["at"]
+            outpolicies[polId] = policy
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
@@ -334,6 +347,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
+        self.event_table = "scaling_schedule"
 
     def view_manifest(self):
         """
@@ -525,7 +539,7 @@ class CassScalingGroup(object):
                        "groupId": self.uuid}
             outpolicies = {}
 
-            _build_policies(data, self.policies_table, queries, cqldata,
+            _build_policies(data, self.policies_table, self.event_table, queries, cqldata,
                             outpolicies)
 
             b = Batch(queries, cqldata,
@@ -800,7 +814,7 @@ class CassScalingGroup(object):
         return d
 
 
-@implementer(IScalingGroupCollection)
+@implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class CassScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
@@ -847,6 +861,7 @@ class CassScalingGroupCollection:
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
         self.state_table = "group_state"
+        self.event_table = "scaling_schedule"
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
@@ -868,7 +883,7 @@ class CassScalingGroupCollection:
                 }
 
         outpolicies = {}
-        _build_policies(policies, self.policies_table, queries, data,
+        _build_policies(policies, self.policies_table, self.event_table, queries, data,
                         outpolicies)
 
         b = Batch(queries, data,
@@ -902,6 +917,19 @@ class CassScalingGroupCollection:
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
+
+    def fetch_batch_of_events(self, now, size=100):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
+        """
+        d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
+                                    {"size": size, "now": now},
+                                    get_consistency_level('list', 'events'))
+        d.addCallback(_jsonize_cassandra_data)
+        d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
+                                     row['policyId'], row['trigger'])
+                                    for row in rows])
+        return d
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

@@ -14,7 +14,8 @@ from otter.models.interface import (
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
-    IScalingGroupCollectionProviderMixin)
+    IScalingGroupCollectionProviderMixin,
+    IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch
 
@@ -616,6 +617,26 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         deferred = self.group.delete_webhook("2", "3")
         self.assertIsNone(self.successResultOf(deferred))
         self.assertEqual(self.group.webhooks, {'2': {}})
+
+
+class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
+                                            TestCase):
+    """
+    Tests for :class:`MockScalingGroupCollection`
+    """
+
+    def setUp(self):
+        """ Set up the mocks """
+        self.collection = MockScalingGroupCollection()
+        self.tenant_id = 'goo1234'
+        self.mock_log = mock.MagicMock()
+
+    def test_list_events(self):
+        """
+        Test that the 'list all events' method works.
+        """
+        deferred = self.collection.fetch_batch_of_events(1234, 100)
+        self.assertEqual(self.successResultOf(deferred), [])
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
