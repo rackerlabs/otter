@@ -159,7 +159,7 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_min_entities=gc_min_entities,
             gc_max_entities=gc_max_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
-                          msg='Create scaling group passed with max minentities. Response: %s'
+                          msg='Create scaling group passed with max < minentities. Response: %s'
                           % create_resp.status_code)
 
     def test_scaling_group_maxentities_cooldown_max(self):

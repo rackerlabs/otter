@@ -29,8 +29,8 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
 
     def test_system_create_delete_scaling_group_invalid_imageid(self):
         """
-        Verify create and delete scaling group with invalid server image id
-         Note: the group state table is first updated with expected, then tries nova and updates to 0
+        Verify scaling group fails server creation gracefully when launch config
+        has an invalid imageId and that it can be deleted
         """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
@@ -47,9 +47,9 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEquals(
             group_state.pendingCapacity +
             group_state.activeCapacity, 0,
-            msg='Group failed to attempt to create server with invalid image. Active+pending != min')
+            msg='Group created servers with invalid image. Active or/and pending is over 0')
         self.assertEqual(group_state.desiredCapacity, 0,
-                         msg='Desired capacity is not equal to the minentities on the group')
+                         msg='Group created servers with invalid image. Desired capacity is over 0')
         delete_group_response = self.autoscale_client.delete_scaling_group(
             group.id)
         self.assertEquals(delete_group_response.status_code, 204,
@@ -58,8 +58,8 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
 
     def test_system_execute_policy_with_invalid_imageid(self):
         """
-        Verify execute policy with invalid server image id
-        Note: the group state table is first updated with expected, then tries nova and updates to 0
+        Verify policy execution fails server creation gracefully when launch config
+        has an invalid imageId and that it can be deleted
         """
         update_launch_config_response = self.autoscale_client.update_launch_config(
             group_id=self.group.id,
@@ -90,7 +90,8 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
     @unittest.skip("Invalid LbaasID handling not implemented")
     def test_system_create_delete_scaling_group_invalid_lbaasid(self):
         """
-        Verify create and delete scaling group with invalid lbaas id
+        Verify scaling group fails when launch config has an invalid lbaasId
+        and that it can be deleted
         """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
@@ -119,7 +120,8 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
     @unittest.skip("Invalid LbaasID handling not implemented")
     def test_system_execute_policy_with_invalid_lbaasid(self):
         """
-        Verify execute policy with invalid lbaas id
+        Verify scaling policy execution fails when launch config has an invalid lbaasId
+        and that it can be deleted
         """
         update_launch_config_response = self.autoscale_client.update_launch_config(
             group_id=self.group.id,
@@ -148,125 +150,132 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEqual(group_state.desiredCapacity, 0,
                          msg='Desired capacity is not equal to expected number of servers')
 
-    def test_system_delete_group_delete_all_servers(self):
-        """
-        Verify delete scaling group when user deletes all the servers on the group
-        """
-        pass
+    # def test_system_delete_group_delete_all_servers(self):
+    #     """
+    #     Verify delete scaling group when user deletes all the servers on the group
+    #     Autoscaling will re create all the deleted servers
+    #     (try changing launch config jus before delete)
+    #     """
+    #     pass
 
-    def test_system_delete_group_delete_some_servers(self):
-        """
-        Verify delete scaling group when user deletes some of the servers on the group
-        """
-        pass
+    # def test_system_delete_group_delete_some_servers(self):
+    #     """
+    #     Verify delete scaling group when user deletes some of the servers on the group
 
-    def test_system_delete_group_other_server_actions(self):
-        """
-        Verify delete scaling group when user performs actions on the servers in the group
-        """
-        pass
+    #     """
+    #     pass
 
-    def test_system_create_delete_scaling_group_server_building_indefinitely(self):
-        """
-        Verify create delete scaling group when servers build indefinitely
-        """
-        pass
+    # def test_system_delete_group_other_server_actions(self):
+    #     """
+    #     Verify delete scaling group when user performs actions on the servers in the group
+    #     Autoscaling will continue, like no action occured
+    #     """
+    #     pass
 
-    def test_system_execute_policy_server_building_indefinitely(self):
-        """
-        Verify execute policy when servers build indefinitely
-        """
-        pass
+    # def test_system_create_delete_scaling_group_server_building_indefinitely(self):
+    #     """
+    #     Verify create delete scaling group when servers build indefinitely
 
-    def test_system_execute_policy_one_ofthe_server_builds_indefinitely(self):
-        """
-        Verify execute policy when servers build indefinitely
-        """
-        pass
+    #     """
+    #     pass
 
-    def test_system_create_delete_scaling_group_some_servers_error(self):
-        """
-        Verify create delete scaling group when servers build indefinitely
-        """
-        pass
+    # def test_system_execute_policy_server_building_indefinitely(self):
+    #     """
+    #     Verify execute policy when servers build indefinitely
+    #     """
+    #     pass
 
-    def test_system_create_delete_scaling_group_all_servers_error(self):
-        """
-        Verify create delete scaling group when servers build indefinitely
-        """
-        pass
+    # def test_system_execute_policy_one_ofthe_server_builds_indefinitely(self):
+    #     """
+    #     Verify execute policy when servers build indefinitely
+    #     """
+    #     pass
 
-    def test_system_create_delete_scaling_group_server_rate_limit_met(self):
-        """
-        Verify create delete group when maximum servers allowed already exist.
-        """
-        pass
+    # def test_system_create_delete_scaling_group_some_servers_error(self):
+    #     """
+    #     Verify create delete scaling group when servers build indefinitely
+    #     """
+    #     pass
 
-    def test_system_execute_policy_when_server_rate_limit_met(self):
-        """
-        Verify execute policy when maximum servers allowed already exist.
-        """
-        pass
+    # def test_system_create_delete_scaling_group_all_servers_error(self):
+    #     """
+    #     Verify create delete scaling group when servers build indefinitely
+    #     Autoscale will know through atomhopper feed
+    #     """
+    #     pass
 
-    def test_system_create_scaling_group_account_suspended(self):
-        """
-        Verify create scaling group when account is suspended
-        """
-        pass
+    # def test_system_create_delete_scaling_group_server_rate_limit_met(self):
+    #     """
+    #     Verify create delete group when maximum servers allowed already exist.
 
-    def test_system_execute_policy_on_suspended_account(self):
-        """
-        Verify create scaling group when account is suspended
-        """
-        pass
+    #     """
+    #     pass
 
-    def test_system_create_scaling_group_account_closed(self):
-        """
-        Verify create scaling group when account is closed
-        """
-        pass
+    # def test_system_execute_policy_when_server_rate_limit_met(self):
+    #     """
+    #     Verify execute policy when maximum servers allowed already exist.
+    #     """
+    #     pass
 
-    def test_system_execute_policy_on_closed_account(self):
-        """
-        Verify create scaling group when account is closed
-        """
-        pass
+    # def test_system_create_scaling_group_account_suspended(self):
+    #     """
+    #     Verify create scaling group when account is suspended
+    #     """
+    #     pass
 
-    def test_system_delete_group_unable_to_impersonate(self):
-        """
-        Verify delete scaling group when impersonation fails
-        """
-        # AUTO - 284
-        pass
+    # def test_system_execute_policy_on_suspended_account(self):
+    #     """
+    #     Verify create scaling group when account is suspended
+    #     """
+    #     pass
 
-    def test_system_delete_group_when_nova_down(self):
-        """
-        Verify delete scaling group when nova is down
-        """
-        pass
+    # def test_system_create_scaling_group_account_closed(self):
+    #     """
+    #     Verify create scaling group when account is closed
+    #     """
+    #     pass
 
-    def test_system_delete_group_when_lbaas_down(self):
-        """
-        Verify delete scaling group when lbaas is down
-        """
-        pass
+    # def test_system_execute_policy_on_closed_account(self):
+    #     """
+    #     Verify create scaling group when account is closed
+    #     """
+    #     pass
 
-    def test_system_scaling_group_lbaas_draining_disabled(self):
-        """
-        Verify execute policy with lbaas draining or disabled
-        """
-        pass
+    # def test_system_delete_group_unable_to_impersonate(self):
+    #     """
+    #     Verify delete scaling group when impersonation fails
+    #     """
+    #     # AUTO - 284
+    #     pass
 
-    def test_system_create_delete_scaling_group_with_deleted_lbaasid(self):
-        """
-        Verify creation of scaling group with deleted lbaas id
-        note : is this same as invalid id??
-        """
-        pass
+    # def test_system_delete_group_when_nova_down(self):
+    #     """
+    #     Verify delete scaling group when nova is down
+    #     """
+    #     pass
 
-    def test_system_execute_policy_with_deleted_lbaasid(self):
-        """
-        Verify polic execution with deleted lbaas id
-        note : is this same as invalid id??
-        """
-        pass
+    # def test_system_delete_group_when_lbaas_down(self):
+    #     """
+    #     Verify delete scaling group when lbaas is down
+    #     """
+    #     pass
+
+    # def test_system_scaling_group_lbaas_draining_disabled(self):
+    #     """
+    #     Verify execute policy with lbaas draining or disabled
+    #     """
+    #     pass
+
+    # def test_system_create_delete_scaling_group_with_deleted_lbaasid(self):
+    #     """
+    #     Verify creation of scaling group with deleted lbaas id
+    #     note : is this same as invalid id??
+    #     """
+    #     pass
+
+    # def test_system_execute_policy_with_deleted_lbaasid(self):
+    #     """
+    #     Verify polic execution with deleted lbaas id
+    #     note : is this same as invalid id??
+    #     """
+    #     pass

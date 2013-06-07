@@ -77,7 +77,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
     def test_system_create_policy_with_multiple_webhooks(self):
         """
         Verify scaling policy in a group can have multiple multiple_webhooks
-        @TODO : fails on dev vm if sleep stmts are not present between all executes
+        and they can be executed
         """
 
         policy = self.autoscale_behaviors.create_policy_min(

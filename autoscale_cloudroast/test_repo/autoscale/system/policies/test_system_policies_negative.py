@@ -32,7 +32,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
         """
-        Verify execute policy when max entities are equal to min entities
+        Verify executing a policy when max entities are equal to min entities,
+        fails with the response code 403
         """
         minentities = maxentities = 1
         splist = [{

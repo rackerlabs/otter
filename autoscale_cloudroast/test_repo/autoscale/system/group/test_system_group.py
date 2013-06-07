@@ -3,7 +3,6 @@ System tests for multiple scaling groups scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import base64
-import unittest
 
 
 class GroupFixture(AutoscaleFixture):
@@ -28,7 +27,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_minentities_to_scaleup(self):
         """
-        Verify scale up when minentities is increased. AUTO-336
+        Verify that the scaling group scales up when the min entities are updated,
+        to be more
         """
         minentities = 0
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -66,7 +66,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_minentities_to_be_lesser_than_during_create_group(self):
         """
-        Verify scaling group when minentities is reduced. Note: scale down will not occur
+        Verify scaling group does not scale down when the minenetities are updated,
+        to be lower
         """
         minentities = 4
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -104,7 +105,9 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_maxentities_less_than_desiredcapacity(self):
         """
-        Verify group when max entities is updated to be less than current active servers
+        Create a scaling group and execute a policy to be within maxentities,
+        reduce the max entities to be less than the active server (desiredCapacity)
+        and verify the scaling group scales down
         """
         minentities = 0
         maxentities = 10
@@ -164,7 +167,9 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_maxenetities_and_execute_policy(self):
         """
-        Verify execute policy after maxentities is updated
+        Execute policy on scaling group such that the max entities are met,
+        update the max entities and verify re-executing the scaling policy beyond
+        the older max entities is successful
         """
         minentities = 0
         maxentities = 2
@@ -227,7 +232,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_group_cooldown_enforced_when_reexecuting_same_policy(self):
         """
-        Verify same policy cannot be re-executed during scaling group cooldown
+        Verify group cooldown is enforced when executing a scaling policy
+        with zero policy cooldown, multiple times
         """
         splist = [{
             'name': 'scale up by 3',
@@ -266,8 +272,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_group_cooldown_enforced_when_executing_different_policies(self):
         """
-        Verify different policies cannot be executed during scaling group cooldown AUTO-336
-        prod group : d3aa8e57-396e-417d-a0ed-fed593630886, created 2 instead of 3
+        Verify group cooldown is enforced when executing different scaling policies,
+        multiple times
         """
         splist = [{
             'name': 'scale up by 3',
@@ -307,8 +313,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_group_cooldown_and_execute_policy(self):
         """
-        Verify execute policy when group cooldown is updated to be Zero AUTO-336
-        prod: group ea5fecb2-3696-424d-b639-e47706752b75 got 5 instead of 6
+        Verify different scaling policies can be executed when the group cooldown
+        is updated to be 0
         """
         splist = [{
             'name': 'scale up by 3',
@@ -387,13 +393,13 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy['id'])
         self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='policy was executed even when max entities were met, with status %s'
+                          msg='Policy execution failed with %s even though cooldown and min/max are met'
                           % execute_policy_response.status_code)
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=group.id,
             policy_id=policy['id'])
         self.assertEquals(execute_policy_response.status_code, 403,
-                          msg='policy was executed even when max entities were met, with status %s'
+                          msg='Policy was executed even when max entities were met, with status %s'
                           % execute_policy_response.status_code)
         upd_maxentities = 10
         update_group = self.autoscale_client.update_group_config(
@@ -422,10 +428,10 @@ class GroupFixture(AutoscaleFixture):
         self.assertEqual(group_state.desiredCapacity, total_servers,
                          msg='Desired capacity is not equal to expected number of servers')
 
-    @unittest.skip("Min cannot be equal to max issue")
     def test_system_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
-        Verify execute policy to exceed maxentities when group has min equal to max
+        Verify scaling group with minentities = maxentities cannot execute scale up
+        policy. Update the maxentities and verify the scaling policy can be executed.
         """
         minentities = 2
         maxentities = 2
@@ -481,7 +487,7 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_create_scaling_group_with_same_attributes(self):
         """
-        Verify two scaling groups can have the same attributes
+        Verify scaling groups can be created with the exact same schema
         """
         gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                        'gc_meta_key_2': 'gc_meta_value_2'}

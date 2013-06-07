@@ -26,9 +26,8 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_update_launchconfig_scale_up(self):
         """
-        Verify execute policies to scale up with multiple updates to launch config.
-        Needs mock implementation of verifying the create server call
-        after launch config is updated.
+        Create a scaling group, update launch config and verify executing a policy
+        creates servers with latest launch config
         """
         minentities = 1
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -72,7 +71,8 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_update_launchconfig_scale_down(self):
         """
-        Verify execute policies to scale down with multiple updates to launch config.
+        Create a scaling group and execute a scale up policy, update launch config
+        and verify executing a scale down policy deletes servers with older launch config
         """
         minentities = 1
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -86,7 +86,7 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
             group_id=group.id,
             sp_cooldown=0)
         scale_down_change = -1
-        policy_down = self.autoscale_behaviors.create_policy_min(
+        policy_down = self.autoscale_behaviors.create_policy_given(
             group_id=group.id,
             sp_change=scale_down_change,
             sp_cooldown=0)
@@ -131,7 +131,9 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_update_launchconfig_scale_up_down(self):
         """
-        Verify execute policies to scale up and down with updates to launch config.
+        Create a scaling group and execute a scale up policy, update launch config
+        and verify executing a scale down policy deletes servers with older launch config,
+        and executing a scale up policy creates servers with new launch configs
         """
         minentities = 1
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -145,7 +147,7 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
             group_id=group.id,
             sp_cooldown=0)
         scale_down_change = -1
-        policy_down = self.autoscale_behaviors.create_policy_min(
+        policy_down = self.autoscale_behaviors.create_policy_given(
             group_id=group.id,
             sp_change=scale_down_change,
             sp_cooldown=0)
@@ -201,7 +203,8 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_server_details_name_and_metadata(self):
         """
-        Verify server name and metadata of servers in a scaling group.
+        Verify server name and metadata of servers created by autoscale
+        in a scaling group
         """
         server_name = 'test_server_details'
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -225,7 +228,8 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_update_launchconfig_while_group_building(self):
         """
-        Verify group when launch config is updated while policy is executing.
+        Verify that updates to a launch config do not apply to a policy that
+        is executing when the update is made
         """
         minentities = 5
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -255,7 +259,8 @@ class LaunchConfigTest(ScalingGroupWebhookFixture):
 
     def test_system_update_launchconfig_group_minentities(self):
         """
-        Verify group when launch config is updated and then minentities are increased.
+        Create a scaling group update the launch config and update the minentities,
+        to be more and verify the newly created servers of the latest launch config
         """
         minentities = 1
         upd_minentities = 2
