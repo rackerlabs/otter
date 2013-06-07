@@ -21,7 +21,8 @@ from otter.models.interface import (
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
-    IScalingGroupCollectionProviderMixin)
+    IScalingGroupCollectionProviderMixin,
+    IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch
 
@@ -743,6 +744,40 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.assertEqual(result, {self.mock_key.return_value: {'b': 'lah'}})
 
+    def test_add_scaling_policy_at(self):
+        """
+        Test that you can add a scaling policy, and what is returned is a
+        dictionary of the ids to the scaling policies
+        """
+        cass_response = [
+            {'cols': [{'timestamp': None,
+                       'name': 'data',
+                       'value': '{}',
+                       'ttl': None}],
+             'key': ''}]
+
+        self.returns = [cass_response, None]
+
+        pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
+               'args': {'at': 12345}}
+        d = self.group.create_policies([pol])
+        result = self.successResultOf(d)
+        expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
+                       'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
+                       'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                       'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
+                       'APPLY BATCH;')
+        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": '
+                                    '5, "_ver": 1, "type": "schedule", "change": 10}'),
+                        "groupId": '12345678g',
+                        "policy0Id": '12345678',
+                        "policy0Trigger": 12345,
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+        self.assertEqual(result, {self.mock_key.return_value: pol})
+
     def test_add_first_checks_view_config(self):
         """
         Before a policy is added, `view_config` is first called to determine
@@ -1420,6 +1455,69 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
 # with this
 _S = namedtuple('_S', ['thing'])
+
+
+class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
+                                            TestCase):
+    """
+    Tests for :class:`CassScalingScheduleCollection`
+    """
+
+    def setUp(self):
+        """ Setup the mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
+
+        self.mock_log = mock.MagicMock()
+
+        self.collection = CassScalingGroupCollection(self.connection)
+        self.tenant_id = 'goo1234'
+        self.config = _de_identify({
+            'name': 'blah',
+            'cooldown': 600,
+            'minEntities': 0,
+            'maxEntities': 10,
+            'metadata': {}
+        })
+        self.launch = _de_identify(group_examples.launch_server_config()[0])
+
+        self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
+
+        # 'serializing' something just wraps it with a _S
+        self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
+                                 side_effect=lambda *args: _S(args[0]))
+
+    def test_fetch(self):
+        """
+        Tests that you can fetch a list of events
+        """
+
+        self.returns = [_cassandrify_data(
+            [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100},
+             {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
+
+        expectedData = {'now': 1234, 'size': 100}
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scaling_schedule '
+                       'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
+        self.mock_key.return_value = '12345678'
+
+        result = self.validate_fetch_batch_of_events(1234, 100)
+        self.assertEqual(result, [('1d2', 'gr2', 'ef', 100),
+                                  ('1d2', 'gr2', 'ex', 122)])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
