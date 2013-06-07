@@ -234,7 +234,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_manifest()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_manifest(*args, **kwargs))
         validate(result, model_schemas.manifest)
         return result
@@ -247,7 +247,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_config()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_config(*args, **kwargs))
         validate(result, model_schemas.group_config)
         return result
@@ -260,7 +260,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_launch_config()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_config(*args, **kwargs))
         validate(result, launch_config)
         return result
@@ -272,7 +272,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_policies()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.list_policies(*args, **kwargs))
         validate(result, model_schemas.policy_list)
         return result
@@ -284,7 +284,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_policies()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.create_policies(*args, **kwargs))
         validate(result, model_schemas.policy_list)
         return result
@@ -296,7 +296,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_webhooks(policy_id)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.list_webhooks(*args, **kwargs))
         validate(result, model_schemas.webhook_list)
         return result
@@ -308,7 +308,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``create_webhooks(policy_id, data)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.create_webhooks(*args, **kwargs))
         validate(result, model_schemas.webhook_list)
         return result
@@ -320,7 +320,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``get_webhook(policy_id, webhook_id)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.get_webhook(*args, **kwargs))
         validate(result, model_schemas.webhook)
         return result
@@ -361,7 +361,7 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_scaling_group_states()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.collection.list_scaling_group_states(*args, **kwargs))
 
         self.assertEqual(type(result), list)

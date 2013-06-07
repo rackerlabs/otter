@@ -283,7 +283,7 @@ def create_new_scaling_group(request, log, tenantId, data):
     data['groupConfiguration'].setdefault('maxEntities', 25)
     data['groupConfiguration'].setdefault('metadata', {})
 
-    if data['groupConfiguration']['minEntities'] >= data['groupConfiguration']['maxEntities']:
+    if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
         raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
     deferred = get_store().create_scaling_group(

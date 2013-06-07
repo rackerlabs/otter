@@ -231,9 +231,9 @@ If it is possible to do so, instrument everything in the test to return immediat
 test after you get your :class:`Deferred`, assert that the :class:`Deferred` has already fired. Then
 run the tests on the result of that :class:`Deferred`.
 
-In :mod:`test.utils`, three methods are provided to help test :class:`Deferred` code:
-:meth:`test.utils.DeferredTestingMixin.assert_deferred_succeeded`, and
-:meth:`test.utils.DeferredTestingMixin.assert_deferred_failed`.
+Use :meth:`twisted.trial.unittest.TestCase.successResultOf`, and
+:meth:`twisted.trial.unittest.TestCase.failureResultOf` to assert that your deferreds have fired or
+failed immediately.
 
 Obviously, if you cannot completely patch everything in your test, just go ahead and return the
 :class:`Deferred` from the test case.

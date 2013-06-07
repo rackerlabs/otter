@@ -78,7 +78,7 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
 
     The entire schema body must be provided.
     """
-    if data['minEntities'] >= data['maxEntities']:
+    if data['minEntities'] > data['maxEntities']:
         raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
     def _do_obey_config_change(_, group):

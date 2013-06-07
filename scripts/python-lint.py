@@ -116,25 +116,23 @@ class Lint(cli.Application):
                 if not os.path.exists(real):
                     raise ValueError("{0} does not exist".format(directory))
                 files.extend(find(real, '-name', '*.py').strip().split('\n'))
-            if len(files) > 0:
-                print "Linting {0} python files.\n".format(len(files))
-                lint(files)
-            else:
-                print "No python files found to lint.\n"
-
         else:
             status = local['git']('status', '--porcelain', '-uno')
             root = local['git']('rev-parse', '--show-toplevel').strip()
 
             # get all modified or added python files
-            modified = re.findall(r"^[AM]\s+\S+\.py$", status, re.MULTILINE)
+            modified = re.findall(r"^\s[AM]\s+(\S+\.py)$", status, re.MULTILINE)
 
             # now just get the path part, which all should be relative to the
             # root
             files = [os.path.join(root, line.split(' ', 1)[-1].strip())
                      for line in modified]
-            if len(files) > 0:
-                lint(files)
+
+        if len(files) > 0:
+            print "Linting {0} python files.\n".format(len(files))
+            lint(files)
+        else:
+            print "No python files found to lint.\n"
 
 
 if __name__ == "__main__":
