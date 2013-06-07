@@ -761,7 +761,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
                'args': {'at': 12345}}
         d = self.group.create_policies([pol])
-        result = self.assert_deferred_succeeded(d)
+        result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '

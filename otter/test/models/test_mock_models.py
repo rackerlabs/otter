@@ -636,7 +636,7 @@ class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         Test that the 'list all events' method works.
         """
         deferred = self.collection.fetch_batch_of_events(1234, 100)
-        self.assertEqual(self.assert_deferred_succeeded(deferred), [])
+        self.assertEqual(self.successResultOf(deferred), [])
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

@@ -382,7 +382,7 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         return result
 
 
-class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
+class IScalingScheduleCollectionProviderMixin(object):
     """
     Mixin that tests for anything that provides
     :class:`IScalingScheduleCollection`.
@@ -404,7 +404,7 @@ class IScalingScheduleCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``fetch_batch_of_events()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.collection.fetch_batch_of_events(*args, **kwargs))
 
         self.assertEqual(type(result), list)
