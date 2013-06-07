@@ -487,7 +487,7 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_create_scaling_group_with_same_attributes(self):
         """
-        Verify scaling groups can be created with the exact same schema
+        Verify scaling groups can be created with the exact same attributes
         """
         gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                        'gc_meta_key_2': 'gc_meta_value_2'}

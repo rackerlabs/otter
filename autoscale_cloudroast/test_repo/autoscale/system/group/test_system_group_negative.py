@@ -150,132 +150,132 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEqual(group_state.desiredCapacity, 0,
                          msg='Desired capacity is not equal to expected number of servers')
 
-    # def test_system_delete_group_delete_all_servers(self):
-    #     """
-    #     Verify delete scaling group when user deletes all the servers on the group
-    #     Autoscaling will re create all the deleted servers
-    #     (try changing launch config jus before delete)
-    #     """
-    #     pass
+    def test_system_delete_group_delete_all_servers(self):
+        """
+        Verify delete scaling group when user deletes all the servers on the group
+        Autoscaling will re create all the deleted servers
+        (try changing launch config jus before delete)
+        """
+        pass
 
-    # def test_system_delete_group_delete_some_servers(self):
-    #     """
-    #     Verify delete scaling group when user deletes some of the servers on the group
+    def test_system_delete_group_delete_some_servers(self):
+        """
+        Verify delete scaling group when user deletes some of the servers on the group
 
-    #     """
-    #     pass
+        """
+        pass
 
-    # def test_system_delete_group_other_server_actions(self):
-    #     """
-    #     Verify delete scaling group when user performs actions on the servers in the group
-    #     Autoscaling will continue, like no action occured
-    #     """
-    #     pass
+    def test_system_delete_group_other_server_actions(self):
+        """
+        Verify delete scaling group when user performs actions on the servers in the group
+        Autoscaling will continue, like no action occured
+        """
+        pass
 
-    # def test_system_create_delete_scaling_group_server_building_indefinitely(self):
-    #     """
-    #     Verify create delete scaling group when servers build indefinitely
+    def test_system_create_delete_scaling_group_server_building_indefinitely(self):
+        """
+        Verify create delete scaling group when servers build indefinitely
 
-    #     """
-    #     pass
+        """
+        pass
 
-    # def test_system_execute_policy_server_building_indefinitely(self):
-    #     """
-    #     Verify execute policy when servers build indefinitely
-    #     """
-    #     pass
+    def test_system_execute_policy_server_building_indefinitely(self):
+        """
+        Verify execute policy when servers build indefinitely
+        """
+        pass
 
-    # def test_system_execute_policy_one_ofthe_server_builds_indefinitely(self):
-    #     """
-    #     Verify execute policy when servers build indefinitely
-    #     """
-    #     pass
+    def test_system_execute_policy_one_ofthe_server_builds_indefinitely(self):
+        """
+        Verify execute policy when servers build indefinitely
+        """
+        pass
 
-    # def test_system_create_delete_scaling_group_some_servers_error(self):
-    #     """
-    #     Verify create delete scaling group when servers build indefinitely
-    #     """
-    #     pass
+    def test_system_create_delete_scaling_group_some_servers_error(self):
+        """
+        Verify create delete scaling group when servers build indefinitely
+        """
+        pass
 
-    # def test_system_create_delete_scaling_group_all_servers_error(self):
-    #     """
-    #     Verify create delete scaling group when servers build indefinitely
-    #     Autoscale will know through atomhopper feed
-    #     """
-    #     pass
+    def test_system_create_delete_scaling_group_all_servers_error(self):
+        """
+        Verify create delete scaling group when servers build indefinitely
+        Autoscale will know through atomhopper feed
+        """
+        pass
 
-    # def test_system_create_delete_scaling_group_server_rate_limit_met(self):
-    #     """
-    #     Verify create delete group when maximum servers allowed already exist.
+    def test_system_create_delete_scaling_group_server_rate_limit_met(self):
+        """
+        Verify create delete group when maximum servers allowed already exist.
 
-    #     """
-    #     pass
+        """
+        pass
 
-    # def test_system_execute_policy_when_server_rate_limit_met(self):
-    #     """
-    #     Verify execute policy when maximum servers allowed already exist.
-    #     """
-    #     pass
+    def test_system_execute_policy_when_server_rate_limit_met(self):
+        """
+        Verify execute policy when maximum servers allowed already exist.
+        """
+        pass
 
-    # def test_system_create_scaling_group_account_suspended(self):
-    #     """
-    #     Verify create scaling group when account is suspended
-    #     """
-    #     pass
+    def test_system_create_scaling_group_account_suspended(self):
+        """
+        Verify create scaling group when account is suspended
+        """
+        pass
 
-    # def test_system_execute_policy_on_suspended_account(self):
-    #     """
-    #     Verify create scaling group when account is suspended
-    #     """
-    #     pass
+    def test_system_execute_policy_on_suspended_account(self):
+        """
+        Verify create scaling group when account is suspended
+        """
+        pass
 
-    # def test_system_create_scaling_group_account_closed(self):
-    #     """
-    #     Verify create scaling group when account is closed
-    #     """
-    #     pass
+    def test_system_create_scaling_group_account_closed(self):
+        """
+        Verify create scaling group when account is closed
+        """
+        pass
 
-    # def test_system_execute_policy_on_closed_account(self):
-    #     """
-    #     Verify create scaling group when account is closed
-    #     """
-    #     pass
+    def test_system_execute_policy_on_closed_account(self):
+        """
+        Verify create scaling group when account is closed
+        """
+        pass
 
-    # def test_system_delete_group_unable_to_impersonate(self):
-    #     """
-    #     Verify delete scaling group when impersonation fails
-    #     """
-    #     # AUTO - 284
-    #     pass
+    def test_system_delete_group_unable_to_impersonate(self):
+        """
+        Verify delete scaling group when impersonation fails
+        """
+        # AUTO - 284
+        pass
 
-    # def test_system_delete_group_when_nova_down(self):
-    #     """
-    #     Verify delete scaling group when nova is down
-    #     """
-    #     pass
+    def test_system_delete_group_when_nova_down(self):
+        """
+        Verify delete scaling group when nova is down
+        """
+        pass
 
-    # def test_system_delete_group_when_lbaas_down(self):
-    #     """
-    #     Verify delete scaling group when lbaas is down
-    #     """
-    #     pass
+    def test_system_delete_group_when_lbaas_down(self):
+        """
+        Verify delete scaling group when lbaas is down
+        """
+        pass
 
-    # def test_system_scaling_group_lbaas_draining_disabled(self):
-    #     """
-    #     Verify execute policy with lbaas draining or disabled
-    #     """
-    #     pass
+    def test_system_scaling_group_lbaas_draining_disabled(self):
+        """
+        Verify execute policy with lbaas draining or disabled
+        """
+        pass
 
-    # def test_system_create_delete_scaling_group_with_deleted_lbaasid(self):
-    #     """
-    #     Verify creation of scaling group with deleted lbaas id
-    #     note : is this same as invalid id??
-    #     """
-    #     pass
+    def test_system_create_delete_scaling_group_with_deleted_lbaasid(self):
+        """
+        Verify creation of scaling group with deleted lbaas id
+        note : is this same as invalid id??
+        """
+        pass
 
-    # def test_system_execute_policy_with_deleted_lbaasid(self):
-    #     """
-    #     Verify polic execution with deleted lbaas id
-    #     note : is this same as invalid id??
-    #     """
-    #     pass
+    def test_system_execute_policy_with_deleted_lbaasid(self):
+        """
+        Verify polic execution with deleted lbaas id
+        note : is this same as invalid id??
+        """
+        pass

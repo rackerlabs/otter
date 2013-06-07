@@ -131,7 +131,6 @@ class AutoscaleBehaviors(BaseBehavior):
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
-            print len(active_list)
 
             if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
                 raise BuildErrorException(
