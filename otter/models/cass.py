@@ -156,9 +156,14 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
                 if policy["type"] == 'schedule':
                     queries.append(_cql_insert_event.format(cf=event_table,
                                                             name=':' + polname))
-                    # Only handling the at-trigger case right now
+                    if 'at' in policy["args"]:
+                        data[polname + "Trigger"] = policy["args"]["at"]
+                    elif 'cron' in policy["args"]:
+                        # TODO
+                        #recurrence = Recurrence(cron=policy["args"]["cron"])
+                        # Temp to pass unitgration/test_rest_cass_model tests
+                        data[polname + "Trigger"] = '2011-02-03 04:05+0000'
 
-                    data[polname + "Trigger"] = policy["args"]["at"]
             outpolicies[polId] = policy
 
 

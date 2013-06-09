@@ -268,6 +268,14 @@ class ScalingPolicyTestCase(TestCase):
     """
     Simple verification that the JSON schema for scaling policies is correct.
     """
+
+    def setUp(self):
+        """
+        Store copies of schedule type policies
+        """
+        self.at_policy = deepcopy(group_examples.policy()[3])
+        self.cron_policy = deepcopy(group_examples.policy()[4])
+
     def test_schema_valid(self):
         """
         The schema itself is a valid Draft 3 schema
@@ -404,9 +412,7 @@ class ScalingPolicyTestCase(TestCase):
             "cooldown": 5,
             "type": "blah"
         }
-        self.assertRaisesRegexp(
-            ValidationError, 'is not one of',
-            validate, invalid, group_schemas.policy)
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
     def test_invalid_name_does_not_validate(self):
         """
@@ -449,6 +455,71 @@ class ScalingPolicyTestCase(TestCase):
         }
         self.assertRaisesRegexp(ValidationError, "does not match",
                                 validate, invalid, group_schemas.policy)
+
+    def test_schedule_no_args(self):
+        """
+        Schedule policy must have 'args'
+        """
+        invalid = self.at_policy
+        del invalid['args']
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_args_when_no_schedule(self):
+        """
+        args can be there only when type is 'schedule'
+        """
+        invalid = self.at_policy
+        invalid['type'] = 'webhook'
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_schedule_no_change(self):
+        """
+        Schedule policy must have 'change', 'changePercent' or 'desiredCapacity'
+        """
+        invalid = self.at_policy
+        del invalid['changePercent']
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_excess_in_args(self):
+        """
+        Args cannot have anything other than 'at' or 'cron'
+        """
+        invalid = self.at_policy
+        invalid['args']['junk'] = 2
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_only_one_in_args(self):
+        """
+        Args can have only one of 'at' or 'cron'; not both
+        """
+        invalid = self.at_policy
+        invalid['args']['cron'] = '* * * * *'
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_empty_args(self):
+        """
+        Args cannot be empty
+        """
+        invalid = self.at_policy
+        invalid['args'] = {}
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_invalid_timestamp(self):
+        """
+        policy with invalid timestamp raises ``ValidationError``
+        """
+        invalid = self.at_policy
+        invalid['args']['at'] = 'junk'
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_invalid_cron(self):
+        """
+        policy with invalid cron entry raises ``ValidationError``
+        """
+        invalid = self.cron_policy
+        invalid['args']['cron'] = 'junk'
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+>>>>>>> scheduling api changes and validation
 
 
 class CreateScalingGroupTestCase(TestCase):
