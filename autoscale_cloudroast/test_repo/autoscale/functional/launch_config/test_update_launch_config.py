@@ -115,7 +115,7 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             networks=lc_networks,
             load_balancers=lc_load_balancers)
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with %s as against a 204'
+                          msg='Update launch config failed with %s as against a 204, success'
                           % update_lc_response.status_code)
         lc_name = "test_upd_lc"
         image_ref = "88876868"
@@ -126,4 +126,4 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             image_ref=image_ref,
             flavor_ref=flavor_ref)
         self.assertEquals(update_launchconfig_response, 204,
-                          msg="Update launch config does not allows partial requests")
+                          msg="Update launch config does not allow partial requests")
