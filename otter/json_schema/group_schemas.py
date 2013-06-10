@@ -27,6 +27,7 @@ from copy import deepcopy
 #
 
 MAX_ENTITIES = 25
+MAX_COOLDOWN = 86400   # 24 * 60 * 60
 
 metadata = {
     "type": "object",
@@ -154,8 +155,10 @@ config = {
             "type": "integer",
             "description": ("Cooldown period before more entities are added, "
                             "given in seconds.  This number must be an "
-                            "integer."),
+                            "integer. Min is 0 seconds, max is 86400 seconds "
+                            "(24 hrs * 60 min * 60 sec)."),
             "minimum": 0,
+            "maximum": MAX_COOLDOWN,
             "required": True
         },
         "minEntities": {
@@ -277,8 +280,10 @@ policy = {
             "description": (
                 "Cooldown period (given in seconds) before this particular "
                 "scaling policy can be executed again.  This cooldown period "
-                "does not affect the global scaling group cooldown."),
+                "does not affect the global scaling group cooldown.  Min is 0 "
+                "seconds, max is 86400 seconds (24 hrs * 60 min * 60 sec)."),
             "minimum": 0,
+            "maximum": MAX_COOLDOWN,
             "required": True
         },
         "type": {
