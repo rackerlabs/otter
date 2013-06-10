@@ -73,7 +73,7 @@ def resume_scaling_group(log, transaction_id, scaling_group):
 
 def obey_config_change(log, transaction_id, config, scaling_group, state):
     """
-    Given the config change, do servers need to be started or deleted?
+    Given the config change, do servers need to be started or deleted
 
     Ignore all cooldowns.
 
@@ -92,15 +92,21 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
     # XXX:  this is a hack to create an internal zero-change policy so
     # calculate delta will work
     delta = calculate_delta(bound_log, state, config, {'change': 0})
-    if delta != 0:
+
+    if delta == 0:
+        return defer.succeed(state)
+    elif delta > 0:
         deferred = scaling_group.view_launch_config()
         deferred.addCallback(partial(execute_launch_config, bound_log,
                                      transaction_id, state,
                                      scaling_group=scaling_group, delta=delta))
         deferred.addCallback(lambda _: state)
         return deferred
-
-    return defer.succeed(state)
+    else:
+        # delta < 0 (scale down)
+        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
+        deferred.addCallback(lambda _: state)
+        return deferred
 
 
 def maybe_execute_scaling_policy(
@@ -158,14 +164,22 @@ def maybe_execute_scaling_policy(
         if check_cooldowns(bound_log, state, config, policy, policy_id):
             delta = calculate_delta(bound_log, state, config, policy)
             execute_bound_log = bound_log.bind(server_delta=delta)
-            if delta != 0:
+            if delta == 0:
+                execute_bound_log.msg("cooldowns checked, no change in servers")
+                error_msg = "Policy execution would violate min/max constraints."
+                raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                               scaling_group.uuid, policy_id,
+                                               error_msg)
+            elif delta > 0:
                 execute_bound_log.msg("cooldowns checked, executing launch configs")
                 d = execute_launch_config(execute_bound_log, transaction_id, state,
                                           launch, scaling_group, delta)
-                return d.addCallback(mark_executed)
-
-            execute_bound_log.msg("cooldowns checked, no change in servers")
-            error_msg = "Policy execution would violate min/max constraints."
+            else:
+                # delta < 0 (scale down event)
+                execute_bound_log.msg("cooldowns checked, Scaling down")
+                d = exec_scale_down(execute_bound_log, transaction_id, state,
+                                    scaling_group, -delta)
+            return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
                                        scaling_group.uuid, policy_id,
@@ -219,15 +233,6 @@ def calculate_delta(log, state, config, policy):
 
     :return: C{int} representing the desired change - can be 0
     """
-    def constrain(desired):
-        max_entities = config['maxEntities']
-        if max_entities is None:
-            max_entities = MAX_ENTITIES
-        log.bind(desired_change=desired, max_entities=max_entities,
-                 min_entities=config['minEntities'], active=len(state.active),
-                 pending=len(state.pending)).msg("calculating delta")
-        return max(min(desired, max_entities), config['minEntities'])
-
     current = len(state.active) + len(state.pending)
     if "change" in policy:
         desired = current + policy['change']
@@ -242,21 +247,88 @@ def calculate_delta(log, state, config, policy):
             "Policy doesn't have attributes 'change', 'changePercent', or "
             "'desiredCapacity: {0}".format(json.dumps(policy)))
 
-    return constrain(desired) - current
+    # constrain the desired
+    max_entities = config['maxEntities']
+    if max_entities is None:
+        max_entities = MAX_ENTITIES
+    constrained = max(min(desired, max_entities), config['minEntities'])
+    delta = constrained - current
+
+    log.msg("calculating delta",
+            unconstrained_desired_capacity=desired,
+            constrained_desired_capacity=constrained,
+            max_entities=max_entities, min_entities=config['minEntities'],
+            server_delta=delta, current_active=len(state.active),
+            current_pending=len(state.pending))
+    return delta
 
 
 def find_pending_jobs_to_cancel(log, state, delta):
     """
-    Identify some jobs to cancel (usually for a scale down event)
+    Identify some pending jobs to cancel (usually for a scale down event)
     """
-    return []
+    if delta >= len(state.pending):  # don't bother sorting - return everything
+        return state.pending.keys()
+
+    sorted_jobs = sorted(state.pending.items(), key=lambda (_id, s): from_timestamp(s['created']),
+                         reverse=True)
+    return [job_id for job_id, _job_info in sorted_jobs[:delta]]
 
 
-def find_server_to_evict(log, state, delta):
+def find_servers_to_evict(log, state, delta):
     """
-    Find the server most appropriate to evict from the scaling group
+    Find the servers most appropriate to evict from the scaling group
+
+    Returns list of server ``dict``
     """
-    return []
+    if delta >= len(state.active):  # don't bother sorting - return everything
+        return state.active.values()
+
+    # return delta number of oldest server
+    sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
+    return sorted_servers[:delta]
+
+
+def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_group,
+                          delta, state):
+    """
+    Start deleting active servers
+
+    Returns a list of Deferreds corresponding to deletion of a server. Each Deferred
+    in the list gets fired when that server is deleted
+    """
+
+    # find servers to evict
+    servers_to_evict = find_servers_to_evict(log, state, delta)
+
+    # remove all the active servers to be deleted
+    for server in servers_to_evict:
+        state.remove_active(server['id'])
+
+    # then start deleting those servers
+    return [supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
+                                             scaling_group, server_info)
+            for server_info in servers_to_evict]
+
+
+def exec_scale_down(log, transaction_id, state, scaling_group, delta):
+    """
+    Execute a scale down policy
+    """
+
+    # cancel pending jobs by removing them from the state. The servers will get
+    # deleted when they are finished building and their id is not found in pending
+    jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
+    for job_id in jobs_to_cancel:
+        state.remove_job(job_id)
+
+    # delete active servers if pending jobs are not enough
+    remaining = delta - len(jobs_to_cancel)
+    if remaining > 0:
+        delete_active_servers(log, transaction_id, authenticate_tenant,
+                              scaling_group, remaining, state)
+
+    return defer.succeed(None)
 
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
@@ -277,10 +349,17 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         # next_round_state is a new state blob passed to these functions by
         # modify_state.  By the time these are called, state may have changed.
         def _on_success(group, next_round_state, result):
-            next_round_state.remove_job(job_id)
-            next_round_state.add_active(result['id'], result)
-            job_log.bind(server_id=result['id']).msg(
-                "Job completed, resulting in an active server.")
+            if job_id not in next_round_state.pending:
+                # server was slated to be deleted when it completed building.
+                # So, deleting it now
+                job_log.msg('Job removed. Deleting server')
+                supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
+                                                 scaling_group, result)
+            else:
+                next_round_state.remove_job(job_id)
+                next_round_state.add_active(result['id'], result)
+                job_log.bind(server_id=result['id']).msg(
+                    "Job completed, resulting in an active server.")
             return next_round_state
 
         def _on_failure(group, next_round_state, f):
@@ -313,8 +392,6 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
                                       scaling_group, launch)
             for i in range(delta)
         ]
-    else:
-        raise NotImplementedError("Scaling down has not been implemented yet.")
 
     pendings_deferred = defer.gatherResults(deferreds, consumeErrors=True)
     pendings_deferred.addCallback(_update_state)

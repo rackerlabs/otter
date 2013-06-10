@@ -13,7 +13,7 @@ from twisted.internet import defer
 from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
-    UnrecognizedCapabilityError)
+    UnrecognizedCapabilityError, IScalingScheduleCollection)
 from otter.util.hashkey import generate_capability
 
 
@@ -382,7 +382,7 @@ class MockScalingGroup:
         return defer.succeed(None)
 
 
-@implementer(IScalingGroupCollection)
+@implementer(IScalingGroupCollection, IScalingScheduleCollection)
 class MockScalingGroupCollection:
     """
     .. autointerface:: otter.models.interface.IScalingGroupCollection
@@ -421,6 +421,12 @@ class MockScalingGroupCollection:
         # if the scaling group doesn't exist, return one anyway that raises
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, self, None)
+
+    def fetch_batch_of_events(self, now, size=100):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
+        """
+        return defer.succeed([])
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

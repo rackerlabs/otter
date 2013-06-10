@@ -26,7 +26,7 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         """
         batch = Batch(['INSERT * INTO BLAH', 'INSERT * INTO BLOO'], {})
         d = batch.execute(self.connection)
-        self.assert_deferred_succeeded(d)
+        self.successResultOf(d)
         expected = 'BEGIN BATCH INSERT * INTO BLAH'
         expected += ' INSERT * INTO BLOO APPLY BATCH;'
         self.connection.execute.assert_called_once_with(expected, {},
@@ -40,7 +40,7 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         batch = Batch(['INSERT :blah INTO BLAH', 'INSERT * INTO BLOO'],
                       params)
         d = batch.execute(self.connection)
-        self.assert_deferred_succeeded(d)
+        self.successResultOf(d)
         expected = 'BEGIN BATCH INSERT :blah INTO BLAH'
         expected += ' INSERT * INTO BLOO APPLY BATCH;'
         self.connection.execute.assert_called_once_with(expected, params,
@@ -52,7 +52,7 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         """
         batch = Batch(['INSERT * INTO BLAH'], {}, timestamp=123)
         d = batch.execute(self.connection)
-        self.assert_deferred_succeeded(d)
+        self.successResultOf(d)
         expected = 'BEGIN BATCH USING TIMESTAMP 123'
         expected += ' INSERT * INTO BLAH APPLY BATCH;'
         self.connection.execute.assert_called_once_with(expected, {},
@@ -65,7 +65,7 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         batch = Batch(['INSERT * INTO BLAH'], {},
                       consistency=ConsistencyLevel.QUORUM)
         d = batch.execute(self.connection)
-        self.assert_deferred_succeeded(d)
+        self.successResultOf(d)
         expected = 'BEGIN BATCH'
         expected += ' INSERT * INTO BLAH APPLY BATCH;'
         self.connection.execute.assert_called_once_with(expected, {},

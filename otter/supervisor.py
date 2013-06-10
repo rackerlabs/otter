@@ -59,10 +59,41 @@ def execute_config(log, transaction_id, auth_function, scaling_group, launch_con
         return {
             'id': server_details['server']['id'],
             'links': server_details['server']['links'],
-            'name': server_details['server']['name']
+            'name': server_details['server']['name'],
+            'lb_info': lb_info
         }
 
     d.addCallback(when_launch_server_completed)
     d.chainDeferred(completion_d)
 
     return succeed((job_id, completion_d))
+
+
+def execute_delete_server(log, transaction_id, auth_function, scaling_group, server):
+    """
+    Executes a single delete server
+
+    Return a Deferred that callbacks with None after the server deleted successfully.
+    None is also callback(ed) when server deletion fails in which case the error is logged
+    before callback(ing).
+    """
+
+    log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+
+    # authenticate for tenant
+    def when_authenticated((auth_token, service_catalog)):
+        log.msg('Deleting server')
+        return launch_server_v1.delete_server(
+            log,
+            config_value('region'),
+            service_catalog,
+            auth_token,
+            (server['id'], server['lb_info']))
+
+    d = auth_function(scaling_group.tenant_id)
+    log.msg("Authenticating for tenant")
+    d.addCallback(when_authenticated)
+    d.addCallback(lambda _: log.msg('Server deleted successfully'))
+    d.addErrback(log.err, 'Server deletion failed')
+
+    return d

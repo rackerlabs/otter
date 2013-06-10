@@ -20,10 +20,8 @@ Developer documentation
 
 Endpoint API documentation
 --------------------------
-.. toctree::
-   :maxdepth: 3
 
-   endpoints
+  See our Apiary documentation `here <http://docs.autoscale.apiary.io/>`_.
 
 Code API documentation
 ----------------------
@@ -32,6 +30,10 @@ Code API documentation
    :maxdepth: 3
 
    otter
+
+This documentation is automatically generated from our code comments.
+If this area is empty, please build on your local machine with
+dev_requirements.txt
 
 Data/Schema documentation
 -------------------------

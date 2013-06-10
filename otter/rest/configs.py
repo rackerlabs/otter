@@ -14,6 +14,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, transaction_id
 
 from otter import controller
+from otter.rest.errors import InvalidMinEntities
 
 
 @app.route('/<string:tenantId>/groups/<string:groupId>/config/',
@@ -77,6 +78,9 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
 
     The entire schema body must be provided.
     """
+    if data['minEntities'] > data['maxEntities']:
+        raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
+
     def _do_obey_config_change(_, group):
         return group.modify_state(
             partial(controller.obey_config_change, log, transaction_id(request),

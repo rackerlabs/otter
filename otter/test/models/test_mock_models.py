@@ -14,7 +14,8 @@ from otter.models.interface import (
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
-    IScalingGroupCollectionProviderMixin)
+    IScalingGroupCollectionProviderMixin,
+    IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch
 
@@ -130,7 +131,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         one it was created with.  There is currently no validation for what
         goes in and hence what goes out, so just check if they are the same.
         """
-        result = self.assert_deferred_succeeded(self.group.view_launch_config())
+        result = self.successResultOf(self.group.view_launch_config())
         self.assertEqual(result, self.launch_config)
 
     def test_view_state_returns_empty_state(self):
@@ -191,7 +192,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': 15,
             'name': 'UPDATED'
         }
-        self.assert_deferred_succeeded(self.group.update_config(expected))
+        self.successResultOf(self.group.update_config(expected))
         result = self.validate_view_config_return_value()
         self.assertEqual(result, expected)
 
@@ -201,7 +202,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         `partial_update` flag is provided as True, the keys that are not
         provided are not overwritten.
         """
-        self.assert_deferred_succeeded(self.group.update_config(
+        self.successResultOf(self.group.update_config(
             {}, partial_update=True))
         result = self.validate_view_config_return_value()
 
@@ -216,7 +217,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         When the config is updated, the launch config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_config({
+        self.successResultOf(self.group.update_config({
             'cooldown': 1000,
             'metadata': {'UPDATED': 'UPDATED'},
             'minEntities': 10,
@@ -224,7 +225,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'name': 'UPDATED'
         }))
         self.assertEqual(
-            self.assert_deferred_succeeded(self.group.view_launch_config()),
+            self.successResultOf(self.group.view_launch_config()),
             self.launch_config)
 
     def test_update_launch_config_overwrites_existing_data(self):
@@ -236,20 +237,20 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }
-        self.assert_deferred_succeeded(self.group.update_launch_config(updated))
-        result = self.assert_deferred_succeeded(self.group.view_launch_config())
+        self.successResultOf(self.group.update_launch_config(updated))
+        result = self.successResultOf(self.group.view_launch_config())
         self.assertEqual(result, updated)
 
     def test_update_launch_config_does_not_change_config(self):
         """
         When the launch_config is updated, the config doesn't change.
         """
-        self.assert_deferred_succeeded(self.group.update_launch_config({
+        self.successResultOf(self.group.update_launch_config({
             "type": "launch_server",
             "args": {"server": {"here are": "new args"}}
         }))
         self.assertEqual(
-            self.assert_deferred_succeeded(self.group.view_config()),
+            self.successResultOf(self.group.view_config()),
             self.output_config)
 
     def test_create_new_scaling_policies(self):
@@ -271,7 +272,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 "type": "webhook"
             }
         ])
-        list_result = self.assert_deferred_succeeded(self.group.list_policies())
+        list_result = self.successResultOf(self.group.list_policies())
         self.assertGreater(len(list_result), len(create_response))
         for key, value in create_response.iteritems():
             self.assertEqual(list_result[key], value)
@@ -322,10 +323,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Try to get a policy by looking up all available UUIDs, and getting one.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list.keys()[0]
         value = policy_list.values()[0]
-        result = self.assert_deferred_succeeded(self.group.get_policy(uuid))
+        result = self.successResultOf(self.group.get_policy(uuid))
         self.assertEqual(value, result)
 
     def test_get_nonexistent_policy_fails(self):
@@ -340,10 +341,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Delete a policy, check that it is actually deleted.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list.keys()[0]
-        self.assert_deferred_succeeded(self.group.delete_policy(uuid))
-        result = self.assert_deferred_succeeded(self.group.list_policies())
+        self.successResultOf(self.group.delete_policy(uuid))
+        result = self.successResultOf(self.group.list_policies())
         self.assertNotIn(uuid, result)
         self.assertEqual({}, result)
 
@@ -360,14 +361,14 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.policies = {"2": {}}
         self.group.webhooks = {"2": {}}
-        self.assert_deferred_succeeded(self.group.delete_policy("2"))
+        self.successResultOf(self.group.delete_policy("2"))
         self.assertNotIn("2", self.group.webhooks)
 
     def test_update_policy_succeeds(self):
         """
         Get a UUID and attempt to update the policy.
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list.keys()[0]
         update_data = {
             "name": "Otters are not good pets",
@@ -375,8 +376,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "cooldown": 555,
             "type": "webhook"
         }
-        self.assert_deferred_succeeded(self.group.update_policy(uuid, update_data))
-        result = self.assert_deferred_succeeded(
+        self.successResultOf(self.group.update_policy(uuid, update_data))
+        result = self.successResultOf(
             self.group.get_policy(uuid))
         self.assertEqual(update_data, result)
 
@@ -406,7 +407,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If there are no webhooks, an empty dictionary is returned when
         ``list_webhooks`` is called
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list.keys()[0]
         result = self.validate_list_webhooks_return_value(uuid)
         self.assertEqual(result, {})
@@ -416,7 +417,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         If there are webhooks for a particular policy, listing webhooks returns
         a dictionary for all of them
         """
-        policy_list = self.assert_deferred_succeeded(self.group.list_policies())
+        policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list.keys()[0]
         webhooks = {
             '10': self.sample_webhook_data,
@@ -471,7 +472,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             }, creation.values())
 
         # listing should return 3
-        listing = self.assert_deferred_succeeded(self.group.list_webhooks('2'))
+        listing = self.successResultOf(self.group.list_webhooks('2'))
         self.assertGreater(len(listing), len(creation))
 
     def test_get_webhook_nonexistent_policy_fails(self):
@@ -505,7 +506,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.policies = {'2': {}}
         self.group.webhooks = {'2': {'3': expected_webhook}}
         deferred = self.group.get_webhook("2", "3")
-        self.assertEqual(self.assert_deferred_succeeded(deferred),
+        self.assertEqual(self.successResultOf(deferred),
                          expected_webhook)
 
     def test_update_webhook_nonexistent_policy_fails(self):
@@ -544,7 +545,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'name': 'updated',
             'metadata': {'key2': 'value2'}
         })
-        self.assertIsNone(self.assert_deferred_succeeded(deferred))
+        self.assertIsNone(self.successResultOf(deferred))
         self.assertEqual(self.group.webhooks, {
             '2': {
                 '3': {
@@ -571,7 +572,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             }
         }
         deferred = self.group.update_webhook("2", "3", {'name': 'updated'})
-        self.assertIsNone(self.assert_deferred_succeeded(deferred))
+        self.assertIsNone(self.successResultOf(deferred))
         self.assertEqual(self.group.webhooks, {
             '2': {
                 '3': {
@@ -614,8 +615,28 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             }
         }
         deferred = self.group.delete_webhook("2", "3")
-        self.assertIsNone(self.assert_deferred_succeeded(deferred))
+        self.assertIsNone(self.successResultOf(deferred))
         self.assertEqual(self.group.webhooks, {'2': {}})
+
+
+class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMixin,
+                                            TestCase):
+    """
+    Tests for :class:`MockScalingGroupCollection`
+    """
+
+    def setUp(self):
+        """ Set up the mocks """
+        self.collection = MockScalingGroupCollection()
+        self.tenant_id = 'goo1234'
+        self.mock_log = mock.MagicMock()
+
+    def test_list_events(self):
+        """
+        Test that the 'list all events' method works.
+        """
+        deferred = self.collection.fetch_batch_of_events(1234, 100)
+        self.assertEqual(self.successResultOf(deferred), [])
 
 
 class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -724,21 +745,21 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        manifest = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
         group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
                                                   manifest['id'])
 
-        pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
+        pol_rec = self.successResultOf(group.create_policies([policy]))
 
         pol_uuid = pol_rec.keys()[0]
 
-        self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
+        self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
         deferred = self.collection.webhook_info_by_hash(self.mock_log, 'hash')
-        webhook_info = self.assert_deferred_succeeded(deferred)
+        webhook_info = self.successResultOf(deferred)
         self.assertEqual(webhook_info, (self.tenant_id, group.uuid, pol_uuid))
 
     @mock.patch('otter.models.mock.generate_capability',
@@ -753,18 +774,18 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "change": 10,
             "cooldown": 5
         }
-        manifest = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
         group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
                                                   manifest['id'])
 
-        pol_rec = self.assert_deferred_succeeded(group.create_policies([policy]))
+        pol_rec = self.successResultOf(group.create_policies([policy]))
 
         pol_uuid = pol_rec.keys()[0]
 
-        self.assert_deferred_succeeded(group.create_webhooks(pol_uuid, [{}]))
+        self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
         deferred = self.collection.webhook_info_by_hash(self.mock_log, 'weasel')
         self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
@@ -830,7 +851,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         succeeded_deferreds = self._call_all_methods_on_group(uuid)
         for deferred in succeeded_deferreds:
-            self.assert_deferred_succeeded(deferred)
+            self.successResultOf(deferred)
 
     def test_get_scaling_group_works_but_methods_do_not(self):
         """

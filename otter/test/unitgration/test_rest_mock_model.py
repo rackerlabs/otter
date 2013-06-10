@@ -92,7 +92,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
             "groupConfiguration": self.config,
             "launchConfiguration": launch_server_config()[0]
         }
-        wrapper = self.assert_deferred_succeeded(request(
+        wrapper = self.successResultOf(request(
             root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -110,7 +110,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         # now make sure the Location header points to something good!
         path = _strip_base_url(headers[0])
 
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200, path)
 
         response = json.loads(wrapper.content)
@@ -120,7 +120,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
 
         # make sure the created group has enough pending entities, and is
         # not paused
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 200)
 
@@ -134,15 +134,15 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         Deleting a scaling group returns with a 204 no content.  The next
         attempt to view the scaling group should return a 404 not found.
         """
-        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 404)
 
@@ -153,7 +153,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         """
         Asserts that there are ``number`` number of scaling groups
         """
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', '/v1.0/11111/groups/'))
         self.assertEqual(200, wrapper.response.code)
 
@@ -186,7 +186,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         path = self.create_and_view_scaling_group() + 'launch/'
         edited_launch = launch_server_config()[1]
 
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'PUT', path, body=json.dumps(edited_launch)))
 
         self.assertEqual(wrapper.response.code, 204,
@@ -194,7 +194,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(wrapper.content, "")
 
         # now try to view again - the config should be the edited config
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
         self.assertEqual(json.loads(wrapper.content),
@@ -216,7 +216,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         store = MockScalingGroupCollection()
         self.mock_log = mock.MagicMock()
-        manifest = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
         self.group_id = manifest['id']
@@ -238,7 +238,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         Asserts that there are ``number`` number of scaling policies
         """
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', self.policies_url))
         self.assertEqual(200, wrapper.response.code)
 
@@ -255,7 +255,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
             to be in any consistent order)
         """
         request_body = policy()[:-1]  # however many of them there are minus one
-        wrapper = self.assert_deferred_succeeded(request(
+        wrapper = self.successResultOf(request(
             root, 'POST', self.policies_url, body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -292,14 +292,14 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         the policy again, it should contain the updated version.
         """
         request_body = policy()[-1]  # the one that was not created
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'PUT', path, body=json.dumps(request_body)))
         self.assertEqual(wrapper.response.code, 204,
                          "Update failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -320,13 +320,13 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         Deleting a scaling policy returns with a 204 no content.  The next
         attempt to view the scaling policy should return a 404 not found.
         """
-        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -368,7 +368,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         self.assert_number_of_scaling_policies(len(first_policies))
 
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'POST', first_policies[0] + 'execute/'))
         self.assertEqual(wrapper.response.code, 202,
                          "Execute failed: {0}".format(wrapper.content))
@@ -382,7 +382,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
             NoSuchPolicyError('11111', '1', '2'))
 
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'POST', self.policies_url + '1/execute/'))
         self.assertEqual(wrapper.response.code, 404,
                          "Execute did not fail as expected: {0}".format(wrapper.content))
@@ -405,14 +405,14 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         self.mock_log = mock.MagicMock()
         store = MockScalingGroupCollection()
-        manifest = self.assert_deferred_succeeded(
+        manifest = self.successResultOf(
             store.create_scaling_group(self.mock_log, self.tenant_id,
                                        config()[0],
                                        launch_server_config()[0]))
         self.group_id = manifest['id']
         group = store.get_scaling_group(self.mock_log,
                                         self.tenant_id, self.group_id)
-        self.policy_id = self.assert_deferred_succeeded(
+        self.policy_id = self.successResultOf(
             group.create_policies([{
                 "name": 'set number of servers to 10',
                 "change": 10,
@@ -440,7 +440,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         Asserts that there are ``number`` number of scaling policies
         """
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'GET', self.webhooks_url))
         self.assertEqual(200, wrapper.response.code)
 
@@ -460,7 +460,7 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
             {'name': 'first', 'metadata': {'notes': 'first webhook'}},
             {'name': 'second', 'metadata': {'notes': 'second webhook'}}
         ]
-        wrapper = self.assert_deferred_succeeded(request(
+        wrapper = self.successResultOf(request(
             root, 'POST', self.webhooks_url, body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
@@ -500,15 +500,15 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         Updating a webhook returns with a 204 no content.  When viewing
         the webhook again, it should contain the updated version.
         """
-        request_body = {'name': 'updated_webhook'}
-        wrapper = self.assert_deferred_succeeded(
+        request_body = {'name': 'updated_webhook', 'metadata': {'foo': 'bar'}}
+        wrapper = self.successResultOf(
             request(root, 'PUT', path, body=json.dumps(request_body)))
         self.assertEqual(wrapper.response.code, 204,
                          "Update failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -526,20 +526,20 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         del updated['id']
         del updated['links']
 
-        self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {}})
+        self.assertEqual(updated, {'name': 'updated_webhook', 'metadata': {'foo': 'bar'}})
 
     def delete_and_view_webhook(self, path):
         """
         Deleting a webhook returns with a 204 no content.  The next attempt to
         view the webhook should return a 404 not found.
         """
-        wrapper = self.assert_deferred_succeeded(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -579,12 +579,12 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         self.assert_number_of_webhooks(0)
         first_webhooks = self.create_and_view_webhooks()
 
-        wrapper = self.assert_deferred_succeeded(request(root, 'GET', first_webhooks[0]))
+        wrapper = self.successResultOf(request(root, 'GET', first_webhooks[0]))
         webhook = json.loads(wrapper.content)['webhook']
         links = {link['rel']: link['href'] for link in webhook['links']}
         cap_path = _strip_base_url(links['capability'])
 
-        wrapper = self.assert_deferred_succeeded(request(root, 'POST', cap_path))
+        wrapper = self.successResultOf(request(root, 'POST', cap_path))
         self.assertEqual(wrapper.response.code, 202)
 
     def test_execute_non_existant_webhook_by_hash(self):
@@ -593,6 +593,6 @@ class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
         """
         self.assert_number_of_webhooks(0)
 
-        wrapper = self.assert_deferred_succeeded(
+        wrapper = self.successResultOf(
             request(root, 'POST', '/v1.0/execute/1/1/'))
         self.assertEqual(wrapper.response.code, 202)

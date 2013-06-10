@@ -1,7 +1,7 @@
 klein==0.2.0
 twisted==13.0
 tryfer==0.2.2
-jsonschema==0.7
+jsonschema==2.0
 yunomi==0.2.2
 iso8601==0.1.4
 lxml==3.0.1

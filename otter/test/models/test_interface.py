@@ -2,7 +2,7 @@
 Tests for :mod:`otter.models.interface`
 """
 from collections import namedtuple
-from jsonschema import validate
+
 
 import mock
 
@@ -12,10 +12,10 @@ from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.models.interface import (
-    GroupState, IScalingGroup, IScalingGroupCollection,
+    GroupState, IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection,
     NoSuchScalingGroupError)
 from otter.json_schema.group_schemas import launch_config
-from otter.json_schema import model_schemas
+from otter.json_schema import model_schemas, validate
 from otter.test.utils import DeferredTestMixin
 
 
@@ -148,6 +148,23 @@ class GroupStateTestCase(TestCase):
         self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
         self.assertEqual(state.active, {'1': {}})
 
+    def test_remove_active_success(self):
+        """
+        If the server ID is in the active list, ``remove_active`` removes it.
+        """
+        state = GroupState('tid', 'gid', {'1': {}}, {}, None, {}, True)
+        state.remove_active('1')
+        self.assertEqual(state.active, {})
+
+    def test_remove_active_fails(self):
+        """
+        If the server ID is not in the active list, ``remove_active`` raises an
+        AssertionError.
+        """
+        state = GroupState('tid', 'gid', {}, {}, None, {}, True)
+        self.assertRaises(AssertionError, state.remove_active, '1')
+        self.assertEqual(state.active, {})
+
     def test_mark_executed_updates_policy_and_group(self):
         """
         Marking executed updates the policy touched and group touched to the
@@ -217,7 +234,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_manifest()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_manifest(*args, **kwargs))
         validate(result, model_schemas.manifest)
         return result
@@ -230,7 +247,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_config()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_config(*args, **kwargs))
         validate(result, model_schemas.group_config)
         return result
@@ -243,7 +260,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``view_launch_config()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.view_config(*args, **kwargs))
         validate(result, launch_config)
         return result
@@ -255,7 +272,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_policies()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.list_policies(*args, **kwargs))
         validate(result, model_schemas.policy_list)
         return result
@@ -267,7 +284,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_policies()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.create_policies(*args, **kwargs))
         validate(result, model_schemas.policy_list)
         return result
@@ -279,7 +296,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_webhooks(policy_id)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.list_webhooks(*args, **kwargs))
         validate(result, model_schemas.webhook_list)
         return result
@@ -291,7 +308,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``create_webhooks(policy_id, data)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.create_webhooks(*args, **kwargs))
         validate(result, model_schemas.webhook_list)
         return result
@@ -303,7 +320,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``get_webhook(policy_id, webhook_id)``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.group.get_webhook(*args, **kwargs))
         validate(result, model_schemas.webhook)
         return result
@@ -344,7 +361,7 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
 
         :return: the return value of ``list_scaling_group_states()``
         """
-        result = self.assert_deferred_succeeded(
+        result = self.successResultOf(
             self.collection.list_scaling_group_states(*args, **kwargs))
 
         self.assertEqual(type(result), list)
@@ -362,4 +379,37 @@ class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
         """
         result = self.collection.get_scaling_group(*args, **kwargs)
         self.assertTrue(IScalingGroup.providedBy(result))
+        return result
+
+
+class IScalingScheduleCollectionProviderMixin(object):
+    """
+    Mixin that tests for anything that provides
+    :class:`IScalingScheduleCollection`.
+
+    :ivar collection: an instance of the :class:`IScalingScheduleCollection` provider
+    """
+
+    def test_implements_interface(self):
+        """
+        The provider correctly implements
+        :class:`otter.scaling_groups_interface.IScalingScheduleCollection`.
+        """
+        verifyObject(IScalingScheduleCollection, self.collection)
+
+    def validate_fetch_batch_of_events(self, *args, **kwargs):
+        """
+        Calls ``fetch_batch_of_events()`` and validates that it returns a
+        list of (tenant_id, scaling_group_id, policy_id, trigger time) tuples
+
+        :return: the return value of ``fetch_batch_of_events()``
+        """
+        result = self.successResultOf(
+            self.collection.fetch_batch_of_events(*args, **kwargs))
+
+        self.assertEqual(type(result), list)
+        for elem in result:
+            self.assertEqual(type(elem), tuple)
+            self.assertEqual(len(elem), 4)
+
         return result

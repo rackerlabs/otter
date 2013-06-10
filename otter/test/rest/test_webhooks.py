@@ -4,14 +4,14 @@ webhooks, and creating/viewing/deleting webhooks.
 """
 
 import json
-from jsonschema import validate, ValidationError
+from jsonschema import ValidationError
 
 import mock
 
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.json_schema import rest_schemas
+from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
@@ -311,6 +311,12 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             }
         })
 
+    def test_update_webhook_missing_metadata_is_400(self):
+        """
+        A PUT with a valid JSON but no metadata returns a 400.
+        """
+        self.assert_status_code(400, None, 'PUT', json.dumps({'name': 'hello'}))
+
     def test_update_webhook_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -318,9 +324,9 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         error = DummyException('what')
         self.mock_group.update_webhook.return_value = defer.fail(error)
         self.assert_status_code(500, None, 'PUT', json.dumps(
-                                {'name': 'one'}))
+                                {'name': 'one', 'metadata': {}}))
         self.mock_group.update_webhook.assert_called_once_with(
-            self.policy_id, self.webhook_id, {'name': 'one'})
+            self.policy_id, self.webhook_id, {'name': 'one', 'metadata': {}})
         self.flushLoggedErrors(DummyException)
 
     def test_update_webhook_for_unknowns_is_404(self):
@@ -338,9 +344,9 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         for error in errors:
             self.mock_group.update_webhook.return_value = defer.fail(error)
             self.assert_status_code(404, None, 'PUT', json.dumps(
-                                    {'name': 'one'}))
+                                    {'name': 'one', 'metadata': {}}))
             self.mock_group.update_webhook.assert_called_once_with(
-                self.policy_id, self.webhook_id, {'name': 'one'})
+                self.policy_id, self.webhook_id, {'name': 'one', 'metadata': {}})
             self.flushLoggedErrors(type(error))
             self.mock_group.update_webhook.reset_mock()
 
@@ -369,7 +375,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_group.update_webhook.return_value = defer.succeed(None)
         response_body = self.assert_status_code(
-            204, None, 'PUT', json.dumps({'name': 'a name'}))
+            204, None, 'PUT', json.dumps({'name': 'a name', 'metadata': {}}))
         self.assertEqual(response_body, "")
 
     def test_delete_webhook_unknown_error_is_500(self):

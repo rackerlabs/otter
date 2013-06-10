@@ -107,6 +107,16 @@ class GroupState(object):
         server_info.setdefault('created', self.now())
         self.active[server_id] = server_info
 
+    def remove_active(self, server_id):
+        """
+        Removes a server to the collection of active servers.
+
+        :param str server_id:  the id of the server to delete
+        :raises: :class:`AssertionError` if the server id does not exist
+        """
+        assert server_id in self.active, "Server does not exists: {}".format(server_id)
+        del self.active[server_id]
+
     def mark_executed(self, policy_id):
         """
         Record the execution time (now) of a particular policy.  This also
@@ -467,6 +477,25 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         :raises: :class:`NoSuchWebhookError` if the webhook id does not exist
+        """
+
+
+class IScalingScheduleCollection(Interface):
+    """
+    A list of scaling events in the future
+    """
+
+    def fetch_batch_of_events(now, size=100):
+        """
+        Fetch a batch of scheduled events.
+
+        :param now: the current time
+        :type now: ``datetime``
+
+        :param size: the size of the request
+        :type size: ``int``
+
+        :return: an array containing a tuple of (tenant_id, scaling_group_id, policy_id, trigger time)
         """
 
 

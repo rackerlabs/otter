@@ -4,8 +4,9 @@ Tests for :mod:`otter.jsonschema.group_schemas`
 from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
-from jsonschema import Draft3Validator, validate, ValidationError
+from jsonschema import Draft3Validator, ValidationError
 
+from otter.json_schema import validate
 from otter.json_schema import group_schemas, group_examples, rest_schemas
 
 
@@ -457,3 +458,53 @@ class CreateScalingGroupTestCase(TestCase):
                 group_examples.launch_server_config()[0],
                 'scalingPolicies': {"Hello!": "Yes quite."}
             }, rest_schemas.create_group_request)
+
+
+class CreateWebhookTestCase(TestCase):
+    """
+    Verify the webhook schema.
+    """
+    def test_schema_valid(self):
+        """
+        The webhook schema is valid JSON Schema Draft 3.
+        """
+        Draft3Validator.check_schema(group_schemas.webhook)
+
+    def test_name_required(self):
+        """
+        Name is required.
+        """
+        invalid = {'metadata': {'foo': 'bar'}}
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.webhook)
+
+    def test_metadata_optional(self):
+        """
+        Metadata is optional.
+        """
+        validate({'name': 'foo'}, group_schemas.webhook)
+
+
+class UpdateWebhookTestCase(TestCase):
+    """
+    Verify the update webhook schemas.
+    """
+
+    def test_schema_valid(self):
+        """
+        The update webhook schema is valid JSON Schema Draft 3.
+        """
+        Draft3Validator.check_schema(group_schemas.update_webhook)
+
+    def test_name_required(self):
+        """
+        Name is required.
+        """
+        invalid = {'metadata': {'foo': 'bar'}}
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.update_webhook)
+
+    def test_required_metadata(self):
+        """
+        Metadata is required on updates.
+        """
+        invalid = {'name': 'foo'}
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.update_webhook)
