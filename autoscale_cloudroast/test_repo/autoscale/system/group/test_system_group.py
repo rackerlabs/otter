@@ -2,8 +2,6 @@
 System tests for multiple scaling groups scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from time import sleep
-import unittest
 import base64
 
 
@@ -29,8 +27,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_minentities_to_scaleup(self):
         """
-        Verify scale up when minentities is increased
-        AUTO-336
+        Verify that the scaling group scales up when the min entities are updated,
+        to be more
         """
         minentities = 0
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -47,7 +45,6 @@ class GroupFixture(AutoscaleFixture):
         self.assertEqual(group_state.desiredCapacity, minentities,
                          msg='Desired capacity is not equal to the minentities on the group')
         upd_minentities = 3
-        sleep(5)
         update_group = self.autoscale_client.update_group_config(
             group_id=group.id,
             name=group.groupConfiguration.name,
@@ -67,10 +64,10 @@ class GroupFixture(AutoscaleFixture):
         self.assertEqual(group_state.desiredCapacity, upd_minentities,
                          msg='Desired capacity is not equal to the minentities on the group')
 
-    @unittest.skip('scaledown')
-    def test_system_update_minentities_to_scaledown(self):
+    def test_system_update_minentities_to_be_lesser_than_during_create_group(self):
         """
-        Verify scaling group when minentities is decreased
+        Verify scaling group does not scale down when the minenetities are updated,
+        to be lower
         """
         minentities = 4
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -101,15 +98,16 @@ class GroupFixture(AutoscaleFixture):
         group_state = group_state_response.entity
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
-            upd_minentities,
+            minentities,
             msg='Active + Pending servers is not equal to the minentities on the group')
-        self.assertEqual(group_state.desiredCapacity, upd_minentities,
+        self.assertEqual(group_state.desiredCapacity, minentities,
                          msg='Desired capacity is not equal to the minentities on the group')
 
-    @unittest.skip("scaledown")
     def test_system_update_maxentities_less_than_desiredcapacity(self):
         """
-        Verify group when max entities is updated to be less than current active servers
+        Create a scaling group and execute a policy to be within maxentities,
+        reduce the max entities to be less than the active server (desiredCapacity)
+        and verify the scaling group scales down
         """
         minentities = 0
         maxentities = 10
@@ -161,10 +159,17 @@ class GroupFixture(AutoscaleFixture):
             msg='Active + Pending servers is not equal to the minentities on the group')
         self.assertEqual(group_state.desiredCapacity, upd_maxentities,
                          msg='Desired capacity is not equal to the minentities on the group')
+        servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+            group_id=group.id,
+            active_servers=upd_maxentities)
+        self.assertEquals(len(servers_list), upd_maxentities,
+                          msg='The total servers are over the max entities when scaling down')
 
     def test_system_update_maxenetities_and_execute_policy(self):
         """
-        Verify execute policy after maxentities is updated
+        Execute policy on scaling group such that the max entities are met,
+        update the max entities and verify re-executing the scaling policy beyond
+        the older max entities is successful
         """
         minentities = 0
         maxentities = 2
@@ -227,7 +232,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_group_cooldown_enforced_when_reexecuting_same_policy(self):
         """
-        Verify same policy cannot be re-executed during scaling group cooldown
+        Verify group cooldown is enforced when executing a scaling policy
+        with zero policy cooldown, multiple times
         """
         splist = [{
             'name': 'scale up by 3',
@@ -266,9 +272,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_group_cooldown_enforced_when_executing_different_policies(self):
         """
-        Verify different policies cannot be executed during scaling group cooldown
-        AUTO-336
-        prod group : d3aa8e57-396e-417d-a0ed-fed593630886, created 2 instead of 3
+        Verify group cooldown is enforced when executing different scaling policies,
+        multiple times
         """
         splist = [{
             'name': 'scale up by 3',
@@ -308,9 +313,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_group_cooldown_and_execute_policy(self):
         """
-        Verify execute policy when group cooldown is updated to be Zero
-        AUTO-336
-        prod: group ea5fecb2-3696-424d-b639-e47706752b75 got 5 instead of 6
+        Verify different scaling policies can be executed when the group cooldown
+        is updated to be 0
         """
         splist = [{
             'name': 'scale up by 3',
@@ -370,6 +374,66 @@ class GroupFixture(AutoscaleFixture):
         Verify execute policy when executed multiple times to exceed maxentities
         """
         minentities = 2
+        maxentities = 3
+        splist = [{
+            'name': 'scale up by 3',
+            'change': 3,
+            'cooldown': 0,
+            'type': 'webhook'
+        }]
+        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=minentities,
+            gc_max_entities=maxentities,
+            gc_cooldown=0,
+            sp_list=splist)
+        group = create_group_response.entity
+        policy = self.autoscale_behaviors.get_policy_properties(
+            group.scalingPolicies)
+        execute_policy_response = self.autoscale_client.execute_policy(
+            group_id=group.id,
+            policy_id=policy['id'])
+        self.assertEquals(execute_policy_response.status_code, 202,
+                          msg='Policy execution failed with %s even though cooldown and min/max are met'
+                          % execute_policy_response.status_code)
+        execute_policy_response = self.autoscale_client.execute_policy(
+            group_id=group.id,
+            policy_id=policy['id'])
+        self.assertEquals(execute_policy_response.status_code, 403,
+                          msg='Policy was executed even when max entities were met, with status %s'
+                          % execute_policy_response.status_code)
+        upd_maxentities = 10
+        update_group = self.autoscale_client.update_group_config(
+            group_id=group.id,
+            name=group.groupConfiguration.name,
+            cooldown=group.groupConfiguration.cooldown,
+            min_entities=group.groupConfiguration.minEntities,
+            max_entities=upd_maxentities,
+            metadata={})
+        self.assertEquals(update_group.status_code, 204)
+        execute_policy_response = self.autoscale_client.execute_policy(
+            group_id=group.id,
+            policy_id=policy['id'])
+        self.assertEquals(execute_policy_response.status_code, 202,
+                          msg='scaling policy failed execution with status %s'
+                          % execute_policy_response.status_code)
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group.id)
+        self.assertEquals(group_state_response.status_code, 200)
+        group_state = group_state_response.entity
+        total_servers = maxentities + policy['change']
+        self.assertEquals(
+            group_state.pendingCapacity + group_state.activeCapacity,
+            total_servers,
+            msg='Active + Pending servers is not equal to expected number of servers')
+        self.assertEqual(group_state.desiredCapacity, total_servers,
+                         msg='Desired capacity is not equal to expected number of servers')
+
+    def test_system_execute_policy_beyond_maxentities_when_min_equals_max(self):
+        """
+        Verify scaling group with minentities = maxentities cannot execute scale up
+        policy. Update the maxentities and verify the scaling policy can be executed.
+        """
+        minentities = 2
         maxentities = 2
         splist = [{
             'name': 'scale up by 3',
@@ -383,6 +447,9 @@ class GroupFixture(AutoscaleFixture):
             gc_cooldown=0,
             sp_list=splist)
         group = create_group_response.entity
+        self.assertEquals(create_group_response.status_code, 201,
+                          msg='Scaling group with min=max not created because %s'
+                          % create_group_response.content)
         policy = self.autoscale_behaviors.get_policy_properties(
             group.scalingPolicies)
         execute_policy_response = self.autoscale_client.execute_policy(
@@ -420,7 +487,7 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_create_scaling_group_with_same_attributes(self):
         """
-        Verify two scaling groups can have the same attributes
+        Verify scaling groups can be created with the exact same attributes
         """
         gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                        'gc_meta_key_2': 'gc_meta_value_2'}

@@ -1,9 +1,13 @@
 """
 Behaviors for Autoscale
 """
+import time
+
+
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.compute.common.datagen import rand_name
 from autoscale.models.servers import Metadata
+from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -40,7 +44,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
         if lc_name is None:
-            lc_name = rand_name('test_lc_srv_hmm')
+            lc_name = rand_name('test_lc_srv')
         else:
             lc_name = rand_name(str(lc_name))
         if lc_image_ref is None:
@@ -99,6 +103,49 @@ class AutoscaleBehaviors(BaseBehavior):
             lc_load_balancers=lc_load_balancers,
             sp_list=sp_list)
         return create_response
+
+    def wait_for_active_list_in_group_state(self, group_id, active_servers,
+                                            interval_time=None, timeout=None):
+        """
+        @summary: verify the desired capacity in group state is equal to active servers
+         and waits for the specified number of servers to be active on a group
+        @param group_id: Group id
+        @param active_servers: Total active servers expected on the group
+        @param interval_time: Time to wait during polling group state
+        @param timeout: Time to wait before exiting this function
+        @return: returns the list of active servers in the group
+        @rtype: returns the active server list
+        """
+        interval_time = interval_time or int(self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if group_state.desiredCapacity != active_servers:
+            raise BuildErrorException(
+                'Group should have %s servers, but is trying to build %s servers'
+                % (active_servers, group_state.desiredCapacity))
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+
+            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
+                raise BuildErrorException(
+                    'Group Id %s failed to attempt server creation. Group has no servers'
+                    % group_id)
+
+            if len(active_list) == active_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
+            print "waiting for servers to be active..."
+        else:
+            raise TimeoutException(
+                "wait_for_active_list_in_group_state ran for {0} seconds and did not "
+                "observe the active server list achieving the expected servers count: {1}.".format(
+                    timeout, active_servers))
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
@@ -172,7 +219,9 @@ class AutoscaleBehaviors(BaseBehavior):
         @param: group id
         @param: dict of policy details such as change type,
                 change integer/number, cooldown(optional)
-        @return: dict containing policy id and its webhook id
+                Eg: {'change_percent': 100, 'cooldown': 200}
+        @return: dict containing policy id and its webhook id and
+                 capability url
         @rtye: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
@@ -195,7 +244,8 @@ class AutoscaleBehaviors(BaseBehavior):
             name=wb_name)
         webhook = AutoscaleBehaviors.get_webhooks_properties(
             self, create_webhook.entity)
-        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'])
+        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'],
+                     webhook_url=webhook['links'].capability)
         return rdata
 
     def to_data(self, data):

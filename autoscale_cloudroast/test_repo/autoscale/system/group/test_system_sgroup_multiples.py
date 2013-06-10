@@ -2,7 +2,7 @@
 System tests for account with multiple scaling groups
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-#from time import sleep
+from decimal import Decimal, ROUND_UP
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -37,22 +37,47 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
         super(ScalingGroupMultiplesTest, cls).tearDownClass()
 
-    def test_system_create_delete_multiple_scaling_groups(self):
-        """
-        Verify multiple scaling groups can be created and deleted
-        """
-        pass
-
     def test_system_create_group_with_multiple_policies(self):
         """
         Verify scaling group can have multiple policies
         """
-        pass
+        change = 3
+        percentage = 50
+        cooldown = 0
+        group_response = self.autoscale_behaviors.create_scaling_group_given(gc_cooldown=cooldown)
+        group = group_response.entity
+        policy1 = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change=change,
+            sp_cooldown=cooldown)
+        policy2 = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change_percent=percentage,
+            sp_cooldown=cooldown)
+        policy3 = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change_percent=percentage,
+            sp_cooldown=cooldown)
+        for each in [policy1, policy2, policy3]:
+            execute_policies = self.autoscale_client.execute_policy(group.id, each['id'])
+            self.assertEquals(execute_policies.status_code, 202)
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(group.id)
+        self.assertEquals(group_state_response.status_code, 200)
+        group_state = group_state_response.entity
+        sp1 = self.gc_min_entities + change
+        sp2 = sp1 + int((sp1 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        sp3 = sp2 + int((sp2 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        self.assertEquals(
+            group_state.pendingCapacity + group_state.activeCapacity,
+            sp3,
+            msg="Active + Pending servers are not equal to the total expected servers")
+        self.assertEqual(group_state.desiredCapacity, sp3,
+                         msg="Desired capacity are not equal to the total expected servers")
 
     def test_system_create_policy_with_multiple_webhooks(self):
         """
         Verify scaling policy in a group can have multiple multiple_webhooks
-        @TODO : remove the waitimes after zoo keeper locks are enforced
+        and they can be executed
         """
 
         policy = self.autoscale_behaviors.create_policy_min(
@@ -77,16 +102,13 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             webhook_third.entity)
         execute_webhook1 = self.autoscale_client.execute_webhook(
             webhook_one['links'].capability)
-        #sleep(3)
         self.assertEquals(execute_webhook1.status_code, 202)
         execute_webhook2 = self.autoscale_client.execute_webhook(
             webhook_two['links'].capability)
         self.assertEquals(execute_webhook2.status_code, 202)
-        #sleep(3)
         execute_webhook3 = self.autoscale_client.execute_webhook(
             webhook_three['links'].capability)
         self.assertEquals(execute_webhook3.status_code, 202)
-        #sleep(3)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             self.first_scaling_group.id)
         self.assertEquals(group_state_response.status_code, 200)

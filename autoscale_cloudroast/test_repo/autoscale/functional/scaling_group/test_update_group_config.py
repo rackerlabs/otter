@@ -3,7 +3,6 @@ Test to create and update the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.compute.common.datagen import rand_name
-import unittest
 
 
 class UpdateGroupConfigTest(AutoscaleFixture):
@@ -65,7 +64,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
                           msg='Update failed with %s as it does not include full request'
                           % upd_group_resp.status_code)
 
-    @unittest.skip('AUTO-302')
     def test_update_minentities_over_maxentities(self):
         """
         Verify update with in incomplete request containing minentities over maxentities
@@ -83,7 +81,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
                           msg='Update failed with %s as it does not include full request'
                           % upd_group_resp.status_code)
 
-    @unittest.skip('AUTO-302')
     def test_update_maxentities_lessthan_minentities(self):
         """
         Verify update with in incomplete request containing maxentities over minentities

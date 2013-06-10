@@ -35,7 +35,7 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
             webhook_id=self.webhook['id'],
             name=upd_wb_name)
         self.assertEquals(update_webhook_response.status_code, 400,
-                          msg='Update webhook failed with with incomplete requests: %s'
+                          msg='Update webhook passed with with incomplete requests: %s'
                           % update_webhook_response.status_code)
 
     def test_update_webhook_successfully(self):

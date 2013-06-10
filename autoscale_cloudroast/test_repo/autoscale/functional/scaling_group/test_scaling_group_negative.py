@@ -136,7 +136,6 @@ class ScalingGroupNegative(AutoscaleFixture):
                         msg='Create scaling group with invalid request returned: %s'
                         % create_error)
 
-    #@unittest.skip('spinning up servers upon group creation not yet implemented')
     def test_scaling_group_minentities_max(self):
         """
         Negative Test: Scaling group should not get created when min entities are max
@@ -147,6 +146,20 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_min_entities=gc_min_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
                           msg='Create scaling group passed with max minentities. Response: %s'
+                          % create_resp.status_code)
+
+    def test_create_scaling_group_minentities_over_max(self):
+        """
+        Negative Test: Scaling group should not get created when min entities are over max
+        """
+        expected_status_code = HttpStatusCodes.BAD_REQUEST
+        gc_min_entities = 22
+        gc_max_entities = 2
+        create_resp = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=gc_min_entities,
+            gc_max_entities=gc_max_entities)
+        self.assertEquals(create_resp.status_code, expected_status_code,
+                          msg='Create scaling group passed with max < minentities. Response: %s'
                           % create_resp.status_code)
 
     def test_scaling_group_maxentities_cooldown_max(self):

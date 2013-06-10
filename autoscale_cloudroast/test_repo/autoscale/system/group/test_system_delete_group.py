@@ -2,7 +2,6 @@
 System tests for delete scaling group
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
-import unittest
 
 
 class DeleteGroupTest(ScalingGroupFixture):
@@ -27,12 +26,10 @@ class DeleteGroupTest(ScalingGroupFixture):
         """
         super(DeleteGroupTest, cls).tearDownClass()
 
-    @unittest.skip('fails due to AUTO-284')
     def test_system_delete_group_with_minentities_over_zero(self):
         """
-        Verify delete scaling group when minentities more than zero
+        Verify a scaling group cannout be deleted when minentities more than zero
         """
-        # cannot delete such a group but this fails in dev vm currently due to AUTO - 284
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             self.group.id)
         self.assertEquals(group_state_response.status_code, 200)
@@ -50,7 +47,8 @@ class DeleteGroupTest(ScalingGroupFixture):
 
     def test_system_delete_group_update_minentities_to_zero(self):
         """
-        Verify delete scaling group when minenetities of the group are updated to be zero
+        Verify when minenetities of the group are updated to be zero,
+        the scaling group cannot be deleted if it has active servers
         """
         minentities = 0
         reduce_group_size_response = self.autoscale_client.update_group_config(
@@ -68,19 +66,20 @@ class DeleteGroupTest(ScalingGroupFixture):
         group_state = group_state_response.entity
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
-            minentities,
+            self.minentities,
             msg='Active + Pending servers over min entities')
-        self.assertEqual(group_state.desiredCapacity, minentities,
+        self.assertEqual(group_state.desiredCapacity, self.minentities,
                          msg='Desired capacity not same as min entities upon group creation')
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group.id)
-        self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group was unsuccessful %s'
+        self.assertEquals(delete_group_response.status_code, 403,
+                          msg='Deleted group succeeded when servers exist on the group due to %s'
                           % delete_group_response.content)
 
     def test_system_delete_group_with_zero_minentities(self):
         """
-        Verify delete scaling group with zero minenetities
+        Verify a scaling group of zero min entities and no active servers,
+        can be deleted
         """
         minentities = 0
         group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -101,7 +100,8 @@ class DeleteGroupTest(ScalingGroupFixture):
 
     def test_system_delete_group_zero_minentities_execute_webhook(self):
         """
-        Verify delete group when group has 0 minentities and webhook has been executed.
+        Create a scaling group with zero min entities, execute a webhook,
+        and verify the group cannot be deleted as it has active servers
         """
         minentities = 0
         sp_list = [{
@@ -125,6 +125,7 @@ class DeleteGroupTest(ScalingGroupFixture):
         execute_policy = self.autoscale_client.execute_webhook(
             webhook['links'].capability)
         self.assertEquals(execute_policy.status_code, 202)
+        #sleep(5)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group.id)
         self.assertEquals(group_state_response.status_code, 200)
@@ -132,7 +133,7 @@ class DeleteGroupTest(ScalingGroupFixture):
         self.assertEquals(
             group_state.desiredCapacity,
             policy['change'],
-            msg='scaling policy executed, but desired capacity does not match')
+            msg='Desired capacity does not match scale up that was executed')
         delete_group_response = self.autoscale_client.delete_scaling_group(
             group.id)
         self.assertEquals(delete_group_response.status_code, 403,
@@ -140,7 +141,8 @@ class DeleteGroupTest(ScalingGroupFixture):
 
     def test_system_delete_group_zero_minentities_execute_policy(self):
         """
-        Verify delete scaling group when group has 0 minentities and policy has been executed.
+        Create a scaling group with zero min entities, execute a scaling policy,
+        and verify the group cannot be deleted as it has active servers
         """
         minentities = 0
         sp_list = [{
