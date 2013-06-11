@@ -96,6 +96,30 @@ class ScalingGroupConfigTestCase(TestCase):
             self.assertRaisesRegexp(ValidationError, error_regexp,
                                     validate, base, group_schemas.config)
 
+    def test_min_cooldown(self):
+        """
+        Cooldown must be >= 0
+        """
+        invalid = {
+            'name': ' ',
+            'cooldown': -1,
+            'minEntities': 0,
+        }
+        self.assertRaisesRegexp(ValidationError, "less than the minimum",
+                                validate, invalid, group_schemas.config)
+
+    def test_max_cooldown(self):
+        """
+        Cooldown must be <= group_schemas.MAX_COOLDOWN
+        """
+        invalid = {
+            'name': ' ',
+            'cooldown': group_schemas.MAX_COOLDOWN + 1,
+            'minEntities': 0,
+        }
+        self.assertRaisesRegexp(ValidationError, "greater than the maximum",
+                                validate, invalid, group_schemas.config)
+
 
 class GeneralLaunchConfigTestCase(TestCase):
     """
@@ -399,6 +423,32 @@ class ScalingPolicyTestCase(TestCase):
             self.assertRaisesRegexp(
                 ValidationError, 'does not match', validate, invalid,
                 group_schemas.policy)
+
+    def test_min_cooldown(self):
+        """
+        Cooldown must be >= 0
+        """
+        invalid = {
+            "name": "",
+            "change": -1,
+            "cooldown": 5,
+            "type": "webhook"
+        }
+        self.assertRaisesRegexp(ValidationError, "does not match",
+                                validate, invalid, group_schemas.policy)
+
+    def test_max_cooldown(self):
+        """
+        Cooldown must be <= group_schemas.MAX_COOLDOWN
+        """
+        invalid = {
+            "name": "",
+            "change": 10,
+            "cooldown": group_schemas.MAX_COOLDOWN + 1,
+            "type": "webhook"
+        }
+        self.assertRaisesRegexp(ValidationError, "does not match",
+                                validate, invalid, group_schemas.policy)
 
 
 class CreateScalingGroupTestCase(TestCase):
