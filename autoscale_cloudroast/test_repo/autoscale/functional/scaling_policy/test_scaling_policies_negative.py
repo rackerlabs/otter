@@ -222,7 +222,7 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_max_cooldown(self):
         """
-        Negative Test: Create scaling policy with cooldown as maxint fails with response code 400
+        Negative Test: Create scaling policy with cooldown < 24hrs fails with response code 400
         """
         cooldown = 86401
         create_resp = self.autoscale_client.create_policy(
