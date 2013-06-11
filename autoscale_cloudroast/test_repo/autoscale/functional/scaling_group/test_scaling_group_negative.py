@@ -3,7 +3,6 @@ Test negative scenarios for a scaling group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from autoscale.status_codes import HttpStatusCodes
-import sys
 
 
 class ScalingGroupNegative(AutoscaleFixture):
@@ -74,7 +73,7 @@ class ScalingGroupNegative(AutoscaleFixture):
 
     def test_scaling_group_minentities_lessthan_zero(self):
         """
-        Negative Test: SCaling group should not get created when min entities
+        Negative Test: Scaling group should not get created when min entities
         are less than Zero
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
@@ -162,18 +161,30 @@ class ScalingGroupNegative(AutoscaleFixture):
                           msg='Create scaling group passed with max < minentities. Response: %s'
                           % create_resp.status_code)
 
-    def test_scaling_group_maxentities_cooldown_max(self):
+    def test_scaling_group_maxentities_max(self):
         """
         Negative Test: Scaling group should not get created when max entities
-        and cooldown are maxint
+        is over 25
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         gc_max_entities = 26
-        gc_cooldown = sys.maxint
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_max_entities=gc_max_entities, gc_cooldown=gc_cooldown)
+            gc_max_entities=gc_max_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
-                          msg='Create group passed when maxntities and cooldown are max. Response: %s'
+                          msg='Create group passed when maxntities is over 25 with response: %s'
+                          % create_resp.status_code)
+
+    def test_scaling_group_with_max_cooldown(self):
+        """
+        Negative Test: Scaling group should not get created when cooldown
+        is over 86400 seconds (24 hrs)
+        """
+        expected_status_code = HttpStatusCodes.BAD_REQUEST
+        gc_cooldown = 86401
+        create_resp = self.autoscale_behaviors.create_scaling_group_given(
+            gc_cooldown=gc_cooldown)
+        self.assertEquals(create_resp.status_code, expected_status_code,
+                          msg='Create group passed when cooldown is over 24 hrs with response: %s'
                           % create_resp.status_code)
 
     def test_get_invalid_group_id(self):
