@@ -110,11 +110,11 @@ class ScalingGroupConfigTestCase(TestCase):
 
     def test_max_cooldown(self):
         """
-        Cooldown must be <= 86400
+        Cooldown must be <= group_schemas.MAX_COOLDOWN
         """
         invalid = {
             'name': ' ',
-            'cooldown': 86401,
+            'cooldown': group_schemas.MAX_COOLDOWN + 1,
             'minEntities': 0,
         }
         self.assertRaisesRegexp(ValidationError, "greater than the maximum",
@@ -439,12 +439,12 @@ class ScalingPolicyTestCase(TestCase):
 
     def test_max_cooldown(self):
         """
-        Cooldown must be <= 86400
+        Cooldown must be <= group_schemas.MAX_COOLDOWN
         """
         invalid = {
             "name": "",
             "change": 10,
-            "cooldown": 86401,
+            "cooldown": group_schemas.MAX_COOLDOWN + 1,
             "type": "webhook"
         }
         self.assertRaisesRegexp(ValidationError, "does not match",
