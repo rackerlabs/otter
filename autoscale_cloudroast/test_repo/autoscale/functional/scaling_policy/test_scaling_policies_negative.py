@@ -201,21 +201,36 @@ class ScalingPolicyNegative(AutoscaleFixture):
                         msg='Create policies with invalid request returned: %s'
                         % create_error)
 
-    def test_scaling_policy_maxint_cooldown_change(self):
+    def test_scaling_policy_maxint_change(self):
         """
-        Negative Test: Test scaling policy when change and cooldown are maxint
+        Negative Test: Test scaling policy when change is maxint does not fail with 400
         """
-        cooldown = change = sys.maxint
+        change = sys.maxint
         create_resp = self.autoscale_client.create_policy(
             group_id=self.group.id,
             name=self.sp_name,
-            cooldown=cooldown,
+            cooldown=self.gc_cooldown,
             change=change,
             policy_type=self.sp_policy_type)
         policy = create_resp.entity
         self.assertEquals(create_resp.status_code, 201,
-                          msg='Create scaling policy failed with maxint as cooldown & change: %s'
+                          msg='Create scaling policy failed with maxint as change: %s'
                           % create_resp.status_code)
         self.assertTrue(policy is not None,
                         msg='Create scaling policy failed: %s'
                         % policy)
+
+    def test_scaling_policy_max_cooldown(self):
+        """
+        Negative Test: Create scaling policy with cooldown over 24hrs fails with response code 400
+        """
+        cooldown = 86401
+        create_resp = self.autoscale_client.create_policy(
+            group_id=self.group.id,
+            name=self.sp_name,
+            cooldown=cooldown,
+            change=self.sp_change,
+            policy_type=self.sp_policy_type)
+        self.assertEquals(create_resp.status_code, 400,
+                          msg='Created scaling policy with cooldown over 24 hrs with response code: %s'
+                          % create_resp.status_code)
