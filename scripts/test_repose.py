@@ -119,16 +119,25 @@ def run_tests(_, args):
 
     params = (args.repose, tenant_id, auth_token)
 
-    yield get_remaining_rate_limit(*params)
+    old_rates = yield get_remaining_rate_limit(*params)
 
     yield defer.gatherResults([
-        # test_random_url_authenticated(*params),
-        # test_list_groups_authenticated(*params),
-        # test_list_groups_unauthenticated(*params),
+        test_random_url_authenticated(*params),
+        test_list_groups_authenticated(*params),
+        test_list_groups_unauthenticated(*params),
         test_webhook_doesnt_need_authentication(*params)
     ], consumeErrors=True)
 
-    yield get_remaining_rate_limit(*params)
+    new_rates = yield get_remaining_rate_limit(*params)
+
+    for key in old_rates:
+        if 'execute' in key:
+            # because the execute rate limit doesn't seem to count down now
+            continue
+        else:
+            # the non-execute webhook rate should have dropped by at least 2
+            # (limit request, list groups authenticated request)
+            assert old_rates[key]['ALL'] - new_rates[key]['ALL'] >= 2
 
 
 def cli():
