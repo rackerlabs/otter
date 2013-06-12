@@ -67,6 +67,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
         cls.gc_min_entities_alt = int(cls.autoscale_config.gc_min_entities_alt)
+        cls.gc_max_entities = int(cls.autoscale_config.gc_max_entities)
         cls.lc_name = cls.autoscale_config.lc_name
         cls.lc_flavor_ref = cls.autoscale_config.lc_flavor_ref
         cls.lc_image_ref = cls.autoscale_config.lc_image_ref

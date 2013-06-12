@@ -2,6 +2,7 @@
 Behaviors for Autoscale
 """
 import time
+from decimal import Decimal, ROUND_UP
 
 
 from cafe.engine.behaviors import BaseBehavior
@@ -116,7 +117,8 @@ class AutoscaleBehaviors(BaseBehavior):
         @return: returns the list of active servers in the group
         @rtype: returns the active server list
         """
-        interval_time = interval_time or int(self.autoscale_config.interval_time)
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
         timeout = timeout or int(self.autoscale_config.timeout)
         end_time = time.time() + timeout
 
@@ -141,6 +143,11 @@ class AutoscaleBehaviors(BaseBehavior):
                 return [server.id for server in active_list]
             time.sleep(interval_time)
             print "waiting for servers to be active..."
+
+            if group_state.desiredCapacity != active_servers:
+                raise BuildErrorException(
+                    'Group should have %s servers, but has reduced the build %s servers'
+                    % (active_servers, group_state.desiredCapacity))
         else:
             raise TimeoutException(
                 "wait_for_active_list_in_group_state ran for {0} seconds and did not "
@@ -210,7 +217,8 @@ class AutoscaleBehaviors(BaseBehavior):
             self, create_response.entity)
         return policy
 
-    def create_policy_webhook(self, group_id, policy_data):
+    def create_policy_webhook(self, group_id, policy_data,
+                              execute_webhook=None, execute_policy=None):
         """
         @summary: wrapper for create_policy_min. Given a dict with
                   change type, the change number, cooldown(optional),
@@ -220,6 +228,8 @@ class AutoscaleBehaviors(BaseBehavior):
         @param: dict of policy details such as change type,
                 change integer/number, cooldown(optional)
                 Eg: {'change_percent': 100, 'cooldown': 200}
+        @param execute_webhook: Executes the newly created webhook
+        @param execute_policy: Executes the newly created policy
         @return: dict containing policy id and its webhook id and
                  capability url
         @rtye: dict
@@ -244,9 +254,21 @@ class AutoscaleBehaviors(BaseBehavior):
             name=wb_name)
         webhook = AutoscaleBehaviors.get_webhooks_properties(
             self, create_webhook.entity)
+        if execute_webhook is True:
+            execute_webhook_response = self.autoscale_client.execute_webhook(
+                webhook['links'].capability)
+            response_code = execute_webhook_response.status_code
+        if execute_policy is True:
+            execute_policy_response = self.autoscale_client.execute_policy(
+                group_id=group_id,
+                policy_id=policy['id'])
+            response_code = execute_policy_response.status_code
         rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'],
-                     webhook_url=webhook['links'].capability)
+                     webhook_url=webhook['links'].capability, execute_response=response_code)
         return rdata
+
+    def calculate_servers(self, current, percentage):
+        return int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP)) + current
 
     def to_data(self, data):
         """converts metadata obj to type dict"""
