@@ -28,7 +28,6 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             gc_min_entities=self.gc_min_entities_alt,
             gc_cooldown=0)
         self.group = self.create_group_response.entity
-        print self.group.id
         self.change = 2
         self.change_percent = 50
         self.cooldown = 2
@@ -39,12 +38,15 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.policy_up_change_percent = self.autoscale_behaviors.create_policy_given(
             group_id=self.group.id, sp_change_percent=self.change_percent, sp_cooldown=self.cooldown)
         self.policy_down_change_percent = self.autoscale_behaviors.create_policy_given(
-            group_id=self.group.id, sp_change_percent=-(self.change_percent), sp_cooldown=self.cooldown)
+            group_id=self.group.id,
+            sp_change_percent=-(self.change_percent),
+            sp_cooldown=self.cooldown)
         self.policy_desired_capacity = self.autoscale_behaviors.create_policy_given(
             group_id=self.group.id,
             sp_desired_capacity=self.group.groupConfiguration.minEntities,
             sp_cooldown=self.cooldown)
-        self.policy_up_execute = {'change': self.change, 'cooldown': self.cooldown}
+        self.policy_up_execute = {
+            'change': self.change, 'cooldown': self.cooldown}
         self.policy_executed = self.autoscale_behaviors.create_policy_webhook(
             group_id=self.group.id,
             policy_data=self.policy_up_execute,
@@ -68,7 +70,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_executed['policy_id'])
         self.assertEquals(execute_on_cooldown.status_code, 403,
-                          msg='Scale up policy executed when cooldown is not met with %s'
+                          msg='Scale up policy executed when cooldown is not met: %s'
                           % execute_on_cooldown.status_code)
 
     def test_system_policy_down_cooldown(self):
@@ -123,12 +125,20 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         Verify the execution of multiple scale up and scale down policies in sequence
         after each cooldown
         """
-        self._execute_policy_after_cooldown(self.group.id, self.policy_executed['policy_id'])
-        self._execute_policy_after_cooldown(self.group.id, self.policy_up_change['id'])
-        self._execute_policy_after_cooldown(self.group.id, self.policy_up_change_percent['id'])
-        self._execute_policy_after_cooldown(self.group.id, self.policy_down_change['id'])
-        self._execute_policy_after_cooldown(self.group.id, self.policy_down_change_percent['id'])
-        self._execute_policy_after_cooldown(self.group.id, self.policy_desired_capacity['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_executed['policy_id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_up_change['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_down_change['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_down_change['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_up_change_percent['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_down_change_percent['id'])
+        self._execute_policy_after_cooldown(
+            self.group.id, self.policy_desired_capacity['id'])
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
             active_servers=self.group.groupConfiguration.minEntities)
@@ -136,10 +146,14 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             active_servers_list), self.group.groupConfiguration.minEntities)
 
     def _execute_policy_after_cooldown(self, group_id, policy_id):
+        """
+        After the cooldown period, executes the policy and asserts if the policy
+        was executed successfully
+        """
         sleep(self.cooldown)
         execute_policy = self.autoscale_client.execute_policy(
             self.group.id,
-            self.policy_executed['policy_id'])
+            policy_id)
         self.assertEquals(execute_policy.status_code, 202,
                           msg='Execution of the policy after cooldown failed with %s'
                           % execute_policy.status_code)
