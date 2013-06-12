@@ -243,17 +243,7 @@ def _jsonize_cassandra_data(raw_response):
     if raw_response is None:
         raise CassBadDataError("Received unexpected None response")
 
-    results = []
-    for row in raw_response:
-        if 'cols' not in row:
-            raise CassBadDataError("Received malformed response with no cols")
-        try:
-            results.append({col['name']: col['value'] for col in row['cols']})
-        except KeyError as e:
-            raise CassBadDataError('Received malformed response without the '
-                                   'required field "{0!s}"'.format(e))
-
-    return results
+    return raw_response
 
 
 def _jsonloads_data(raw_data):
