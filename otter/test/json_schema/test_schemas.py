@@ -519,7 +519,6 @@ class ScalingPolicyTestCase(TestCase):
         invalid = self.cron_policy
         invalid['args']['cron'] = 'junk'
         self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
->>>>>>> scheduling api changes and validation
 
 
 class CreateScalingGroupTestCase(TestCase):
