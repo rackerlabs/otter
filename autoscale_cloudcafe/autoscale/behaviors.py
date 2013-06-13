@@ -127,8 +127,8 @@ class AutoscaleBehaviors(BaseBehavior):
         group_state = group_state_response.entity
         if group_state.desiredCapacity != active_servers:
             raise BuildErrorException(
-                'Group should have %s servers, but is trying to build %s servers'
-                % (active_servers, group_state.desiredCapacity))
+                'Group %s should have %s servers, but is trying to build %s servers'
+                % (group_id, active_servers, group_state.desiredCapacity))
         while time.time() < end_time:
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
@@ -146,13 +146,13 @@ class AutoscaleBehaviors(BaseBehavior):
 
             if group_state.desiredCapacity != active_servers:
                 raise BuildErrorException(
-                    'Group should have %s servers, but has reduced the build %s servers'
-                    % (active_servers, group_state.desiredCapacity))
+                    'Group %s should have %s servers, but has reduced the build %s servers'
+                    % (group_id, active_servers, group_state.desiredCapacity))
         else:
             raise TimeoutException(
-                "wait_for_active_list_in_group_state ran for {0} seconds and did not "
-                "observe the active server list achieving the expected servers count: {1}.".format(
-                    timeout, active_servers))
+                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
+                "observe the active server list achieving the expected servers count: {2}.".format(
+                    timeout, group_id, active_servers))
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
