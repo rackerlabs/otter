@@ -2,7 +2,6 @@
 System tests for execute updated policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 from time import sleep
 
 
@@ -35,15 +34,14 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_policy=True)
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_update_policy_from_change_to_desired_capacity_scale_down(self):
         """
@@ -70,7 +68,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         such that the policy when executed scales up
         Failing .. check why!!
         """
-        upd_desired_capacity = self.group.groupConfiguration.minEntities + self.policy_up['change'] + 1
+        upd_desired_capacity = self.group.groupConfiguration.minEntities + \
+            self.policy_up['change'] + 1
         sleep(self.cooldown)
         upd_policy_to_desired_capacity_execute = self._update_execute_policy_dc(
             self.group.id,
@@ -149,7 +148,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             active_servers=self.group.groupConfiguration.minEntities + self.policy_up['change'])
         self.assertEquals(len(
             active_servers_list), self.group.groupConfiguration.minEntities + self.policy_up['change'])
-        change = - (self.policy_up['change'] + self.group.groupConfiguration.minEntities) + 1
+        change = - (self.policy_up[
+                    'change'] + self.group.groupConfiguration.minEntities) + 1
         sleep(self.cooldown)
         upd_to_scale_down_execute = self._update_execute_policy(
             self.group.id,

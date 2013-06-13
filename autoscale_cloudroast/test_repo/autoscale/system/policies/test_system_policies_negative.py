@@ -2,7 +2,6 @@
 System tests for scaling policies negative scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 
 
 class ScalingPoliciesNegativeFixture(AutoscaleFixture):
@@ -26,15 +25,14 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             gc_min_entities=self.gc_min_entities_alt,
             gc_cooldown=0)
         self.group = self.create_group_response.entity
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
         """

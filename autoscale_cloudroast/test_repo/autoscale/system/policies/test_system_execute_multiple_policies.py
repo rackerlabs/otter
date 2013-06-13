@@ -2,7 +2,6 @@
 System tests for execute multiple policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 from time import sleep
 
 
@@ -30,7 +29,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.group = self.create_group_response.entity
         self.change = 2
         self.change_percent = 50
-        self.cooldown = 2
+        self.cooldown = 1
         self.policy_up_change = self.autoscale_behaviors.create_policy_given(
             group_id=self.group.id, sp_change=self.change, sp_cooldown=self.cooldown)
         self.policy_down_change = self.autoscale_behaviors.create_policy_given(
@@ -51,15 +50,14 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up_execute,
             execute_policy=True)
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_policy_up_cooldown(self):
         """

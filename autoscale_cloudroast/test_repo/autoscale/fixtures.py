@@ -101,6 +101,18 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
+    def empty_scaling_group(self, group):
+        """
+        Updates the group to be of 0 minentities and maxentities.
+        """
+        self.autoscale_client.update_group_config(
+            group_id=group.id,
+            name=group.groupConfiguration.name,
+            cooldown=0,
+            min_entities=0,
+            max_entities=0,
+            metadata={})
+
     @classmethod
     def tearDownClass(cls):
         """

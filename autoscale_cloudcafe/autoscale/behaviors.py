@@ -198,17 +198,17 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
             sp_policy_type = self.autoscale_config.sp_policy_type
-        if sp_change:
+        if sp_change is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change=sp_change, policy_type=sp_policy_type)
-        if sp_change_percent:
+        if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change_percent=sp_change_percent, policy_type=sp_policy_type)
-        if sp_desired_capacity:
+        if sp_desired_capacity is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,

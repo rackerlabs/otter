@@ -2,7 +2,6 @@
 System tests for scaling policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 
 
 class ScalingUpExecuteWebhookTest(AutoscaleFixture):
@@ -25,19 +24,18 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt)
         self.group = self.create_group_response.entity
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_execute_webhook_scale_up_change(self):
         """
-        Create a scale up polic and execute its webhook and verify execution
+        Create a scale up policy and execute its webhook and verify execution
         """
         policy_up = {'change': 1}
         execute_webhook_in_change_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -86,4 +84,5 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
             active_servers=policy_up['desired_capacity'])
-        self.assertEquals(len(active_servers_list), policy_up['desired_capacity'])
+        self.assertEquals(len(active_servers_list),
+                          policy_up['desired_capacity'])

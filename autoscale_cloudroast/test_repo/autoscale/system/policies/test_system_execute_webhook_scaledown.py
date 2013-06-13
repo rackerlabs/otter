@@ -2,7 +2,6 @@
 System tests for scaling policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 
 
 class ScalingDownExecuteWebhookTest(AutoscaleFixture):
@@ -31,15 +30,14 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_execute_webhook_scale_down_change(self):
         """
@@ -57,7 +55,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
             active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(active_servers_list), self.group.groupConfiguration.minEntities)
+        self.assertEquals(len(
+            active_servers_list), self.group.groupConfiguration.minEntities)
 
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
@@ -71,7 +70,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
         self.assertEquals(execute_webhook_in_change_percent_policy[
                           'execute_response'], 202)
         servers_from_scale_down = self.autoscale_behaviors.calculate_servers(
-            current=self.group.groupConfiguration.minEntities + self.policy_up['change'],
+            current=self.group.groupConfiguration.minEntities +
+            self.policy_up['change'],
             percentage=policy_down['change_percent'])
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
@@ -83,7 +83,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
         Verify execution of a webhook, scale down with desired capacity as the
         minentities of the group
         """
-        policy_down = {'desired_capacity': self.group.groupConfiguration.minEntities}
+        policy_down = {
+            'desired_capacity': self.group.groupConfiguration.minEntities}
         execute_webhook_desired_capacity = self.autoscale_behaviors.create_policy_webhook(
             group_id=self.group.id,
             policy_data=policy_down,
@@ -93,4 +94,5 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
             active_servers=policy_down['desired_capacity'])
-        self.assertEquals(len(active_servers_list), policy_down['desired_capacity'])
+        self.assertEquals(len(
+            active_servers_list), policy_down['desired_capacity'])

@@ -2,7 +2,6 @@
 System tests for execute policy
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 
 
 class ExecutePoliciesUpTest(AutoscaleFixture):
@@ -26,15 +25,14 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             gc_min_entities=self.gc_min_entities_alt,
             gc_max_entities=self.gc_min_entities_alt * 2)
         self.group = self.create_group_response.entity
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_scale_up_policy_execution_change(self):
         """

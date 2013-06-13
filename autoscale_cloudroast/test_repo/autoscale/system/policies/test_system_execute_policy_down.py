@@ -2,7 +2,6 @@
 System tests for execute scale down policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.common.resources import ResourcePool
 
 
 class ExecutePoliciesDownTest(AutoscaleFixture):
@@ -32,15 +31,14 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_policy=True)
-        self.resource = ResourcePool()
-        self.resource.add(self.group.id,
-                          self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
         Delete scaling group
         """
-        self.resource.release()
+        self.empty_scaling_group(self.group)
 
     def test_system_scale_down_policy_execution_change(self):
         """
@@ -143,7 +141,8 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         Verify execution of scale down policy when desired capacity less than minentities
         of the scaling group
         """
-        policy_down = {'desired_capacity': self.group.groupConfiguration.minEntities - 1}
+        policy_down = {
+            'desired_capacity': self.group.groupConfiguration.minEntities - 1}
         execute_change_policy = self.autoscale_behaviors.create_policy_webhook(
             group_id=self.group.id,
             policy_data=policy_down,
