@@ -72,24 +72,7 @@ def _cassandrify_data(list_of_dicts):
 
     This function also de-identifies the data for you.
     """
-    results = []
-    for data_dict in list_of_dicts:
-        columns = []
-        for key, value in data_dict.iteritems():
-            if isinstance(value, bool):
-                if value is True:
-                    value = '\x01'
-                else:
-                    value = '\x00'
-
-            columns.append({
-                'timestamp': None,
-                'name': key,
-                'value': value,
-                'ttl': None
-            })
-        results.append({'cols': columns, 'key': ''})
-    return _de_identify(results)
+    return _de_identify(list_of_dicts)
 
 
 class SerialJsonDataTestCase(TestCase):
@@ -166,23 +149,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`CassBadDataErrors`
         """
         bads = (
-            # no data
-            None,
             # this should probably not happen
             [{}],
-            # no results
-            [{'cols': [{}]}],
-            # no value
-            [{'cols': [{'timestamp': None, 'name': 'data', 'ttl': None}],
-              'key': ''}],
             # non json
-            [{'cols': [{'timestamp': None, 'name': 'data',
-                        'value': 'hi', 'ttl': None}],
-              'key': ''}],
-            [{'cols': [{'timestamp': None, 'name': 'data', 'value': '{ff}',
-                       'ttl': None}],
-             'key': ''}]
-
+            [{'data': 'hi'}],
+            [{'data': '{ff}'}]
         )
 
         for bad in bads:
@@ -195,13 +166,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Test that you can call view and receive a valid parsed response
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-        self.returns = [cass_response]
+        self.returns = [[{'data': '{}'}]]
         d = self.group.view_config()
         r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
@@ -219,7 +184,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': False, 'deleted': False}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'deleted': '\x00'}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
@@ -254,7 +219,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': True, 'deleted': False}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'deleted': '\x00'}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
@@ -372,12 +337,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         When viewing the config, any version information is removed from the
         final output
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{"_ver": 5}',
-                       'ttl': None}],
-             'key': ''}]
+        cass_response = [{'data': '{"_ver": 5}'}]
         self.returns = [cass_response]
         d = self.group.view_config()
         r = self.successResultOf(d)
@@ -388,12 +348,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can call view and receive a valid parsed response
         for the launch config
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
@@ -439,12 +394,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         When viewing the launch config, any version information is removed from
         the final output
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{"_ver": 5}',
-                       'ttl': None}],
-             'key': ''}]
+        cass_response = [{'data': '{"_ver": 5}'}]
         self.returns = [cass_response]
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
@@ -455,13 +405,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can update a config, and if its successful the return
         value is None
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
         d = self.group.update_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -478,13 +422,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can update a launch config, and if successful the return
         value is None
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
         d = self.group.update_launch_config({"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -521,12 +459,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Test that you can call view and receive a valid parsed response
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response]
         d = self.group.get_policy("3444")
         r = self.successResultOf(d)
@@ -572,12 +505,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         When viewing the policy, any version information is removed from the
         final output
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{"_ver": 5}',
-                       'ttl': None}],
-             'key': ''}]
+        cass_response = [{'data': '{"_ver": 5}'}]
         self.returns = [cass_response]
         d = self.group.get_policy("3444")
         r = self.successResultOf(d)
@@ -670,27 +598,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
         """
         bads = (
-            None,
             [{}],
-            # no results
-            [{'cols': [{}]}],
-            # no value
-            [{'cols': [{'timestamp': None, 'name': 'policyId', 'ttl': None},
-                       {'timestamp': None, 'name': 'data', 'ttl': None}],
-              'key': ''}],
             # missing one column
-            [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'policy1', 'ttl': None}],
-              'key': ''}],
-            [{'cols': [{'timestamp': None, 'name': 'data',
-                        'value': '{}', 'ttl': None}],
-              'key': ''}],
+            [{'policyId': 'policy1'}],
+            [{'data': '{}'}],
             # non json
-            [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'policy1', 'ttl': None},
-                       {'timestamp': None, 'name': 'data',
-                        'value': 'hi', 'ttl': None}],
-              'key': ''}]
+            [{'policyId': 'policy1', 'data': 'hi'}]
         )
         for bad in bads:
             self.returns = [bad]
@@ -703,15 +616,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         When listing the policies, any version information is removed from the
         final output
         """
-        cass_response = [
-            {'cols': [{'timestamp': None, 'name': 'policyId',
-                       'value': 'group1', 'ttl': None},
-                      {'timestamp': None, 'name': 'data',
-                       'value': '{"_ver": 5}', 'ttl': None}], 'key': ''},
-            {'cols': [{'timestamp': None, 'name': 'policyId',
-                       'value': 'group3', 'ttl': None},
-                      {'timestamp': None, 'name': 'data',
-                       'value': '{"_ver": 2}', 'ttl': None}], 'key': ''}]
+        cass_response = [{'policyId': 'group1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'group3', 'data': '{"_ver": 2}'}]
         self.returns = [cass_response]
         d = self.group.list_policies()
         r = self.successResultOf(d)
@@ -722,13 +628,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can add a scaling policy, and what is returned is a
         dictionary of the ids to the scaling policies
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
         d = self.group.create_policies([{"b": "lah"}])
         result = self.successResultOf(d)
@@ -749,13 +649,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can add a scaling policy, and what is returned is a
         dictionary of the ids to the scaling policies
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
 
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
@@ -901,13 +795,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Test that you can update a scaling policy, and if successful it returns
         None
         """
-        cass_response = [
-            {'cols': [{'timestamp': None,
-                       'name': 'data',
-                       'value': '{}',
-                       'ttl': None}],
-             'key': ''}]
-
+        cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
@@ -1692,8 +1580,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': False,
-            'deleted': False
+            'paused': '\x00',
+            'deleted': '\x00'
         } for i in range(2)])]
 
         expectedData = {'tenantId': '123'}
@@ -1740,7 +1628,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that you can get webhook info by hash.
         """
         self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': False}]),
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': '\x00'}]),
             _cassandrify_data([{'data': '{}'}])
         ]
         expectedData = {'webhookKey': 'x'}
@@ -1779,7 +1667,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that deletion works
         """
         self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': True}])
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': '\x01'}])
         ]
         expectedData = {'webhookKey': 'x'}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
