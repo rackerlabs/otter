@@ -236,31 +236,6 @@ def _assemble_webhook_from_row(row):
     return webhook_base
 
 
-def _jsonize_cassandra_data(raw_response):
-    """
-    Unwrap cassandra responses into an array of dicts - this should probably
-    go into silverberg.
-
-    :param dict raw_response: the raw response from Cassandra
-
-    :return: ``list`` of ``dicts`` representing the Cassandra data
-    """
-    if raw_response is None:
-        raise CassBadDataError("Received unexpected None response")
-
-    results = []
-    for row in raw_response:
-        if 'cols' not in row:
-            raise CassBadDataError("Received malformed response with no cols")
-        try:
-            results.append({col['name']: col['value'] for col in row['cols']})
-        except KeyError as e:
-            raise CassBadDataError('Received malformed response without the '
-                                   'required field "{0!s}"'.format(e))
-
-    return results
-
-
 def _jsonloads_data(raw_data):
     try:
         data = json.loads(raw_data)
@@ -288,7 +263,7 @@ def _grab_list(raw_response, id_name, has_data=True):
 
     :return: a ``list`` or ``dict`` representing the data in Cassandra
     """
-    results = _jsonize_cassandra_data(raw_response)
+    results = raw_response
     try:
         if has_data:
             return dict([(row[id_name], _jsonloads_data(row['data']))
@@ -406,7 +381,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
         def _do_state_lookup(state_rec):
-            res = _jsonize_cassandra_data(state_rec)
+            res = state_rec
             if len(res) == 0:
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             return _unmarshal_state(res[0])
@@ -648,7 +623,6 @@ class CassScalingGroup(object):
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
-        d.addCallback(_jsonize_cassandra_data)
         d.addCallback(_assemble_webhook_results)
         return d
 
@@ -712,7 +686,6 @@ class CassScalingGroup(object):
                                      "policyId": policy_id,
                                      "webhookId": webhook_id},
                                     get_consistency_level('view', 'webhook'))
-        d.addCallback(_jsonize_cassandra_data)
         d.addCallback(_assemble_webhook)
         return d
 
@@ -759,7 +732,7 @@ class CassScalingGroup(object):
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
 
     def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
-        results = _jsonize_cassandra_data(rawResponse)
+        results = rawResponse
         if len(results) == 0:
             if webhook_id is not None:
                 raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
@@ -912,7 +885,6 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
-        d.addCallback(_jsonize_cassandra_data)
         d.addCallback(_build_states)
         return d
 
@@ -930,7 +902,6 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
                                     get_consistency_level('list', 'events'))
-        d.addCallback(_jsonize_cassandra_data)
         d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
                                      row['policyId'], row['trigger'])
                                     for row in rows])
@@ -958,7 +929,7 @@ class CassScalingGroupCollection:
         the row instead of the index that picks out what has not been deleted.
         """
         def _do_webhook_lookup(webhook_rec):
-            res = _jsonize_cassandra_data(webhook_rec)
+            res = webhook_rec
             if len(res) == 0:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             res = res[0]
