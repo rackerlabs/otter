@@ -2,6 +2,7 @@
 Composable log observers for use with Twisted's log module.
 """
 import json
+from twisted.python.failure import Failure
 
 
 class ReprFallbackEncoder(json.JSONEncoder):
@@ -98,7 +99,12 @@ def PEP3101FormattingWrapper(observer):
             message = ' '.join(eventDict['message'])
 
             if message:
-                eventDict['message'] = (message.format(**eventDict),)
+                try:
+                    eventDict['message'] = (message.format(**eventDict),)
+                except:
+                    failure = Failure()
+                    eventDict['message_formatting_error'] = str(failure)
+                    eventDict['message'] = message
 
         observer(eventDict)
 
