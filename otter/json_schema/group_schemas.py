@@ -307,10 +307,19 @@ policy = {
             "properties": {
                 "cron": {
                     "type": "string",
+                    "description": (
+                        "The recurrence pattern as a cron entry. This describes at what times"
+                        "in the future will the scaling policy get executed. For example, if this is"
+                        "'1 0 * * *' then the policy will get executed at one minute past midnight"
+                        "(00:01) of every day of the month, of every day of the week."
+                        "Kindly check http://en.wikipedia.org/wiki/Cron"),
                     "format": "cron"
                 },
                 "at": {
                     "type": "string",
+                    "description": (
+                        "The time at which this policy will be executed. This property is mutually"
+                        "exclusive w.r.t 'cron'. Either 'cron' or 'at' can be given. Not both."),
                     "format": "date-time"
                 }
             }
