@@ -115,6 +115,11 @@ class AutoscaleFixture(BaseTestFixture):
             metadata={})
 
     def verify_group_state(self, group_id, desired_capacity):
+        """
+        Given the group id and the expected desired capacity,
+        asserts if the desired capacity is being met by the scaling group
+        through the list group status call
+        """
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group_id)
         self.assertEquals(group_state_response.status_code, 200)

@@ -88,9 +88,9 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           % delete_policy.status_code)
         active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities + self.policy_up['change'])
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities + self.policy_up['change'])
+            active_servers=self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
+        self.assertEquals(len(active_servers_list),
+                          self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
 
     def test_system_execute_scale_up_after_maxentities_met(self):
         """
