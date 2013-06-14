@@ -9,6 +9,8 @@ from croniter import croniter
 from otter.util.timestamp import from_timestamp
 from otter.json_schema import g_format_checker
 
+import iso8601
+
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
 # required-based-on-value-of-another-field
@@ -199,21 +201,9 @@ zero = {
 }
 
 
-def _register_check(f, format):
-    """
-    Register function ``f`` to validate ``format``
-    """
-    @g_format_checker.checks(format, raises=ValueError)
-    def _check(inst):
-        try:
-            return bool(f(inst))
-        except Exception as e:
-            # TODO: log; How to get log object here?
-            raise ValueError(e)
-    return _check
-
-_register_check(croniter, 'cron')
-_register_check(from_timestamp, 'date-time')
+# Register cron and ISO8601 date-time format checkers with the global checker.
+g_format_checker.checks('cron', raises=ValueError)(croniter)
+g_format_checker.checks('date-time', raises=iso8601.iso8601.ParseError)(from_timestamp)
 
 _policy_base_type = {
     "type": "object",
