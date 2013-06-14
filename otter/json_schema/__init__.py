@@ -7,6 +7,6 @@ import functools
 from jsonschema import Draft3Validator, validate, FormatChecker
 
 # This is there since later modules need to add specific format validators to this.
-g_format_checker = FormatChecker()
+format_checker = FormatChecker()
 
-validate = functools.partial(validate, cls=Draft3Validator, format_checker=g_format_checker)
+validate = functools.partial(validate, cls=Draft3Validator, format_checker=format_checker)

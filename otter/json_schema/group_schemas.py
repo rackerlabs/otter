@@ -7,7 +7,7 @@ from copy import deepcopy
 from croniter import croniter
 
 from otter.util.timestamp import from_timestamp
-from otter.json_schema import g_format_checker
+from otter.json_schema import format_checker
 
 import iso8601
 
@@ -202,8 +202,8 @@ zero = {
 
 
 # Register cron and ISO8601 date-time format checkers with the global checker.
-g_format_checker.checks('cron', raises=ValueError)(croniter)
-g_format_checker.checks('date-time', raises=iso8601.iso8601.ParseError)(from_timestamp)
+format_checker.checks('cron', raises=ValueError)(croniter)
+format_checker.checks('date-time', raises=iso8601.iso8601.ParseError)(from_timestamp)
 
 _policy_base_type = {
     "type": "object",
