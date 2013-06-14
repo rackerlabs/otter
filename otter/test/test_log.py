@@ -14,7 +14,8 @@ from otter.log.formatters import StreamObserverWrapper
 from otter.log.formatters import SystemFilterWrapper
 from otter.log.formatters import PEP3101FormattingWrapper
 
-from otter.test.utils import SameJSON
+from testtools.matchers import Contains
+from otter.test.utils import SameJSON, matches
 
 
 class BoundLogTests(TestCase):
@@ -230,3 +231,14 @@ class PEP3101FormattingWrapperTests(TestCase):
         """
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
         self.observer.assert_called_once_with({'message': ('foo bar baz bax',), 'bax': 'bax'})
+
+    def test_formatting_failure(self):
+        """
+        PEP3101FormattingWrapper should fall back to using the unformatted
+        message and include an 'exception_formatting_message' key.
+        """
+        self.wrapper({'message': ('{u"Hello": "There"}',)})
+        self.observer.assert_called_once_with({
+            'message': '{u"Hello": "There"}',
+            'message_formatting_error': matches(Contains('KeyError'))
+        })
