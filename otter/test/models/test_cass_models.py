@@ -149,23 +149,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`CassBadDataErrors`
         """
         bads = (
-            # no data
-            None,
             # this should probably not happen
             [{}],
-            # no results
-            [{'cols': [{}]}],
-            # no value
-            [{'cols': [{'timestamp': None, 'name': 'data', 'ttl': None}],
-              'key': ''}],
             # non json
-            [{'cols': [{'timestamp': None, 'name': 'data',
-                        'value': 'hi', 'ttl': None}],
-              'key': ''}],
-            [{'cols': [{'timestamp': None, 'name': 'data', 'value': '{ff}',
-                       'ttl': None}],
-             'key': ''}]
-
+            [{'data': 'hi'}],
+            [{'data': '{ff}'}]
         )
 
         for bad in bads:
@@ -610,27 +598,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
         """
         bads = (
-            None,
             [{}],
-            # no results
-            [{'cols': [{}]}],
-            # no value
-            [{'cols': [{'timestamp': None, 'name': 'policyId', 'ttl': None},
-                       {'timestamp': None, 'name': 'data', 'ttl': None}],
-              'key': ''}],
             # missing one column
-            [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'policy1', 'ttl': None}],
-              'key': ''}],
-            [{'cols': [{'timestamp': None, 'name': 'data',
-                        'value': '{}', 'ttl': None}],
-              'key': ''}],
+            [{'policyId': 'policy1'}],
+            [{'data': '{}'}],
             # non json
-            [{'cols': [{'timestamp': None, 'name': 'policyId',
-                        'value': 'policy1', 'ttl': None},
-                       {'timestamp': None, 'name': 'data',
-                        'value': 'hi', 'ttl': None}],
-              'key': ''}]
+            [{'policyId': 'policy1', 'data': 'hi'}]
         )
         for bad in bads:
             self.returns = [bad]
