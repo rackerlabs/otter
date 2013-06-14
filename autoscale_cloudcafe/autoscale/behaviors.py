@@ -2,7 +2,7 @@
 Behaviors for Autoscale
 """
 import time
-from decimal import Decimal, ROUND_UP
+from decimal import Decimal, ROUND_HALF_UP
 
 
 from cafe.engine.behaviors import BaseBehavior
@@ -235,6 +235,7 @@ class AutoscaleBehaviors(BaseBehavior):
         @rtye: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
+        response_code = None
         if policy_data.get('change_percent'):
             sp_change_percent = policy_data['change_percent']
         if policy_data.get('change'):
@@ -272,7 +273,7 @@ class AutoscaleBehaviors(BaseBehavior):
         Given the current number of servers and change percentage,
         returns the servers expected for the percentage.
         """
-        return int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP)) + current
+        return int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_HALF_UP)) + current
 
     def to_data(self, data):
         """converts metadata obj to type dict"""

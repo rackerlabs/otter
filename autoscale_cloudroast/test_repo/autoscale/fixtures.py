@@ -103,7 +103,8 @@ class AutoscaleFixture(BaseTestFixture):
 
     def empty_scaling_group(self, group):
         """
-        Updates the group to be of 0 minentities and maxentities.
+        Updates the group to be of 0 minentities and maxentities,
+        and asserts the update was successful
         """
         self.autoscale_client.update_group_config(
             group_id=group.id,
@@ -112,6 +113,21 @@ class AutoscaleFixture(BaseTestFixture):
             min_entities=0,
             max_entities=0,
             metadata={})
+
+    def verify_group_state(self, group_id, desired_capacity):
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        self.assertEquals(group_state_response.status_code, 200)
+        group_state = group_state_response.entity
+        self.assertEquals(
+            group_state.pendingCapacity + group_state.activeCapacity,
+            desired_capacity,
+            msg='Active + Pending servers (%s) != (%s) minentities on the group %s'
+            % (group_state.pendingCapacity + group_state.activeCapacity,
+                desired_capacity, group_id))
+        self.assertEquals(group_state.desiredCapacity, desired_capacity,
+                          msg='Desired capacity (%s) != (%s) minentities on the group %s'
+                          % (group_state.desiredCapacity, desired_capacity, group_id))
 
     @classmethod
     def tearDownClass(cls):
