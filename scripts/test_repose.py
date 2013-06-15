@@ -6,47 +6,19 @@ identity server, and that webhooks do not need authorization
 """
 from argparse import ArgumentParser
 import json
-from urlparse import urlparse
 
 import treq
 
-from twisted.internet import defer, error, task
+from twisted.internet import defer, task
 
-from otter.util.http import append_segments
-from otter.util.deferredutils import unwrap_first_error
-
-
-default_identity = "https://staging.identity.api.rackspacecloud.com/v2.0/"
-
-content_type = {'content-type': ['application/json'],
-                'accept': ['application/json']}
+from otter.auth import authenticate_user
+from otter.util.http import append_segments, headers, wrap_request_error
 
 
-def wrap_connection_timeout(failure, url):
-    """
-    Connection timeouts aren't useful becuase they don't contain the netloc
-    that is timing out, so wrap the error.
-    """
-    if failure.check(error.TimeoutError):
-        raise Exception('Timed out trying to hit {0}'.format(
-            urlparse(url).netloc))
-    return failure
+default_identity = "https://identity.api.rackspacecloud.com/v2.0/"
 
 
-def check_status_cb(purpose, expected=200):
-    """
-    Get a callback that can be used to check the status of a response and
-    print a nice error message.
-    """
-    def check_status(response):
-        if response.code != expected:
-            raise Exception(
-                "{p} should result in a {e}.  Got {r} instead.".format(
-                    p=purpose, e=expected, r=response.code))
-    return check_status
-
-
-def request(url, method='GET', data=None, auth_token=None):
+def request(url, purpose, method='GET', data=None, auth_token=None, expected=200):
     """
     Makes a treq GET request with the given method and URL.  For headers, takes
     the content type headers and possibly adds an auth token bit, if provided.
@@ -54,39 +26,41 @@ def request(url, method='GET', data=None, auth_token=None):
     Also checks that the status is the expected status, and wraps any timeouts
     to have a more useful error message.
     """
-    if auth_token is None:
-        headers = content_type
-    else:
-        headers = content_type.copy()
-        headers['x-auth-token'] = [auth_token]
+    def check_status(response):
+        if response.code != expected:
+            raise Exception(
+                "{p} should result in a {e}.  Got {r} instead.".format(
+                    p=purpose, e=expected, r=response.code))
+        print '{} --> {}... ok!'.format(purpose, expected)
+        return response
 
-    d = treq.request(method, url, headers=headers, data=data)
-    d.addErrback(wrap_connection_timeout, url)
+    def print_err_message(failure):
+        print '{0} failed:\n{1!s}'.format(purpose, failure)
+        return failure
+
+    d = treq.request(method, url, headers=headers(auth_token), data=data)
+    d.addErrback(wrap_request_error, url, data=auth_token)
+    d.addCallbacks(check_status, print_err_message)
     return d
 
 
-def test_webhook_doesnt_need_authentication(repose_endpoint):
+def test_webhook_doesnt_need_authentication(repose_endpoint, tenant_id, auth_token):
     """
     Trying to execute a webhook does not need any authentication.  Even if the
     webhook doesn't exist, a 202 is returned.  But a 4XX certainly shouldn't
     be returned.
     """
-    url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', 'random')
-    d = request(url, method='POST')
-    d.addCallback(check_status_cb('Executing a webhook without authentication',
-                                  expected=202))
-    return d
+    url = append_segments(repose_endpoint, 'v1.0', 'execute', '1', tenant_id)
+    return request(url, 'Executing a webhook without authentication',
+                   method='POST', expected=202)
 
 
-def test_list_groups_unauthenticated(repose_endpoint, tenant_id):
+def test_list_groups_unauthenticated(repose_endpoint, tenant_id, auth_token):
     """
     Try to get groups, which returns with a 401 because it is unauthenticated
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
-    d = request(url)
-    d.addCallback(check_status_cb("Listing groups with authentication",
-                                  expected=401))
-    return d
+    return request(url, "Listing groups without authentication", expected=401)
 
 
 def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
@@ -94,9 +68,8 @@ def test_list_groups_authenticated(repose_endpoint, tenant_id, auth_token):
     Try to get groups, which returns with a 200 because it is authenticated.
     """
     url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'groups')
-    d = request(url, auth_token=auth_token)
-    d.addCallback(check_status_cb("Listing groups with authentication"))
-    return d
+    return request(url, "Listing groups with authentication",
+                   auth_token=auth_token)
 
 
 def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
@@ -105,66 +78,66 @@ def test_random_url_authenticated(repose_endpoint, tenant_id, auth_token):
     because it is neither in the repose client-auth authenticated regex nor is
     it in the repose client-auth whitelist regex.
     """
-    url = append_segments(repose_endpoint, 'v10.6', tenant_id, 'groups')
-    d = request(url, auth_token=auth_token)
-    d.addCallback(check_status_cb("Hitting an invalid url even with authentication",
-                                  expected=401))
+    url = append_segments(repose_endpoint, 'v106', tenant_id, 'groups')
+    return request(url, "Hitting an invalid url even with authentication",
+                   auth_token=auth_token, expected=401)
+
+
+def get_remaining_rate_limit(repose_endpoint, tenant_id, auth_token):
+    """
+    Get the remaining number of times a GET request can be made (since in these
+    tests they are all GETs)
+    """
+    def get_limits(limits_dictionary):
+        regexes = limits_dictionary['limits']['rate']
+        rates = dict([(
+            regex['regex'],
+            dict([(rate['verb'], rate['remaining']) for rate in regex['limit']]))
+            for regex in regexes])
+
+        info = '\tRate info (by regex): {0}'.format(json.dumps(rates, indent=4))
+        print '\n\t'.join(info.split('\n'))
+        return rates
+
+    url = append_segments(repose_endpoint, 'v1.0', tenant_id, 'limits')
+    d = request(url, "Getting the rate limit info", auth_token=auth_token,
+                expected=200)
+    d.addCallback(treq.json_content)
+    d.addCallback(get_limits)
     return d
 
 
-def get_user_info(identity_endpoint, username, api_key):
-    """
-    Hit auth manually to get a valid auth token (and the tenant ID) with which
-    to test repose
-    """
-    data = {
-        "auth": {
-            "RAX-KSKEY:apiKeyCredentials": {
-                "username": username,
-                "apiKey": api_key
-            }
-        }
-    }
-
-    url = append_segments(identity_endpoint, 'tokens')
-    d = request(url, method='POST', data=json.dumps(data))
-
-    def extract_token_and_tenant(response):
-        if response.code == 200:
-            contents = treq.content(response)
-            contents.addCallback(json.loads)
-            contents.addCallback(lambda blob: (
-                blob['access']['token']['id'].encode('ascii'),
-                blob['access']['token']['tenant']['id'].encode('ascii')))
-            return contents
-        raise Exception('User {0} unauthorized.'.format(username))
-
-    d.addCallback(extract_token_and_tenant)
-    return d
-
-
+@defer.inlineCallbacks
 def run_tests(_, args):
     """
-    Run the authenticated and unauthenticated tests.
+    Run the authenticated and unauthenticated tests.  Using inlinecallbacks
+    because the logic is just easier to understand in this case.
     """
+    blob = yield authenticate_user(args.identity, args.username, args.password)
+    auth_token = blob['access']['token']['id'].encode('ascii')
+    tenant_id = blob['access']['token']['tenant']['id'].encode('ascii')
 
-    def _do_tests(token_and_tenant):
-        """
-        Run the tests that require the user to be authenticated
-        """
-        auth_token, tenant_id = token_and_tenant
+    params = (args.repose, tenant_id, auth_token)
 
-        return defer.gatherResults(
-            [test_random_url_authenticated(args.repose, tenant_id, auth_token),
-             test_list_groups_authenticated(args.repose, tenant_id, auth_token),
-             test_list_groups_unauthenticated(args.repose, tenant_id),
-             test_webhook_doesnt_need_authentication(args.repose)],
-            consumeErrors=True)
+    old_rates = yield get_remaining_rate_limit(*params)
 
-    d = get_user_info(args.identity, args.username, args.apikey)
-    d.addCallback(_do_tests)
-    d.addErrback(unwrap_first_error)  # get the actual error returned
-    return d
+    yield defer.gatherResults([
+        test_random_url_authenticated(*params),
+        test_list_groups_authenticated(*params),
+        test_list_groups_unauthenticated(*params),
+        test_webhook_doesnt_need_authentication(*params)
+    ], consumeErrors=True)
+
+    new_rates = yield get_remaining_rate_limit(*params)
+
+    for key in old_rates:
+        if 'execute' in key:
+            # because the execute rate limit doesn't seem to count down now
+            continue
+        else:
+            # the non-execute webhook rate should have dropped by at least 2
+            # (limit request, list groups authenticated request)
+            assert old_rates[key]['ALL'] - new_rates[key]['ALL'] >= 2
 
 
 def cli():
@@ -177,8 +150,8 @@ def cli():
         help='Username of user with credentials on identity service')
 
     parser.add_argument(
-        'apikey', type=str,
-        help='API key of user with credentials on identity service')
+        'password', type=str,
+        help='Password of the user with credentials on identity service')
 
     parser.add_argument(
         'repose', type=str, help='URL that points at repose.')
@@ -191,4 +164,5 @@ def cli():
     task.react(run_tests, [parser.parse_args()])
 
 
-cli()
+if __name__ == "__main__":
+    cli()
