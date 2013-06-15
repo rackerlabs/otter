@@ -172,7 +172,7 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
             auth_token,
             lb_config,
             ip_address).addCallback(
-                lambda response: (lb_config['loadBalancerId'], response))
+                lambda response, lbid: (lbid, response), lb_config['loadBalancerId'])
 
         for lb_config in lb_configs
     ], consumeErrors=True)

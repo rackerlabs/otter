@@ -6,7 +6,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -183,11 +183,15 @@ class LoadBalancersTests(TestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
+        d1 = Deferred()
+        d2 = Deferred()
+        add_to_load_balancer_deferreds = [d1, d2]
+
         def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
             # Include the ID and port in the response so that we can verify
             # that add_to_load_balancers associates the response with the correct
             # load balancer.
-            return succeed((lb_config['loadBalancerId'], lb_config['port']))
+            return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
@@ -197,6 +201,9 @@ class LoadBalancersTests(TestCase):
                                    {'loadBalancerId': 54321,
                                     'port': 81}],
                                   '192.168.1.1')
+
+        d2.callback((54321, 81))
+        d1.callback((12345, 80))
 
         results = self.successResultOf(d)
 
