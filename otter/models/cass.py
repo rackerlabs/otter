@@ -907,6 +907,15 @@ class CassScalingGroupCollection:
                                     for row in rows])
         return d
 
+    def delete_events(self, now):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
+        """
+        d = self.connection.execute(_cql_delete_events.format(cf=self.event_table), {"now": now},
+                                    get_consistency_level('list', 'events'))
+        d.addCallback(lambda rows: rows)
+        return d
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
