@@ -32,7 +32,8 @@ class BoundLogTests(TestCase):
 
     def test_bind_msg(self):
         """
-        bind saves it's keyword arguments and passes them to msg when it is called.
+        bind saves it's keyword arguments and passes them to msg when it is
+        called.
         """
         log = self.log.bind(system='hello')
         log.msg('Hi there')
@@ -41,7 +42,8 @@ class BoundLogTests(TestCase):
 
     def test_bind_err(self):
         """
-        bind saves it's keyword arguments and passes them to err when it is called.
+        bind saves it's keyword arguments and passes them to err when it is
+        called.
         """
         exc = ValueError('uh oh')
         log = self.log.bind(system='hello')
@@ -62,13 +64,15 @@ class JSONObserverWrapperTests(TestCase):
 
     def test_default_formatter(self):
         """
-        JSONObserverWrapper returns an ILogObserver that serializes the eventDict as JSON,
-        and calls the wrapped observer with the JSON bytes as the message.
+        JSONObserverWrapper returns an ILogObserver that serializes the
+        eventDict as JSON, and calls the wrapped observer with the JSON bytes
+        as the message.
         """
         eventDict = {'foo': 'bar', 'baz': 'bax'}
         observer = JSONObserverWrapper(self.observer)
         observer(eventDict)
-        self.observer.assert_called_once_with({'message': (SameJSON(eventDict),)})
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON(eventDict),)})
 
     def test_propagates_keyword_arguments(self):
         """
@@ -189,7 +193,8 @@ class SystemFilterWrapperTests(TestCase):
         SystemFilterObserver passes through all other systems.
         """
         self.sfo({'system': 'otter.rest.blah.blargh'})
-        self.observer.assert_called_once_with({'system': 'otter.rest.blah.blargh'})
+        self.observer.assert_called_once_with(
+            {'system': 'otter.rest.blah.blargh'})
 
 
 class PEP3101FormattingWrapperTests(TestCase):
@@ -216,21 +221,24 @@ class PEP3101FormattingWrapperTests(TestCase):
         PEP3101FormattingWrapper formats the why argument to log.err.
         """
         self.wrapper({'why': 'Hello {name}', 'name': 'World'})
-        self.observer.assert_called_once_with({'why': 'Hello World', 'name': 'World'})
+        self.observer.assert_called_once_with({'why': 'Hello World',
+                                               'name': 'World'})
 
     def test_format_message(self):
         """
         PEP3101FormattingWrapper formats the message.
         """
         self.wrapper({'message': ('foo {bar}',), 'bar': 'bar'})
-        self.observer.assert_called_once_with({'message': ('foo bar',), 'bar': 'bar'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo bar',), 'bar': 'bar'})
 
     def test_format_message_tuple(self):
         """
         PEP3101FormattingWrapper joins the message tuple before formatting.
         """
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
-        self.observer.assert_called_once_with({'message': ('foo bar baz bax',), 'bax': 'bax'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo bar baz bax',), 'bax': 'bax'})
 
     def test_formatting_failure(self):
         """

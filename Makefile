@@ -24,6 +24,7 @@ env:
 
 lint:
 	${PYTHONLINT} ${PYDIRS}
+	pep8 ${PYDIRS}
 
 unit:
 ifneq ($(JENKINS_URL), )
