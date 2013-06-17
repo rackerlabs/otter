@@ -11,7 +11,10 @@ RS_USERNAME = os.environ['RACKSPACE_USERNAME']
 RS_API_KEY = os.environ['RACKSPACE_API_KEY']
 container_name = os.environ.get('CONTAINER_NAME') or 'otter_artifacts'
 
-driver = get_driver(Provider.CLOUDFILES_US)(RS_USERNAME, RS_API_KEY)
+driver = get_driver(Provider.CLOUDFILES_US)(
+    RS_USERNAME,
+    RS_API_KEY,
+    ex_force_service_region='dfw')
 
 # Create a container if it doesn't already exist
 try:
