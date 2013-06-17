@@ -498,12 +498,12 @@ class IScalingScheduleCollection(Interface):
         :return: an array containing a tuple of (tenant_id, scaling_group_id, policy_id, trigger time)
         """
 
-    def delete_events(now):
+    def delete_events(policy_id):
         """
-        Delete scheduled events occurred before ``now``
+        Delete scheduled events of ``policy_id``
 
-        :param now: the current time
-        :type now: ``datetime``
+        :param policy_id: the Id of policy
+        :type now: ``str``
 
         :return: None
         """
