@@ -1392,7 +1392,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         Tests that you can delete event of a given policy_ids
         """
-        expectedData = {':policyid0': 'p1', ':policyid1': 'p2'}
+        expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
         expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
         result = self.successResultOf(self.collection.delete_events(['p1', 'p2']))
         self.assertEqual(result, None)
