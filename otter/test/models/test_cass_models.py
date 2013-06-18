@@ -13,7 +13,8 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     CassBadDataError,
-    serialize_json_data)
+    serialize_json_data,
+    filter_deleted)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -86,6 +87,34 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
+
+
+class FilterDeletedTestCase(TestCase):
+    """
+    Filtering out tombstone deletes happens in the API, so it does not slow
+    down the Cassandra query.  This is temporary until we stop doing tombstone
+    deletes.
+    """
+
+    def test_filters_deleted(self):
+        """
+        Out of all the rows that get returned from Cassandra, only the
+        ones whose delete column is False are returned.
+        """
+        rows = [{'deleted': '\x00', 'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'deleted': '\x00', 'name': 'value3'}]
+        expected = [{'name': 'value1'}, {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), expected)
+
+    def test_ignores_rows_without_delete(self):
+        """
+        If a row does not have a deleted parameter, it will not be filtered out.
+        """
+        rows = [{'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), [rows[0], rows[2]])
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):

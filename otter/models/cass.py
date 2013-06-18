@@ -99,6 +99,26 @@ _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FR
                            '"webhookKey" = :webhookKey;')
 
 
+def filter_deleted(cass_result):
+    """
+    Filters out all rows with a ``deleted`` column whose value is True.
+    Also removes the ``deleted`` column from the resulting rows.
+
+    This is intended to be used as a temporary callback to ``execute`` as part
+    of phasing out manual tombstone deletes.  ``deleted`` is an index, and
+    Cassandra queries the index for all undeleted items first before checking
+    the other items, which takes a long time.  This doesn't seem to happen
+    when selecting just one item (with both parts of the compound key in the
+    where clause.)
+    """
+    filtered = []
+    for dictionary in cass_result:
+        deleted = dictionary.pop('deleted', '\x00')  # default is false
+        if not bool(ord(deleted)):
+            filtered.append(dictionary)
+    return filtered
+
+
 def get_consistency_level(operation, resource):
     """
     Get the consistency level for a particular operation.
