@@ -90,13 +90,13 @@ _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantI
                        '"webhookId" = :{name}')
 
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                    '"policyTouched", paused, deleted FROM {cf} WHERE "tenantId" = :tenantId;')
-_cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE "tenantId" = :tenantId AND '
-                    '"groupId" = :groupId;')
-# _cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} WHERE '
-#                      '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId;')
-_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
-                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                    '"policyTouched", paused, deleted FROM {cf} WHERE '
+                    '"tenantId" = :tenantId;')
+_cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE '
+                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
+_cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} '
+                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
+                     '"policyId" = :policyId;')
 
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -623,6 +623,7 @@ class CassScalingGroup(object):
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
+        d.addCallback(filter_deleted)
         d.addCallback(_assemble_webhook_results)
         return d
 

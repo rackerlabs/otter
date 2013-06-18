@@ -985,9 +985,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
                         "policyId": '23456789'}
-        expectedCql = ('SELECT "webhookId", data, capability FROM policy_webhooks '
-                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       '"policyId" = :policyId AND deleted = False;')
+        expectedCql = ('SELECT "webhookId", data, capability, deleted FROM '
+                       'policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId AND "policyId" = :policyId;')
         r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
 
