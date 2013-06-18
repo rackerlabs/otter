@@ -544,14 +544,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Naive list policies lists existing scaling policies
         """
-        self.returns = [_cassandrify_data([
-            {'policyId': 'policy1', 'data': '{}'},
-            {'policyId': 'policy2', 'data': '{}'}])]
+        self.returns = [_de_identify([
+            {'policyId': 'policy1', 'data': '{}', 'deleted': '\x00'},
+            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}])]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111'}
-        expectedCql = ('SELECT "policyId", data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND deleted = False;')
+        expectedCql = ('SELECT "policyId", data, deleted FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
         self.assertEqual(r, {'policy1': {}, 'policy2': {}})
@@ -621,24 +621,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_failed(self.group.list_policies(),
                                     NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
-
-    def test_list_policy_errors(self):
-        """
-        Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
-        """
-        bads = (
-            [{}],
-            # missing one column
-            [{'policyId': 'policy1'}],
-            [{'data': '{}'}],
-            # non json
-            [{'policyId': 'policy1', 'data': 'hi'}]
-        )
-        for bad in bads:
-            self.returns = [bad]
-            self.assert_deferred_failed(self.group.list_policies(),
-                                        CassBadDataError)
-            self.flushLoggedErrors(CassBadDataError)
 
     def test_list_policy_no_version(self):
         """

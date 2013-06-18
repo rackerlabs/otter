@@ -88,13 +88,19 @@ _cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId
 _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId AND '
                        '"webhookId" = :{name}')
+
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                     '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId '
                     'AND deleted = False;')
-_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
-                    '"groupId" = :groupId AND deleted = False;')
+# _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+#                     '"policyTouched", paused, deleted FROM {cf} WHERE "tenantId" = :tenantId;')
+_cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE "tenantId" = :tenantId AND '
+                    '"groupId" = :groupId;')
+# _cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} WHERE '
+#                      '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId;')
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
 
@@ -484,12 +490,17 @@ class CassScalingGroup(object):
         all the policies associated with particular scaling group
         irregardless of whether the scaling group still exists.
         """
+        def construct_dictionary(rows):
+            return dict(
+                [(row['policyId'], _jsonloads_data(row['data'])) for row in rows])
+
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(_grab_list, 'policyId', has_data=True)
+        d.addCallback(filter_deleted)
+        d.addCallback(construct_dictionary)
         return d
 
     def list_policies(self):
