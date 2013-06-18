@@ -90,10 +90,7 @@ _cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantI
                        '"webhookId" = :{name}')
 
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                    '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId '
-                    'AND deleted = False;')
-# _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-#                     '"policyTouched", paused, deleted FROM {cf} WHERE "tenantId" = :tenantId;')
+                    '"policyTouched", paused, deleted FROM {cf} WHERE "tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId;')
 # _cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} WHERE '
@@ -916,6 +913,7 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
+        d.addCallback(filter_deleted)
         d.addCallback(_build_states)
         return d
 

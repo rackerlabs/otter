@@ -1597,8 +1597,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1616,8 +1616,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(expectedCql,
