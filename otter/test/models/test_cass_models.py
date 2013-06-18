@@ -1180,7 +1180,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             None]
         d = self.group.delete_webhook('3444', '4555')
         self.assertIsNone(self.successResultOf(d))  # delete returns None
-        expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '
+        expectedCql = ('DELETE FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND "webhookId" = :webhookId')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",

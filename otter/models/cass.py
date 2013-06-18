@@ -83,11 +83,11 @@ _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data)
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
-_cql_delete_policy = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
-                      'AND "groupId" = :groupId AND "policyId" = {name}')
-_cql_delete_webhook = ('UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND '
-                       '"webhookId" = :{name}')
+_cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
+                             'AND "groupId" = :groupId AND "policyId" = {name}')
+_cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
+                           '"groupId" = :groupId AND "policyId" = :policyId AND '
+                           '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                     '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId '
                     'AND deleted = False;')
@@ -718,8 +718,7 @@ class CassScalingGroup(object):
         self.log.bind(policy_id=policy_id, webhook_id=webhook_id).msg("Deleting webhook")
 
         def _do_delete(lastRev):
-            query = _cql_delete_webhook.format(
-                cf=self.webhooks_table, name="webhookId")
+            query = _cql_delete_one_webhook.format(cf=self.webhooks_table)
 
             d = self.connection.execute(query,
                                         {"tenantId": self.tenant_id,
