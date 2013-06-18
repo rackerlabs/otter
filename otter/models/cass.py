@@ -912,11 +912,11 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
         """
-        # TODO: This may not be good for CQL injection?!?
-        policy_ids = ','.join(["'%s'" % policy_id for policy_id in policy_ids])
+        policy_ids_cql = ','.join([":policyid%d" % i for i in range(len(policy_ids))])
+        id_values_dict = {':policyid%d' % i: policy_id for i, policy_id in enumerate(policy_ids)}
         d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
-                                                              policy_ids=policy_ids),
-                                    {}, get_consistency_level('list', 'events'))
+                                                              policy_ids=policy_ids_cql),
+                                    id_values_dict, get_consistency_level('list', 'events'))
         return d
 
     def webhook_info_by_hash(self, log, capability_hash):
