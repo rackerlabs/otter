@@ -270,34 +270,6 @@ def _jsonloads_data(raw_data):
         return data
 
 
-def _grab_list(raw_response, id_name, has_data=True):
-    """
-    The response is a list of stuff.  Return the list.
-
-    :param raw_response: the raw response from cassandra
-    :type raw_response: ``dict``
-
-    :param id_name: The column name to look for and get
-    :type id_name: ``str``
-
-    :param has_data: Whether to pull a data object out or not.  Determines
-        whether the returned value is a list or a dictionary
-    :type has_data: ``bool``
-
-    :return: a ``list`` or ``dict`` representing the data in Cassandra
-    """
-    results = raw_response
-    try:
-        if has_data:
-            return dict([(row[id_name], _jsonloads_data(row['data']))
-                         for row in results])
-        else:
-            return [row[id_name] for row in results]
-    except KeyError as e:
-        raise CassBadDataError('Received malformed response without the '
-                               'required field "{0!s}"'.format(e))
-
-
 def _unmarshal_state(state_dict):
     return GroupState(
         state_dict['tenantId'], state_dict['groupId'],
