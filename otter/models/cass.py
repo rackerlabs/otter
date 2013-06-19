@@ -82,7 +82,8 @@ _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data)
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
-_cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
+_cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
+                            '"groupId" = :groupId')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
                              'AND "groupId" = :groupId AND "policyId" = :policyId')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -726,6 +727,8 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
 
         TODO: locking!!
+        XXX: What happens if a group is deleted while policie stuff is updating?
+            seems like locking/some kind of coordination must happen.
         """
         d = self.view_state()
 
@@ -733,31 +736,18 @@ class CassScalingGroup(object):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
-            consistency = get_consistency_level('delete', 'group')
+            queries = [
+                _cql_delete_all_in_group.format(cf=table) for table in
+                (self.config_table, self.launch_table, self.policies_table,
+                 self.webhooks_table, self.state_table)]
 
-            def _delete_configs_and_state():
-                queries = [
-                    _cql_delete.format(cf=self.config_table),
-                    _cql_delete.format(cf=self.launch_table),
-                    _cql_delete.format(cf=self.state_table)
-                ]
-                b = Batch(queries,
-                          {"tenantId": self.tenant_id, "groupId": self.uuid},
-                          consistency=consistency)
-                return b.execute(self.connection)
+            b = Batch(queries,
+                      {"tenantId": self.tenant_id, "groupId": self.uuid},
+                      consistency=get_consistency_level('delete', 'group'))
 
-            def _delete_policies(policy_dict):  # CassScalingGroup.list_policies
-                return defer.gatherResults([
-                    self._naive_delete_policy(policy_id, consistency)
-                    for policy_id in policy_dict])
-
-            return defer.gatherResults([
-                _delete_configs_and_state(),
-                self._naive_list_policies().addCallback(_delete_policies)
-            ])
+            return b.execute(self.connection)
 
         d.addCallback(_maybe_delete)
-        d.addCallback(lambda _: None)
 
         return d
 
