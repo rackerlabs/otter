@@ -1365,32 +1365,14 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.mock_log = mock.MagicMock()
-
         self.collection = CassScalingGroupCollection(self.connection)
-        self.tenant_id = 'goo1234'
-        self.config = _de_identify({
-            'name': 'blah',
-            'cooldown': 600,
-            'minEntities': 0,
-            'maxEntities': 10,
-            'metadata': {}
-        })
-        self.launch = _de_identify(group_examples.launch_server_config()[0])
-
-        self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
-
-        # 'serializing' something just wraps it with a _S
-        self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
-                                 side_effect=lambda *args: _S(args[0]))
 
     def test_fetch(self):
         """
         Tests that you can fetch a list of events
         """
-
         self.returns = [_cassandrify_data(
             [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100},
              {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
@@ -1398,11 +1380,22 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         expectedData = {'now': 1234, 'size': 100}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scaling_schedule '
                        'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
-        self.mock_key.return_value = '12345678'
 
         result = self.validate_fetch_batch_of_events(1234, 100)
         self.assertEqual(result, [('1d2', 'gr2', 'ef', 100),
                                   ('1d2', 'gr2', 'ex', 122)])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_delete_events(self):
+        """
+        Tests that you can delete event of a given policy_ids
+        """
+        expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
+        expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
+        result = self.successResultOf(self.collection.delete_events(['p1', 'p2']))
+        self.assertEqual(result, None)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
