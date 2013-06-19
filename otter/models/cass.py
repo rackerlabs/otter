@@ -919,6 +919,13 @@ class CassScalingGroupCollection:
                                     id_values_dict, get_consistency_level('delete', 'events'))
         return d
 
+    def update_events_trigger(policy_and_triggers):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
+        """
+        pass
+
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`

@@ -508,6 +508,15 @@ class IScalingScheduleCollection(Interface):
         :return: None
         """
 
+    def update_events_trigger(policy_and_triggers):
+        """
+        Update the trigger time of given policy ids
+
+        :param policy_and_triggers: list of (policy ID, trigger time) tuples
+        :type now: ``list``
+
+        :return: None
+        """
 
 class IScalingGroupCollection(Interface):
     """
