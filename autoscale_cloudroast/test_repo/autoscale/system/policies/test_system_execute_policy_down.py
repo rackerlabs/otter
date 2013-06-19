@@ -36,7 +36,8 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -50,12 +51,12 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             policy_data=policy_down,
             execute_policy=True)
         self.assertEquals(execute_scale_down_policy[
-                          'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          'execute_response'], 202,
+                          msg='Scale down policy execution with change for group %s failed with %s'
+                          % (self.group.id, execute_scale_down_policy['execute_response']))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_scale_down_policy_execution_change_percent(self):
         """
@@ -72,10 +73,9 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=servers_from_scale_down)
-        self.assertEquals(len(active_servers_list), servers_from_scale_down)
+            expected_servers=servers_from_scale_down)
 
     def test_system_scale_down_policy_execution_desired_capacity(self):
         """
@@ -89,32 +89,27 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_desired_capacity_policy[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_down['desired_capacity'])
-        self.assertEquals(len(
-            active_servers_list), policy_down['desired_capacity'])
+            expected_servers=policy_down['desired_capacity'])
 
     def test_system_execute_scale_down_below_minentities_change(self):
         """
         Verify execution of scale down policy when change results in servers less than
-        minentities of the scaling group
+        minentities of the scaling group, is successful when desired capacity > minentities
         """
-        policy_down = {'change': - (1 + self.policy_up['change'] +
-                                    self.group.groupConfiguration.minEntities)}
+        policy_down = {'change': - 100}
         execute_change_policy = self.autoscale_behaviors.create_policy_webhook(
             group_id=self.group.id,
             policy_data=policy_down,
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
                           msg='Scale down policy execution failed when minentities limit is met: %s'
-                          % execute_change_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          'for group %s'
+                          % (execute_change_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.minEntities,
-            msg='Active servers on group after scaling down below min entities are not as expected')
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_execute_scale_down_below_minentities_change_percent(self):
         """
@@ -128,13 +123,11 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
                           msg='Scale down policy execution failed when minentities limit is met: %s'
-                          % execute_change_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (execute_change_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.minEntities,
-            msg='Active servers on group after scaling down below min entities are not as expected')
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_execute_scale_down_below_minentities_desired_capacity(self):
         """
@@ -149,10 +142,8 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
                           msg='Scale down policy execution failed when minentities limit is met: %s'
-                          % execute_change_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (execute_change_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.minEntities,
-            msg='Active servers on group after scaling down below min entities are not as expected')
+            expected_servers=self.group.groupConfiguration.minEntities)

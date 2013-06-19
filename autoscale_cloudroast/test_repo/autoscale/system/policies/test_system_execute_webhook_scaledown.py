@@ -35,7 +35,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -52,11 +53,9 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
@@ -73,10 +72,9 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=servers_from_scale_down)
-        self.assertEquals(len(active_servers_list), servers_from_scale_down)
+            expected_servers=servers_from_scale_down)
 
     def test_system_execute_webhook_scale_down_desired_capacity(self):
         """
@@ -91,8 +89,6 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_down['desired_capacity'])
-        self.assertEquals(len(
-            active_servers_list), policy_down['desired_capacity'])
+            expected_servers=policy_down['desired_capacity'])

@@ -40,25 +40,28 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
         """
         Update minentities=maxentities and verify execution of a scale up policy
+        fails with a 403
         """
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=self.group.groupConfiguration.minEntities)
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
         self.assertEquals(execute_policy_up.status_code, 403,
-                          msg='Scale up policy executed when minentities=maxentities: %s'
-                          % execute_policy_up.status_code)
+                          msg='Scale up policy executed when minentities=maxentities: %s for group %s'
+                          % (execute_policy_up.status_code, self.group.id))
 
     def test_system_execute_scale_down_on_newly_created_group_with_minentities(self):
         """
         Update minentities=maxentities and verify execution of a scale down policy
+        fails with a 403
         """
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=self.group.groupConfiguration.minEntities)
@@ -76,25 +79,24 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
-        self.assertEquals(execute_policy_up.status_code, 202,
-                          msg='Scale up policy failed for group %s cause policy was deleted'
-                          ' during execution: %s'
-                          % (self.group.id, execute_policy_up.status_code))
         delete_policy = self.autoscale_client.delete_scaling_policy(
             self.group.id,
             self.policy_up['policy_id'])
         self.assertEquals(delete_policy.status_code, 204,
                           msg='Deleting the scaling policy while its executing failed %s'
-                          % delete_policy.status_code)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (delete_policy.status_code, self.group.id))
+        self.assertEquals(execute_policy_up.status_code, 202,
+                          msg='Scale up policy failed for group %s cause policy was deleted'
+                          ' during execution: %s'
+                          % (self.group.id, execute_policy_up.status_code))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
-        self.assertEquals(len(active_servers_list),
-                          self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
+            expected_servers=self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
 
     def test_system_execute_scale_up_after_maxentities_met(self):
         """
-        Update max entities of the scaling group to be 4 and execute scale up policy
+        Update max entities of the scaling group to be 3 and execute scale up policy
         once to update active servers = maxentities successfully and verify reexecuting the
         policy when max entities are already met fails with 403
         """
@@ -124,7 +126,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         """
         Create a scaling group and execute a scale up policy, update min and max entities
         to be 0 and delete the group and verify all the on the group servers are deleted
-        before the user can delete the group
+        before the user can delete the group (AUTO-373)
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])

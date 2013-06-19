@@ -55,7 +55,8 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -68,8 +69,9 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_executed['policy_id'])
         self.assertEquals(execute_on_cooldown.status_code, 403,
-                          msg='Scale up policy executed when cooldown is not met: %s'
-                          % execute_on_cooldown.status_code)
+                          msg='Scale up policy executed sucessfully for group %s'
+                          ' when cooldown is not met: %s'
+                          % (self.group.id, execute_on_cooldown.status_code))
 
     def test_system_policy_down_cooldown(self):
         """
@@ -80,43 +82,43 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_scale_down.status_code, 202,
-                          msg='Policy down failed to execute with %s'
-                          % execute_scale_down.status_code)
+                          msg='Policy down failed to execute for group %s with %s'
+                          % (self.group.id, execute_scale_down.status_code))
         execute_on_cooldown = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_on_cooldown.status_code, 403,
                           msg='Scale down policy executed when cooldown is not met with %s'
-                          % execute_on_cooldown.status_code)
+                          ' for group %s'
+                          % (execute_on_cooldown.status_code, self.group.id))
 
     def test_system_execute_different_policies_simaltaneously(self):
         """
         Verify the policy cooldown times are not enforced when executing different policies,
-        and verify all polcies result in servers as expected
+        and verify all polcies result in active servers as expected
         """
         execute_change_percent_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_up_change_percent['id'])
         self.assertEquals(execute_change_percent_scale_up.status_code, 202,
-                          msg='Scale up policy execution failed with %s'
-                          % execute_change_percent_scale_up.status_code)
+                          msg='Scale up policy execution for group %s failed with %s'
+                          % (self.group.id, execute_change_percent_scale_up.status_code))
         execute_change_scale_down = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_change_scale_down.status_code, 202,
-                          msg='Scale down policy execution failed with %s'
-                          % execute_change_scale_down.status_code)
+                          msg='Scale down policy execution for group %s failed with %s'
+                          % (self.group.id, execute_change_scale_down.status_code))
         execute_desired_capacity_scale = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_desired_capacity['id'])
         self.assertEquals(execute_desired_capacity_scale.status_code, 202,
                           msg='Policy with desired capacity=minentities failed to execute with %s'
-                          % execute_desired_capacity_scale.status_code)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (execute_desired_capacity_scale.status_code, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_scale_up_scale_down_multiple_policies_in_sequence(self):
         """
@@ -137,11 +139,9 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id, self.policy_down_change_percent['id'])
         self._execute_policy_after_cooldown(
             self.group.id, self.policy_desired_capacity['id'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def _execute_policy_after_cooldown(self, group_id, policy_id):
         """
@@ -153,5 +153,5 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             policy_id)
         self.assertEquals(execute_policy.status_code, 202,
-                          msg='Execution of the policy after cooldown failed with %s'
-                          % execute_policy.status_code)
+                          msg='Execution of the policy after cooldown failed with %s for group %s'
+                          % (execute_policy.status_code, self.group.id))

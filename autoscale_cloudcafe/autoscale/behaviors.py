@@ -105,13 +105,14 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_list=sp_list)
         return create_response
 
-    def wait_for_active_list_in_group_state(self, group_id, active_servers,
-                                            interval_time=None, timeout=None):
+    def wait_for_expected_number_of_active_servers(
+        self, group_id, expected_servers,
+            interval_time=None, timeout=None):
         """
-        @summary: verify the desired capacity in group state is equal to active servers
+        @summary: verify the desired capacity in group state is equal to expected servers
          and waits for the specified number of servers to be active on a group
         @param group_id: Group id
-        @param active_servers: Total active servers expected on the group
+        @param expected_servers: Total active servers expected on the group
         @param interval_time: Time to wait during polling group state
         @param timeout: Time to wait before exiting this function
         @return: returns the list of active servers in the group
@@ -125,10 +126,10 @@ class AutoscaleBehaviors(BaseBehavior):
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group_id)
         group_state = group_state_response.entity
-        if group_state.desiredCapacity != active_servers:
+        if group_state.desiredCapacity != expected_servers:
             raise BuildErrorException(
                 'Group %s should have %s servers, but is trying to build %s servers'
-                % (group_id, active_servers, group_state.desiredCapacity))
+                % (group_id, expected_servers, group_state.desiredCapacity))
         while time.time() < end_time:
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
@@ -139,20 +140,20 @@ class AutoscaleBehaviors(BaseBehavior):
                     'Group Id %s failed to attempt server creation. Group has no servers'
                     % group_id)
 
-            if len(active_list) == active_servers:
+            if len(active_list) == expected_servers:
                 return [server.id for server in active_list]
             time.sleep(interval_time)
             print "waiting for servers to be active..."
 
-            if group_state.desiredCapacity != active_servers:
+            if group_state.desiredCapacity != expected_servers:
                 raise BuildErrorException(
                     'Group %s should have %s servers, but has reduced the build %s servers'
-                    % (group_id, active_servers, group_state.desiredCapacity))
+                    % (group_id, expected_servers, group_state.desiredCapacity))
         else:
             raise TimeoutException(
                 "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
                 "observe the active server list achieving the expected servers count: {2}.".format(
-                    timeout, group_id, active_servers))
+                    timeout, group_id, expected_servers))
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
@@ -203,12 +204,12 @@ class AutoscaleBehaviors(BaseBehavior):
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change=sp_change, policy_type=sp_policy_type)
-        if sp_change_percent is not None:
+        elif sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change_percent=sp_change_percent, policy_type=sp_policy_type)
-        if sp_desired_capacity is not None:
+        elif sp_desired_capacity is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
@@ -220,7 +221,7 @@ class AutoscaleBehaviors(BaseBehavior):
     def create_policy_webhook(self, group_id, policy_data,
                               execute_webhook=None, execute_policy=None):
         """
-        @summary: wrapper for create_policy_min. Given a dict with
+        @summary: wrapper for create_policy_given. Given a dict with
                   change type, the change number, cooldown(optional),
                   sets the parameters in create_policy_min and
                   creates a webhook for the policy

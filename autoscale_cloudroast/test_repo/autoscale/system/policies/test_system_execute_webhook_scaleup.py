@@ -29,7 +29,8 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -44,11 +45,9 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_in_change_policy[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_up['change'] + self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(active_servers_list), policy_up[
-                          'change'] + self.group.groupConfiguration.minEntities)
+            expected_servers=policy_up['change'] + self.group.groupConfiguration.minEntities)
 
     def test_system_execute_webhook_scale_up_change_percent(self):
         """
@@ -64,10 +63,9 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         servers_from_scale_up = self.autoscale_behaviors.calculate_servers(
             current=self.group.groupConfiguration.minEntities,
             percentage=policy_up['change_percent'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=servers_from_scale_up)
-        self.assertEquals(len(active_servers_list), servers_from_scale_up)
+            expected_servers=servers_from_scale_up)
 
     def test_system_execute_webhook_scale_up_desired_capacity(self):
         """
@@ -81,8 +79,6 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_in_desired_capacity_policy[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_up['desired_capacity'])
-        self.assertEquals(len(active_servers_list),
-                          policy_up['desired_capacity'])
+            expected_servers=policy_up['desired_capacity'])

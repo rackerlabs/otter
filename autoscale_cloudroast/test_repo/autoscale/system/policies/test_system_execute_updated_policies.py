@@ -26,8 +26,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         self.cooldown = 1
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
-            gc_cooldown=0,
-            gc_max_entities=self.gc_max_entities)
+            gc_cooldown=0)
         self.group = self.create_group_response.entity
         self.policy_up = {'change': 2, 'cooldown': self.cooldown}
         self.policy = self.autoscale_behaviors.create_policy_webhook(
@@ -39,7 +38,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -55,18 +55,16 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
                           msg='Executing the updated policy with desired capacity failed with %s'
-                          % upd_policy_to_desired_capacity_execute)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (upd_policy_to_desired_capacity_execute, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_update_policy_from_change_to_desired_capacity_scale_up(self):
         """
         Update the existing scale up policy from change to desired capacity,
         such that the policy when executed scales up
-        Failing .. check why!!
         """
         upd_desired_capacity = self.group.groupConfiguration.minEntities + \
             self.policy_up['change'] + 1
@@ -76,12 +74,11 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
                           msg='Executing the updated policy with desired capacity failed with %s'
-                          % upd_policy_to_desired_capacity_execute)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (upd_policy_to_desired_capacity_execute, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=upd_desired_capacity)
-        self.assertEquals(len(
-            active_servers_list), upd_desired_capacity)
+            expected_servers=upd_desired_capacity)
 
     def test_system_update_policy_desired_capacity(self):
         """
@@ -95,7 +92,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
                           msg='Executing the updated policy with desired capacity failed with %s'
-                          % upd_policy_to_desired_capacity_execute)
+                          ' for group %s'
+                          % (upd_policy_to_desired_capacity_execute, self.group.id))
         upd_desired_capacity = self.group.groupConfiguration.maxEntities + 1
         sleep(self.cooldown)
         upd_policy_to_desired_capacity_execute = self._update_execute_policy_dc(
@@ -103,12 +101,11 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
                           msg='Executing the updated policy with desired capacity failed with %s'
-                          % upd_policy_to_desired_capacity_execute)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          ' for group %s'
+                          % (upd_policy_to_desired_capacity_execute, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.maxEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.maxEntities)
+            expected_servers=self.group.groupConfiguration.maxEntities)
 
     def test_system_update_scale_up_to_scale_down(self):
         """
@@ -121,13 +118,11 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], change)
         self.assertEquals(upd_to_scale_down_execute, 202,
-                          msg='Executing the updated scale down policy failed with %s'
-                          % upd_to_scale_down_execute)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          msg='Executing the updated scale down policy failed with %s for group %s'
+                          % (upd_to_scale_down_execute, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities)
+            expected_servers=self.group.groupConfiguration.minEntities)
 
     def test_system_update_minentities_and_scale_down(self):
         """
@@ -143,11 +138,9 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             min_entities=new_minentities,
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata={})
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.minEntities + self.policy_up['change'])
-        self.assertEquals(len(
-            active_servers_list), self.group.groupConfiguration.minEntities + self.policy_up['change'])
+            expected_servers=self.group.groupConfiguration.minEntities + self.policy_up['change'])
         change = - (self.policy_up[
                     'change'] + self.group.groupConfiguration.minEntities) + 1
         sleep(self.cooldown)
@@ -155,13 +148,11 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], change)
         self.assertEquals(upd_to_scale_down_execute, 202,
-                          msg='Executing the updated scale down policy failed with %s'
-                          % upd_to_scale_down_execute)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          msg='Executing the updated scale down policy failed with %s for group %s'
+                          % (upd_to_scale_down_execute, self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=new_minentities)
-        self.assertEquals(len(
-            active_servers_list), new_minentities)
+            expected_servers=new_minentities)
 
     def _update_execute_policy_dc(self, group_id, policy_id, policy_data):
         """

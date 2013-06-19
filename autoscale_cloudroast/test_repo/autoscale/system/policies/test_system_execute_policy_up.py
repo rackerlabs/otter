@@ -30,7 +30,8 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
 
     def tearDown(self):
         """
-        Delete scaling group
+        Emptying the scaling group by updating minentities=maxentities=0,
+        which is then deleted by the Autoscale fixture's teardown
         """
         self.empty_scaling_group(self.group)
 
@@ -45,11 +46,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_change_policy[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_up['change'] + self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(active_servers_list), policy_up[
-                          'change'] + self.group.groupConfiguration.minEntities)
+            expected_servers=policy_up['change'] + self.group.groupConfiguration.minEntities)
 
     def test_system_scale_up_policy_execution_change_percent(self):
         """
@@ -65,10 +64,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
         servers_from_scale_up = self.autoscale_behaviors.calculate_servers(
             current=self.group.groupConfiguration.minEntities,
             percentage=policy_up['change_percent'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=servers_from_scale_up)
-        self.assertEquals(len(active_servers_list), servers_from_scale_up)
+            expected_servers=servers_from_scale_up)
 
     def test_system_scale_up_policy_execution_desired_capacity(self):
         """
@@ -82,11 +80,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_desired_capacity_policy[
                           'execute_response'], 202)
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=policy_up['desired_capacity'])
-        self.assertEquals(len(active_servers_list),
-                          policy_up['desired_capacity'])
+            expected_servers=policy_up['desired_capacity'])
 
     def test_system_execute_scale_up_meets_maxentities_change(self):
         """
@@ -99,14 +95,12 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             policy_data=policy_up,
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
-                          msg='Scale up policy execution failed when change exceeds maxentities with %s'
-                          % execute_change_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+                          msg='Scale up policy execution failed when change exceeds maxentities '
+                          'with %s for group %s'
+                          % (execute_change_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.maxEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.maxEntities,
-            msg='Active servers on group after scale up policy execution is not as expected')
+            expected_servers=self.group.groupConfiguration.maxEntities)
 
     def test_system_execute_scale_up_meets_maxentities_change_percent(self):
         """
@@ -121,13 +115,11 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
         self.assertEquals(
             execute_change_percent_policy['execute_response'], 202,
             msg='Scale up execution failed when changepercent exceeds maxentities with %s'
-            % execute_change_percent_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+            ' for group %s'
+            % (execute_change_percent_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.maxEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.maxEntities,
-            msg='Active servers on group after scale up policy execution is not as expected')
+            expected_servers=self.group.groupConfiguration.maxEntities)
 
     def test_system_execute_scale_up_meets_maxentities_desired_capacity(self):
         """
@@ -143,10 +135,8 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
         self.assertEquals(
             execute_desired_capacity_policy['execute_response'], 202,
             msg='Scale up execution failed when desiredcapacity over maxentities with %s'
-            % execute_desired_capacity_policy['execute_response'])
-        active_servers_list = self.autoscale_behaviors.wait_for_active_list_in_group_state(
+            ' for group %s'
+            % (execute_desired_capacity_policy['execute_response'], self.group.id))
+        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            active_servers=self.group.groupConfiguration.maxEntities)
-        self.assertEquals(
-            len(active_servers_list), self.group.groupConfiguration.maxEntities,
-            msg='Active servers on group after scale up policy execution is not as expected')
+            expected_servers=self.group.groupConfiguration.maxEntities)

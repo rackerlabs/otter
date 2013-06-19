@@ -103,8 +103,7 @@ class AutoscaleFixture(BaseTestFixture):
 
     def empty_scaling_group(self, group):
         """
-        Updates the group to be of 0 minentities and maxentities,
-        and asserts the update was successful
+        Given the group, updates the group to be of 0 minentities and maxentities.
         """
         self.autoscale_client.update_group_config(
             group_id=group.id,
