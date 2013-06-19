@@ -73,6 +73,7 @@ _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
+_cql_update_event = 'UPDATE {cf} SET trigger = {trigger} WHERE "policyId" = {policy_id};'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -923,8 +924,14 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
         """
-        pass
-
+        for i, (policy_id, trigger) in enumerate(policy_and_triggers):
+            trigger_i = 'trigger{0}'.format(i)
+            policyid_i = 'policyid{0}'.format(i)
+            queries.append(_cql_update_event.format(trigger=trigger_i, policy_id=policyid_i))
+            data.update({trigger_i: timestamp.isoformat(trigger),
+                         policyid_i: policy_id})
+        b = Batch(queries, data, get_consistency_level('update', 'events'))
+        return b.execute(self.connection)
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

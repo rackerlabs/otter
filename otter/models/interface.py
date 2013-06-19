@@ -513,7 +513,7 @@ class IScalingScheduleCollection(Interface):
         Update the trigger time of given policy ids
 
         :param policy_and_triggers: list of (policy ID, trigger time) tuples
-        :type now: ``list``
+        :type policy_and_triggers: ``list``
 
         :return: None
         """

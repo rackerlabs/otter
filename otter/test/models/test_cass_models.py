@@ -1400,6 +1400,12 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+    def test_update_events_trigger(self):
+        """
+        Tests that you can update trigger times of one or more policies
+        """
+        pass
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
