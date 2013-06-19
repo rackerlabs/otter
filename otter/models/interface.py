@@ -503,7 +503,7 @@ class IScalingScheduleCollection(Interface):
         Delete scheduled event of given policy Ids
 
         :param policy_ids: list of policy IDs
-        :type now: ``list``
+        :type policy_ids: ``list``
 
         :return: None
         """
