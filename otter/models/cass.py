@@ -84,7 +84,7 @@ _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "web
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete = 'UPDATE {cf} SET deleted=True WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
-                             'AND "groupId" = :groupId AND "policyId" = {name}')
+                             'AND "groupId" = :groupId AND "policyId" = :policyId')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
@@ -552,53 +552,24 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def _naive_delete_policy(self, policy_id, consistency):
-        """
-        Like :meth:`otter.models.cass.CassScalingGroup.delete_policy` but
-        does not check if the policy exists first before deleting it.  Assumes
-        that it does exist.
-        """
-        def _do_delete_policy():
-            queries = [
-                _cql_delete_policy.format(cf=self.policies_table,
-                                          name=":policyId")]
-            b = Batch(
-                queries, {"tenantId": self.tenant_id,
-                          "groupId": self.uuid,
-                          "policyId": policy_id},
-                consistency=consistency)
-            return b.execute(self.connection)
-
-        def _do_delete_webhooks(webhook_dict):
-            if len(webhook_dict) == 0:  # don't hit cassandra at all
-                return defer.succeed(None)
-
-            queries = []
-            cql_params = {'tenantId': self.tenant_id, 'groupId': self.uuid,
-                          'policyId': policy_id}
-
-            for i, webhook_id in enumerate(webhook_dict.keys()):
-                varname = 'webhookId{0}'.format(i)
-                queries.append(_cql_delete_webhook.format(
-                    cf=self.webhooks_table, name=varname))
-                cql_params[varname] = webhook_id
-
-            b = Batch(queries, cql_params, consistency=consistency)
-            return b.execute(self.connection)
-
-        return defer.gatherResults(
-            [_do_delete_policy(),
-             self._naive_list_webhooks(policy_id).addCallback(_do_delete_webhooks)])
-
     def delete_policy(self, policy_id):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_policy`
         """
         self.log.bind(policy_id=policy_id).msg("Deleting policy")
+
+        def _do_delete(_):
+            queries = [
+                _cql_delete_all_in_policy.format(cf=self.policies_table),
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
+            b = Batch(queries, {"tenantId": self.tenant_id,
+                                "groupId": self.uuid,
+                                "policyId": policy_id},
+                      consistency=get_consistency_level('delete', 'policy'))
+            return b.execute(self.connection)
+
         d = self.get_policy(policy_id)
-        d.addCallback(lambda _: self._naive_delete_policy(
-            policy_id, get_consistency_level('delete', 'policy')))
-        d.addCallback(lambda _: None)
+        d.addCallback(_do_delete)
         return d
 
     def _naive_list_webhooks(self, policy_id):

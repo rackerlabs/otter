@@ -684,87 +684,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.view_config.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
                 return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
-    def test_naive_delete_policy_no_webhooks(self, mock_list_webhooks,
-                                             mock_naive, mock_get_policy):
-        """
-        When you delete a scaling policy, the policy is deleted but if there are
-        no webhooks no call to delete its webhooks is made.
-
-        No call to verify if the policy exists is made.  For
-        listing the webhooks, ``_naive_list_webhooks`` is called, not
-        ``list_webhooks`.
-
-        ``naive_delete_policy`` should also use the consistency level provided
-
-        There is no assertion about the return value, because that doesn't
-        really matter.
-        """
-        self.returns = [None]
-        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
-        # make sure that delete policy execution happend
-        self.connection.execute.assert_called_once_with(
-            ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
-             'APPLY BATCH;'),
-            {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"},
-            ConsistencyLevel.TWO)
-
-        self.assertEqual(len(mock_get_policy.mock_calls), 0)
-        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
-        mock_naive.assert_called_with('3222')
-
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
-                return_value=defer.succeed({'webhook1': {}, 'webhook2': {}}))
-    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
-    def test_naive_delete_policy_some_webhooks(self, mock_list_webhooks,
-                                               mock_naive, mock_get_policy):
-        """
-        When you delete a scaling policy with webhooks, the policy itself and
-        its webhooks are deleted.
-
-        No call to verify if the policy exists is made.  For
-        listing the webhooks, ``_naive_list_webhooks`` is called, not
-        ``list_webhooks`.
-
-        ``naive_delete_policy`` should also use the consistency level provided
-
-        There is no assertion about the return value, because that doesn't
-        really matter.
-        """
-        self.returns = [None, None]
-        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
-        # make sure that delete policy execution happend
-        self.connection.execute.assert_any_call(
-            ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-             '"policyId" = :policyId AND "webhookId" = :webhookId0 '
-             'UPDATE policy_webhooks SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-             '"policyId" = :policyId AND "webhookId" = :webhookId1 '
-             'APPLY BATCH;'),
-            {"tenantId": "11111", "groupId": "12345678g",
-             "policyId": "3222", "webhookId0": "webhook1",
-             "webhookId1": "webhook2"},
-            ConsistencyLevel.TWO)
-
-        # =/  has_calls doesn't mean "has only these calls"
-        self.assertEqual(len(self.connection.execute.mock_calls), 2)
-
-        self.assertEqual(len(mock_get_policy.mock_calls), 0)
-        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
-        mock_naive.assert_called_with('3222')
-
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    def test_delete_policy_valid_policy(self, mock_naive, mock_get_policy):
+    def test_delete_policy_valid_policy(self, mock_get_policy):
         """
         When you delete a scaling policy, it checks if the policy exists and
         if it does, calls _naive_delete_policy and if it succeeds, returns None
@@ -773,13 +694,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         # delete returns None
         self.assertIsNone(self.successResultOf(d))
         mock_get_policy.assert_called_once_with('3222')
-        mock_naive.assert_called_once_with('3222', ConsistencyLevel.TWO)
+
+        expected_cql = (
+            'BEGIN BATCH '
+            'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
+            '"groupId" = :groupId AND "policyId" = :policyId '
+            'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
+            '"groupId" = :groupId AND "policyId" = :policyId '
+            'APPLY BATCH;')
+        expected_data = {
+            "tenantId": self.group.tenant_id,
+            "groupId": self.group.uuid,
+            "policyId": "3222"}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    def test_delete_policy_invalid_policy(self, mock_naive, mock_get_policy):
+    def test_delete_policy_invalid_policy(self, mock_get_policy):
         """
         When you delete a scaling policy that doesn't exist, a
         :class:`NoSuchPolicyError` is raised
@@ -787,7 +720,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.delete_policy('3222')
         self.assert_deferred_failed(d, NoSuchPolicyError)
         mock_get_policy.assert_called_once_with('3222')
-        self.assertEqual(len(mock_naive.mock_calls), 0)
+        self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_scaling_policy(self):
