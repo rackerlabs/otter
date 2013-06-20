@@ -23,6 +23,8 @@ from otter.log.graylog import GraylogUDPPublisher
 
 from txairbrake.observers import AirbrakeLogObserver
 
+from otter.scheduler import check_for_events
+
 
 class Options(usage.Options):
     """
@@ -69,6 +71,14 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
+def run_scheduler():
+    """
+    Working guts of the scheduler service
+    """
+    reactor.callLater(1, run_scheduler)
+    check_for_events()
+
+
 def makeService(config):
     """
     Set up the otter-api service.
@@ -101,6 +111,9 @@ def makeService(config):
             config_value('cassandra.keyspace'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
+
+    if config_value('otterclock'):
+        reactor.callLater(1, run_scheduler)
 
     s = MultiService()
 
