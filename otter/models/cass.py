@@ -72,6 +72,7 @@ _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigge
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
+_cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -905,6 +906,17 @@ class CassScalingGroupCollection:
         d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
                                      row['policyId'], row['trigger'])
                                     for row in rows])
+        return d
+
+    def delete_events(self, policy_ids):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
+        """
+        policy_ids_cql = ','.join([':policyid{0}'.format(i) for i in range(len(policy_ids))])
+        id_values_dict = {'policyid{0}'.format(i): policy_id for i, policy_id in enumerate(policy_ids)}
+        d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
+                                                              policy_ids=policy_ids_cql),
+                                    id_values_dict, get_consistency_level('delete', 'events'))
         return d
 
     def webhook_info_by_hash(self, log, capability_hash):
