@@ -253,10 +253,7 @@ class RestAPITestMixin(RequestTestMixin):
             return_value='transaction-id')
 
         set_store(self.mock_store)
-
-        def unset_store():
-            set_store(None)
-        self.addCleanup(unset_store)
+        self.addCleanup(set_store, None)
 
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
