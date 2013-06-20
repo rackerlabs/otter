@@ -96,8 +96,8 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
                           msg='Scale up policy execution failed when change exceeds maxentities '
-                          'with %s for group %s'
-                          % (execute_change_policy['execute_response'], self.group.id))
+                          'with {} for group {}'
+                          .format(execute_change_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
@@ -114,9 +114,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(
             execute_change_percent_policy['execute_response'], 202,
-            msg='Scale up execution failed when changepercent exceeds maxentities with %s'
-            ' for group %s'
-            % (execute_change_percent_policy['execute_response'], self.group.id))
+            msg='Scale up execution failed when changepercent exceeds maxentities with {}'
+            ' for group {}'
+            .format(execute_change_percent_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
@@ -134,9 +134,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(
             execute_desired_capacity_policy['execute_response'], 202,
-            msg='Scale up execution failed when desiredcapacity over maxentities with %s'
-            ' for group %s'
-            % (execute_desired_capacity_policy['execute_response'], self.group.id))
+            msg='Scale up execution failed when desiredcapacity over maxentities with {}'
+            ' for group {}'
+            .format(execute_desired_capacity_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)

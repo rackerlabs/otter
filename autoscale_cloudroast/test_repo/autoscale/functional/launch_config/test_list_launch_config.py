@@ -54,7 +54,7 @@ class ListLaunchConfigTest(AutoscaleFixture):
         Verify the list config call for response code, headers and data.
         """
         self.assertEquals(self.launch_config_response.status_code, 200, msg='List launch\
-                        config failed with %s' % self.launch_config_response.status_code)
+                        config failed with {}' .format(self.launch_config_response.status_code))
         self.assertTrue(self.launch_config_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(self.launch_config_response.headers)

@@ -53,8 +53,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             self.group.id)
         updated_launchconfig = launchconfig_response.entity
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with %s as against a 204'
-                          % update_lc_response.status_code)
+                          msg='Update launch config failed with {} as against a 204'
+                          .format(update_lc_response.status_code))
         self.assertTrue(update_lc_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_lc_response.headers)
@@ -115,8 +115,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             networks=lc_networks,
             load_balancers=lc_load_balancers)
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with %s as against a 204, success'
-                          % update_lc_response.status_code)
+                          msg='Update launch config failed with {} as against a 204, success'
+                          .format(update_lc_response.status_code))
         lc_name = "test_upd_lc"
         image_ref = "88876868"
         flavor_ref = "0"

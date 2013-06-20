@@ -47,9 +47,9 @@ class AutoscaleFixture(BaseTestFixture):
         cls.tenant_id = cls.autoscale_config.tenant_id
         env = os.environ['OSTNG_CONFIG_FILE']
         if 'dev' in env.lower():
-            url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
+            url = 'http://localhost:9000/v1.0/{}'.format(cls.tenant_id)
         elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
+            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{}'.format(
                 cls.tenant_id)
         else:
             url = autoscale_service.get_endpoint(
@@ -107,7 +107,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         self.autoscale_client.update_group_config(
             group_id=group.id,
-            name=group.groupConfiguration.name,
+            name="delete_me_please",
             cooldown=0,
             min_entities=0,
             max_entities=0,
@@ -126,12 +126,12 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
             desired_capacity,
-            msg='Active + Pending servers (%s) != (%s) minentities on the group %s'
-            % (group_state.pendingCapacity + group_state.activeCapacity,
+            msg='Active + Pending servers ({}) != ({}) minentities on the group {}'
+            .format((group_state.pendingCapacity + group_state.activeCapacity),
                 desired_capacity, group_id))
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
-                          msg='Desired capacity (%s) != (%s) minentities on the group %s'
-                          % (group_state.desiredCapacity, desired_capacity, group_id))
+                          msg='Desired capacity ({}) != ({}) minentities on the group {}'
+                          .format(group_state.desiredCapacity, desired_capacity, group_id))
 
     @classmethod
     def tearDownClass(cls):
