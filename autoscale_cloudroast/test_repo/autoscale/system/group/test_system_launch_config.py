@@ -226,25 +226,29 @@ class LaunchConfigTest(AutoscaleFixture):
         self._update_launch_config(
             group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
         self._execute_policy(group)
-        active_list_on_upd_lc = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_after_upd_lc = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=minentities + self.sp_change)
-        servers_after_scale_up = set(active_list_on_upd_lc) - set(servers_list_b4_upd)
+        servers_after_scale_up = set(
+            active_list_after_upd_lc) - set(servers_list_b4_upd)
         self._verify_server_list_for_updated_launch_config(
             servers_after_scale_up, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
         update_group_response = self.autoscale_client.update_group_config(
             group_id=group.id,
             name=group.groupConfiguration.name,
             cooldown=group.groupConfiguration.cooldown,
-            min_entities=group.groupConfiguration.minentities,
-            max_entities=group.groupConfiguration.minentities,
+            min_entities=group.groupConfiguration.minEntities,
+            max_entities=group.groupConfiguration.minEntities,
             metadata={})
         self.assertEquals(update_group_response.status_code, 204)
         self._execute_policy(group)
         servers_list_on_upd_group = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minentities)
-        active_servers_on_upd_group = set(servers_list_on_upd_group) - set(active_list_on_upd_lc)
+        active_servers_on_upd_group = set(
+            servers_list_on_upd_group) - set(active_list_after_upd_lc)
+        self.assertEquals(set(active_servers_on_upd_group),
+                         (set(active_list_after_upd_lc) - set(servers_list_b4_upd)))
         self._verify_server_list_for_updated_launch_config(
             active_servers_on_upd_group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
         self.empty_scaling_group(group)
@@ -271,7 +275,7 @@ class LaunchConfigTest(AutoscaleFixture):
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {}'.format(group.id))
-        self.resources.add(self.group.id,
+        self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
         return group
 
@@ -297,7 +301,7 @@ class LaunchConfigTest(AutoscaleFixture):
         for each in list(server_list):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
-            self.assertEquals(server.name, upd_server_name)
+            self.assertTrue(upd_server_name in server.name)
             self.assertEquals(server.image.id, upd_image_ref)
             self.assertEquals(server.flavor.id, upd_flavor_ref)
 

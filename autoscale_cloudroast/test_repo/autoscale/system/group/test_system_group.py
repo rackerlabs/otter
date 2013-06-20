@@ -319,7 +319,7 @@ class GroupFixture(AutoscaleFixture):
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {}'.format(group.id))
-        self.resources.add(self.group.id,
+        self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
         return group
 
@@ -330,9 +330,9 @@ class GroupFixture(AutoscaleFixture):
         assert the update was successful.
         """
         if minentities is None:
-            minentities = group.groupConfiguration.minentities
+            minentities = group.groupConfiguration.minEntities
         if maxentities is None:
-            maxentities = group.groupConfiguration.maxentities
+            maxentities = group.groupConfiguration.maxEntities
         if cooldown is None:
             cooldown = group.groupConfiguration.cooldown
         update_group = self.autoscale_client.update_group_config(
@@ -360,3 +360,4 @@ class GroupFixture(AutoscaleFixture):
                           msg='scaling policy failed execution with status {}'
                           ' for group {}'.format(execute_policy_response.status_code,
                                                  group.id))
+        return policy
