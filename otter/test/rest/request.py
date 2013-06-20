@@ -254,6 +254,10 @@ class RestAPITestMixin(RequestTestMixin):
 
         set_store(self.mock_store)
 
+        def unset_store():
+            set_store(None)
+        self.addCleanup(unset_store)
+
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
 
