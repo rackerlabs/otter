@@ -68,7 +68,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             execute_policies = self.autoscale_client.execute_policy(
                 self.first_scaling_group.id, each['id'])
             self.assertEquals(execute_policies.status_code, 202,
-                              msg='Policy execution failed for group {} with {}'.format(
+                              msg='Policy execution failed for group {0} with {1}'.format(
                               self.first_scaling_group.id, execute_policies.status_code))
         sp1 = self.gc_min_entities + change
         sp2 = self.autoscale_behaviors.calculate_servers(sp1, percentage)
@@ -106,7 +106,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             execute_webhook = self.autoscale_client.execute_webhook(
                 each_webhook['links'].capability)
             self.assertEquals(execute_webhook.status_code, 202,
-                              msg='Policy webhook execution failed for group {} with {}'.format(
+                              msg='Policy webhook execution failed for group {0} with {1}'.format(
                               self.first_scaling_group.id, execute_webhook.status_code))
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))

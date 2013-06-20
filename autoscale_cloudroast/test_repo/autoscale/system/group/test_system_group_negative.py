@@ -37,7 +37,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
             lc_image_ref="INVALIDIMAGEID")
         group = create_group_response.entity
         self.assertEquals(create_group_response.status_code, 201,
-                          msg='Create group with invalid server image id failed with {}'
+                          msg='Create group with invalid server image id failed with {0}'
                           .format(create_group_response.status_code))
         sleep(2)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
@@ -53,7 +53,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             group.id)
         self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group failed for a group with invalid server image ID with {}'
+                          msg='Deleted group failed for a group with invalid server image ID with {0}'
                           .format(delete_group_response.status_code))
 
     def test_system_execute_policy_with_invalid_imageid(self):
@@ -67,13 +67,13 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
             image_ref="INVALIDIMAGEID",
             flavor_ref=self.group.launchConfiguration.server.flavorRef)
         self.assertEquals(update_launch_config_response.status_code, 204,
-                          msg='Updating launch config with invalid image id faile with {}'
+                          msg='Updating launch config with invalid image id faile with {0}'
                           .format(update_launch_config_response))
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=self.policy['id'])
         self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='policy executed with an invalid server image id with status {}'
+                          msg='policy executed with an invalid server image id with status {0}'
                           .format(execute_policy_response.status_code))
         sleep(2)
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
@@ -98,7 +98,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
             lc_load_balancers=self.invalid_lbaas)
         group = create_group_response.entity
         self.assertEquals(create_group_response.status_code, 201,
-                          msg='Create group with invalid lbaas id failed with {}'
+                          msg='Create group with invalid lbaas id failed with {0}'
                           .format(create_group_response.status_code))
         #check active servers and wait for lbaas add node to fail
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
@@ -114,7 +114,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             group.id)
         self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group failed for a group with invalid lbaas id with {}'
+                          msg='Deleted group failed for a group with invalid lbaas id with {0}'
                           .format(delete_group_response.status_code))
 
     @unittest.skip("Invalid LbaasID handling not implemented")
@@ -130,13 +130,13 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
             flavor_ref=self.group.launchConfiguration.server.flavorRef,
             load_balancers=self.invalid_lbaas)
         self.assertEquals(update_launch_config_response.status_code, 204,
-                          msg='Updating launch config with invalid lbaas id failed with {}'
+                          msg='Updating launch config with invalid lbaas id failed with {0}'
                           .format(update_launch_config_response))
         execute_policy_response = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=self.policy['id'])
         self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='Policy executed with an invalid lbaas id with status {}'
+                          msg='Policy executed with an invalid lbaas id with status {0}'
                           .format(execute_policy_response.status_code))
         #check active servers and wait for lbaas add node to fail
         group_state_response = self.autoscale_client.list_status_entities_sgroups(

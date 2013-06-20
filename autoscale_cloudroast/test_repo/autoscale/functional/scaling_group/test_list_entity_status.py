@@ -39,10 +39,10 @@ class GetListEntityStatusTest(AutoscaleFixture):
         Verify list status' response code, header.
         """
         self.assertEquals(200, self.group_state_response.status_code,
-                          msg='The list entities call failed with {}'
+                          msg='The list entities call failed with {0}'
                           .format(self.group_state_response.status_code))
         self.assertTrue(self.group_state_response.headers is not None,
-                        msg='The headers are not as expected {}'
+                        msg='The headers are not as expected {0}'
                         .format(self.group_state_response.headers))
         self.validate_headers(self.group_state_response.headers)
 

@@ -30,7 +30,7 @@ class CreateWebhook(ScalingGroupWebhookFixture):
         Verify the create webhook call for response code, headers and data
         """
         self.assertEquals(self.create_webhook_response.status_code, 201,
-                          msg='Create webhook for a policy failed with {}'
+                          msg='Create webhook for a policy failed with {0}'
                           .format(self.create_webhook_response.status_code))
         self.validate_headers(self.create_webhook_response.headers)
         self.assertTrue(self.webhook['id'] is not None,
@@ -42,4 +42,4 @@ class CreateWebhook(ScalingGroupWebhookFixture):
         self.assertEquals(
             self.autoscale_behaviors.to_data(self.webhook['metadata']),
             self.wb_metadata,
-            msg="Webhook's metadata does not match {}" .format(self.wb_metadata))
+            msg="Webhook's metadata does not match {0}" .format(self.wb_metadata))

@@ -47,7 +47,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             cooldown=self.group.groupConfiguration.cooldown,
             min_entities=upd_min_entities)
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_minentities_only(self):
@@ -61,7 +61,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             cooldown=self.group.groupConfiguration.cooldown,
             min_entities=upd_min_entities)
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_minentities_over_maxentities(self):
@@ -78,7 +78,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata={})
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_maxentities_lessthan_minentities(self):
@@ -95,7 +95,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             max_entities=upd_max_entities,
             metadata={})
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_maxentities_only(self):
@@ -110,7 +110,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities,
             max_entities=upd_max_entities)
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_metadata_only(self):
@@ -125,7 +125,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities,
             metadata=upd_metadata)
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_metadata_to_be_none(self):
@@ -141,7 +141,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata=upd_metadata)
         self.assertEquals(upd_group_resp.status_code, 204,
-                          msg='Update failed with {}'
+                          msg='Update failed with {0}'
                           .format(upd_group_resp.status_code))
         get_upd_group = self.autoscale_client.\
             view_scaling_group_config(group_id=self.group.id)
@@ -159,7 +159,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities,
             max_entities=self.group.groupConfiguration.maxEntities)
         self.assertEquals(upd_group_resp.status_code, 400,
-                          msg='Update failed with {} as it does not include full request'
+                          msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_group_config_response(self):
@@ -177,7 +177,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             self.group.id)
         updated_config = group_config_response.entity
         self.assertEquals(update_group_response.status_code, 204,
-                          msg='Update group config failed with {}'
+                          msg='Update group config failed with {0}'
                           .format(update_group_response.status_code))
         self.assertTrue(update_group_response.headers is not None,
                         msg='The headers are not as expected')

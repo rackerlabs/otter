@@ -35,7 +35,7 @@ class GetWebhook(ScalingGroupWebhookFixture):
         Get a webhook and verify response code, headers and the data.
         """
         self.assertEquals(self.get_webhook_response.status_code, 200,
-                          msg='Get webhook failed with {}'
+                          msg='Get webhook failed with {0}'
                           .format(self.get_webhook_response.status_code))
         self.validate_headers(self.get_webhook_response.headers)
         self.assertEquals(self.get_webhook.id, self.webhook['id'],

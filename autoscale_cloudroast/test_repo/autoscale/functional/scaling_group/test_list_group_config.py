@@ -44,7 +44,7 @@ class ListGroupConfigTest(AutoscaleFixture):
         Verify the list group config for response code, headers and data
         """
         self.assertEquals(self.group_config_response.status_code, 200,
-                          msg='List group config failed with {}'
+                          msg='List group config failed with {0}'
                           .format(self.group_config_response.status_code))
         self.assertTrue(self.group_config_response.headers is not None,
                         msg='The headers are not as expected')

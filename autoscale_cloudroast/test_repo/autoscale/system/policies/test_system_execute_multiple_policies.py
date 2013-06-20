@@ -69,8 +69,8 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_executed['policy_id'])
         self.assertEquals(execute_on_cooldown.status_code, 403,
-                          msg='Scale up policy executed sucessfully for group {}'
-                          ' when cooldown is not met: {}'
+                          msg='Scale up policy executed sucessfully for group {0}'
+                          ' when cooldown is not met: {1}'
                           .format(self.group.id, execute_on_cooldown.status_code))
 
     def test_system_policy_down_cooldown(self):
@@ -82,14 +82,14 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_scale_down.status_code, 202,
-                          msg='Policy down failed to execute for group {} with {}'
+                          msg='Policy down failed to execute for group {0} with {1}'
                           .format(self.group.id, execute_scale_down.status_code))
         execute_on_cooldown = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_on_cooldown.status_code, 403,
-                          msg='Scale down policy executed when cooldown is not met with {}'
-                          ' for group {}'
+                          msg='Scale down policy executed when cooldown is not met with {0}'
+                          ' for group {1}'
                           .format(execute_on_cooldown.status_code, self.group.id))
 
     def test_system_execute_different_policies_simaltaneously(self):
@@ -101,20 +101,20 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy_up_change_percent['id'])
         self.assertEquals(execute_change_percent_scale_up.status_code, 202,
-                          msg='Scale up policy execution for group {} failed with {}'
+                          msg='Scale up policy execution for group {0} failed with {1}'
                           .format(self.group.id, execute_change_percent_scale_up.status_code))
         execute_change_scale_down = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_down_change['id'])
         self.assertEquals(execute_change_scale_down.status_code, 202,
-                          msg='Scale down policy execution for group {} failed with {}'
+                          msg='Scale down policy execution for group {0} failed with {1}'
                           .format(self.group.id, execute_change_scale_down.status_code))
         execute_desired_capacity_scale = self.autoscale_client.execute_policy(
             self.group.id,
             self.policy_desired_capacity['id'])
         self.assertEquals(execute_desired_capacity_scale.status_code, 202,
-                          msg='Policy with desired capacity=minentities failed to execute with {}'
-                          ' for group {}'
+                          msg='Policy with desired capacity=minentities failed to execute with {0}'
+                          ' for group {1}'
                           .format(execute_desired_capacity_scale.status_code, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -153,5 +153,5 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id,
             policy_id)
         self.assertEquals(execute_policy.status_code, 202,
-                          msg='Execution of the policy after cooldown failed with {} for group {}'
+                          msg='Execution of the policy after cooldown failed with {0} for group {1}'
                           .format(execute_policy.status_code, self.group.id))

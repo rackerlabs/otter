@@ -123,8 +123,8 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy['id'])
         self.assertEquals(reexecute_policy_response.status_code, 403,
-                          msg='scaling policy failed execution with status {}'
-                          ' for group {}'
+                          msg='scaling policy failed execution with status {0}'
+                          ' for group {1}'
                           .format(reexecute_policy_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
         self.empty_scaling_group(group)
@@ -147,8 +147,8 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy2['id'])
         self.assertEquals(execute_policy2_response.status_code, 403,
-                          msg='scaling policy failed execution with status {}'
-                          ' for group {}'
+                          msg='scaling policy failed execution with status {0}'
+                          ' for group {1}'
                           .format(execute_policy2_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
         self.empty_scaling_group(group)
@@ -177,16 +177,16 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy2['id'])
         self.assertEquals(execute_policy2_response.status_code, 403,
-                          msg='scaling policy failed execution with status {}'
-                          ' for group {}'
+                          msg='scaling policy failed execution with status {0}'
+                          ' for group {1}'
                           .format(execute_policy2_response.status_code, group.id))
         self._update_group(group=group, cooldown=0)
         execute_policy2_response = self.autoscale_client.execute_policy(
             group_id=group.id,
             policy_id=policy2['id'])
         self.assertEquals(execute_policy2_response.status_code, 202,
-                          msg='policy failed execution even with group cooldown 0, with status {}'
-                          ' for group {}'
+                          msg='policy failed execution even with group cooldown 0, with status {0}'
+                          ' for group {1}'
                           .format(execute_policy2_response.status_code, group.id))
         total_servers = policy2[
             'change'] + group.groupConfiguration.minEntities + policy['change']
@@ -217,7 +217,7 @@ class GroupFixture(AutoscaleFixture):
             policy_id=policy['id'])
         self.assertEquals(execute_policy_response.status_code, 403,
                           msg='Policy was executed even when max entities were met,'
-                          'with status {} for group {}'
+                          'with status {0} for group {1}'
                           .format(execute_policy_response.status_code, group.id))
         upd_maxentities = 10
         self._update_group(group=group, maxentities=upd_maxentities)
@@ -249,8 +249,8 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy['id'])
         self.assertEquals(execute_policy_response.status_code, 403,
-                          msg='policy was executed even when max entities were met, with status {}'
-                          ' for group {}'
+                          msg='policy was executed even when max entities were met, with status {0}'
+                          ' for group {1}'
                           .format(execute_policy_response.status_code, group.id))
         upd_maxentities = 10
         self._update_group(group=group, maxentities=upd_maxentities)
@@ -318,7 +318,7 @@ class GroupFixture(AutoscaleFixture):
             gc_cooldown=cooldown, sp_list=splist)
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
-                         msg='Create group failed with {}'.format(group.id))
+                         msg='Create group failed with {0}'.format(group.id))
         self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
         return group
@@ -343,7 +343,7 @@ class GroupFixture(AutoscaleFixture):
             max_entities=maxentities,
             metadata={})
         self.assertEqual(update_group.status_code, 204,
-                         msg='Update group failed with {} for group {}'.format(
+                         msg='Update group failed with {0} for group {1}'.format(
                          update_group.status_code, group.id))
 
     def _execute_policy(self, group):
@@ -357,7 +357,7 @@ class GroupFixture(AutoscaleFixture):
             group_id=group.id,
             policy_id=policy['id'])
         self.assertEquals(execute_policy_response.status_code, 202,
-                          msg='scaling policy failed execution with status {}'
-                          ' for group {}'.format(execute_policy_response.status_code,
-                                                 group.id))
+                          msg='scaling policy failed execution with status {0}'
+                          ' for group {1}'.format(execute_policy_response.status_code,
+                                                  group.id))
         return policy

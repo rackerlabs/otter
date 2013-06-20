@@ -52,7 +52,7 @@ class DeleteGroupTest(AutoscaleFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group1.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group {} while servers were building on the group'
+                          msg='Deleted group {0} while servers were building on the group'
                           .format(self.group1.id))
 
     def test_system_delete_group_update_minentities_to_zero(self):
@@ -68,13 +68,13 @@ class DeleteGroupTest(AutoscaleFixture):
             max_entities=self.group1.groupConfiguration.maxEntities,
             metadata={})
         self.assertEquals(reduce_group_size_response.status_code, 204,
-                          msg='Update to 0 minentities failed with reason {} for group {}'
+                          msg='Update to 0 minentities failed with reason {0} for group {1}'
                           .format(reduce_group_size_response.content, self.group1.id))
         self.verify_group_state(self.group1.id, self.gc_min_entities_alt)
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group1.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group succeeded when servers exist on the group {} due to {}'
+                          msg='Deleted group succeeded when servers exist on the group {0} due to {1}'
                           .format(self.group1.id, delete_group_response.content))
 
     def test_system_delete_group_with_zero_minentities(self):
@@ -86,7 +86,7 @@ class DeleteGroupTest(AutoscaleFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group0.id)
         self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Delete group {} failed even when group was empty'
+                          msg='Delete group {0} failed even when group was empty'
                           .format(self.group0.id))
 
     def test_system_delete_group_zero_minentities_execute_webhook(self):
@@ -102,7 +102,7 @@ class DeleteGroupTest(AutoscaleFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group0.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group {} while servers were building on the group'
+                          msg='Deleted group {0} while servers were building on the group'
                           .format(self.group0.id))
 
     def test_system_delete_group_zero_minentities_execute_policy(self):
@@ -119,5 +119,5 @@ class DeleteGroupTest(AutoscaleFixture):
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group0.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group {} while servers were building on the group'
+                          msg='Deleted group {0} while servers were building on the group'
                           .format(self.group0.id))

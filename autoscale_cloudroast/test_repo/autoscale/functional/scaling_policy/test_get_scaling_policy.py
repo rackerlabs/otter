@@ -32,7 +32,7 @@ class GetScalingPolicy(ScalingGroupPolicyFixture):
         Verify the get policy call for response code, headers and data
         """
         self.assertEquals(self.get_policy_response.status_code, 200,
-                          msg='Get scaling policy failed with {}'
+                          msg='Get scaling policy failed with {0}'
                           .format(self.get_policy_response.status_code))
         self.assertTrue(self.get_policy_response.headers is not None,
                         msg='The headers are not as expected')

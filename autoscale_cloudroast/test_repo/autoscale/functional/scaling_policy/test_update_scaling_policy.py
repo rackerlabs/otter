@@ -40,7 +40,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             self.policy['id'])
         updated_policy = policy_response.entity
         self.assertEquals(update_policy_response.status_code, 204,
-                          msg='Update scaling policy failed with {}'
+                          msg='Update scaling policy failed with {0}'
                           .format(update_policy_response.status_code))
         self.assertTrue(update_policy_response.headers is not None,
                         msg='The headers are not as expected')
@@ -74,7 +74,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             self.policy['id'])
         updated_policy = policy_response.entity
         self.assertEquals(update_policy_response.status_code, 204,
-                          msg='Update scaling policy failed with {}'
+                          msg='Update scaling policy failed with {0}'
                           .format(update_policy_response.status_code))
         self.assertTrue(update_policy_response.headers is not None,
                         msg='The headers are not as expected')

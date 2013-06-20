@@ -67,10 +67,10 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Verify the parameters are correct in the initial response
         """
         self.assertTrue(self.create_resp.ok,
-                        msg='Create scaling group call failed with API Response: {}'
+                        msg='Create scaling group call failed with API Response: {0}'
                         .format(self.create_resp.content))
         self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {}'
+                          msg='The create failed with {0}'
                           .format(self.create_resp.status_code))
         self.validate_headers(self.create_resp.headers)
 

@@ -275,13 +275,15 @@ class LaunchConfigTest(AutoscaleFixture):
             wait_for_expected_number_of_active_servers(
                 group_id=group.id,
                 expected_servers=minentities + self.sp_change)
-        servers_from_scale_up = set(active_list_after_scale_up) - set(first_server)
+        servers_from_scale_up = set(
+            active_list_after_scale_up) - set(first_server)
         self._execute_policy(group, policy_down['id'])
         active_server_list_after_scale_down = self.autoscale_behaviors.\
             wait_for_expected_number_of_active_servers(
                 group_id=group.id,
                 expected_servers=self.sp_change)
-        self.assertEqual(set(servers_from_scale_up), set(active_server_list_after_scale_down))
+        self.assertEqual(set(servers_from_scale_up), set(
+            active_server_list_after_scale_down))
 
     def _create_group(self, minentities=None, maxentities=None, policy=False):
         """
@@ -304,7 +306,7 @@ class LaunchConfigTest(AutoscaleFixture):
                 gc_cooldown=0)
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
-                         msg='Create group failed with {}'.format(group.id))
+                         msg='Create group failed with {0}'.format(group.id))
         self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
         return group
@@ -321,7 +323,7 @@ class LaunchConfigTest(AutoscaleFixture):
             image_ref=image_ref,
             flavor_ref=flavor_ref)
         self.assertEquals(update_launch_config_response.status_code, 204,
-                          msg='Updating launch config failed with {} for group {}'
+                          msg='Updating launch config failed with {0} for group {1}'
                           .format(update_launch_config_response, group.id))
 
     def _verify_server_list_for_updated_launch_config(self, server_list,
@@ -345,7 +347,7 @@ class LaunchConfigTest(AutoscaleFixture):
                 group_id=group.id,
                 policy_id=policy_id)
             self.assertEquals(execute_policy_response.status_code, 202,
-                              msg='Policy failed to execute with status {} for group {}'
+                              msg='Policy failed to execute with status {0} for group {1}'
                               .format(execute_policy_response.status_code, group.id))
         else:
             policy = self.autoscale_behaviors.get_policy_properties(
@@ -354,6 +356,6 @@ class LaunchConfigTest(AutoscaleFixture):
                 group_id=group.id,
                 policy_id=policy['id'])
             self.assertEquals(execute_policy_response.status_code, 202,
-                              msg='scaling policy failed execution with status {}'
-                              ' for group {}'.format(execute_policy_response.status_code,
-                                                     group.id))
+                              msg='scaling policy failed execution with status {0}'
+                              ' for group {1}'.format(execute_policy_response.status_code,
+                                                      group.id))

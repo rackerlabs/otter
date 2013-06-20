@@ -47,9 +47,9 @@ class AutoscaleFixture(BaseTestFixture):
         cls.tenant_id = cls.autoscale_config.tenant_id
         env = os.environ['OSTNG_CONFIG_FILE']
         if 'dev' in env.lower():
-            url = 'http://localhost:9000/v1.0/{}'.format(cls.tenant_id)
+            url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
         elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{}'.format(
+            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
                 cls.tenant_id)
         else:
             url = autoscale_service.get_endpoint(
@@ -126,11 +126,11 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
             desired_capacity,
-            msg='Active + Pending servers ({}) != ({}) minentities on the group {}'
+            msg='Active + Pending servers ({0}) != ({1}) minentities on the group {2}'
             .format((group_state.pendingCapacity + group_state.activeCapacity),
                 desired_capacity, group_id))
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
-                          msg='Desired capacity ({}) != ({}) minentities on the group {}'
+                          msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
                           .format(group_state.desiredCapacity, desired_capacity, group_id))
 
     @classmethod

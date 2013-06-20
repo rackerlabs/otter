@@ -54,8 +54,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
-                          msg='Executing the updated policy with desired capacity failed with {}'
-                          ' for group {}'
+                          msg='Executing the updated policy with desired capacity failed with {0}'
+                          ' for group {1}'
                           .format(upd_policy_to_desired_capacity_execute, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -73,8 +73,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
-                          msg='Executing the updated policy with desired capacity failed with {}'
-                          ' for group {}'
+                          msg='Executing the updated policy with desired capacity failed with {0}'
+                          ' for group {1}'
                           .format(upd_policy_to_desired_capacity_execute, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -91,8 +91,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
-                          msg='Executing the updated policy with desired capacity failed with {}'
-                          ' for group {}'
+                          msg='Executing the updated policy with desired capacity failed with {0}'
+                          ' for group {1}'
                           .format(upd_policy_to_desired_capacity_execute, self.group.id))
         upd_desired_capacity = self.group.groupConfiguration.maxEntities + 1
         sleep(self.cooldown)
@@ -100,8 +100,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], upd_desired_capacity)
         self.assertEquals(upd_policy_to_desired_capacity_execute, 202,
-                          msg='Executing the updated policy with desired capacity failed with {}'
-                          ' for group {}'
+                          msg='Executing the updated policy with desired capacity failed with {0}'
+                          ' for group {1}'
                           .format(upd_policy_to_desired_capacity_execute, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -118,7 +118,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], change)
         self.assertEquals(upd_to_scale_down_execute, 202,
-                          msg='Executing the updated scale down policy failed with {} for group {}'
+                          msg='Executing the updated scale down policy failed with {0} for group {1}'
                           .format(upd_to_scale_down_execute, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -148,7 +148,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             self.group.id,
             self.policy['policy_id'], change)
         self.assertEquals(upd_to_scale_down_execute, 202,
-                          msg='Executing the updated scale down policy failed with {} for group {}'
+                          msg='Executing the updated scale down policy failed with {0} for group {1}'
                           .format(upd_to_scale_down_execute, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,

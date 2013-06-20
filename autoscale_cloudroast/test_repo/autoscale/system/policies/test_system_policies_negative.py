@@ -55,7 +55,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
         self.assertEquals(execute_policy_up.status_code, 403,
-                          msg='Scale up policy executed when minentities=maxentities: {} for group {}'
+                          msg='Scale up policy executed when minentities=maxentities: {0} for group {1}'
                           .format(execute_policy_up.status_code, self.group.id))
 
     def test_system_execute_scale_down_on_newly_created_group_with_minentities(self):
@@ -70,7 +70,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             self.policy_down['policy_id'])
         self.assertEquals(execute_policy_down.status_code, 403,
                           msg='Scale down policy executed when minentities=maxentities'
-                          ' on the group {} with response code {}'
+                          ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
 
     def test_system_delete_policy_during_execution(self):
@@ -85,12 +85,12 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             self.group.id,
             self.policy_up['policy_id'])
         self.assertEquals(delete_policy.status_code, 204,
-                          msg='Deleting the scaling policy while its executing failed {}'
-                          ' for group {}'
+                          msg='Deleting the scaling policy while its executing failed {0}'
+                          ' for group {1}'
                           .format(delete_policy.status_code, self.group.id))
         self.assertEquals(execute_policy_up.status_code, 202,
-                          msg='Scale up policy failed for group {} cause policy was deleted'
-                          ' during execution: {}'
+                          msg='Scale up policy failed for group {0} cause policy was deleted'
+                          ' during execution: {1}'
                           .format(self.group.id, execute_policy_up.status_code))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
@@ -113,15 +113,15 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             policy_data=policy_up,
             execute_policy=True)
         self.assertEquals(execute_policy['execute_response'], 202,
-                          msg='Scale up policy execution failed for group {}'
-                          'when change delta < maxentities with response: {}'
+                          msg='Scale up policy execution failed for group {0}'
+                          'when change delta < maxentities with response: {1}'
                           .format(self.group.id, execute_policy['execute_response']))
         reexecute_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
             execute_policy['policy_id'])
         self.assertEquals(reexecute_scale_up.status_code, 403,
-                          msg='Scale up policy executed for group {} when group already'
-                          ' has maxentities, response code: {}'
+                          msg='Scale up policy executed for group {0} when group already'
+                          ' has maxentities, response code: {1}'
                           .format(self.group.id, reexecute_scale_up.status_code))
 
     def test_system_scaleup_update_min_max_0_delete_group(self):
@@ -133,16 +133,16 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
         self.assertEquals(execute_policy_up.status_code, 202,
-                          msg='Scale up policy execution failed for group {} '
-                          'when change delta < maxentities with response: {}'
+                          msg='Scale up policy execution failed for group {0} '
+                          'when change delta < maxentities with response: {1}'
                           .format(self.group.id, execute_policy_up.status_code))
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=0, minentities=0)
         delete_group = self.autoscale_client.delete_scaling_group(
             self.group.id)
         self.assertEquals(delete_group.status_code, 204,
-                          msg='Delete group failed for group {} when min and maxentities '
-                          'is update to 0 with response {}'
+                          msg='Delete group failed for group {0} when min and maxentities '
+                          'is update to 0 with response {1}'
                           .format(self.group.id, delete_group.status_code))
         # find a way to list servers in a scaling group without using the group state call
         # i.e. using nova to verify the servers were deleted
@@ -155,8 +155,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
         self.assertEquals(execute_policy_up.status_code, 202,
-                          msg='Scale up policy execution failed for group {} '
-                          'when change delta < maxentities with response: {}'
+                          msg='Scale up policy execution failed for group {0} '
+                          'when change delta < maxentities with response: {1}'
                           .format(self.group.id, execute_policy_up.status_code))
         self._update_group_min_max_entities(group=self.group,
                                             minentities=self.group.groupConfiguration.minEntities +
@@ -166,7 +166,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             self.policy_down['policy_id'])
         self.assertEquals(execute_policy_down.status_code, 403,
                           msg='Scale down policy executed when minentities=maxentities'
-                          ' on the group {} with response code {}'
+                          ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
 
     def _update_group_min_max_entities(self, group, maxentities=None, minentities=None):
@@ -187,5 +187,5 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             metadata={})
         self.assertEquals(update_group.status_code, 204,
                           msg='Updating minentities and/or maxentities in the group config'
-                          ' for {} failed: {}'
+                          ' for {0} failed: {1}'
                           .format(group.id, update_group.status_code))

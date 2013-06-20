@@ -28,7 +28,7 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
         Test delete webhook
         """
         self.assertEquals(self.create_webhook_response.status_code, 201,
-                          msg='Create webhook for a policy failed with {}'
+                          msg='Create webhook for a policy failed with {0}'
                           .format(self.create_webhook_response.status_code))
         self.validate_headers(self.create_webhook_response.headers)
         delete_webhook_resp = self.autoscale_client.delete_webhook(
@@ -36,6 +36,6 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
             policy_id=self.policy['id'],
             webhook_id=self.webhook['id'])
         self.assertEquals(delete_webhook_resp.status_code, 204,
-                          msg='Delete webhook failed with {}'
+                          msg='Delete webhook failed with {0}'
                           .format(delete_webhook_resp.status_code))
         self.validate_headers(delete_webhook_resp.headers)
