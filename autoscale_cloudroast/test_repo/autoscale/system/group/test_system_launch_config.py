@@ -84,7 +84,9 @@ class LaunchConfigTest(AutoscaleFixture):
             set(active_list_b4_upd) - set(first_server)))
         self._verify_server_list_for_updated_launch_config(
             active_server_list_after_scale_down,
-            self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
+            group.launchConfiguration.server.name,
+            group.launchConfiguration.server.imageRef,
+            group.launchConfiguration.server.flavorRef)
         self.empty_scaling_group(group)
 
     def test_system_update_launchconfig_scale_up_down(self):
@@ -253,6 +255,34 @@ class LaunchConfigTest(AutoscaleFixture):
             active_servers_on_upd_group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
         self.empty_scaling_group(group)
 
+    def test_system_scale_down_oldest_on_active_servers(self):
+        """
+        Create a scaling group with minentities=1, scale up=scale_down=change.
+        Scale down and verify that the oldest server is scaled down first
+        """
+        minentities = self.sp_change
+        group = self._create_group(minentities=minentities, policy=True)
+        scale_down_change = - self.sp_change
+        policy_down = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change=scale_down_change,
+            sp_cooldown=0)
+        first_server = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities)
+        self._execute_policy(group)
+        active_list_after_scale_up = self.autoscale_behaviors.\
+            wait_for_expected_number_of_active_servers(
+                group_id=group.id,
+                expected_servers=minentities + self.sp_change)
+        servers_from_scale_up = set(active_list_after_scale_up) - set(first_server)
+        self._execute_policy(group, policy_down['id'])
+        active_server_list_after_scale_down = self.autoscale_behaviors.\
+            wait_for_expected_number_of_active_servers(
+                group_id=group.id,
+                expected_servers=self.sp_change)
+        self.assertEqual(set(servers_from_scale_up), set(active_server_list_after_scale_down))
+
     def _create_group(self, minentities=None, maxentities=None, policy=False):
         """
         Create a scaling group with the given minentities, maxentities,
@@ -262,7 +292,7 @@ class LaunchConfigTest(AutoscaleFixture):
         if policy is True:
             sp_list = [{'name': "policy in group",
                         'change': self.sp_change,
-                        'cooldown': self.sp_cooldown,
+                        'cooldown': 0,
                         'type': 'webhook'
                         }]
             create_group_response = self.autoscale_behaviors.create_scaling_group_given(
