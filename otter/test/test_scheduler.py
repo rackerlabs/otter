@@ -6,6 +6,7 @@ from otter.models.interface import IScalingGroup, IScalingGroupCollection, IScal
 from otter.rest.application import set_store
 from twisted.internet import defer
 import mock
+from twisted.internet.interfaces import IReactorTime
 
 
 class SchedulerTestCase(DeferredTestMixin, TestCase):
@@ -46,9 +47,9 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         Test what happens when you launch it with no events
         """
         self.mock_store.fetch_batch_of_events.return_value = defer.succeed([])
-        d = check_for_events(self.mock_log)
+        d = check_for_events(self.mock_log, 100)
         result = self.successResultOf(d)
-        self.assertEquals(result, False)
+        self.assertEquals(result, None)
 
     def test_one(self):
         """
@@ -56,9 +57,9 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         eventlist = [('1234', 'scal44', 'pol44', 'now')]
         self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
-        d = check_for_events(self.mock_log)
+        d = check_for_events(self.mock_log, 100)
         result = self.successResultOf(d)
-        self.assertEquals(result, False)
+        self.assertEquals(result, None)
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '1234', 'scal44')
         self.assertEqual(self.mock_group.modify_state.call_count, 1)
@@ -75,21 +76,24 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         Test with many events
         """
+        batches = [0]
+        mockcalllater = iMock(IReactorTime)
+        def _second_time(seconds, functions, *args, **kwargs):
+            batches[0] += 1
+            if batches[0] == 2:
+                self.mock_store.fetch_batch_of_events.return_value = defer.succeed([])
+            functions(*args, **kwargs)
+
+        mockcalllater.callLater.side_effect = _second_time
+
         eventlist = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
         self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
-        d = check_for_events(self.mock_log)
+        d = check_for_events(self.mock_log, 100, mockcalllater)
         result = self.successResultOf(d)
-        self.assertEquals(result, True)
+        self.assertEquals(result, None)
 
-        #self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '1234', 'scal44')
         self.assertEqual(self.mock_group.modify_state.call_count, 100)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 100)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 100)
+        mockcalllater.callLater.assert_called_once_with(0, check_for_events, self.mock_log, 100, mockcalllater)
 
-        #self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-        #    mock.ANY,
-        #    'transaction-id',
-        #    self.mock_group,
-        #    self.mock_state,
-        #    policy_id='pol44'
-        #)

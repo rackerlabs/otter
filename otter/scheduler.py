@@ -6,7 +6,7 @@ in the first place.
 from otter.rest.application import get_store
 from datetime import datetime
 from functools import partial
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from otter.util.hashkey import generate_transaction_id
 from otter import controller
 
@@ -26,14 +26,17 @@ def execute_event(log, event):
     return d
 
 
-def check_for_events(log):
+def check_for_events(log, batchsize, icalllater = None):
     """
     Check for events in the database before the present time.
 
     :param log: A bound log for logging
 
-    :return: True if there are more events, False otherwise
+    :return: a deferred that fires with None
     """
+    if icalllater == None:
+        icalllater = reactor
+    
     def process_events(events):
         deferreds = [
             execute_event(log, event) for event in events
@@ -43,9 +46,13 @@ def check_for_events(log):
         return d
 
     def check_for_more(events):
-        return len(events) == 100
+        if len(events) == batchsize:
+            icalllater.callLater(0, check_for_events, log, batchsize, icalllater)
+        return None
 
-    deferred = get_store().fetch_batch_of_events(datetime.now())
+
+    # utcnow because of cass serialization issues
+    deferred = get_store().fetch_batch_of_events(datetime.utcnow(), batchsize)
     deferred.addCallback(process_events)
     # DELETE EVENTS HERE
     deferred.addCallback(check_for_more)
