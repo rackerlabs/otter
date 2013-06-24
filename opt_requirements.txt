@@ -1,0 +1,2 @@
+txgraylog2==0.11
+txairbrake==0.2.0
