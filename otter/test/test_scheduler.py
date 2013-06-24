@@ -18,9 +18,20 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         setup
         """
+
         self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = self.returns.pop(0)
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.mock_store.fetch_batch_of_events.side_effect = _responses
 
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
@@ -46,7 +57,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         Test what happens when you launch it with no events
         """
-        self.mock_store.fetch_batch_of_events.return_value = defer.succeed([])
+        self.returns = [[]]
         d = check_for_events(self.mock_log, 100)
         result = self.successResultOf(d)
         self.assertEquals(result, None)
@@ -55,8 +66,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         Test with one event
         """
-        eventlist = [('1234', 'scal44', 'pol44', 'now')]
-        self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
+        self.returns = [[('1234', 'scal44', 'pol44', 'now')]]
         d = check_for_events(self.mock_log, 100)
         result = self.successResultOf(d)
         self.assertEquals(result, None)
@@ -76,20 +86,17 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         Test with many events
         """
-        batches = [0]
         mockcalllater = iMock(IReactorTime)
 
+        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        [('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        []]
+
         def _second_time(seconds, functions, *args, **kwargs):
-            batches[0] += 1
-            self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
-            if batches[0] == 2:
-                self.mock_store.fetch_batch_of_events.return_value = defer.succeed([])
             functions(*args, **kwargs)
 
         mockcalllater.callLater.side_effect = _second_time
 
-        eventlist = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
-        self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
         d = check_for_events(self.mock_log, 100, mockcalllater)
         result = self.successResultOf(d)
         self.assertEquals(result, None)
