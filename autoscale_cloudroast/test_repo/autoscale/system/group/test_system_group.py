@@ -78,7 +78,7 @@ class GroupFixture(AutoscaleFixture):
             expected_servers=upd_maxentities)
         self.empty_scaling_group(group)
 
-    def test_system_update_maxenetities_andexecute_policy(self):
+    def test_system_update_maxenetities_and_execute_policy(self):
         """
         Execute policy on scaling group such that the maxentities are met,
         update the maxentities and upon re-executing the scaling policy beyond
@@ -153,7 +153,7 @@ class GroupFixture(AutoscaleFixture):
         self.verify_group_state(group.id, policy['change'])
         self.empty_scaling_group(group)
 
-    def test_systemupdate_group_cooldown_andexecute_policy(self):
+    def test_systemupdate_group_cooldown_and_execute_policy(self):
         """
         Different scaling policies can be executed when the group cooldown
         is updated to be 0
@@ -193,7 +193,7 @@ class GroupFixture(AutoscaleFixture):
         self.verify_group_state(group.id, total_servers)
         self.empty_scaling_group(group)
 
-    def test_systemexecute_policy_beyond_maxentities(self):
+    def test_system_execute_policy_beyond_maxentities(self):
         """
         Verify execute policy when executed multiple times to exceed maxentities
         """
@@ -226,7 +226,7 @@ class GroupFixture(AutoscaleFixture):
         self.verify_group_state(group.id, total_servers)
         self.empty_scaling_group(group)
 
-    def test_systemexecute_policy_beyond_maxentities_when_min_equals_max(self):
+    def test_system_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
         Verify scaling group with minentities = maxentities cannot execute scale up
         policy. Update the maxentities and verify the scaling policy can be executed.

@@ -35,6 +35,10 @@ class DeleteGroupTest(AutoscaleFixture):
             gc_min_entities=self.gc_min_entities_alt)
         self.group1 = self.create_group1_response.entity
         self.assertEquals(self.create_group1_response.status_code, 201)
+        self.resources.add(self.group0.id,
+                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group1.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def tearDown(self):
         """
