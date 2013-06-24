@@ -17,7 +17,7 @@ import os
 class AutoscaleFixture(BaseTestFixture):
 
     """
-   :summary: Fixture for an Autoscale test.
+    :summary: Fixture for an Autoscale test.
     """
 
     @classmethod
