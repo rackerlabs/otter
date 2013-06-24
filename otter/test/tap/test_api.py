@@ -206,8 +206,9 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.log.addObserver')
     def test_graylog(self, addObserver, GraylogUDPPublisher):
         """
-        makeService configures adds log observer when graylog is in the config
-        and GraylogUDPPublisher is importable (and hence not None)
+        makeService configures the log observer to publish to graylog when
+        graylog is in the config and GraylogUDPPublisher is importable (and
+        hence not None)
         """
         mock_config = test_config.copy()
         mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
