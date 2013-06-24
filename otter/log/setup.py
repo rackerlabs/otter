@@ -9,9 +9,8 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     SystemFilterWrapper,
     PEP3101FormattingWrapper,
+    GELFObserverWrapper
 )
-
-from otter.log.graylog import GELFObserverWrapper
 
 
 def make_observer_chain(ultimate_observer):
