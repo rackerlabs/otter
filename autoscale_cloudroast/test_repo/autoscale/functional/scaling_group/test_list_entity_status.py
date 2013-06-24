@@ -36,7 +36,7 @@ class GetListEntityStatusTest(AutoscaleFixture):
 
     def test_entity_status_response(self):
         """
-        Verify list status' response code, header.
+        Verify list status' response code is 200, header.
         """
         self.assertEquals(200, self.group_state_response.status_code,
                           msg='The list entities call failed with {0}'

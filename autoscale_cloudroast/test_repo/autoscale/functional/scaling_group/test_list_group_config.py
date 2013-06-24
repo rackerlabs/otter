@@ -6,6 +6,7 @@ from cloudcafe.compute.common.datagen import rand_name
 
 
 class ListGroupConfigTest(AutoscaleFixture):
+
     """
     Verify list group config.
     """
@@ -41,7 +42,7 @@ class ListGroupConfigTest(AutoscaleFixture):
 
     def test_list_group_config_response(self):
         """
-        Verify the list group config for response code, headers and data
+        Verify the list group config for response code 200, headers and data
         """
         self.assertEquals(self.group_config_response.status_code, 200,
                           msg='List group config failed with {0}'
@@ -60,6 +61,7 @@ class ListGroupConfigTest(AutoscaleFixture):
         self.assertEquals(self.group_config.maxEntities,
                           self.gc_max_entities,
                           msg='Max entities in the Group config did not match')
-        self.assertEquals(self.autoscale_behaviors.to_data(self.group_config.metadata),
-                          self.gc_metadata,
-                          msg='Metadata in the Group config did not match')
+        self.assertEquals(
+            self.autoscale_behaviors.to_data(self.group_config.metadata),
+            self.gc_metadata,
+            msg='Metadata in the Group config did not match')

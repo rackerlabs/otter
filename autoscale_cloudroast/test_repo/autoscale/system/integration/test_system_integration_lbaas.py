@@ -26,8 +26,8 @@ class AutoscaleLbaasFixture(ScalingGroupWebhookFixture):
 
     def test_add_nodes_to_existing_lbaas(self):
         """
-        Create a lbaas and add it in the launch config and verify the servers
-        created by the scaling group are added to it
+        Add an existing lbaas to a scaling group with minentities > 0. The servers
+        on the scaling group are added as nodes to the loadbalancer
         """
         pass
 

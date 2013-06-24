@@ -14,13 +14,12 @@ Autoscale Cloudcafe's configurations will be installed at: USER_HOME/.cloudcafe/
                        or
 2. Write entirely new tests in this repository using the CloudCAFE Framework.
 
-**Test Plan for Autoscale**
------------------------------
+**Test Plan for Autoscale (autoscale_cloudroast)**
+---------------------------------------------------
 .. toctree::
    :maxdepth: 3
 
    test_plan.rst
-   autoscale
 
 **Running Tests**
 -------------------
@@ -30,3 +29,12 @@ Example:
          *cafe-runner autoscale dev -p functional --parallel*    (executes all the autoscale tests under the functional folder, in parallel)
 
          *cafe-runner autoscale dev -m test_create_scaling_group*     (executes the test 'test_create_scaling_group.py')
+
+**autoscale_cloudcafe**
+-------------------------
+.. toctree::
+   :maxdepth: 3
+
+   autoscale
+
+

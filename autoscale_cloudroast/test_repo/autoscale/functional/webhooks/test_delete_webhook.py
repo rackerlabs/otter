@@ -12,7 +12,7 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Create a webhook.
+        Create a scaling group with a webhook.
         """
         super(DeleteWebhook, cls).setUpClass()
 
@@ -25,7 +25,7 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
 
     def test_delete_webhook(self):
         """
-        Test delete webhook
+        Test delete webhook returns 204 when successful
         """
         self.assertEquals(self.create_webhook_response.status_code, 201,
                           msg='Create webhook for a policy failed with {0}'

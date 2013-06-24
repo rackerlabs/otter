@@ -8,7 +8,7 @@ import urlparse
 
 class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
     """
-    Verify negatice scenarios for webhooks
+    Verify negative scenarios for webhooks
     """
 
     @classmethod
@@ -27,7 +27,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
 
     def test_webhooks_nonexistant(self):
         """
-        Negative Test: Verify no webhooks on a newly created policy.
+        Negative Test: Verify no webhooks exist on a newly created policy.
         """
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         group = create_resp.entity
@@ -197,7 +197,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
 
     def test_execute_invalid_version_webhook(self):
         """
-        Negative Test: Execute a webhook with an invalid version.
+        Negative Test: Executing a webhook with an invalid version, returns 202.
         """
         create_resp = self.autoscale_client.create_webhook(
             group_id=self.group.id,
@@ -226,7 +226,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
 
     def test_execute_nonexistant_webhook(self):
         """
-        Negative Test: Execute a invalid webhook.
+        Negative Test: Executing an invalid webhook returns 202
         """
         create_resp = self.autoscale_client.create_webhook(
             group_id=self.group.id,
@@ -255,7 +255,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
 
     def test_execute_webhook_after_deletion(self):
         """
-        Negative Test: Execute a webhook after it has been deleted.
+        Negative Test: Execute a webhook after it has been deleted, returns 202.
         """
         create_resp = self.autoscale_client.create_webhook(
             group_id=self.group.id,

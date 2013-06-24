@@ -21,7 +21,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
 
     def setUp(self):
         """
-        Create a scaling group with min entities > 0, scale up with cooldown 1 sec
+        Create a scaling group with min entities>0, scale up with cooldown=1 second
+        and execute the policy
         """
         self.cooldown = 1
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -82,8 +83,10 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
 
     def test_system_update_policy_desired_capacity(self):
         """
-        Verify execution of updated policy with desired capacity < minentities of the group,
-        then update desired capacity > maxentities and execute
+        Update a scale up change policy to a scale down policy with desired capacity
+        < minentities and execute policy (results in active servers=minentities)
+        Update the desired capacity scale down policy > maxenetities and execute.
+        Results in active servers = maxentities in the scaling group
         """
         upd_desired_capacity = self.group.groupConfiguration.minEntities - 1
         sleep(self.cooldown)
@@ -109,8 +112,8 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
 
     def test_system_update_scale_up_to_scale_down(self):
         """
-        Update a scale up policy to scale down by the same change and verify execution
-        of such a policy
+        Update a scale up policy to scale down by the same change and execute
+        such a policy to result in active servers = minentities on the scaling group
         """
         change = - self.policy_up['change']
         sleep(self.cooldown)

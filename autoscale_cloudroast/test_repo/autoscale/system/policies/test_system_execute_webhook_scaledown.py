@@ -42,7 +42,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_down_change(self):
         """
-        Verify execution of a webhook scale down with change as the number
+        Execute a scale down webhook with change as the number
         at which the setUp scaled up, hence reducing current servers to
         min entities
         """
@@ -59,7 +59,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
-        Verify execution of a webhook, scale down with change percentage 60
+        Execute a webhook with scale down with change percentage 60
         """
         policy_down = {'change_percent': -60}
         execute_webhook_in_change_percent_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -78,7 +78,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_down_desired_capacity(self):
         """
-        Verify execution of a webhook, scale down with desired capacity as the
+        Execute a webhook with scale down with desired capacity as the
         minentities of the group
         """
         policy_down = {

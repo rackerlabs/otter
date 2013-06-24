@@ -48,6 +48,10 @@ def skip_classmethods(app, what, name, obj, skip, options):
         skip = True
     elif ('__name__' in str(name)) and ('test_repo' in str(obj)):
         skip = True
+    elif ('setUpClass' in str(name)) and ('system' in str(obj)):
+        skip = True
+    elif ('tearDownClass' in str(name)) and ('system' in str(obj)):
+        skip = True
     elif (str(name).startswith('test_')) and ('test_repo' in str(obj)):
         skip = False
     return skip
