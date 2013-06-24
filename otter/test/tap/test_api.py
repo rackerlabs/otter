@@ -243,8 +243,9 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.AirbrakeLogObserver')
     def test_airbrake(self, airbrake_observer):
         """
-        makeService configures adds log observer when graylog is in the config
-        and GraylogUDPPublisher is importable (and hence not None)
+        makeService configures the log observer to publish to airbrake when
+        airbrake is in the config and AirbrakeLogObserver is importable
+        (and hence not None)
         """
         mock_config = test_config.copy()
         mock_config['airbrake'] = {'api_key': 'XXX'}
@@ -257,7 +258,7 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.AirbrakeLogObserver', new=None)
     def test_airbrake_warning(self):
         """
-        makeService warns when graylog is in the config but GraylogUDPPublisher
+        makeService warns when airbrake is in the config but AirbrakeLogObserver
         is not importable (and hence None).  It does not add any log observers.
         """
         mock_config = test_config.copy()
