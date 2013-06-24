@@ -78,6 +78,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         batches = [0]
         mockcalllater = iMock(IReactorTime)
+
         def _second_time(seconds, functions, *args, **kwargs):
             batches[0] += 1
             self.mock_store.fetch_batch_of_events.return_value = defer.succeed(eventlist)
@@ -97,5 +98,5 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
         self.assertEqual(mockcalllater.callLater.call_count, 2)
-        mockcalllater.callLater.assert_called_with(0, check_for_events, self.mock_log, 100, mockcalllater)
-
+        mockcalllater.callLater.assert_called_with(0, check_for_events, self.mock_log, 100,
+                                                   mockcalllater)

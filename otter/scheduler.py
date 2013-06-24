@@ -26,7 +26,7 @@ def execute_event(log, event):
     return d
 
 
-def check_for_events(log, batchsize, icalllater = None):
+def check_for_events(log, batchsize, icalllater=None):
     """
     Check for events in the database before the present time.
 
@@ -34,9 +34,9 @@ def check_for_events(log, batchsize, icalllater = None):
 
     :return: a deferred that fires with None
     """
-    if icalllater == None:
+    if icalllater is None:
         icalllater = reactor
-    
+
     def process_events(events):
         deferreds = [
             execute_event(log, event) for event in events
@@ -49,7 +49,6 @@ def check_for_events(log, batchsize, icalllater = None):
         if len(events) == batchsize:
             icalllater.callLater(0, check_for_events, log, batchsize, icalllater)
         return None
-
 
     # utcnow because of cass serialization issues
     deferred = get_store().fetch_batch_of_events(datetime.utcnow(), batchsize)
