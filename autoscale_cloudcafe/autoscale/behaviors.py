@@ -231,7 +231,7 @@ class AutoscaleBehaviors(BaseBehavior):
         :param: execute_policy. Executes the newly created policy
         :return: dict containing policy id and its webhook id and
                  capability url
-        :rtye: dict
+        :rtype: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
         response_code = None

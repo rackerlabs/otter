@@ -1,3 +1,3 @@
 """
-@summary: Model Objects specific to Autoscaling
+:summary: Model Objects specific to Autoscaling
 """

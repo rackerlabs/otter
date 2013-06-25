@@ -64,7 +64,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def test_create_scaling_group_response(self):
         """
-        Verify the response code for thr create scaling group is 201
+        Verify the response code for the create scaling group is 201
         """
         self.assertTrue(self.create_resp.ok,
                         msg='Create scaling group call failed with API Response: {0}'
