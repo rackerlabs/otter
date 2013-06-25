@@ -688,7 +688,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
     def test_delete_policy_valid_policy(self, mock_get_policy):
         """
         When you delete a scaling policy, it checks if the policy exists and
-        if it does, calls _naive_delete_policy and if it succeeds, returns None
+        if it does, deletes the policy and all its associated webhooks.
         """
         d = self.group.delete_policy('3222')
         # delete returns None
