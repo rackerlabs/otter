@@ -156,12 +156,8 @@ class LaunchConfigTest(AutoscaleFixture):
 
     def test_system_update_launchconfig_while_group_building(self):
         """
-<<<<<<< HEAD
-        Updates to the launch config do not apply the servers building,
+        Updates to the launch config do not apply to the servers building,
         when the update is made
-=======
-        Updates to the launch config do not apply to a policy that is executing.
->>>>>>> test plan in docs
         """
         minentities = 2
         group = self._create_group(minentities=minentities)
