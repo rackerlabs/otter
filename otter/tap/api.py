@@ -91,6 +91,7 @@ def run_scheduler(batchsize):
         return None
     d = check_for_events(log, batchsize)
     d.addErrback(eat_errors)
+    return d
 
 
 def makeService(config):
