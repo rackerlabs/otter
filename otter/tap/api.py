@@ -6,7 +6,7 @@ import warnings
 
 from twisted.python import usage
 
-from twisted.internet import reactor
+from twisted.internet import reactor, task
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
@@ -81,12 +81,16 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-def run_scheduler():
+def run_scheduler(batchsize):
     """
     Working guts of the scheduler service
     """
-    reactor.callLater(1, run_scheduler)
-    check_for_events()
+    def eat_errors(err):
+        # Eat transient errors
+        log.err(err)
+        return None
+    d = check_for_events(log, batchsize)
+    d.addErrback(eat_errors)
 
 
 def makeService(config):
@@ -131,7 +135,8 @@ def makeService(config):
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
     if config_value('otterclock'):
-        reactor.callLater(1, run_scheduler)
+        scheduler_task = task.LoopingCall(run_scheduler, int(config_value('otterclock.batchsize')))
+        scheduler_task.start(int(config_value('otterclock.interval')))
 
     s = MultiService()
 
