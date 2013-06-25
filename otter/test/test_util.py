@@ -87,7 +87,8 @@ class HTTPUtilityTests(TestCase):
 
     def test_check_success(self):
         """
-        check_success will return the response if the response.code is in success_codes.
+        check_success will return the response if the response.code is in
+        success_codes.
         """
         response = mock.Mock()
         response.code = 201
@@ -208,7 +209,8 @@ class TimestampTests(TestCase):
     Test timestamp utilities
     """
     @mock.patch('otter.util.timestamp.datetime', spec=['utcnow'])
-    def test_now_returns_iso8601Z_timestamp_no_microseconds(self, mock_datetime):
+    def test_now_returns_iso8601Z_timestamp_no_microseconds(self,
+                                                            mock_datetime):
         """
         ``now()`` returns the current UTC time in iso8601 zulu format
         """
@@ -228,8 +230,8 @@ class TimestampTests(TestCase):
     def test_min_returns_iso8601Z_timestamp(self):
         """
         datetime.min returns the earliest available time:
-        ``datetime(MINYEAR, 1, 1, tzinfo=None)`` according to the docs.  ``MIN``
-        returns this datetime in iso8601 zulu format.
+        ``datetime(MINYEAR, 1, 1, tzinfo=None)`` according to the docs.
+        ``MIN`` returns this datetime in iso8601 zulu format.
         """
         self.assertEqual(timestamp.MIN, "0001-01-01T00:00:00Z")
 
