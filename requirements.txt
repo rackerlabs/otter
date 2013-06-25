@@ -9,7 +9,5 @@ treq==0.2.0
 silverberg==0.1.2
 pyOpenSSL==0.13
 jsonfig==0.1.1
-txgraylog2==0.11
 testtools==0.9.31
-txairbrake==0.2.0
 croniter==0.3.3

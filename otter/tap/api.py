@@ -2,6 +2,7 @@
 Twisted Application plugin for otter API nodes.
 """
 import jsonfig
+import warnings
 
 from twisted.python import usage
 
@@ -14,14 +15,23 @@ from twisted.application.service import MultiService
 from twisted.web.server import Site
 from twisted.python import log
 
+try:
+    from txairbrake.observers import AirbrakeLogObserver as _a
+    AirbrakeLogObserver = _a   # to get around pyflakes
+except ImportError:
+    AirbrakeLogObserver = None
+
+try:
+    from otter.log.graylog import GraylogUDPPublisher as _g
+    GraylogUDPPublisher = _g   # to get around pyflakes
+except ImportError:
+    GraylogUDPPublisher = None
+
 from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
 from silverberg.cluster import RoundRobinCassandraCluster
-from otter.log.graylog import GraylogUDPPublisher
-
-from txairbrake.observers import AirbrakeLogObserver
 
 
 class Options(usage.Options):
@@ -75,21 +85,29 @@ def makeService(config):
     """
     set_config_data(dict(config))
 
-    # Configure graylog.
+    # Try to configure graylog and airbrake.
 
     if config_value('graylog'):
-        log.addObserver(
-            make_observer_chain(
-                GraylogUDPPublisher(**config_value('graylog'))))
+        if GraylogUDPPublisher is not None:
+            log.addObserver(
+                make_observer_chain(
+                    GraylogUDPPublisher(**config_value('graylog'))))
+        else:
+            warnings.warn("There is a configuration option for Graylog, but "
+                          "txgraylog is not installed.")
 
     if config_value('airbrake'):
-        airbrake = AirbrakeLogObserver(
-            config_value('airbrake.api_key'),
-            config_value('environment'),
-            use_ssl=True
-        )
+        if AirbrakeLogObserver is not None:
+            airbrake = AirbrakeLogObserver(
+                config_value('airbrake.api_key'),
+                config_value('environment'),
+                use_ssl=True
+            )
 
-        airbrake.start()
+            airbrake.start()
+        else:
+            warnings.warn("There is a configuration option for Airbrake, but "
+                          "txairbrake is not installed.")
 
     if not config_value('mock'):
         seed_endpoints = [
