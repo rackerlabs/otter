@@ -41,8 +41,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
         list_policy_resp = self.autoscale_client.list_policies(group.id)
         list_policy = list_policy_resp.entity
         self.assertEquals(list_policy_resp.status_code, 200,
-                          msg='List scaling policies failed with %s'
-                          % list_policy_resp.status_code)
+                          msg='List scaling policies failed with {0}'
+                          .format(list_policy_resp.status_code))
         self.validate_headers(list_policy_resp.headers)
         self.assertEquals(list_policy, [],
                           msg='Some scaling policies exist on the scaling group')
@@ -59,11 +59,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling policy succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling policy with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_policy_name_whitespace(self):
         """
@@ -77,11 +77,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling policy succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling policy with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_policy_cooldown_lessthan_zero(self):
         """
@@ -96,11 +96,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling policy succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling policy with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_policy_change_lessthan_zero(self):
         """
@@ -113,11 +113,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 change='0.001')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling policy succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling policy succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling policy with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling policy with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_get_invalid_policy_id(self):
         """
@@ -130,11 +130,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                      policy_id=policy)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create policies succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: %s'
-                        % create_error)
+                        msg='Create policies with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_update_invalid_policy_id(self):
         """
@@ -151,11 +151,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create policies succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: %s'
-                        % create_error)
+                        msg='Create policies with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_get_policy_after_deletion(self):
         """
@@ -171,11 +171,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                      policy_id=policy['id'])
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create policies succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: %s'
-                        % create_error)
+                        msg='Create policies with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_update_policy_after_deletion(self):
         """
@@ -195,11 +195,12 @@ class ScalingPolicyNegative(AutoscaleFixture):
                                                                 policy_type=self.sp_policy_type)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create policies succeeded with invalid request: %s, policy/groupid: %s %s'
-                          % (error_create_resp.status_code, self.group.id, policy['id']))
+                          msg='Create policies succeeded with invalid request: {0},'
+                          'policy/groupid: {1} / {2}'
+                          .format(error_create_resp.status_code, self.group.id, policy['id']))
         self.assertTrue(create_error is None,
-                        msg='Create policies with invalid request returned: %s'
-                        % create_error)
+                        msg='Create policies with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_policy_maxint_change(self):
         """
@@ -214,11 +215,11 @@ class ScalingPolicyNegative(AutoscaleFixture):
             policy_type=self.sp_policy_type)
         policy = create_resp.entity
         self.assertEquals(create_resp.status_code, 201,
-                          msg='Create scaling policy failed with maxint as change: %s'
-                          % create_resp.status_code)
+                          msg='Create scaling policy failed with maxint as change: {0}'
+                          .format(create_resp.status_code))
         self.assertTrue(policy is not None,
-                        msg='Create scaling policy failed: %s'
-                        % policy)
+                        msg='Create scaling policy failed: {0}'
+                        .format(policy))
 
     def test_scaling_policy_max_cooldown(self):
         """
@@ -232,5 +233,5 @@ class ScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change,
             policy_type=self.sp_policy_type)
         self.assertEquals(create_resp.status_code, 400,
-                          msg='Created scaling policy with cooldown over 24 hrs with response code: %s'
-                          % create_resp.status_code)
+                          msg='Created scaling policy with cooldown over 24 hrs with response code: {0}'
+                          .format(create_resp.status_code))
