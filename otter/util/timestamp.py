@@ -21,18 +21,6 @@ def now():
     return "{0}Z".format(datetime.utcnow().isoformat())
 
 
-def isoformat(time):
-    """
-    :return: the given UTC time in ISO8601 zulu timestamp format
-    """
-    # utcnow returns a naive datetime object without tzinfo, which means that
-    # when isoformat() is called no time zone info is included
-
-    # however, python doesn't seem to do zulu format =/ so just add 'Z' to the
-    # end
-    return "{0}Z".format(time.isoformat())
-
-
 def from_timestamp(timestamp):
     """
     :param str timestamp: a timestamp string which is a ISO8601 formatted

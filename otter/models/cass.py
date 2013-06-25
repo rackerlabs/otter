@@ -15,6 +15,8 @@ from otter.util.hashkey import generate_capability, generate_key_str
 from silverberg.client import ConsistencyLevel
 
 import json
+import iso8601
+from datetime import datetime
 
 
 class CassBadDataError(Exception):
@@ -159,12 +161,12 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
                     queries.append(_cql_insert_event.format(cf=event_table,
                                                             name=':' + polname))
                     if 'at' in policy["args"]:
-                        data[polname + "Trigger"] = policy["args"]["at"]
+                        data[polname + "Trigger"] = iso8601.parse_date(policy["args"]["at"])
                     elif 'cron' in policy["args"]:
                         # TODO
                         #recurrence = Recurrence(cron=policy["args"]["cron"])
                         # Temp to pass unitgration/test_rest_cass_model tests
-                        data[polname + "Trigger"] = '2011-02-03 04:05+0000'
+                        data[polname + "Trigger"] = datetime.now()
 
             outpolicies[polId] = policy
 
@@ -920,16 +922,18 @@ class CassScalingGroupCollection:
                                     id_values_dict, get_consistency_level('delete', 'events'))
         return d
 
-    def update_events_trigger(policy_and_triggers):
+    def update_events_trigger(self, policy_and_triggers):
         """
         see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
         """
+        queries = []
+        data = {}
         for i, (policy_id, trigger) in enumerate(policy_and_triggers):
-            trigger_i = 'trigger{0}'.format(i)
-            policyid_i = 'policyid{0}'.format(i)
-            queries.append(_cql_update_event.format(trigger=trigger_i, policy_id=policyid_i))
-            data.update({trigger_i: timestamp.isoformat(trigger),
-                         policyid_i: policy_id})
+            queries.append(_cql_update_event.format(cf=self.event_table,
+                                                    trigger=':trigger{0}'.format(i),
+                                                    policy_id=':policyid{0}'.format(i)))
+            data.update({'trigger{0}'.format(i): trigger,
+                         'policyid{0}'.format(i): policy_id})
         b = Batch(queries, data, get_consistency_level('update', 'events'))
         return b.execute(self.connection)
 
