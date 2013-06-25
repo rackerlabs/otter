@@ -30,8 +30,8 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
         cap_url = self.webhook['links'].capability
         execute_wb_resp = self.autoscale_client.execute_webhook(cap_url)
         self.assertEquals(execute_wb_resp.status_code, 202,
-                          msg='Execute webhook failed with %s'
-                          % execute_wb_resp.status_code)
+                          msg='Execute webhook failed with {0}'
+                          .format(execute_wb_resp.status_code))
         self.validate_headers(execute_wb_resp.headers)
 
     def test_execute_webhook_after_update(self):
@@ -45,8 +45,8 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
                                                                    name='update_execute_webhook',
                                                                    metadata={})
         self.assertEquals(update_webhook_resp.status_code, 204,
-                          msg='Update webhook failed with %s'
-                          % update_webhook_resp.status_code)
+                          msg='Update webhook failed with {0}'
+                          .format(update_webhook_resp.status_code))
         updated_webhook_response = self.autoscale_client.get_webhook(self.group.id,
                                                                      self.policy['id'],
                                                                      self.webhook['id'])
@@ -56,6 +56,6 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
                           msg='Capability URL changed upon update to webhook name')
         execute_wb_resp = self.autoscale_client.execute_webhook(cap_url_after_update)
         self.assertEquals(execute_wb_resp.status_code, 202,
-                          msg='Execute webhook failed with %s'
-                          % execute_wb_resp.status_code)
+                          msg='Execute webhook failed with {0}'
+                          .format(execute_wb_resp.status_code))
         self.validate_headers(execute_wb_resp.headers)

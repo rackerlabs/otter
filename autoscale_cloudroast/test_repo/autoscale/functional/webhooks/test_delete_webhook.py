@@ -28,14 +28,14 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
         Test delete webhook
         """
         self.assertEquals(self.create_webhook_response.status_code, 201,
-                          msg='Create webhook for a policy failed with %s'
-                          % self.create_webhook_response.status_code)
+                          msg='Create webhook for a policy failed with {0}'
+                          .format(self.create_webhook_response.status_code))
         self.validate_headers(self.create_webhook_response.headers)
         delete_webhook_resp = self.autoscale_client.delete_webhook(
             group_id=self.group.id,
             policy_id=self.policy['id'],
             webhook_id=self.webhook['id'])
         self.assertEquals(delete_webhook_resp.status_code, 204,
-                          msg='Delete webhook failed with %s'
-                          % delete_webhook_resp.status_code)
+                          msg='Delete webhook failed with {0}'
+                          .format(delete_webhook_resp.status_code))
         self.validate_headers(delete_webhook_resp.headers)

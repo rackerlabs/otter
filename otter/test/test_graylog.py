@@ -27,7 +27,8 @@ class GraylogUDPPublisherTests(TestCase):
         """
         Mock reactor and transport."
         """
-        self.reactor = iMock(IReactorUDP, IReactorCore, IReactorPluggableResolver)
+        self.reactor = iMock(IReactorUDP, IReactorCore,
+                             IReactorPluggableResolver)
         patch(self, 'txgraylog2.graylogger.reactor', new=self.reactor)
         self.transport = iMock(IUDPTransport)
 
@@ -47,7 +48,8 @@ class GraylogUDPPublisherTests(TestCase):
 
     def test_wrapper_listens(self):
         """
-        GraylogUDPPublisher does a listenUDP to hook up the publishing protocol.
+        GraylogUDPPublisher does a listenUDP to hook up the
+        publishing protocol.
         """
         self.reactor.listenUDP.assert_called_once_with(
             0,
@@ -62,7 +64,8 @@ class GraylogUDPPublisherTests(TestCase):
         self.transport.write.assert_called_once_with(
             'x\x9c\xabV*\xce\xc8/*\x89\xcfM-.NLOU\xb2RPJ\xcb\xcfW\xaa\x05\x00p\xee\x08\x93')
 
-    @mock.patch('txgraylog2.graylogger.randbytes.secureRandom', return_value='secureBytes')
+    @mock.patch('txgraylog2.graylogger.randbytes.secureRandom',
+                return_value='secureBytes')
     def test_observer_writes_chunks(self, secureRandom):
         """
         GraylogUDPPublisher chunks messages that exceed chunk_size.
@@ -74,8 +77,10 @@ class GraylogUDPPublisherTests(TestCase):
         graylog({'message': ('{"short_message": "foo"}',)})
 
         self.transport.write.assert_has_calls(
-            [mock.call('\x1e\x0fsecureBytes\x00\x04x\x9c\xabV*\xce\xc8/*\x89'),
+            [mock.call(
+                '\x1e\x0fsecureBytes\x00\x04x\x9c\xabV*\xce\xc8/*\x89'),
              mock.call('\x1e\x0fsecureBytes\x01\x04\xcfM-.NLOU\xb2R'),
-             mock.call('\x1e\x0fsecureBytes\x02\x04PJ\xcb\xcfW\xaa\x05\x00p\xee'),
+             mock.call(
+                 '\x1e\x0fsecureBytes\x02\x04PJ\xcb\xcfW\xaa\x05\x00p\xee'),
              mock.call('\x1e\x0fsecureBytes\x03\x04\x08\x93')],
             any_order=False)

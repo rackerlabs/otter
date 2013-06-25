@@ -2,7 +2,6 @@
 System tests for account with multiple scaling groups
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from decimal import Decimal, ROUND_UP
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -17,25 +16,34 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         Instantiate client and configs
         """
         super(ScalingGroupMultiplesTest, cls).setUpClass()
-        first_group = cls.autoscale_behaviors.create_scaling_group_min()
-        cls.first_scaling_group = first_group.entity
-        second_group = cls.autoscale_behaviors.create_scaling_group_min()
-        cls.second_scaling_group = second_group.entity
-        third_group = cls.autoscale_behaviors.create_scaling_group_min()
-        cls.third_scaling_group = third_group.entity
-        cls.resources.add(cls.first_scaling_group.id,
-                          cls.autoscale_client.delete_scaling_group)
-        cls.resources.add(cls.second_scaling_group.id,
-                          cls.autoscale_client.delete_scaling_group)
-        cls.resources.add(cls.third_scaling_group.id,
-                          cls.autoscale_client.delete_scaling_group)
 
-    @classmethod
-    def tearDownClass(cls):
+    def setUp(self):
         """
-        Delete the scaling group
+        Create 3 scaling groups
         """
-        super(ScalingGroupMultiplesTest, cls).tearDownClass()
+        first_group = self.autoscale_behaviors.create_scaling_group_given(
+            gc_cooldown=0)
+        self.first_scaling_group = first_group.entity
+        second_group = self.autoscale_behaviors.create_scaling_group_given(
+            gc_cooldown=0)
+        self.second_scaling_group = second_group.entity
+        third_group = self.autoscale_behaviors.create_scaling_group_given(
+            gc_cooldown=0)
+        self.third_scaling_group = third_group.entity
+        self.resources.add(self.first_scaling_group.id,
+                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.second_scaling_group.id,
+                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.third_scaling_group.id,
+                           self.autoscale_client.delete_scaling_group)
+
+    def tearDown(self):
+        """
+        Delete scaling groups
+        """
+        self.empty_scaling_group(self.first_scaling_group)
+        self.empty_scaling_group(self.second_scaling_group)
+        self.empty_scaling_group(self.third_scaling_group)
 
     def test_system_create_group_with_multiple_policies(self):
         """
@@ -44,35 +52,28 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         change = 3
         percentage = 50
         cooldown = 0
-        group_response = self.autoscale_behaviors.create_scaling_group_given(gc_cooldown=cooldown)
-        group = group_response.entity
         policy1 = self.autoscale_behaviors.create_policy_given(
-            group_id=group.id,
+            group_id=self.first_scaling_group.id,
             sp_change=change,
             sp_cooldown=cooldown)
         policy2 = self.autoscale_behaviors.create_policy_given(
-            group_id=group.id,
+            group_id=self.first_scaling_group.id,
             sp_change_percent=percentage,
             sp_cooldown=cooldown)
         policy3 = self.autoscale_behaviors.create_policy_given(
-            group_id=group.id,
+            group_id=self.first_scaling_group.id,
             sp_change_percent=percentage,
             sp_cooldown=cooldown)
         for each in [policy1, policy2, policy3]:
-            execute_policies = self.autoscale_client.execute_policy(group.id, each['id'])
-            self.assertEquals(execute_policies.status_code, 202)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
+            execute_policies = self.autoscale_client.execute_policy(
+                self.first_scaling_group.id, each['id'])
+            self.assertEquals(execute_policies.status_code, 202,
+                              msg='Policy execution failed for group {0} with {1}'.format(
+                              self.first_scaling_group.id, execute_policies.status_code))
         sp1 = self.gc_min_entities + change
-        sp2 = sp1 + int((sp1 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
-        sp3 = sp2 + int((sp2 * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            sp3,
-            msg="Active + Pending servers are not equal to the total expected servers")
-        self.assertEqual(group_state.desiredCapacity, sp3,
-                         msg="Desired capacity are not equal to the total expected servers")
+        sp2 = self.autoscale_behaviors.calculate_servers(sp1, percentage)
+        sp3 = self.autoscale_behaviors.calculate_servers(sp2, percentage)
+        self.verify_group_state(self.first_scaling_group.id, sp3)
 
     def test_system_create_policy_with_multiple_webhooks(self):
         """
@@ -81,7 +82,8 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
 
         policy = self.autoscale_behaviors.create_policy_min(
-            self.first_scaling_group.id)
+            group_id=self.first_scaling_group.id,
+            sp_cooldown=0)
         webhook_first = self.autoscale_client.create_webhook(
             group_id=self.first_scaling_group.id,
             policy_id=policy['id'],
@@ -100,40 +102,29 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             name='testwebhook3')
         webhook_three = self.autoscale_behaviors.get_webhooks_properties(
             webhook_third.entity)
-        execute_webhook1 = self.autoscale_client.execute_webhook(
-            webhook_one['links'].capability)
-        self.assertEquals(execute_webhook1.status_code, 202)
-        execute_webhook2 = self.autoscale_client.execute_webhook(
-            webhook_two['links'].capability)
-        self.assertEquals(execute_webhook2.status_code, 202)
-        execute_webhook3 = self.autoscale_client.execute_webhook(
-            webhook_three['links'].capability)
-        self.assertEquals(execute_webhook3.status_code, 202)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            self.first_scaling_group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            self.sp_change,
-            msg="Active + Pending servers over first execute policy's change")
-        self.assertEqual(group_state.desiredCapacity, self.sp_change,
-                         msg="Desired capacity over first execute policy's change")
+        for each_webhook in [webhook_one, webhook_two, webhook_three]:
+            execute_webhook = self.autoscale_client.execute_webhook(
+                each_webhook['links'].capability)
+            self.assertEquals(execute_webhook.status_code, 202,
+                              msg='Policy webhook execution failed for group {0} with {1}'.format(
+                              self.first_scaling_group.id, execute_webhook.status_code))
+        self.verify_group_state(
+            self.first_scaling_group.id, (self.sp_change * 3))
 
-    def test_system_max_scaling_groups_on_one_account(self):
-        """
-        Verify the maximum scaling groups an account can have.
-        """
-        pass
+    # def test_system_max_scaling_groups_on_one_account(self):
+    #     """
+    #     Verify the maximum scaling groups an account can have.
+    #     """
+    #     pass
 
-    def test_system_max_policies_on_a_scaling_group(self):
-        """
-        Verify the maximum scaling policies allowed on a scaling group.
-        """
-        pass
+    # def test_system_max_policies_on_a_scaling_group(self):
+    #     """
+    #     Verify the maximum scaling policies allowed on a scaling group.
+    #     """
+    #     pass
 
-    def test_system_max_webhooks_on_a_scaling_policy(self):
-        """
-        Verify the maximum webhooks allowed on a scaling policies.
-        """
-        pass
+    # def test_system_max_webhooks_on_a_scaling_policy(self):
+    #     """
+    #     Verify the maximum webhooks allowed on a scaling policies.
+    #     """
+    #     pass

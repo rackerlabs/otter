@@ -35,8 +35,8 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
             webhook_id=self.webhook['id'],
             name=upd_wb_name)
         self.assertEquals(update_webhook_response.status_code, 400,
-                          msg='Update webhook passed with with incomplete requests: %s'
-                          % update_webhook_response.status_code)
+                          msg='Update webhook passed with with incomplete requests: {0}'
+                          .format(update_webhook_response.status_code))
 
     def test_update_webhook_successfully(self):
         """
@@ -57,8 +57,8 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
                                                                  self.webhook['id'])
         updated_webhook = get_webhook_response.entity
         self.assertEquals(update_webhook_response.status_code, 204,
-                          msg='Update webhook failed with %s'
-                          % update_webhook_response.status_code)
+                          msg='Update webhook failed with {0}'
+                          .format(update_webhook_response.status_code))
         self.assertTrue(update_webhook_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_webhook_response.headers)
@@ -90,5 +90,5 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
             name=self.wb_name
         )
         self.assertEquals(update_webhook_response.status_code, 400,
-                          msg='Update webhook was successful with incomplete request: %s'
-                          % update_webhook_response.status_code)
+                          msg='Update webhook was successful with incomplete request: {0}'
+                          .format(update_webhook_response.status_code))
