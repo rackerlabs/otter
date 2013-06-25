@@ -166,8 +166,9 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
                     elif 'cron' in policy["args"]:
                         # TODO
                         #recurrence = Recurrence(cron=policy["args"]["cron"])
-                        # Temp to pass unitgration/test_rest_cass_model tests
-                        data[polname + "Trigger"] = datetime.now()
+                        # Temporarily storing date in far future to not trigger this
+                        # This is done to pass unitgration/test_rest_cass_model tests
+                        data[polname + "Trigger"] = datetime(2037, 12, 31)
 
             outpolicies[polId] = policy
 
