@@ -30,10 +30,12 @@ class SupervisorTests(TestCase):
 
         self.auth_token = 'auth-token'
         self.service_catalog = {}
-        self.auth_function = mock.Mock(return_value=succeed((self.auth_token, self.service_catalog)))
+        self.auth_function = mock.Mock(
+            return_value=succeed((self.auth_token, self.service_catalog)))
 
         self.fake_server_details = {
-            'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh', 'metadata': {}}
+            'server': {'id': 'server_id', 'links': ['links'], 'name': 'meh',
+                       'metadata': {}}
         }
 
         set_config_data({'region': 'ORD'})
@@ -51,8 +53,9 @@ class LaunchConfigTests(SupervisorTests):
         """
         super(LaunchConfigTests, self).setUp()
 
-        self.launch_server = patch(self, 'otter.supervisor.launch_server_v1.launch_server',
-                                   return_value=succeed((self.fake_server_details, {})))
+        self.launch_server = patch(
+            self, 'otter.supervisor.launch_server_v1.launch_server',
+            return_value=succeed((self.fake_server_details, {})))
         self.generate_job_id = patch(self, 'otter.supervisor.generate_job_id')
         self.generate_job_id.return_value = 'job-id'
         self.launch_config = {'type': 'launch_server',
@@ -79,7 +82,8 @@ class LaunchConfigTests(SupervisorTests):
 
     def test_execute_config_propogates_auth_error(self):
         """
-        execute_config will propogate any errors from the authentication function.
+        execute_config will propogate any errors from the authentication
+        function.
         """
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
@@ -126,15 +130,17 @@ class DeleteServerTests(SupervisorTests):
         mock worker functions and other dependant objects
         """
         super(DeleteServerTests, self).setUp()
-        self.delete_server = patch(self, 'otter.supervisor.launch_server_v1.delete_server',
-                                   return_value=succeed(None))
+        self.delete_server = patch(
+            self, 'otter.supervisor.launch_server_v1.delete_server',
+            return_value=succeed(None))
 
         self.fake_server = self.fake_server_details['server']
         self.fake_server['lb_info'] = {}
 
     def test_execute_delete_calls_delete_worker(self):
         """
-        ``launch_server_v1.delete_server`` is called with correct args. It is also logged
+        ``launch_server_v1.delete_server`` is called with correct args. It is
+        also logged
         """
         execute_delete_server(self.log, 'transaction-id', self.auth_function,
                               self.group, self.fake_server)
@@ -173,7 +179,8 @@ class DeleteServerTests(SupervisorTests):
 
     def test_execute_delete_propogates_auth_error(self):
         """
-        ``execute_delete_server`` will propogate any errors from the authentication function.
+        ``execute_delete_server`` will propogate any errors from the
+        authentication function.
         """
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)

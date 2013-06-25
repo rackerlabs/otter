@@ -15,7 +15,8 @@ class matches(object):
     with mock.
 
     It allows testtools matchers to be used in places where comparisons for
-    equality would normally be used, such as the ``mock.Mock.assert_*`` methods.
+    equality would normally be used, such as the ``mock.Mock.assert_*``
+    methods.
 
     Example::
 
@@ -25,7 +26,8 @@ class matches(object):
                 ContainsDict(
                     {'baz': Equals('bax')})))
 
-    See `testtools.matchers <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
+    See `testtools.matchers
+    <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
     for a complete list of matchers provided with testtools.
 
     :param matcher: A testtools matcher that will be matched when this object
