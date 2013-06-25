@@ -518,6 +518,7 @@ class IScalingScheduleCollection(Interface):
         :return: None
         """
 
+
 class IScalingGroupCollection(Interface):
     """
     Collection of scaling groups

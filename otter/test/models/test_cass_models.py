@@ -664,8 +664,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                        'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
                        'APPLY BATCH;')
-        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"},
-                                      "cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
+        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
+                                    '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
                         "groupId": '12345678g',
                         "policy0Id": '12345678',
                         "policy0Trigger": iso8601.parse_date(expected_at),
