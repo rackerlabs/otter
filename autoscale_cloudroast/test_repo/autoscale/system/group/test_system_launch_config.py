@@ -260,7 +260,7 @@ class LaunchConfigTest(AutoscaleFixture):
 
     def test_system_scale_down_oldest_on_active_servers(self):
         """
-        Create a scaling group with minentities=1, scale up=scale_down=sp_change(from config).
+        Create a scaling group with minentities=scale up=scale_down=sp_change(from config).
         Scale down and verify that the oldest server is scaled down first
         """
         minentities = self.sp_change
