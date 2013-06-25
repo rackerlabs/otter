@@ -135,3 +135,27 @@ class Lbaas(AutoMarshallingModel):
             if hasattr(lbaas, k):
                 setattr(lbaas, k, getattr(lbaas, k))
         return lbaas
+
+
+class Args(AutoMarshallingModel):
+    """
+    Marshalling for Args of the scheduler policy
+    """
+
+    def __init__(self, **kwargs):
+        super(Args, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        return cls._dict_to_obj(serialized_str)
+
+    @classmethod
+    def _dict_to_obj(cls, args_dict):
+        args = Args(**args_dict)
+        for each in args_dict:
+            if each.startswith('{'):
+                newkey = re.split('}', each)[1]
+                setattr(args, newkey, args_dict[each])
+        return args

@@ -3,6 +3,7 @@ Behaviors for Autoscale
 """
 import time
 from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timedelta
 
 
 from cafe.engine.behaviors import BaseBehavior
@@ -181,7 +182,8 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def create_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
                             sp_change=None, sp_change_percent=None,
-                            sp_desired_capacity=None, sp_policy_type=None):
+                            sp_desired_capacity=None, sp_policy_type=None,
+                            schedule_at=None, schedule_cron=None):
         """
         :summary: creates the specified policy for the given change type
         :params: group_id
@@ -215,6 +217,58 @@ class AutoscaleBehaviors(BaseBehavior):
         policy = AutoscaleBehaviors.get_policy_properties(
             self, create_response.entity)
         return policy
+
+    def create_schedule_policy_given(
+        self, group_id, sp_name=None, sp_cooldown=None,
+        sp_change=None, sp_change_percent=None,
+        sp_desired_capacity=None, sp_policy_type='schedule',
+            schedule_at=None, schedule_cron=None):
+        """
+        :summary: creates the specified policy for the given schedule
+        :return: returns the newly created policy object
+        :rtype: returns the policy object
+        """
+        if sp_name is None:
+            sp_name = rand_name('testscheduler_')
+        else:
+            sp_name = (str(sp_name))
+        if sp_cooldown is None:
+            sp_cooldown = int(self.autoscale_config.sp_cooldown)
+        if schedule_cron:
+            args = {'cron': schedule_cron}
+        elif schedule_at:
+            args = {'at': schedule_at}
+        else:
+            args = {'at': AutoscaleBehaviors.get_time_in_utc(self, 5)}
+        if sp_change is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change=sp_change, policy_type=sp_policy_type, args=args)
+        elif sp_change_percent is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change_percent=sp_change_percent, policy_type=sp_policy_type, args=args)
+        elif sp_desired_capacity is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                desired_capacity=sp_desired_capacity, policy_type=sp_policy_type, args=args)
+        if create_response.status_code != 201:
+            return dict(status_code=create_response.status_code)
+        else:
+            policy = AutoscaleBehaviors.get_policy_properties(
+                self, policy_list=create_response.entity, status_code=create_response.status_code,
+                headers=create_response.headers)
+            return policy
+
+    def get_time_in_utc(self, delay):
+        """
+        Given the delay in seconds, returns current time in utc + the delay
+        """
+        time_format = '%Y-%m-%dT%H:%M:%S.%fZ'
+        return ((datetime.utcnow() + timedelta(seconds=delay)).strftime(time_format))
 
     def create_policy_webhook(self, group_id, policy_data,
                               execute_webhook=None, execute_policy=None):
@@ -334,7 +388,8 @@ class AutoscaleBehaviors(BaseBehavior):
                 policy_chng.append(i.change)
         return policy_name, policy_cooldown, policy_chng
 
-    def get_policy_properties(self, policy_list):
+    def get_policy_properties(self, policy_list, status_code=None,
+                              headers=None):
         """converts policy list object to a dict"""
         # :todo : find the change type
         policy = {}
@@ -354,12 +409,31 @@ class AutoscaleBehaviors(BaseBehavior):
                     policy['desired_capacity'] = policy_type.desiredCapacity
             except AttributeError:
                 pass
+            try:
+                if policy_type.args:
+                    try:
+                        if policy_type.args.at:
+                            policy['schedule_type'] = 'at'
+                            policy['schedule_value'] = policy_type.args.at
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.cron:
+                            policy['schedule_type'] = 'cron'
+                            policy['schedule_value'] = policy_type.args.cron
+                    except AttributeError:
+                        pass
+            except AttributeError:
+                pass
+
             policy['id'] = policy_type.id
             policy['links'] = policy_type.links
             policy['name'] = policy_type.name
             policy['cooldown'] = policy_type.cooldown
             policy['type'] = policy_type.type
             policy['count'] = len(policy_list)
+            policy['status_code'] = status_code
+            policy['headers'] = headers
             return policy
 
     def get_webhooks_properties(self, webhook_list):

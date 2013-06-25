@@ -44,7 +44,7 @@ class Policy_Request(AutoMarshallingModel):
     """
 
     def __init__(self, name, cooldown, change=None, change_percent=None,
-                 desired_capacity=None, policy_type=None):
+                 desired_capacity=None, policy_type=None, args=None):
         super(Policy_Request, self).__init__()
         self.name = name
         self.cooldown = cooldown
@@ -52,6 +52,7 @@ class Policy_Request(AutoMarshallingModel):
         self.changePercent = change_percent
         self.desiredCapacity = desired_capacity
         self.type = policy_type
+        self.args = args
 
     def _obj_to_json(self):
         req = []
@@ -65,7 +66,7 @@ class Update_Policy_Request(AutoMarshallingModel):
     """
 
     def __init__(self, name, cooldown, change=None, change_percent=None,
-                 desired_capacity=None, policy_type=None):
+                 desired_capacity=None, policy_type=None, args=None):
         super(Update_Policy_Request, self).__init__()
         self.name = name
         self.cooldown = cooldown
@@ -73,6 +74,7 @@ class Update_Policy_Request(AutoMarshallingModel):
         self.changePercent = change_percent
         self.desiredCapacity = desired_capacity
         self.type = policy_type
+        self.args = args
 
     def _obj_to_json(self):
         return json.dumps(self._auto_to_dict())
