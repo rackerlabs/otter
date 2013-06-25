@@ -107,7 +107,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         self.autoscale_client.update_group_config(
             group_id=group.id,
-            name=group.groupConfiguration.name,
+            name="delete_me_please",
             cooldown=0,
             min_entities=0,
             max_entities=0,
@@ -126,12 +126,12 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
             desired_capacity,
-            msg='Active + Pending servers (%s) != (%s) minentities on the group %s'
-            % (group_state.pendingCapacity + group_state.activeCapacity,
+            msg='Active + Pending servers ({0}) != ({1}) minentities on the group {2}'
+            .format((group_state.pendingCapacity + group_state.activeCapacity),
                 desired_capacity, group_id))
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
-                          msg='Desired capacity (%s) != (%s) minentities on the group %s'
-                          % (group_state.desiredCapacity, desired_capacity, group_id))
+                          msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
+                          .format(group_state.desiredCapacity, desired_capacity, group_id))
 
     @classmethod
     def tearDownClass(cls):

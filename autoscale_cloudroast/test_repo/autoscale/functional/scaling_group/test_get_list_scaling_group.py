@@ -43,11 +43,11 @@ class ScalingGroupListTest(AutoscaleFixture):
             view_manifest_config_for_scaling_group(group_id=self.first_scaling_group.id)
         group_info = group_info_response.entity
         self.assertEqual(200, group_info_response.status_code,
-                         msg='The get scaling group call failed with %s'
-                         % group_info_response.status_code)
+                         msg='The get scaling group call failed with {0}'
+                         .format(group_info_response.status_code))
         self.assertTrue(group_info_response.headers,
-                        msg='The headers are not as expected, %s'
-                        % group_info_response.headers)
+                        msg='The headers are not as expected, {0}'
+                        .format(group_info_response.headers))
         self.validate_headers(group_info_response.headers)
         self.assertEqual(group_info.id, self.first_scaling_group.id,
                          msg='Group id did not match')
@@ -68,18 +68,18 @@ class ScalingGroupListTest(AutoscaleFixture):
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = list_groups_response.entity
         self.assertEqual(200, list_groups_response.status_code,
-                         msg='The list scaling group call failed with: %s'
-                         % list_groups_response.content)
+                         msg='The list scaling group call failed with: {0}'
+                         .format(list_groups_response.content))
         self.validate_headers(list_groups_response.headers)
         group_id_list = []
         for i in list_groups:
             group_id_list.append(i.id)
         self.assertTrue(self.first_scaling_group.id in
-                        group_id_list, msg='Group with id %s was not found in the list %s'
-                        % (self.first_scaling_group.id, group_id_list))
+                        group_id_list, msg='Group with id {0} was not found in the list {1}'
+                        .format(self.first_scaling_group.id, group_id_list))
         self.assertTrue(self.second_scaling_group.id in
-                        group_id_list, msg='Group with id %s was not found in the list'
-                        % self.second_scaling_group.id)
+                        group_id_list, msg='Group with id {0} was not found in the list'
+                        .format(self.second_scaling_group.id))
         self.assertTrue(self.third_scaling_group.id in
-                        group_id_list, msg='Group with id %s was not found in the list'
-                        % self.third_scaling_group.id)
+                        group_id_list, msg='Group with id {0} was not found in the list'
+                        .format(self.third_scaling_group.id))
