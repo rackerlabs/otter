@@ -301,7 +301,8 @@ class GELFObserverWrapperTests(TestCase):
         """
         self.gelf({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'short_message': Equals(repr(ValueError()))})))
+            matches(
+                ContainsDict({'short_message': Equals(repr(ValueError()))})))
 
     def test_isError_with_message_instead_of_failure(self):
         """
@@ -332,7 +333,9 @@ class GELFObserverWrapperTests(TestCase):
                    'why': 'Everything is terrible.'})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'short_message': Contains('Everything is terrible.')})))
+            matches(
+                ContainsDict(
+                    {'short_message': Contains('Everything is terrible.')})))
 
     def test_includes_structured_data(self):
         """
