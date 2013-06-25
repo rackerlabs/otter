@@ -684,102 +684,35 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.view_config.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
                 return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
-    def test_naive_delete_policy_no_webhooks(self, mock_list_webhooks,
-                                             mock_naive, mock_get_policy):
-        """
-        When you delete a scaling policy, the policy is deleted but if there are
-        no webhooks no call to delete its webhooks is made.
-
-        No call to verify if the policy exists is made.  For
-        listing the webhooks, ``_naive_list_webhooks`` is called, not
-        ``list_webhooks`.
-
-        ``naive_delete_policy`` should also use the consistency level provided
-
-        There is no assertion about the return value, because that doesn't
-        really matter.
-        """
-        self.returns = [None]
-        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
-        # make sure that delete policy execution happend
-        self.connection.execute.assert_called_once_with(
-            ('BEGIN BATCH UPDATE scaling_policies SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND "policyId" = :policyId '
-             'APPLY BATCH;'),
-            {"tenantId": "11111", "groupId": "12345678g", "policyId": "3222"},
-            ConsistencyLevel.TWO)
-
-        self.assertEqual(len(mock_get_policy.mock_calls), 0)
-        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
-        mock_naive.assert_called_with('3222')
-
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
-                return_value=defer.succeed({'webhook1': {}, 'webhook2': {}}))
-    @mock.patch('otter.models.cass.CassScalingGroup.list_webhooks')
-    def test_naive_delete_policy_some_webhooks(self, mock_list_webhooks,
-                                               mock_naive, mock_get_policy):
-        """
-        When you delete a scaling policy with webhooks, the policy itself and
-        its webhooks are deleted.
-
-        No call to verify if the policy exists is made.  For
-        listing the webhooks, ``_naive_list_webhooks`` is called, not
-        ``list_webhooks`.
-
-        ``naive_delete_policy`` should also use the consistency level provided
-
-        There is no assertion about the return value, because that doesn't
-        really matter.
-        """
-        self.returns = [None, None]
-        self.group._naive_delete_policy('3222', ConsistencyLevel.TWO)
-        # make sure that delete policy execution happend
-        self.connection.execute.assert_any_call(
-            ('BEGIN BATCH UPDATE policy_webhooks SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-             '"policyId" = :policyId AND "webhookId" = :webhookId0 '
-             'UPDATE policy_webhooks SET deleted=True WHERE '
-             '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-             '"policyId" = :policyId AND "webhookId" = :webhookId1 '
-             'APPLY BATCH;'),
-            {"tenantId": "11111", "groupId": "12345678g",
-             "policyId": "3222", "webhookId0": "webhook1",
-             "webhookId1": "webhook2"},
-            ConsistencyLevel.TWO)
-
-        # =/  has_calls doesn't mean "has only these calls"
-        self.assertEqual(len(self.connection.execute.mock_calls), 2)
-
-        self.assertEqual(len(mock_get_policy.mock_calls), 0)
-        self.assertEqual(len(mock_list_webhooks.mock_calls), 0)
-        mock_naive.assert_called_with('3222')
-
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    def test_delete_policy_valid_policy(self, mock_naive, mock_get_policy):
+    def test_delete_policy_valid_policy(self, mock_get_policy):
         """
         When you delete a scaling policy, it checks if the policy exists and
-        if it does, calls _naive_delete_policy and if it succeeds, returns None
+        if it does, deletes the policy and all its associated webhooks.
         """
         d = self.group.delete_policy('3222')
         # delete returns None
         self.assertIsNone(self.successResultOf(d))
         mock_get_policy.assert_called_once_with('3222')
-        mock_naive.assert_called_once_with('3222', ConsistencyLevel.TWO)
+
+        expected_cql = (
+            'BEGIN BATCH '
+            'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND '
+            '"groupId" = :groupId AND "policyId" = :policyId '
+            'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
+            '"groupId" = :groupId AND "policyId" = :policyId '
+            'APPLY BATCH;')
+        expected_data = {
+            "tenantId": self.group.tenant_id,
+            "groupId": self.group.uuid,
+            "policyId": "3222"}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    def test_delete_policy_invalid_policy(self, mock_naive, mock_get_policy):
+    def test_delete_policy_invalid_policy(self, mock_get_policy):
         """
         When you delete a scaling policy that doesn't exist, a
         :class:`NoSuchPolicyError` is raised
@@ -787,7 +720,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         d = self.group.delete_policy('3222')
         self.assert_deferred_failed(d, NoSuchPolicyError)
         mock_get_policy.assert_called_once_with('3222')
-        self.assertEqual(len(mock_naive.mock_calls), 0)
+        self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_scaling_policy(self):
@@ -1180,7 +1113,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             None]
         d = self.group.delete_webhook('3444', '4555')
         self.assertIsNone(self.successResultOf(d))  # delete returns None
-        expectedCql = ('UPDATE policy_webhooks SET deleted=True WHERE '
+        expectedCql = ('DELETE FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                        '"policyId" = :policyId AND "webhookId" = :webhookId')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
@@ -1243,13 +1176,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
         self.assertEqual(len(self.group._naive_list_policies), 0)
 
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_non_empty_scaling_group_fails(self, mock_view_state,
-                                                  mock_naive_list_policy,
-                                                  mock_naive_del_policy):
+    def test_delete_non_empty_scaling_group_fails(self, mock_view_state):
         """
         ``delete_group`` errbacks with :class:`GroupNotEmptyError` if scaling
         group state is not empty
@@ -1260,23 +1188,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         # nothing else called except view
         self.assertTrue(mock_view_state.called)
-        self.assertFalse(mock_naive_list_policy.called)
-        self.assertFalse(mock_naive_del_policy.called)
         self.assertFalse(self.connection.execute.called)
-
         self.flushLoggedErrors(GroupNotEmptyError)
 
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
-                return_value=defer.succeed({'policy1': {}, 'policy2': {}}))
-    @mock.patch('otter.models.cass.CassScalingGroup.list_policies')
-    @mock.patch('otter.models.cass.CassScalingGroup.delete_policy')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_empty_scaling_group_with_policies(self, mock_view_state,
-                                                      mock_del, mock_list,
-                                                      mock_naive_list_policy,
-                                                      mock_naive_del_policy):
+    def test_delete_empty_scaling_group_with_policies(self, mock_view_state):
         """
         ``delete_group`` deletes config, launch config, state, and the group's
         policies and webhooks if the scaling group is empty.
@@ -1291,53 +1207,19 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
 
-        # naive_list_policies called before naive_delete_policy called
-        mock_naive_list_policy.assert_called_once_with()
-        mock_naive_del_policy.assert_has_calls([
-            mock.call('policy1', ConsistencyLevel.TWO),
-            mock.call('policy2', ConsistencyLevel.TWO)], any_order=True)
-
-        # the real delete and list policies are not called ever
-        self.assertEqual(len(mock_del.mock_calls), 0)
-        self.assertEqual(len(mock_list.mock_calls), 0)
-
-        # delete configs happens
         expected_data = {'tenantId': self.tenant_id,
                          'groupId': self.group_id}
         expected_cql = (
             'BEGIN BATCH '
-            'UPDATE scaling_config SET deleted=True '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'UPDATE launch_config SET deleted=True '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'UPDATE group_state SET deleted=True '
-            'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM launch_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
+
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
-
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_delete_policy',
-                return_value=defer.succeed(None))
-    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
-                return_value=defer.succeed({}))
-    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_empty_scaling_group_with_no_policies(self, mock_view_state,
-                                                         mock_naive_list_policy,
-                                                         mock_naive_del_policy):
-        """
-        ``delete_group`` deletes only the config, launch config and state if
-        the scaling group is empty but no policies exist.
-        ``_naive_delete_policy`` is not called.
-        """
-        mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, {}, {}, None, {}, False))
-        self.returns = [None]
-        result = self.successResultOf(self.group.delete_group())
-        self.assertIsNone(result)  # delete returns None
-
-        # naive_list_policies called before delete policy called
-        mock_naive_list_policy.assert_called_once_with()
-        self.assertEqual(len(mock_naive_del_policy.mock_calls), 0)
 
 
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
@@ -1365,32 +1247,14 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
 
         self.connection.execute.side_effect = _responses
 
-        self.mock_log = mock.MagicMock()
-
         self.collection = CassScalingGroupCollection(self.connection)
-        self.tenant_id = 'goo1234'
-        self.config = _de_identify({
-            'name': 'blah',
-            'cooldown': 600,
-            'minEntities': 0,
-            'maxEntities': 10,
-            'metadata': {}
-        })
-        self.launch = _de_identify(group_examples.launch_server_config()[0])
-
-        self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
-
-        # 'serializing' something just wraps it with a _S
-        self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
-                                 side_effect=lambda *args: _S(args[0]))
 
     def test_fetch(self):
         """
         Tests that you can fetch a list of events
         """
-
         self.returns = [_cassandrify_data(
             [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100},
              {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
@@ -1398,11 +1262,22 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         expectedData = {'now': 1234, 'size': 100}
         expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scaling_schedule '
                        'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
-        self.mock_key.return_value = '12345678'
 
         result = self.validate_fetch_batch_of_events(1234, 100)
         self.assertEqual(result, [('1d2', 'gr2', 'ef', 100),
                                   ('1d2', 'gr2', 'ex', 122)])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_delete_events(self):
+        """
+        Tests that you can delete event of a given policy_ids
+        """
+        expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
+        expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
+        result = self.successResultOf(self.collection.delete_events(['p1', 'p2']))
+        self.assertEqual(result, None)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
