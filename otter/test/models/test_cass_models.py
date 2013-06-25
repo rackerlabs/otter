@@ -544,9 +544,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Naive list policies lists existing scaling policies
         """
-        self.returns = [_de_identify([
+        self.returns = [[
             {'policyId': 'policy1', 'data': '{}', 'deleted': '\x00'},
-            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}])]
+            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}]]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111'}
