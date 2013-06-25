@@ -211,10 +211,10 @@ class LaunchConfigTest(AutoscaleFixture):
 
     def test_system_update_launchconfig_group_maxentities(self):
         """
-        Create a scaling group with scaling policy and with minentities=change in the scaling policy.
+        Create a scaling group with scaling policy and with minentities=sp_change in the scaling policy.
         Update the launch config, execute policy, new servers are of updated launch config.
         Update the maxentities=minentities=sp_change, hence causing scale down by same number as
-        the scale up. Resulting servers are of updated launch config only.
+        the scale up. Resulting servers are of updated launch config only. (sp_change from config)
         """
         minentities = self.sp_change
         group = self._create_group(
@@ -260,7 +260,7 @@ class LaunchConfigTest(AutoscaleFixture):
 
     def test_system_scale_down_oldest_on_active_servers(self):
         """
-        Create a scaling group with minentities=1, scale up=scale_down=change.
+        Create a scaling group with minentities=1, scale up=scale_down=sp_change(from config).
         Scale down and verify that the oldest server is scaled down first
         """
         minentities = self.sp_change
