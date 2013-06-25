@@ -50,9 +50,16 @@ def check_for_events(log, batchsize, icalllater=None):
             icalllater.callLater(0, check_for_events, log, batchsize, icalllater)
         return None
 
+    def delete_events(events):
+        if len(events) != 0:
+            policy_ids = [event[2] for event in events]
+            get_store().delete_events(policy_ids)
+        return events
+
     # utcnow because of cass serialization issues
     deferred = get_store().fetch_batch_of_events(datetime.utcnow(), batchsize)
     deferred.addCallback(process_events)
+    deferred.addCallback(delete_events)
     # DELETE EVENTS HERE
     deferred.addCallback(check_for_more)
     return deferred

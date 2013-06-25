@@ -33,6 +33,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_store.fetch_batch_of_events.side_effect = _responses
 
+        self.mock_store.delete_events.side_effect = lambda _: defer.succeed(None)
+
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
             return_value='transaction-id')
@@ -60,6 +62,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.returns = [[]]
         d = check_for_events(self.mock_log, 100)
         result = self.successResultOf(d)
+        self.assertEqual(self.mock_store.delete_events.call_count, 0)
         self.assertEquals(result, None)
 
     def test_one(self):
@@ -73,6 +76,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '1234', 'scal44')
         self.assertEqual(self.mock_group.modify_state.call_count, 1)
+        self.mock_store.delete_events.assert_called_once_with(['pol44'])
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
             mock.ANY,
@@ -105,5 +109,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
         self.assertEqual(mockcalllater.callLater.call_count, 2)
+        self.assertEqual(self.mock_store.delete_events.call_count, 2)
+        self.mock_store.delete_events.assert_called_with(['pol44' for i in range(100)])
         mockcalllater.callLater.assert_called_with(0, check_for_events, self.mock_log, 100,
                                                    mockcalllater)
