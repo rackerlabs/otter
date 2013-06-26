@@ -19,10 +19,11 @@ def execute_event(log, event):
 
     :return: a deferred with the results of execution
     """
-    group = get_store().get_scaling_group(log, event[0], event[1])
+    tenant_id, group_id, policy_id, trigger = event
+    group = get_store().get_scaling_group(log, tenant_id, group_id)
     d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                    log, generate_transaction_id(),
-                                   policy_id=event[2]))
+                                   policy_id=policy_id))
     return d
 
 
