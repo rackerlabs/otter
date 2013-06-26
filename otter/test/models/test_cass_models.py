@@ -4,6 +4,8 @@ Tests for :mod:`otter.models.mock`
 from collections import namedtuple
 import json
 import mock
+from datetime import datetime
+import iso8601
 
 from twisted.trial.unittest import TestCase
 
@@ -13,7 +15,8 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     CassBadDataError,
-    serialize_json_data)
+    serialize_json_data,
+    filter_deleted)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -86,6 +89,34 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
+
+
+class FilterDeletedTestCase(TestCase):
+    """
+    Filtering out tombstone deletes happens in the API, so it does not slow
+    down the Cassandra query.  This is temporary until we stop doing tombstone
+    deletes.
+    """
+
+    def test_filters_deleted(self):
+        """
+        Out of all the rows that get returned from Cassandra, only the
+        ones whose delete column is False are returned.
+        """
+        rows = [{'deleted': '\x00', 'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'deleted': '\x00', 'name': 'value3'}]
+        expected = [{'name': 'value1'}, {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), expected)
+
+    def test_ignores_rows_without_delete(self):
+        """
+        If a row does not have a deleted parameter, it will not be filtered out.
+        """
+        rows = [{'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), [rows[0], rows[2]])
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
@@ -515,14 +546,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Naive list policies lists existing scaling policies
         """
-        self.returns = [_cassandrify_data([
-            {'policyId': 'policy1', 'data': '{}'},
-            {'policyId': 'policy2', 'data': '{}'}])]
+        self.returns = [[
+            {'policyId': 'policy1', 'data': '{}', 'deleted': '\x00'},
+            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}]]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111'}
-        expectedCql = ('SELECT "policyId", data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND deleted = False;')
+        expectedCql = ('SELECT "policyId", data, deleted FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
         self.assertEqual(r, {'policy1': {}, 'policy2': {}})
@@ -593,24 +624,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                                     NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    def test_list_policy_errors(self):
-        """
-        Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
-        """
-        bads = (
-            [{}],
-            # missing one column
-            [{'policyId': 'policy1'}],
-            [{'data': '{}'}],
-            # non json
-            [{'policyId': 'policy1', 'data': 'hi'}]
-        )
-        for bad in bads:
-            self.returns = [bad]
-            self.assert_deferred_failed(self.group.list_policies(),
-                                        CassBadDataError)
-            self.flushLoggedErrors(CassBadDataError)
-
     def test_list_policy_no_version(self):
         """
         When listing the policies, any version information is removed from the
@@ -646,14 +659,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_add_scaling_policy_at(self):
         """
-        Test that you can add a scaling policy, and what is returned is a
+        Test that you can add a scaling policy with 'at' schedule and what is returned is
         dictionary of the ids to the scaling policies
         """
         cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
+        expected_at = '2012-10-20T03:23:45'
 
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
-               'args': {'at': 12345}}
+               'args': {'at': '2012-10-20T03:23:45'}}
         d = self.group.create_policies([pol])
         result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
@@ -661,11 +675,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                        'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
                        'APPLY BATCH;')
-        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": '
-                                    '5, "_ver": 1, "type": "schedule", "change": 10}'),
+        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
+                                    '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
                         "groupId": '12345678g',
                         "policy0Id": '12345678',
-                        "policy0Trigger": 12345,
+                        "policy0Trigger": iso8601.parse_date(expected_at),
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
@@ -907,9 +921,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
                         "policyId": '23456789'}
-        expectedCql = ('SELECT "webhookId", data, capability FROM policy_webhooks '
-                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       '"policyId" = :policyId AND deleted = False;')
+        expectedCql = ('SELECT "webhookId", data, capability, deleted FROM '
+                       'policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId AND "policyId" = :policyId;')
         r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
 
@@ -1282,6 +1296,30 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+    def test_update_events_trigger(self):
+        """
+        Tests that you can update trigger times of one or more policies
+        """
+        datetime0 = datetime(2012, 10, 20, 5, 24, 31)
+        datetime1 = datetime(2012, 10, 22, 7, 20, 30)
+        expectedData = {
+            'trigger0': datetime0,
+            'policyid0': 'p1',
+            'trigger1': datetime1,
+            'policyid1': 'p2'}
+        expectedCql = ('BEGIN BATCH '
+                       'UPDATE scaling_schedule SET trigger = :trigger0 '
+                       'WHERE "policyId" = :policyid0; '
+                       'UPDATE scaling_schedule SET trigger = :trigger1 '
+                       'WHERE "policyId" = :policyid1; '
+                       'APPLY BATCH;')
+        d = self.collection.update_events_trigger([('p1', datetime0),
+                                                   ('p2', datetime1)])
+        self.assertEqual(self.successResultOf(d), None)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -1461,8 +1499,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1480,8 +1518,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(expectedCql,
