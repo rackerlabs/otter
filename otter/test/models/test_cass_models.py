@@ -13,7 +13,8 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     CassBadDataError,
-    serialize_json_data)
+    serialize_json_data,
+    filter_deleted)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -86,6 +87,34 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
+
+
+class FilterDeletedTestCase(TestCase):
+    """
+    Filtering out tombstone deletes happens in the API, so it does not slow
+    down the Cassandra query.  This is temporary until we stop doing tombstone
+    deletes.
+    """
+
+    def test_filters_deleted(self):
+        """
+        Out of all the rows that get returned from Cassandra, only the
+        ones whose delete column is False are returned.
+        """
+        rows = [{'deleted': '\x00', 'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'deleted': '\x00', 'name': 'value3'}]
+        expected = [{'name': 'value1'}, {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), expected)
+
+    def test_ignores_rows_without_delete(self):
+        """
+        If a row does not have a deleted parameter, it will not be filtered out.
+        """
+        rows = [{'name': 'value1'},
+                {'deleted': '\x01', 'name': 'value2'},
+                {'name': 'value3'}]
+        self.assertEqual(filter_deleted(rows), [rows[0], rows[2]])
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
@@ -515,14 +544,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Naive list policies lists existing scaling policies
         """
-        self.returns = [_cassandrify_data([
-            {'policyId': 'policy1', 'data': '{}'},
-            {'policyId': 'policy2', 'data': '{}'}])]
+        self.returns = [[
+            {'policyId': 'policy1', 'data': '{}', 'deleted': '\x00'},
+            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}]]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111'}
-        expectedCql = ('SELECT "policyId", data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND deleted = False;')
+        expectedCql = ('SELECT "policyId", data, deleted FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
         self.assertEqual(r, {'policy1': {}, 'policy2': {}})
@@ -592,24 +621,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assert_deferred_failed(self.group.list_policies(),
                                     NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
-
-    def test_list_policy_errors(self):
-        """
-        Errors from cassandra in listing policies cause :class:`CassBadDataErrors`
-        """
-        bads = (
-            [{}],
-            # missing one column
-            [{'policyId': 'policy1'}],
-            [{'data': '{}'}],
-            # non json
-            [{'policyId': 'policy1', 'data': 'hi'}]
-        )
-        for bad in bads:
-            self.returns = [bad]
-            self.assert_deferred_failed(self.group.list_policies(),
-                                        CassBadDataError)
-            self.flushLoggedErrors(CassBadDataError)
 
     def test_list_policy_no_version(self):
         """
@@ -907,9 +918,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
                         "policyId": '23456789'}
-        expectedCql = ('SELECT "webhookId", data, capability FROM policy_webhooks '
-                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       '"policyId" = :policyId AND deleted = False;')
+        expectedCql = ('SELECT "webhookId", data, capability, deleted FROM '
+                       'policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId AND "policyId" = :policyId;')
         r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
 
@@ -1461,8 +1472,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1480,8 +1491,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND deleted = False;')
+                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
         self.connection.execute.assert_called_once_with(expectedCql,

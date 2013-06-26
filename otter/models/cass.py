@@ -91,14 +91,36 @@ _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                    '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId '
-                    'AND deleted = False;')
-_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND '
-                    '"groupId" = :groupId AND deleted = False;')
-_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
-                     '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                    '"policyTouched", paused, deleted FROM {cf} WHERE '
+                    '"tenantId" = :tenantId;')
+_cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE '
+                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
+_cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} '
+                     'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
+                     '"policyId" = :policyId;')
+
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
+
+
+def filter_deleted(cass_result):
+    """
+    Filters out all rows with a ``deleted`` column whose value is True.
+    Also removes the ``deleted`` column from the resulting rows.
+
+    This is intended to be used as a temporary callback to ``execute`` as part
+    of phasing out manual tombstone deletes.  ``deleted`` is an index, and
+    Cassandra queries the index for all undeleted items first before checking
+    the other items, which takes a long time.  This doesn't seem to happen
+    when selecting just one item (with both parts of the compound key in the
+    where clause.)
+    """
+    filtered = []
+    for dictionary in cass_result:
+        deleted = dictionary.pop('deleted', '\x00')  # default is false
+        if not bool(ord(deleted)):
+            filtered.append(dictionary)
+    return filtered
 
 
 def get_consistency_level(operation, resource):
@@ -247,34 +269,6 @@ def _jsonloads_data(raw_data):
         if "_ver" in data:
             del data["_ver"]
         return data
-
-
-def _grab_list(raw_response, id_name, has_data=True):
-    """
-    The response is a list of stuff.  Return the list.
-
-    :param raw_response: the raw response from cassandra
-    :type raw_response: ``dict``
-
-    :param id_name: The column name to look for and get
-    :type id_name: ``str``
-
-    :param has_data: Whether to pull a data object out or not.  Determines
-        whether the returned value is a list or a dictionary
-    :type has_data: ``bool``
-
-    :return: a ``list`` or ``dict`` representing the data in Cassandra
-    """
-    results = raw_response
-    try:
-        if has_data:
-            return dict([(row[id_name], _jsonloads_data(row['data']))
-                         for row in results])
-        else:
-            return [row[id_name] for row in results]
-    except KeyError as e:
-        raise CassBadDataError('Received malformed response without the '
-                               'required field "{0!s}"'.format(e))
 
 
 def _unmarshal_state(state_dict):
@@ -466,12 +460,17 @@ class CassScalingGroup(object):
         all the policies associated with particular scaling group
         irregardless of whether the scaling group still exists.
         """
+        def construct_dictionary(rows):
+            return dict(
+                [(row['policyId'], _jsonloads_data(row['data'])) for row in rows])
+
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(_grab_list, 'policyId', has_data=True)
+        d.addCallback(filter_deleted)
+        d.addCallback(construct_dictionary)
         return d
 
     def list_policies(self):
@@ -596,6 +595,7 @@ class CassScalingGroup(object):
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
+        d.addCallback(filter_deleted)
         d.addCallback(_assemble_webhook_results)
         return d
 
@@ -846,6 +846,7 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
+        d.addCallback(filter_deleted)
         d.addCallback(_build_states)
         return d
 
