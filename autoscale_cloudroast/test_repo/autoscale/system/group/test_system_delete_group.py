@@ -1,10 +1,10 @@
 """
 System tests for delete scaling group
 """
-from test_repo.autoscale.fixtures import ScalingGroupFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
-class DeleteGroupTest(ScalingGroupFixture):
+class DeleteGroupTest(AutoscaleFixture):
 
     """
     System tests to verify various delete scaling group scenarios
@@ -13,163 +13,115 @@ class DeleteGroupTest(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Create a scaling group
+        Instantiate client, behaviours and configs
         """
-        cls.minentities = 2
-        super(DeleteGroupTest, cls).setUpClass(
-            gc_min_entities=cls.minentities)
+        super(DeleteGroupTest, cls).setUpClass()
 
-    @classmethod
-    def tearDownClass(cls):
+    def setUp(self):
         """
-        Delete the scaling group
+        Create 2 scaling groups, one with minentities>0 with a scaling up policy and webhook
+        another with minentities=0
         """
-        super(DeleteGroupTest, cls).tearDownClass()
+        self.create_group0_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=0)
+        self.group0 = self.create_group0_response.entity
+        self.assertEquals(self.create_group0_response.status_code, 201)
+        self.policy_up_execute = {'change': 2}
+        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(
+            group_id=self.group0.id,
+            policy_data=self.policy_up_execute,
+            execute_policy=False)
+        self.create_group1_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=self.gc_min_entities_alt)
+        self.group1 = self.create_group1_response.entity
+        self.assertEquals(self.create_group1_response.status_code, 201)
+        self.resources.add(self.group0.id,
+                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group1.id,
+                           self.autoscale_client.delete_scaling_group)
+
+    def tearDown(self):
+        """
+        Empty the scaling groups by setting min and maxentities=0 and delete groups
+        """
+        self.empty_scaling_group(self.group0)
+        self.empty_scaling_group(self.group1)
 
     def test_system_delete_group_with_minentities_over_zero(self):
         """
-        Verify a scaling group cannout be deleted when minentities more than zero
+        A scaling group cannot be deleted when minentities > zero
         """
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            self.group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            self.minentities,
-            msg='Active + Pending servers over min entities')
-        self.assertEqual(group_state.desiredCapacity, self.minentities,
-                         msg='Desired capacity not same as min entities upon group creation')
+        self.verify_group_state(
+            self.group1.id, self.group1.groupConfiguration.minEntities)
         delete_group_response = self.autoscale_client.delete_scaling_group(
-            self.group.id)
+            self.group1.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group while servers were building on the group')
+                          msg='Deleted group {0} while servers were building on the group'
+                          .format(self.group1.id))
 
     def test_system_delete_group_update_minentities_to_zero(self):
         """
-        Verify when minenetities of the group are updated to be zero,
+        When minenetities of the group are updated to be zero,
         the scaling group cannot be deleted if it has active servers
         """
         minentities = 0
         reduce_group_size_response = self.autoscale_client.update_group_config(
-            group_id=self.group.id, name=self.group.groupConfiguration.name,
-            cooldown=self.group.groupConfiguration.cooldown,
+            group_id=self.group1.id, name=self.group1.groupConfiguration.name,
+            cooldown=self.group1.groupConfiguration.cooldown,
             min_entities=minentities,
-            max_entities=self.group.groupConfiguration.maxEntities,
+            max_entities=self.group1.groupConfiguration.maxEntities,
             metadata={})
         self.assertEquals(reduce_group_size_response.status_code, 204,
-                          msg='Update to 0 minentities failed with reason %s'
-                          % reduce_group_size_response.content)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            self.group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.pendingCapacity + group_state.activeCapacity,
-            self.minentities,
-            msg='Active + Pending servers over min entities')
-        self.assertEqual(group_state.desiredCapacity, self.minentities,
-                         msg='Desired capacity not same as min entities upon group creation')
+                          msg='Update to 0 minentities failed with reason {0} for group {1}'
+                          .format(reduce_group_size_response.content, self.group1.id))
+        self.verify_group_state(self.group1.id, self.gc_min_entities_alt)
         delete_group_response = self.autoscale_client.delete_scaling_group(
-            self.group.id)
+            self.group1.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group succeeded when servers exist on the group due to %s'
-                          % delete_group_response.content)
+                          msg='Deleted group succeeded when servers exist on the group {0} due to {1}'
+                          .format(self.group1.id, delete_group_response.content))
 
     def test_system_delete_group_with_zero_minentities(self):
         """
-        Verify a scaling group of zero min entities and no active servers,
+        A scaling group of zero minentities and no active servers,
         can be deleted
         """
-        minentities = 0
-        group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=minentities)
-        group = group_response.entity
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.desiredCapacity,
-            minentities,
-            msg='Desired capacity does not match zero minentities')
+        self.verify_group_state(self.group0.id, 0)
         delete_group_response = self.autoscale_client.delete_scaling_group(
-            group.id)
+            self.group0.id)
         self.assertEquals(delete_group_response.status_code, 204,
-                          msg='Deleted group failed even when group was empty')
+                          msg='Delete group {0} failed even when group was empty'
+                          .format(self.group0.id))
 
     def test_system_delete_group_zero_minentities_execute_webhook(self):
         """
-        Create a scaling group with zero min entities, execute a webhook,
-        and verify the group cannot be deleted as it has active servers
+        Create a scaling group with zero minentities and execute a webhook,
+        the group cannot be deleted as it has active servers
         """
-        minentities = 0
-        sp_list = [{
-            'name': 'scale up by 2',
-            'change': 2,
-            'cooldown': 0,
-            'type': 'webhook'
-        }]
-        group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=minentities,
-            sp_list=sp_list)
-        group = group_response.entity
-        policy = self.autoscale_behaviors.get_policy_properties(
-            group.scalingPolicies)
-        webhook_response = self.autoscale_client.create_webhook(
-            group_id=group.id,
-            policy_id=policy['id'],
-            name='testit')
-        webhook = self.autoscale_behaviors.get_webhooks_properties(
-            webhook_response.entity)
-        execute_policy = self.autoscale_client.execute_webhook(
-            webhook['links'].capability)
-        self.assertEquals(execute_policy.status_code, 202)
-        #sleep(5)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.desiredCapacity,
-            policy['change'],
-            msg='Desired capacity does not match scale up that was executed')
+        execute_webhook = self.autoscale_client.execute_webhook(
+            self.policy_webhook['webhook_url'])
+        self.assertEquals(execute_webhook.status_code, 202)
+        self.verify_group_state(
+            self.group0.id, self.policy_up_execute['change'])
         delete_group_response = self.autoscale_client.delete_scaling_group(
-            group.id)
+            self.group0.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group while servers were building on the group')
+                          msg='Deleted group {0} while servers were building on the group'
+                          .format(self.group0.id))
 
     def test_system_delete_group_zero_minentities_execute_policy(self):
         """
-        Create a scaling group with zero min entities, execute a scaling policy,
-        and verify the group cannot be deleted as it has active servers
+        Create a scaling group with zero min entities and execute a scaling policy,
+        the group cannot be deleted as it has active servers
         """
-        minentities = 0
-        sp_list = [{
-            'name': 'scale up by 2',
-            'change': 2,
-            'cooldown': 0,
-            'type': 'webhook'
-        }]
-        group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=minentities,
-            sp_list=sp_list)
-        group = group_response.entity
-        policy = self.autoscale_behaviors.get_policy_properties(
-            group.scalingPolicies)
         execute_policy = self.autoscale_client.execute_policy(
-            group_id=group.id,
-            policy_id=policy['id'])
+            group_id=self.group0.id,
+            policy_id=self.policy_webhook['policy_id'])
         self.assertEquals(execute_policy.status_code, 202)
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group.id)
-        self.assertEquals(group_state_response.status_code, 200)
-        group_state = group_state_response.entity
-        self.assertEquals(
-            group_state.desiredCapacity,
-            policy['change'],
-            msg='scaling policy executed, but desired capacity does not match')
+        self.verify_group_state(
+            self.group0.id, self.policy_up_execute['change'])
         delete_group_response = self.autoscale_client.delete_scaling_group(
-            group.id)
+            self.group0.id)
         self.assertEquals(delete_group_response.status_code, 403,
-                          msg='Deleted group while servers were building on the group')
+                          msg='Deleted group {0} while servers were building on the group'
+                          .format(self.group0.id))

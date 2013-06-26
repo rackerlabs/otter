@@ -5,16 +5,19 @@ Tests for logging integration.
 import json
 import mock
 
+from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
+
+from testtools.matchers import Contains, ContainsDict, Equals
 
 from otter.log.bound import BoundLog
 
+from otter.log.formatters import GELFObserverWrapper
 from otter.log.formatters import JSONObserverWrapper
+from otter.log.formatters import PEP3101FormattingWrapper
 from otter.log.formatters import StreamObserverWrapper
 from otter.log.formatters import SystemFilterWrapper
-from otter.log.formatters import PEP3101FormattingWrapper
 
-from testtools.matchers import Contains
 from otter.test.utils import SameJSON, matches
 
 
@@ -32,7 +35,8 @@ class BoundLogTests(TestCase):
 
     def test_bind_msg(self):
         """
-        bind saves it's keyword arguments and passes them to msg when it is called.
+        bind saves it's keyword arguments and passes them to msg when it is
+        called.
         """
         log = self.log.bind(system='hello')
         log.msg('Hi there')
@@ -41,7 +45,8 @@ class BoundLogTests(TestCase):
 
     def test_bind_err(self):
         """
-        bind saves it's keyword arguments and passes them to err when it is called.
+        bind saves it's keyword arguments and passes them to err when it is
+        called.
         """
         exc = ValueError('uh oh')
         log = self.log.bind(system='hello')
@@ -62,13 +67,15 @@ class JSONObserverWrapperTests(TestCase):
 
     def test_default_formatter(self):
         """
-        JSONObserverWrapper returns an ILogObserver that serializes the eventDict as JSON,
-        and calls the wrapped observer with the JSON bytes as the message.
+        JSONObserverWrapper returns an ILogObserver that serializes the
+        eventDict as JSON, and calls the wrapped observer with the JSON bytes
+        as the message.
         """
         eventDict = {'foo': 'bar', 'baz': 'bax'}
         observer = JSONObserverWrapper(self.observer)
         observer(eventDict)
-        self.observer.assert_called_once_with({'message': (SameJSON(eventDict),)})
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON(eventDict),)})
 
     def test_propagates_keyword_arguments(self):
         """
@@ -189,7 +196,8 @@ class SystemFilterWrapperTests(TestCase):
         SystemFilterObserver passes through all other systems.
         """
         self.sfo({'system': 'otter.rest.blah.blargh'})
-        self.observer.assert_called_once_with({'system': 'otter.rest.blah.blargh'})
+        self.observer.assert_called_once_with(
+            {'system': 'otter.rest.blah.blargh'})
 
 
 class PEP3101FormattingWrapperTests(TestCase):
@@ -216,21 +224,24 @@ class PEP3101FormattingWrapperTests(TestCase):
         PEP3101FormattingWrapper formats the why argument to log.err.
         """
         self.wrapper({'why': 'Hello {name}', 'name': 'World'})
-        self.observer.assert_called_once_with({'why': 'Hello World', 'name': 'World'})
+        self.observer.assert_called_once_with({'why': 'Hello World',
+                                               'name': 'World'})
 
     def test_format_message(self):
         """
         PEP3101FormattingWrapper formats the message.
         """
         self.wrapper({'message': ('foo {bar}',), 'bar': 'bar'})
-        self.observer.assert_called_once_with({'message': ('foo bar',), 'bar': 'bar'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo bar',), 'bar': 'bar'})
 
     def test_format_message_tuple(self):
         """
         PEP3101FormattingWrapper joins the message tuple before formatting.
         """
         self.wrapper({'message': ('foo', 'bar', 'baz', '{bax}'), 'bax': 'bax'})
-        self.observer.assert_called_once_with({'message': ('foo bar baz bax',), 'bax': 'bax'})
+        self.observer.assert_called_once_with(
+            {'message': ('foo bar baz bax',), 'bax': 'bax'})
 
     def test_formatting_failure(self):
         """
@@ -242,3 +253,113 @@ class PEP3101FormattingWrapperTests(TestCase):
             'message': '{u"Hello": "There"}',
             'message_formatting_error': matches(Contains('KeyError'))
         })
+
+
+class GELFObserverWrapperTests(TestCase):
+    """
+    Test the GELFObserverWrapper.
+    """
+    def setUp(self):
+        """
+        Set up a mock observer.
+        """
+        self.observer = mock.Mock()
+        self.seconds = mock.Mock(return_value=0)
+        self.gelf = GELFObserverWrapper(self.observer,
+                                        hostname='localhost',
+                                        seconds=self.seconds)
+
+    def test_formats_eventDict_as_gelf(self):
+        """
+        GELFObserverWrapper calls the wrapped observer with a dictionary
+        in the GELF format.
+        """
+        self.gelf({'message': ('Hello',)})
+
+        self.observer.assert_called_once_with({
+            'host': 'localhost',
+            'version': '1.0',
+            'short_message': 'Hello',
+            'full_message': 'Hello',
+            'facility': '',
+            'timestamp': 0,
+            'level': 6,
+        })
+
+    def test_failure_include_traceback_in_full_message(self):
+        """
+        The observer puts the traceback in the full_message key.
+        """
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'full_message': Contains('Traceback')})))
+
+    def test_failure_repr_in_short_message(self):
+        """
+        The observer includes the repr of failure.value in short_message.
+        """
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+        self.observer.assert_called_once_with(
+            matches(
+                ContainsDict({'short_message': Equals(repr(ValueError()))})))
+
+    def test_isError_with_message_instead_of_failure(self):
+        """
+        The observer should use message when there is no failure.
+        """
+        self.gelf({'message': ('uh oh',), 'isError': True})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'short_message': Equals('uh oh'),
+                                  'full_message': Equals('uh oh')})))
+
+    def test_isError_sets_level_3(self):
+        """
+        The observer sets the level to 3 (syslog ERROR) when isError is true.
+        """
+
+        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'level': Equals(3)})))
+
+    def test_isError_includes_why_in_short_message(self):
+        """
+        The observer includes 'why' in the short_message when isError is true.
+        """
+        self.gelf({'failure': Failure(ValueError()),
+                   'isError': True,
+                   'why': 'Everything is terrible.'})
+
+        self.observer.assert_called_once_with(
+            matches(
+                ContainsDict(
+                    {'short_message': Contains('Everything is terrible.')})))
+
+    def test_includes_structured_data(self):
+        """
+        The observer includes arbitrary structured data prefixed with an _.
+        """
+        self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'_uri': Equals('http://example.com')})))
+
+    def test_includes_file(self):
+        """
+        The observer includes file if it is specified.
+        """
+        self.gelf({'message': 'hello', 'file': 'test.py'})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'file': Equals('test.py')})))
+
+    def test_includes_line(self):
+        """
+        The observer includes line if it is specified.
+        """
+        self.gelf({'line': 10, 'message': ''})
+
+        self.observer.assert_called_once_with(
+            matches(ContainsDict({'line': Equals(10)})))

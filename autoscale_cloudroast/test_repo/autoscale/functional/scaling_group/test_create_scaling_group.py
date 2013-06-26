@@ -64,19 +64,19 @@ class CreateScalingGroupTest(AutoscaleFixture):
 
     def test_create_scaling_group_response(self):
         """
-        Verify the parameters are correct in the initial response
+        Verify the response code for the create scaling group is 201
         """
         self.assertTrue(self.create_resp.ok,
-                        msg='Create scaling group call failed with API Response: %s'
-                        % self.create_resp.content)
+                        msg='Create scaling group call failed with API Response: {0}'
+                        .format(self.create_resp.content))
         self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with %s'
-                          % self.create_resp.status_code)
+                          msg='The create failed with {0}'
+                          .format(self.create_resp.status_code))
         self.validate_headers(self.create_resp.headers)
 
     def test_create_scaling_group_fields(self):
         """
-        Verify the parameters are correct in the initial response
+        Verify the scaling group id and links exist in the response
         """
         self.assertTrue(self.scaling_group.id is not None,
                         msg='Scaling Group id was not set in the response')

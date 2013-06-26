@@ -44,13 +44,16 @@ class CalculateDeltaTestCase(TestCase):
         If the policy is a scale up by a fixed number,
         and a min and max are given,
         and the desired number of servers fall between the min and the max,
-        then ``calculate_delta`` returns a delta that is just the policy change.
+        then ``calculate_delta`` returns a delta that is just the policy
+        change.
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 300}
         fake_state = self.get_state(dict.fromkeys(range(5)), {})
 
-        self.assertEqual(5, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(5, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_positive_change_will_hit_max(self):
@@ -62,9 +65,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(2, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(2, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_positive_change_but_at_max(self):
@@ -76,9 +82,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_positive_change_but_at_default_max(self):
@@ -90,9 +99,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': 5}
         fake_config = {'minEntities': 0, 'maxEntities': None}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_negative_change_within_min_max(self):
@@ -100,13 +112,16 @@ class CalculateDeltaTestCase(TestCase):
         If the policy is a scale down by a fixed number,
         and a min and max are given,
         and the desired number of servers fall between the min and the max,
-        then ``calculate_delta`` returns a delta that is just the policy change.
+        then ``calculate_delta`` returns a delta that is just the policy
+        change.
         """
         fake_policy = {'change': -5}
         fake_config = {'minEntities': 0, 'maxEntities': 30}
         fake_state = self.get_state(dict.fromkeys(range(10)), {})
 
-        self.assertEqual(-5, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(-5, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_negative_change_will_hit_min(self):
@@ -118,9 +133,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'change': -5}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_negative_change_but_at_min(self):
@@ -134,20 +152,25 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 5, 'maxEntities': 10}
         fake_state = self.get_state({}, dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_positive_change_within_min_max(self):
         """
         If the policy is a scale up by x% and a min and max are given,
         and the desired number of servers fall between the min and the max,
-        then ``calculate_delta`` returns a delta that is just the policy change.
+        then ``calculate_delta`` returns a delta that is just the policy
+        change.
         """
         fake_policy = {'changePercent': 20}
         fake_config = {'minEntities': 0, 'maxEntities': 300}
         fake_state = self.get_state(dict.fromkeys(range(5)), {})
 
-        self.assertEqual(1, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(1, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_positive_change_will_hit_max(self):
@@ -158,9 +181,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'changePercent': 75}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(2, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(2, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_positive_change_but_at_max(self):
@@ -171,9 +197,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'changePercent': 50}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_positive_change_but_at_default_max(self):
@@ -184,22 +213,28 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'changePercent': 50}
         fake_config = {'minEntities': 0, 'maxEntities': None}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_negative_change_within_min_max(self):
         """
         If the policy is a scale down by x% and a min and max are given,
         and the desired number of servers fall between the min and the max,
-        then ``calculate_delta`` returns a delta that is just the policy change.
+        then ``calculate_delta`` returns a delta that is just the policy
+        change.
         """
         fake_policy = {'changePercent': -50}
         fake_config = {'minEntities': 0, 'maxEntities': 30}
         fake_state = self.get_state(dict.fromkeys(range(10)), {})
 
-        self.assertEqual(-5, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(-5, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_percent_negative_change_will_hit_min(self):
@@ -210,9 +245,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'changePercent': -80}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_percent_negative_change_but_at_min(self):
@@ -225,7 +263,9 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 5, 'maxEntities': 10}
         fake_state = self.get_state({}, dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_percent_rounding(self):
@@ -244,19 +284,24 @@ class CalculateDeltaTestCase(TestCase):
             fake_policy = {'changePercent': change_percent}
             self.assertEqual(expected_delta,
                              controller.calculate_delta(self.mock_log,
-                                                        fake_state, fake_config, fake_policy))
+                                                        fake_state,
+                                                        fake_config,
+                                                        fake_policy))
 
     def test_desired_positive_change_within_min_max(self):
         """
         If the policy is based on desiredCapacity and a min and max are given,
         and the desired number of servers fall between the min and the max,
-        then ``calculate_delta`` returns a delta that is just the policy change.
+        then ``calculate_delta`` returns a delta that is just the policy
+        change.
         """
         fake_policy = {'desiredCapacity': 25}
         fake_config = {'minEntities': 0, 'maxEntities': 300}
         fake_state = self.get_state(dict.fromkeys(range(5)), {})
 
-        self.assertEqual(20, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(20, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_desired_positive_change_will_hit_max(self):
@@ -267,9 +312,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'desiredCapacity': 15}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(2, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(2, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_desired_positive_change_but_at_max(self):
@@ -280,9 +328,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'desiredCapacity': 15}
         fake_config = {'minEntities': 0, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_desired_positive_change_but_at_default_max(self):
@@ -293,9 +344,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'desiredCapacity': 15}
         fake_config = {'minEntities': 0, 'maxEntities': None}
-        fake_state = self.get_state(dict.fromkeys(range(5)), dict.fromkeys(range(5)))
+        fake_state = self.get_state(dict.fromkeys(range(5)),
+                                    dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_desired_will_hit_min(self):
@@ -306,9 +360,12 @@ class CalculateDeltaTestCase(TestCase):
         """
         fake_policy = {'desiredCapacity': 3}
         fake_config = {'minEntities': 5, 'maxEntities': 10}
-        fake_state = self.get_state(dict.fromkeys(range(4)), dict.fromkeys(range(4)))
+        fake_state = self.get_state(dict.fromkeys(range(4)),
+                                    dict.fromkeys(range(4)))
 
-        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
                                                         fake_policy))
 
     def test_desired_at_min(self):
@@ -321,7 +378,9 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 5, 'maxEntities': 10}
         fake_state = self.get_state({}, dict.fromkeys(range(5)))
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state, fake_config,
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
                                                        fake_policy))
 
     def test_no_change_or_percent_or_desired_fails(self):
@@ -347,8 +406,10 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 1, 'maxEntities': 10}
         fake_state = self.get_state(dict.fromkeys(range(5)), {})
 
-        self.assertEqual(0, controller.calculate_delta(self.mock_log, fake_state,
-                                                       fake_config, fake_policy))
+        self.assertEqual(0, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
+                                                       fake_policy))
 
     def test_zero_change_below_min(self):
         """
@@ -360,8 +421,10 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 5, 'maxEntities': 10}
         fake_state = self.get_state({}, {})
 
-        self.assertEqual(5, controller.calculate_delta(self.mock_log, fake_state,
-                                                       fake_config, fake_policy))
+        self.assertEqual(5, controller.calculate_delta(self.mock_log,
+                                                       fake_state,
+                                                       fake_config,
+                                                       fake_policy))
 
     def test_zero_change_above_max(self):
         """
@@ -373,8 +436,10 @@ class CalculateDeltaTestCase(TestCase):
         fake_config = {'minEntities': 0, 'maxEntities': 2}
         fake_state = self.get_state(dict.fromkeys(range(5)), {})
 
-        self.assertEqual(-3, controller.calculate_delta(self.mock_log, fake_state,
-                                                        fake_config, fake_policy))
+        self.assertEqual(-3, controller.calculate_delta(self.mock_log,
+                                                        fake_state,
+                                                        fake_config,
+                                                        fake_policy))
 
     def test_logs_relevant_information(self):
         """
@@ -419,8 +484,8 @@ class CheckCooldownsTestCase(TestCase):
 
     def get_state(self, group_touched, policy_touched):
         """
-        Only care about the group_touched and policy_touched values, so generate
-        a whole :class:`GroupState` with other fake info
+        Only care about the group_touched and policy_touched values, so
+        generate a whole :class:`GroupState` with other fake info
         """
         return GroupState(1, 1, {}, {}, group_touched, policy_touched, False)
 
@@ -432,8 +497,9 @@ class CheckCooldownsTestCase(TestCase):
         self.mock_now(30)
         fake_config = fake_policy = {'cooldown': 0}
         fake_state = self.get_state(MIN, {'pol': MIN})
-        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
-                                                   fake_policy, 'pol'))
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state,
+                                                   fake_config, fake_policy,
+                                                   'pol'))
 
     def test_check_cooldowns_global_cooldown_passes_policy_never_touched(self):
         """
@@ -445,8 +511,9 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 0}
         fake_policy = {'cooldown': 10000000}
         fake_state = self.get_state(MIN, {})
-        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
-                                                   fake_policy, 'pol'))
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state,
+                                                   fake_config, fake_policy,
+                                                   'pol'))
 
     def test_check_cooldowns_no_policy_ever_executed(self):
         """
@@ -457,8 +524,9 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 1000}
         fake_policy = {'cooldown': 100}
         fake_state = self.get_state(None, {})
-        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
-                                                   fake_policy, 'pol'))
+        self.assertTrue(controller.check_cooldowns(self.mock_log, fake_state,
+                                                   fake_config, fake_policy,
+                                                   'pol'))
 
     def test_check_cooldowns_global_cooldown_fails(self):
         """
@@ -469,8 +537,9 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 30}
         fake_policy = {'cooldown': 1000000000}
         fake_state = self.get_state(MIN, {})
-        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
-                                                    fake_policy, 'pol'))
+        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state,
+                                                    fake_config, fake_policy,
+                                                    'pol'))
 
     def test_check_cooldowns_policy_cooldown_fails(self):
         """
@@ -481,8 +550,9 @@ class CheckCooldownsTestCase(TestCase):
         fake_config = {'cooldown': 1000000000}
         fake_policy = {'cooldown': 30}
         fake_state = self.get_state(MIN, {'pol': MIN})
-        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state, fake_config,
-                                                    fake_policy, 'pol'))
+        self.assertFalse(controller.check_cooldowns(self.mock_log, fake_state,
+                                                    fake_config, fake_policy,
+                                                    'pol'))
 
 
 class ObeyConfigChangeTestCase(TestCase):
@@ -565,7 +635,8 @@ class ObeyConfigChangeTestCase(TestCase):
                                           'config', self.group, self.state)
         self.assertIs(self.successResultOf(d), self.state)
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
+            self.log.bind.return_value, 'transaction-id', self.state,
+            self.group, 5)
 
     def test_negative_delta_execute_errors_propagated(self):
         """
@@ -578,7 +649,8 @@ class ObeyConfigChangeTestCase(TestCase):
         f = self.failureResultOf(d)
         self.assertTrue(f.check(Exception))
         self.exec_scale_down.assert_called_once_with(
-            self.log.bind.return_value, 'transaction-id', self.state, self.group, 5)
+            self.log.bind.return_value, 'transaction-id', self.state,
+            self.group, 5)
 
 
 class FindPendingJobsToCancelTests(TestCase):
@@ -598,20 +670,23 @@ class FindPendingJobsToCancelTests(TestCase):
             '5': {'created': '0001-01-05T00:00:00Z'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.cancellable_state = GroupState('t', 'g', {}, self.data, None, {}, False)
+        self.cancellable_state = GroupState('t', 'g', {}, self.data, None, {},
+                                            False)
 
     def test_returns_most_recent_jobs(self):
         """
         ``find_pending_jobs_to_cancel`` returns the top ``delta`` recent jobs.
         """
         self.assertEqual(
-            controller.find_pending_jobs_to_cancel(mock.ANY, self.cancellable_state, 3),
+            controller.find_pending_jobs_to_cancel(mock.ANY,
+                                                   self.cancellable_state,
+                                                   3),
             ['5', '2', '3'])
 
     def test_returns_all_jobs_if_delta_is_high(self):
         """
-        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
-        than the length of the jobs
+        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is
+        greater than the length of the jobs
         """
         self.assertEqual(
             sorted(controller.find_pending_jobs_to_cancel(
@@ -629,27 +704,32 @@ class FindServersToEvictTests(TestCase):
         sorting.
         """
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+                  'lb': 'lb'},
             '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+                  'lb': 'lb'},
             '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.deletable_state = GroupState('t', 'g', self.data, {}, None, {}, False)
+        self.deletable_state = GroupState('t', 'g', self.data, {}, None, {},
+                                          False)
 
     def test_returns_oldest_servers(self):
         """
         ``find_servers_to_evict`` returns the top ``delta`` oldest jobs.
         """
         self.assertEqual(
-            controller.find_servers_to_evict(mock.ANY, self.deletable_state, 3),
+            controller.find_servers_to_evict(mock.ANY,
+                                             self.deletable_state,
+                                             3),
             [self.data['1'], self.data['4'], self.data['3']])
 
     def test_returns_all_jobs_if_delta_is_high(self):
         """
-        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is greater
-        than the length of the jobs
+        ``find_pending_jobs_to_cancel`` returns all jobs if ``delta`` is
+        greater than the length of the jobs
         """
         self.assertEqual(
             sorted(controller.find_servers_to_evict(
@@ -668,18 +748,22 @@ class DeleteActiveServersTests(TestCase):
         """
         self.log = mock.Mock()
         self.data = {
-            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            '1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+                  'lb': 'lb'},
             '2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             '3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            '4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+                  'lb': 'lb'},
             '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
-        self.fake_state = GroupState('t', 'g', self.data, {}, False, False, False)
-        self.find_servers_to_evict = patch(self, 'otter.controller.find_servers_to_evict',
-                                           return_value=[self.data[id]
-                                                         for id in ('1', '4', '3')])
-        self.exec_del_server = patch(self, 'otter.supervisor.execute_delete_server',
-                                     side_effect=[defer.succeed(id) for id in range(3)])
+        self.fake_state = GroupState('t', 'g', self.data, {}, False, False,
+                                     False)
+        self.find_servers_to_evict = patch(
+            self, 'otter.controller.find_servers_to_evict',
+            return_value=[self.data[id] for id in ('1', '4', '3')])
+        self.exec_del_server = patch(
+            self, 'otter.supervisor.execute_delete_server',
+            side_effect=[defer.succeed(id) for id in range(3)])
 
     def test_supervisor_called(self):
         """
@@ -689,10 +773,10 @@ class DeleteActiveServersTests(TestCase):
         d1, d2, d3 = self.data['1'], self.data['4'], self.data['3']
         controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
                                          3, self.fake_state)
-        self.assertEqual(self.exec_del_server.mock_calls,
-                         [mock.call(self.log, 'trans-id', 'auth', 'group', d1),
-                          mock.call(self.log, 'trans-id', 'auth', 'group', d2),
-                          mock.call(self.log, 'trans-id', 'auth', 'group', d3)])
+        self.assertEqual(self.exec_del_server.mock_calls, [
+            mock.call(self.log, 'trans-id', 'auth', 'group', d1),
+            mock.call(self.log, 'trans-id', 'auth', 'group', d2),
+            mock.call(self.log, 'trans-id', 'auth', 'group', d3)])
 
     def test_active_servers_removed(self):
         """
@@ -707,8 +791,8 @@ class DeleteActiveServersTests(TestCase):
         """
         List of Deferreds are returned with expected values
         """
-        dl = controller.delete_active_servers(self.log, 'trans-id', 'auth', 'group',
-                                              3, self.fake_state)
+        dl = controller.delete_active_servers(self.log, 'trans-id', 'auth',
+                                              'group', 3, self.fake_state)
         for i, d in enumerate(dl):
             result = self.successResultOf(d)
             self.assertEqual(result, i)
@@ -742,16 +826,22 @@ class ExecScaleDownTests(TestCase):
             '5': {'created': '0001-01-05T00:00:00Z'}
         }  # descending order by time would be: 5, 2, 3, 4, 1
         self.active = {
-            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1', 'lb': 'lb'},
+            'a1': {'created': '0001-01-01T00:00:05Z.0001', 'id': '1',
+                   'lb': 'lb'},
             'a2': {'created': '0001-01-04T00:02:02Z', 'id': '2', 'lb': 'lb'},
             'a3': {'created': '0001-01-04T00:00:10Z', 'id': '3', 'lb': 'lb'},
-            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4', 'lb': 'lb'},
+            'a4': {'created': '0001-01-01T01:00:00Z.3513', 'id': '4',
+                   'lb': 'lb'},
             'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
-        self.fake_state = GroupState('t', 'g', self.active, self.pending, False, False, False)
-        self.find_pending_jobs_to_cancel = patch(self, 'otter.controller.find_pending_jobs_to_cancel')
-        self.del_active_servers = patch(self, 'otter.controller.delete_active_servers')
-        self.fake_auth_tenant = patch(self, 'otter.controller.authenticate_tenant')
+        self.fake_state = GroupState('t', 'g', self.active, self.pending,
+                                     False, False, False)
+        self.find_pending_jobs_to_cancel = patch(
+            self, 'otter.controller.find_pending_jobs_to_cancel')
+        self.del_active_servers = patch(
+            self, 'otter.controller.delete_active_servers')
+        self.fake_auth_tenant = patch(
+            self, 'otter.controller.authenticate_tenant')
 
     def test_pending_jobs_removed(self):
         """
@@ -771,7 +861,8 @@ class ExecScaleDownTests(TestCase):
         controller.exec_scale_down(self.log, 'tid', self.fake_state, 'g', 7)
         self.del_active_servers.assert_called_once_with(self.log, 'tid',
                                                         self.fake_auth_tenant,
-                                                        'g', 2, self.fake_state)
+                                                        'g', 2,
+                                                        self.fake_state)
 
     def test_del_active_servers_not_called(self):
         """
@@ -814,7 +905,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                return_value=self.lock)
 
         for thing, return_val in things_and_return_vals.iteritems():
-            self.mocks[thing] = patch(self, 'otter.controller.{0}'.format(thing),
+            self.mocks[thing] = patch(self,
+                                      'otter.controller.{0}'.format(thing),
                                       return_value=return_val)
 
         self.mock_log = mock.MagicMock()
@@ -834,8 +926,10 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.group.get_policy.return_value = defer.fail(
             NoSuchPolicyError('1', '1', '1'))
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, self.mock_state,
+        d = controller.maybe_execute_scaling_policy(self.mock_log,
+                                                    'transaction',
+                                                    self.group,
+                                                    self.mock_state,
                                                     'pol1')
         self.assert_deferred_failed(d, NoSuchPolicyError)
 
@@ -844,15 +938,17 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
     def test_execute_launch_config_success_on_positive_delta(self):
         """
-        If lock is acquired, all cooldowns are all fine, ``calculate_delta`` returns positive
-        delta then ``execute_launch_config`` gets called and if does not fail,
-        return value is the updated state.
+        If lock is acquired, all cooldowns are all fine, ``calculate_delta``
+        returns positive delta then ``execute_launch_config`` gets called
+        and if does not fail, return value is the updated state.
         """
         self.mocks['execute_launch_config'].return_value = defer.succeed(
             'this should be returned')
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, self.mock_state,
+        d = controller.maybe_execute_scaling_policy(self.mock_log,
+                                                    'transaction',
+                                                    self.group,
+                                                    self.mock_state,
                                                     'pol1')
 
         result = self.successResultOf(d)
@@ -863,9 +959,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
             self.mock_log.bind.return_value.bind.return_value,
             'transaction', self.mock_state, "launch", self.group,
@@ -880,14 +978,16 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
     def test_execute_launch_config_failure_on_positive_delta(self):
         """
-        If ``execute_launch_config`` fails for some reason, then state should not be
-        marked as executed
+        If ``execute_launch_config`` fails for some reason, then state should
+        not be marked as executed
         """
         expected = ValueError('some failure')
         self.mocks['execute_launch_config'].return_value = defer.fail(expected)
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, self.mock_state,
+        d = controller.maybe_execute_scaling_policy(self.mock_log,
+                                                    'transaction',
+                                                    self.group,
+                                                    self.mock_state,
                                                     'pol1')
         failure = self.failureResultOf(d)
         self.assertEqual(failure.value, expected)
@@ -897,9 +997,11 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy")
         self.mocks['execute_launch_config'].assert_called_once_with(
             self.mock_log.bind.return_value.bind.return_value,
             'transaction', self.mock_state, "launch", self.group,
@@ -919,14 +1021,17 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         self.mocks['check_cooldowns'].return_value = False
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, self.mock_state,
+        d = controller.maybe_execute_scaling_policy(self.mock_log,
+                                                    'transaction',
+                                                    self.group,
+                                                    self.mock_state,
                                                     'pol1')
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy", 'pol1')
         self.assertEqual(self.mocks['calculate_delta'].call_count, 0)
         self.assertEqual(self.mocks['execute_launch_config'].call_count, 0)
 
@@ -941,23 +1046,28 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         """
         self.mocks['calculate_delta'].return_value = 0
 
-        d = controller.maybe_execute_scaling_policy(self.mock_log, 'transaction',
-                                                    self.group, self.mock_state,
+        d = controller.maybe_execute_scaling_policy(self.mock_log,
+                                                    'transaction',
+                                                    self.group,
+                                                    self.mock_state,
                                                     'pol1')
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
         self.assertIn("Policy execution would violate min/max constraints",
                       str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
-        self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy")
+        self.assertEqual(
+            len(self.mocks['execute_launch_config'].mock_calls), 0)
 
     def test_exec_scale_down_success_when_delta_negative(self):
         """
-        ``exec_scale_down`` gets called when ``calculate_delta`` returns value < 0.
-        The state is marked as executed
+        ``exec_scale_down`` gets called when ``calculate_delta`` returns value
+        < 0. The state is marked as executed
         """
         self.mocks['calculate_delta'].return_value = -3
 
@@ -968,10 +1078,13 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             self.mock_log.bind.return_value.bind.return_value, 'transaction',
             self.mock_state, self.group, 3)
         self.mocks['check_cooldowns'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy", 'pol1')
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy", 'pol1')
         self.mocks['calculate_delta'].assert_called_once_with(
-            self.mock_log.bind.return_value, self.mock_state, "config", "policy")
-        self.assertEqual(len(self.mocks['execute_launch_config'].mock_calls), 0)
+            self.mock_log.bind.return_value, self.mock_state, "config",
+            "policy")
+        self.assertEqual(
+            len(self.mocks['execute_launch_config'].mock_calls), 0)
 
         # state should have been updated
         self.mock_state.mark_executed.assert_called_once_with('pol1')
@@ -1030,7 +1143,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
                 return defer.fail(ExecuteException('no more!'))
             d = defer.Deferred()
             self.execute_config_deferreds.append(d)
-            return defer.succeed((str(len(self.execute_config_deferreds)), d, {}))
+            return defer.succeed((
+                str(len(self.execute_config_deferreds)), d, {}))
 
         self.execute_config.side_effect = fake_execute
         d = controller.execute_launch_config(self.log, '1', self.fake_state,
@@ -1062,8 +1176,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
     def test_on_job_completion_modify_state_called(self):
         """
         ``execute_launch_config`` sets it up so that the group's
-        ``modify_state``state is called with the result as an arg whenever a job
-        finishes, whether successfully or not
+        ``modify_state``state is called with the result as an arg whenever a
+        job finishes, whether successfully or not
         """
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
@@ -1100,12 +1214,14 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
         self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
 
-    @mock.patch('otter.supervisor.execute_delete_server', return_value=defer.succeed(None))
+    @mock.patch('otter.supervisor.execute_delete_server',
+                return_value=defer.succeed(None))
     def test_pending_server_delete(self, exec_del_server):
         """
-        When a pending job is cancelled, it is deleted from the job list. When the server finishes
-        building, then ``execute_launch_config`` is called to remove the job from pending job list.
-        It then notices that pending job_id is not there in job list and calls ``execute_delete_server``
+        When a pending job is cancelled, it is deleted from the job list. When
+        the server finishes building, then ``execute_launch_config`` is called
+        to remove the job from pending job list. It then notices that pending
+        job_id is not there in job list and calls ``execute_delete_server``
         to delete the server.
         """
         s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
@@ -1120,8 +1236,9 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         s.remove_job('1')
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
-        exec_del_server.assert_called_once_with(self.log, '1', self.authenticate_tenant,
-                                                self.group, {'id': 's1'})
+        exec_del_server.assert_called_once_with(
+            self.log, '1', self.authenticate_tenant,
+            self.group, {'id': 's1'})
 
     def test_job_failure(self):
         """
@@ -1145,7 +1262,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[0].errback(f)
 
         # job is removed and no active servers added
-        self.assertEqual(s, GroupState('tenant', 'group', {}, {}, None, {}, False))
+        self.assertEqual(s, GroupState('tenant', 'group', {}, {}, None, {},
+                                       False))
         # state is written
         self.assertEqual(len(written), 1)
         self.assertEqual(written[0], s)
@@ -1155,7 +1273,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
     def test_modify_state_failure_logged(self):
         """
-        If the job succeeded but modifying the state fails, that error is logged.
+        If the job succeeded but modifying the state fails, that error is
+        logged.
         """
         self.group.modify_state.side_effect = AssertionError
         controller.execute_launch_config(self.log, '1', self.fake_state,
@@ -1169,7 +1288,8 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
                 self.exception_type = exception_type
 
             def __eq__(self, other):
-                return isinstance(other, Failure) and other.check(self.exception_type)
+                return isinstance(other, Failure) and other.check(
+                    self.exception_type)
 
         self.log.bind.return_value.err.assert_called_once_with(
             _CheckFailure(AssertionError))

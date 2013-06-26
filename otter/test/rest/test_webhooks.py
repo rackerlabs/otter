@@ -53,7 +53,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         for error in errors:
             self.mock_group.list_webhooks.return_value = defer.fail(error)
             self.assert_status_code(404)
-            self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+            self.mock_group.list_webhooks.assert_called_once_with(
+                self.policy_id)
             self.flushLoggedErrors(type(error))
             self.mock_group.list_webhooks.reset_mock()
 
@@ -253,7 +254,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
     def test_get_webhook_for_unknowns_is_404(self):
         """
         When getting a webhook, endpoint returns a 404 if:
-        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the group doesn't exist and :class:`NoSuchScalingGroupError`
+        is raised
         - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
         - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
         """
@@ -265,8 +267,9 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         for error in errors:
             self.mock_group.get_webhook.return_value = defer.fail(error)
             self.assert_status_code(404)
-            self.mock_group.get_webhook.assert_called_once_with(self.policy_id,
-                                                                self.webhook_id)
+            self.mock_group.get_webhook.assert_called_once_with(
+                self.policy_id,
+                self.webhook_id)
             self.flushLoggedErrors(type(error))
             self.mock_group.get_webhook.reset_mock()
 
@@ -299,9 +302,10 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
                 'links': [
                     {
                         'rel': 'self',
-                        'href': ('/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}/'
-                                 .format(t=self.tenant_id, g=self.group_id,
-                                         p=self.policy_id, w=self.webhook_id))
+                        'href': (
+                            '/v1.0/{t}/groups/{g}/policies/{p}/webhooks/{w}/'
+                            .format(t=self.tenant_id, g=self.group_id,
+                                    p=self.policy_id, w=self.webhook_id))
                     },
                     {
                         'rel': 'capability',
@@ -315,7 +319,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         A PUT with a valid JSON but no metadata returns a 400.
         """
-        self.assert_status_code(400, None, 'PUT', json.dumps({'name': 'hello'}))
+        self.assert_status_code(400, None, 'PUT',
+                                json.dumps({'name': 'hello'}))
 
     def test_update_webhook_unknown_error_is_500(self):
         """
@@ -332,7 +337,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
     def test_update_webhook_for_unknowns_is_404(self):
         """
         When updating a webhook, endpoint returns a 404 if:
-        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the group doesn't exist and :class:`NoSuchScalingGroupError`
+        is raised
         - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
         - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
         """
@@ -346,7 +352,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             self.assert_status_code(404, None, 'PUT', json.dumps(
                                     {'name': 'one', 'metadata': {}}))
             self.mock_group.update_webhook.assert_called_once_with(
-                self.policy_id, self.webhook_id, {'name': 'one', 'metadata': {}})
+                self.policy_id, self.webhook_id,
+                {'name': 'one', 'metadata': {}})
             self.flushLoggedErrors(type(error))
             self.mock_group.update_webhook.reset_mock()
 
@@ -392,7 +399,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
     def test_delete_webhook_for_unknowns_is_404(self):
         """
         When deleting a webhook, endpoint returns a 404 if:
-        - the group doesn't exist and :class:`NoSuchScalingGroupError` is raised
+        - the group doesn't exist and :class:`NoSuchScalingGroupError`
+        is raised
         - the policy doesn't exist and :class:`NoSuchPolicyError` is raised
         - the webhook doesn't exist and :class:`NoSuchWebhookError` is raised
         """
@@ -447,7 +455,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         does not wait for the response
         """
         self.mock_group.modify_state.side_effect = None
-        self.mock_group.modify_state.return_value = defer.Deferred()  # no callback
+        # no callback
+        self.mock_group.modify_state.return_value = defer.Deferred()
 
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
@@ -475,7 +484,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         Executing a webhook should only surface 500 in the case of
         a synchronous exception and not specific codes.
         """
-        self.mock_store.webhook_info_by_hash.return_value = defer.fail(ValueError('otters in pants'))
+        self.mock_store.webhook_info_by_hash.return_value = defer.fail(
+            ValueError('otters in pants'))
 
         self.assert_status_code(500, '/v1.0/execute/1/11111/', 'POST')
 

@@ -36,14 +36,14 @@ class GetListEntityStatusTest(AutoscaleFixture):
 
     def test_entity_status_response(self):
         """
-        Verify list status' response code, header.
+        Verify list status' response code is 200, header.
         """
         self.assertEquals(200, self.group_state_response.status_code,
-                          msg='The list entities call failed with %s'
-                          % self.group_state_response.status_code)
+                          msg='The list entities call failed with {0}'
+                          .format(self.group_state_response.status_code))
         self.assertTrue(self.group_state_response.headers is not None,
-                        msg='The headers are not as expected %s'
-                        % self.group_state_response.headers)
+                        msg='The headers are not as expected {0}'
+                        .format(self.group_state_response.headers))
         self.validate_headers(self.group_state_response.headers)
 
     @unittest.skip('fails when run in parallel: Investigate')

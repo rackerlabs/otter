@@ -429,6 +429,18 @@ class MockScalingGroupCollection:
         """
         return defer.succeed([])
 
+    def delete_events(self, policy_ids):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
+        """
+        return defer.succeed(None)
+
+    def update_events_trigger(self, policyids_with_trigger):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
+        """
+        return defer.succeed(None)
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`

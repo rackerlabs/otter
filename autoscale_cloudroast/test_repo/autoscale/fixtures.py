@@ -1,8 +1,5 @@
 """
-@summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
-@note: Correspondes DIRECTLY TO A unittest.TestCase
-@see: http://docs.python.org/library/unittest.html#unittest.TestCase
-@copyright: Copyright (c) 2012 Rackspace US, Inc.
+:summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from autoscale.behaviors import AutoscaleBehaviors
@@ -20,7 +17,7 @@ import os
 class AutoscaleFixture(BaseTestFixture):
 
     """
-    @summary: Fixture for an Autoscale test.
+    :summary: Fixture for an Autoscale test.
     """
 
     @classmethod
@@ -107,7 +104,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         self.autoscale_client.update_group_config(
             group_id=group.id,
-            name=group.groupConfiguration.name,
+            name="delete_me_please",
             cooldown=0,
             min_entities=0,
             max_entities=0,
@@ -126,12 +123,12 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertEquals(
             group_state.pendingCapacity + group_state.activeCapacity,
             desired_capacity,
-            msg='Active + Pending servers (%s) != (%s) minentities on the group %s'
-            % (group_state.pendingCapacity + group_state.activeCapacity,
+            msg='Active + Pending servers ({0}) != ({1}) minentities on the group {2}'
+            .format((group_state.pendingCapacity + group_state.activeCapacity),
                 desired_capacity, group_id))
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
-                          msg='Desired capacity (%s) != (%s) minentities on the group %s'
-                          % (group_state.desiredCapacity, desired_capacity, group_id))
+                          msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
+                          .format(group_state.desiredCapacity, desired_capacity, group_id))
 
     @classmethod
     def tearDownClass(cls):
@@ -145,7 +142,7 @@ class AutoscaleFixture(BaseTestFixture):
 class ScalingGroupFixture(AutoscaleFixture):
 
     """
-    @summary: Creates a scaling group using the default from
+    :summary: Creates a scaling group using the default from
               the test data
     """
 
@@ -200,8 +197,8 @@ class ScalingGroupFixture(AutoscaleFixture):
 class ScalingGroupPolicyFixture(ScalingGroupFixture):
 
     """
-    @summary: Creates a scaling group with policy using
-    the default from the test data
+    :summary: Creates a scaling group with policy using the default from
+              the test data
     """
 
     @classmethod
@@ -253,8 +250,8 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
 class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
 
     """
-    @summary: Creates a scaling group with a scaling policy
-    and webhook using the default from the test data
+    :summary: Creates a scaling group with a scaling policy
+              and webhook using the default from the test data
     """
 
     @classmethod

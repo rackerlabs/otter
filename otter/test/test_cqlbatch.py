@@ -68,5 +68,5 @@ class CqlBatchTestCase(DeferredTestMixin, TestCase):
         self.successResultOf(d)
         expected = 'BEGIN BATCH'
         expected += ' INSERT * INTO BLAH APPLY BATCH;'
-        self.connection.execute.assert_called_once_with(expected, {},
-                                                        ConsistencyLevel.QUORUM)
+        self.connection.execute.assert_called_once_with(
+            expected, {}, ConsistencyLevel.QUORUM)

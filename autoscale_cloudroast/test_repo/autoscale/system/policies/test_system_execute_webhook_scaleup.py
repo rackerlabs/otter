@@ -36,7 +36,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_up_change(self):
         """
-        Create a scale up policy and execute its webhook and verify execution
+        Create a scale up policy with change and execute its webhook
         """
         policy_up = {'change': 1}
         execute_webhook_in_change_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -51,7 +51,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_up_change_percent(self):
         """
-        Verify execution to scale up with change percent through a webhook.
+        Execute a webhook for scale up policy with change percent.
         """
         policy_up = {'change_percent': 100}
         execute_webhook_in_change_percent_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -69,7 +69,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
 
     def test_system_execute_webhook_scale_up_desired_capacity(self):
         """
-        Verify execution to scale up through a webhook, with desired capacity
+        Execute a webhook for scale up policy with desired capacity.
         """
         desired_capacity = self.group.groupConfiguration.minEntities + 1
         policy_up = {'desired_capacity': desired_capacity}

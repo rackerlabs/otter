@@ -37,7 +37,7 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
 
     def test_system_scale_up_policy_execution_change(self):
         """
-        Verify the execution of a scale up policy with change
+        A scale up policy with change can be executed
         """
         policy_up = {'change': 1}
         execute_change_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -52,7 +52,7 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
 
     def test_system_scale_up_policy_execution_change_percent(self):
         """
-        Verify the execution of a scale up policy with change percent
+        A scale up policy with change percent can be executed
         """
         policy_up = {'change_percent': 50}
         execute_change_percent_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -70,7 +70,7 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
 
     def test_system_scale_up_policy_execution_desired_capacity(self):
         """
-        Verify the execution of a scale up policy with desired capacity
+        A scale up policy with desired capacity can be executed
         """
         desired_capacity = self.group.groupConfiguration.maxEntities
         policy_up = {'desired_capacity': desired_capacity}
@@ -86,8 +86,8 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
 
     def test_system_execute_scale_up_meets_maxentities_change(self):
         """
-        Verify execution of scale up policy when change exceeds maxentities
-        of the scaling group
+        Executing a scale up policy when change exceeds maxentities of the scaling group,
+        results in a scaling group with active servers=maxentities
         """
         policy_up = {'change': self.group.groupConfiguration.maxEntities}
         execute_change_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -96,16 +96,16 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(execute_change_policy['execute_response'], 202,
                           msg='Scale up policy execution failed when change exceeds maxentities '
-                          'with %s for group %s'
-                          % (execute_change_policy['execute_response'], self.group.id))
+                          'with {0} for group {1}'
+                          .format(execute_change_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
 
     def test_system_execute_scale_up_meets_maxentities_change_percent(self):
         """
-        Verify execution of scale up policy when change percent exceeds maxentities
-        of the scaling group
+        Executing a scale up policy when change percent exceeds maxentities of the scaling group,
+        results in a scaling group with active servers=maxentities
         """
         policy_up = {'change_percent': 300}
         execute_change_percent_policy = self.autoscale_behaviors.create_policy_webhook(
@@ -114,17 +114,17 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(
             execute_change_percent_policy['execute_response'], 202,
-            msg='Scale up execution failed when changepercent exceeds maxentities with %s'
-            ' for group %s'
-            % (execute_change_percent_policy['execute_response'], self.group.id))
+            msg='Scale up execution failed when changepercent exceeds maxentities with {0}'
+            ' for group {1}'
+            .format(execute_change_percent_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
 
     def test_system_execute_scale_up_meets_maxentities_desired_capacity(self):
         """
-        Verify execution of scale up policy when desired capacity exceeds maxentities
-        of the scaling group by 1
+        Executing a scale up policy when desired capacity exceeds maxentities of the scaling group,
+        results in a scaling group with active servers=maxentities
         """
         policy_up = {
             'desired_capacity': self.group.groupConfiguration.maxEntities + 1}
@@ -134,9 +134,9 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
             execute_policy=True)
         self.assertEquals(
             execute_desired_capacity_policy['execute_response'], 202,
-            msg='Scale up execution failed when desiredcapacity over maxentities with %s'
-            ' for group %s'
-            % (execute_desired_capacity_policy['execute_response'], self.group.id))
+            msg='Scale up execution failed when desiredcapacity over maxentities with {0}'
+            ' for group {1}'
+            .format(execute_desired_capacity_policy['execute_response'], self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
