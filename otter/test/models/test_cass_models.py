@@ -4,6 +4,8 @@ Tests for :mod:`otter.models.mock`
 from collections import namedtuple
 import json
 import mock
+from datetime import datetime
+import iso8601
 
 from twisted.trial.unittest import TestCase
 
@@ -657,14 +659,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
     def test_add_scaling_policy_at(self):
         """
-        Test that you can add a scaling policy, and what is returned is a
+        Test that you can add a scaling policy with 'at' schedule and what is returned is
         dictionary of the ids to the scaling policies
         """
         cass_response = [{'data': '{}'}]
         self.returns = [cass_response, None]
+        expected_at = '2012-10-20T03:23:45'
 
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
-               'args': {'at': 12345}}
+               'args': {'at': '2012-10-20T03:23:45'}}
         d = self.group.create_policies([pol])
         result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
@@ -672,11 +675,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                        'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
                        'APPLY BATCH;')
-        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": 12345}, "cooldown": '
-                                    '5, "_ver": 1, "type": "schedule", "change": 10}'),
+        expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
+                                    '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
                         "groupId": '12345678g',
                         "policy0Id": '12345678',
-                        "policy0Trigger": 12345,
+                        "policy0Trigger": iso8601.parse_date(expected_at),
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
@@ -1289,6 +1292,30 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
         result = self.successResultOf(self.collection.delete_events(['p1', 'p2']))
         self.assertEqual(result, None)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_update_events_trigger(self):
+        """
+        Tests that you can update trigger times of one or more policies
+        """
+        datetime0 = datetime(2012, 10, 20, 5, 24, 31)
+        datetime1 = datetime(2012, 10, 22, 7, 20, 30)
+        expectedData = {
+            'trigger0': datetime0,
+            'policyid0': 'p1',
+            'trigger1': datetime1,
+            'policyid1': 'p2'}
+        expectedCql = ('BEGIN BATCH '
+                       'UPDATE scaling_schedule SET trigger = :trigger0 '
+                       'WHERE "policyId" = :policyid0; '
+                       'UPDATE scaling_schedule SET trigger = :trigger1 '
+                       'WHERE "policyId" = :policyid1; '
+                       'APPLY BATCH;')
+        d = self.collection.update_events_trigger([('p1', datetime0),
+                                                   ('p2', datetime1)])
+        self.assertEqual(self.successResultOf(d), None)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
