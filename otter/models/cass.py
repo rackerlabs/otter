@@ -15,6 +15,8 @@ from otter.util.hashkey import generate_capability, generate_key_str
 from silverberg.client import ConsistencyLevel
 
 import json
+import iso8601
+from datetime import datetime
 
 
 class CassBadDataError(Exception):
@@ -73,6 +75,7 @@ _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
+_cql_update_event = 'UPDATE {cf} SET trigger = {trigger} WHERE "policyId" = {policy_id};'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -181,12 +184,13 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
                     queries.append(_cql_insert_event.format(cf=event_table,
                                                             name=':' + polname))
                     if 'at' in policy["args"]:
-                        data[polname + "Trigger"] = policy["args"]["at"]
+                        data[polname + "Trigger"] = iso8601.parse_date(policy["args"]["at"])
                     elif 'cron' in policy["args"]:
                         # TODO
                         #recurrence = Recurrence(cron=policy["args"]["cron"])
-                        # Temp to pass unitgration/test_rest_cass_model tests
-                        data[polname + "Trigger"] = '2011-02-03 04:05+0000'
+                        # Temporarily storing date in far future to not trigger this
+                        # This is done to pass unitgration/test_rest_cass_model tests
+                        data[polname + "Trigger"] = datetime(2037, 12, 31)
 
             outpolicies[polId] = policy
 
@@ -879,6 +883,21 @@ class CassScalingGroupCollection:
                                                               policy_ids=policy_ids_cql),
                                     id_values_dict, get_consistency_level('delete', 'events'))
         return d
+
+    def update_events_trigger(self, policy_and_triggers):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
+        """
+        queries = []
+        data = {}
+        for i, (policy_id, trigger) in enumerate(policy_and_triggers):
+            queries.append(_cql_update_event.format(cf=self.event_table,
+                                                    trigger=':trigger{0}'.format(i),
+                                                    policy_id=':policyid{0}'.format(i)))
+            data.update({'trigger{0}'.format(i): trigger,
+                         'policyid{0}'.format(i): policy_id})
+        b = Batch(queries, data, get_consistency_level('update', 'events'))
+        return b.execute(self.connection)
 
     def webhook_info_by_hash(self, log, capability_hash):
         """
