@@ -394,7 +394,6 @@ class MockScalingGroupCollection:
         # If all authorization passes, and the user doesn't exist in the store,
         # then they must be a valid new user.  Just create an account for them.
         self.data = defaultdict(dict)
-        self.connection = None
 
     def create_scaling_group(self, log, tenant, config, launch, policies=None):
         """
