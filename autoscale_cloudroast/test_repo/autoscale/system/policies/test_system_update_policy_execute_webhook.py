@@ -57,7 +57,8 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
                           .format(upd_scale_up_execute_webhook, self.group.id))
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
-            expected_servers=self.group.groupConfiguration.minEntities + self.policy_up['change'] + change)
+            expected_servers=self.group.groupConfiguration.minEntities +
+            self.policy_up['change'] + change)
 
     def test_system_update_scale_up_to_scale_down_execute_webhook(self):
         """
