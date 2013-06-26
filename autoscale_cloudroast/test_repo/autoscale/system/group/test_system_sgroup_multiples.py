@@ -47,7 +47,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
 
     def test_system_create_group_with_multiple_policies(self):
         """
-        Verify scaling group can have multiple policies
+        Scaling group can have multiple policies and can be executed
         """
         change = 3
         percentage = 50
@@ -77,8 +77,8 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
 
     def test_system_create_policy_with_multiple_webhooks(self):
         """
-        Verify scaling policy in a group can have multiple multiple_webhooks
-        and they can be executed
+        Scaling policy in a group can have multiple webhooks and they can be
+        executed
         """
 
         policy = self.autoscale_behaviors.create_policy_min(
@@ -111,20 +111,20 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 
-    # def test_system_max_scaling_groups_on_one_account(self):
-    #     """
-    #     Verify the maximum scaling groups an account can have.
-    #     """
-    #     pass
+    def test_system_max_scaling_groups_on_one_account(self):
+        """
+        The maximum scaling groups an account can have are 100.
+        """
+        pass
 
-    # def test_system_max_policies_on_a_scaling_group(self):
-    #     """
-    #     Verify the maximum scaling policies allowed on a scaling group.
-    #     """
-    #     pass
+    def test_system_max_policies_on_a_scaling_group(self):
+        """
+        The maximum scaling policies allowed on a scaling group are XXX.
+        """
+        pass
 
-    # def test_system_max_webhooks_on_a_scaling_policy(self):
-    #     """
-    #     Verify the maximum webhooks allowed on a scaling policies.
-    #     """
-    #     pass
+    def test_system_max_webhooks_on_a_scaling_policy(self):
+        """
+        The maximum webhooks allowed on a scaling policy are XXX.
+        """
+        pass

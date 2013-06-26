@@ -31,7 +31,7 @@ class LaunchConfigTest(AutoscaleFixture):
         """
         Create a scaling group with a scaling policy, update the launch config.
         Execute the scaling policy, the servers created from executing the policy
-        are with updated launch config
+        are with the updated launch config
         """
         minentities = 1
         group = self._create_group(minentities=minentities, policy=True)
@@ -92,8 +92,8 @@ class LaunchConfigTest(AutoscaleFixture):
     def test_system_update_launchconfig_scale_up_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute the scale up
-        policy, update launch config. Then executing the scale down and scale up policy
-        deletes servers with older launch config and launches servers with updated
+        policy, update launch config. Then executing the scale down and scale up policy,
+        deletes servers with older launch config and launches servers with the updated
         launch config
         """
         minentities = 1
@@ -156,7 +156,7 @@ class LaunchConfigTest(AutoscaleFixture):
 
     def test_system_update_launchconfig_while_group_building(self):
         """
-        Updates to the launch config do not apply the servers building,
+        Updates to the launch config do not apply to the servers building,
         when the update is made
         """
         minentities = 2
@@ -177,7 +177,7 @@ class LaunchConfigTest(AutoscaleFixture):
         """
         Create a scaling group, update the launch config.
         Update the minentities to be more than when the group was created,
-        the newly created servers to match the updated minentities are of the
+        the newly created servers to match the updated minentities, are of the
         latest launch config
         """
         minentities = 1

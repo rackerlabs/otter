@@ -63,7 +63,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
     def test_system_policy_up_cooldown(self):
         """
         Execute a scale up policy with cooldown > 0 more than once within the cooldown period,
-        and verify policy execution fails when cooldown is not met
+        and policy execution fails when cooldown is not met
         """
         execute_on_cooldown = self.autoscale_client.execute_policy(
             self.group.id,
@@ -76,7 +76,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
     def test_system_policy_down_cooldown(self):
         """
         Execute a scale down policy with cooldown > 0 more than once within the cooldown period,
-        and verify policy execution fails when cooldown is not met
+        and policy execution fails when cooldown is not met
         """
         execute_scale_down = self.autoscale_client.execute_policy(
             self.group.id,
@@ -94,8 +94,8 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
 
     def test_system_execute_different_policies_simaltaneously(self):
         """
-        Verify the policy cooldown times are not enforced when executing different policies,
-        and verify all polcies result in active servers as expected
+        The policy cooldown times are not enforced when executing different policies,
+        and executing such polcies result in active servers as expected
         """
         execute_change_percent_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
@@ -122,8 +122,8 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
 
     def test_system_scale_up_scale_down_multiple_policies_in_sequence(self):
         """
-        Verify the execution of multiple scale up and scale down policies in sequence
-        after each cooldown
+        Different scale up and scale down policies on the scaling group can be executed
+        in sequence after each policy's cooldown time
         """
         self._execute_policy_after_cooldown(
             self.group.id, self.policy_executed['policy_id'])

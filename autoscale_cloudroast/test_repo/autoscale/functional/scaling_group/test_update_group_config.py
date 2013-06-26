@@ -38,21 +38,22 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_minentities_to_be_the_same(self):
         """
-        Verify update with in incomplete request containing minentities to be the same
+        Verify update with an incomplete request containing minentities to be the same,
+        fails with 400
         """
-        upd_min_entities = 2
         upd_group_resp = self.autoscale_client.update_group_config(
             self.group.id,
             name=self.group.groupConfiguration.name,
             cooldown=self.group.groupConfiguration.cooldown,
-            min_entities=upd_min_entities)
+            min_entities=self.group.groupConfiguration.minEntities)
         self.assertEquals(upd_group_resp.status_code, 400,
                           msg='Update failed with {0} as it does not include full request'
                           .format(upd_group_resp.status_code))
 
     def test_update_minentities_only(self):
         """
-        Verify update with in incomplete request containing minentities only
+        Verify update with an incomplete request containing minentities only,
+        fails with 400
         """
         upd_min_entities = 3
         upd_group_resp = self.autoscale_client.update_group_config(
@@ -66,7 +67,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_minentities_over_maxentities(self):
         """
-        Verify update with in incomplete request containing minentities over maxentities
+        Verify update with an incomplete request containing minentities over maxentities,
+        fails with 400
         """
         #AUTO-302
         upd_min_entities = 25
@@ -83,7 +85,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_maxentities_lessthan_minentities(self):
         """
-        Verify update with in incomplete request containing maxentities over minentities
+        Verify update with an incomplete request containing maxentities under minentities,
+        fails with 400
         """
         #AUTO-302
         upd_max_entities = 0
@@ -100,7 +103,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_maxentities_only(self):
         """
-        Verify update with in incomplete request containing maxentities only
+        Verify update with an incomplete request containing maxentities only,
+        fails with 400
         """
         upd_max_entities = 5
         upd_group_resp = self.autoscale_client.update_group_config(
@@ -115,7 +119,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_metadata_only(self):
         """
-        Verify update with in incomplete request containing metadata only
+        Verify update with an incomplete request containing metadata only, fails with 400
         """
         upd_metadata = {'does this': 'work'}
         upd_group_resp = self.autoscale_client.update_group_config(
@@ -164,7 +168,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
 
     def test_update_group_config_response(self):
         """
-        Verify update for response code, header and data
+        Verify update for response code 204, header and data
         """
         update_group_response = self.autoscale_client.update_group_config(
             group_id=self.group.id,

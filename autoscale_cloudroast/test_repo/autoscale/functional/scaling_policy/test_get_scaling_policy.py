@@ -29,7 +29,7 @@ class GetScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_get_scaling_policy(self):
         """
-        Verify the get policy call for response code, headers and data
+        Verify the get policy call for response code 200, headers and data
         """
         self.assertEquals(self.get_policy_response.status_code, 200,
                           msg='Get scaling policy failed with {0}'
