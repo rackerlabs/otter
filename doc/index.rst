@@ -35,14 +35,6 @@ This documentation is automatically generated from our code comments.
 If this area is empty, please build on your local machine with
 dev_requirements.txt
 
-Testing documentation
-----------------------
-
-.. toctree::
-   :maxdepth: 4
-
-   cloudcafe.rst
-
 Data/Schema documentation
 -------------------------
 

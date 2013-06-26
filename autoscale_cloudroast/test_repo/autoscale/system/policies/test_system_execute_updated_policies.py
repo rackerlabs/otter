@@ -83,10 +83,11 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
 
     def test_system_update_policy_desired_capacity(self):
         """
-        Update a scale up change policy to a scale down policy with desired capacity
-        < minentities and execute policy (results in active servers=minentities)
-        Update the desired capacity scale down policy > maxenetities and execute.
-        Results in active servers = maxentities in the scaling group
+        Update a scale up via 'change', to a scale down policy via 'desiredCapacity', with
+        desiredCapacity set to be less than minentities and execute the policy.
+        (results in active servers=minentities)
+        Update the desired capacity to scale up by setting desired capacity > maxentities
+        and execute. (Results in active servers = maxentities in the scaling group)
         """
         upd_desired_capacity = self.group.groupConfiguration.minEntities - 1
         sleep(self.cooldown)

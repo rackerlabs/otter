@@ -127,7 +127,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     def test_system_scaleup_update_min_max_0_delete_group(self):
         """
         Create a scaling group and execute a scale up policy, update min and max entities
-        to be 0 and delete the group. All the on the group servers are deleted
+        to be 0 and delete the group (while the servers from the create group and execute policy
+        are still building). All the servers on the group should be deleted
         before the user can delete the group (AUTO-373)
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
