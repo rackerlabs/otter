@@ -5,6 +5,8 @@ import json
 import mock
 import os
 
+from silverberg.lock import BasicLock
+from twisted.internet import defer
 from zope.interface import directlyProvides
 
 
@@ -159,3 +161,21 @@ class SameJSON(object):
         repr containing the expected object.
         """
         return 'SameJSON({0!r})'.format(self._expected)
+
+
+class LockMixin(object):
+    """
+    A mixin for patching BasicLock.
+    """
+
+    def mock_lock(acquire_result=None, release_result=None):
+        lock = mock.create_autospec(BasicLock)
+
+        def _acquire(*args, **kwargs):
+            return defer.succeed(None)
+        lock.acquire.side_effect = _acquire
+
+        def _release():
+            return defer.succeed(None)
+        lock.release.side_effect = _release
+        return lock

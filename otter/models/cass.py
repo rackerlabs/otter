@@ -13,6 +13,7 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
 from silverberg.client import ConsistencyLevel
+from silverberg.lock import BasicLock, with_lock
 
 import json
 import iso8601
@@ -397,8 +398,6 @@ class CassScalingGroup(object):
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
-
-        TODO: locking!!
         """
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -415,9 +414,12 @@ class CassScalingGroup(object):
             return self.connection.execute(_cql_update_group_state, params,
                                            get_consistency_level('update', 'state'))
 
-        d = self.view_state()
-        d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
-        return d.addCallback(_write_state)
+        def _modify_state():
+            d = self.view_state()
+            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
+            return d.addCallback(_write_state)
+        lock = BasicLock(self.connection, 'lock', self.uuid)
+        return with_lock(lock, _modify_state)
 
     def update_config(self, data):
         """
