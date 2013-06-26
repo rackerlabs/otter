@@ -33,6 +33,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_store.fetch_batch_of_events.side_effect = _responses
 
+        # Tribal knowledge: When you are returning a defer that succeeds, you
+        # need to return it as a side effect instead of just a return value.
         self.mock_store.delete_events.side_effect = lambda _: defer.succeed(None)
 
         self.mock_generate_transaction_id = patch(
@@ -90,16 +92,19 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         Test with many events
         """
+        deferLater_patcher = mock.patch('otter.scheduler.task.deferLater')
+        deferLater = deferLater_patcher.start()
+        self.addCleanup(deferLater_patcher.stop)
         mockcalllater = iMock(IReactorTime)
 
         self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
                         [('1234', 'scal44', 'pol44', 'now') for i in range(100)],
                         []]
 
-        def _second_time(seconds, functions, *args, **kwargs):
+        def _second_time(clock, seconds, functions, *args, **kwargs):
             functions(*args, **kwargs)
 
-        mockcalllater.callLater.side_effect = _second_time
+        deferLater.side_effect = _second_time
 
         d = check_for_events(self.mock_log, 100, mockcalllater)
         result = self.successResultOf(d)
@@ -108,8 +113,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_group.modify_state.call_count, 200)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
-        self.assertEqual(mockcalllater.callLater.call_count, 2)
+        self.assertEqual(deferLater.call_count, 2)
         self.assertEqual(self.mock_store.delete_events.call_count, 2)
         self.mock_store.delete_events.assert_called_with(['pol44' for i in range(100)])
-        mockcalllater.callLater.assert_called_with(0, check_for_events, self.mock_log, 100,
-                                                   mockcalllater)
+        deferLater.assert_called_with(mockcalllater, 0, check_for_events,
+                                      self.mock_log, 100, mockcalllater)
