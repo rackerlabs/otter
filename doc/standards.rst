@@ -119,9 +119,9 @@ Please limit 1 letter variable names (e.g. using 'i' within a for loop is OK.  P
 object as part of an interface method is not).  There is no linter to enforce this policy - this will
 just be enforced through code review.
 
-=======
-Testing
-=======
+============
+Unit Testing
+============
 
 We are using Twisted's testing framework, since the codebase is Twisted-based.  So tests are run using
 ``trial``, and the unit testing framework is :mod:`twisted.trial.unittest` rather than the standard
@@ -250,56 +250,6 @@ expected to have been logged.
 
 (See `similar guidelines for warnings
 <http://twistedmatrix.com/documents/current/core/howto/testing.html#auto5>`_)
-
--------------------
-Integration Testing
--------------------
-`autoscale_cloudcafe <https://github.com/rackerlabs/otter/autoscale_cloudcafe>`_, is the test driver for the autoscale api and `autoscale_cloudroast <https://github.com/rackerlabs/otter/autoscale_cloudroast>`_, contains the functional, integration and system tests. It can be installed using dev_requirements.txt in `Otter <https://github.com/rackerlabs/otter>`_. It works in tandem with the Open CAFE and Cloud Cafe.
-
-`Open Cafe <https://github.com/stackforge/opencafe>`_ is the core engine that provides a model, a pattern and assorted common tools for building automated tests. It provides its own light weight unittest based runner, however, it is designed to be modular.
-
-`Cloud Cafe <https://github.com/stackforge/cloudcafe>`_ is an implementaion of the Open Cafe and has drivers for the rackspace open sourced products such as Nova, Block storage etc.
-
-**Configuration**
-
-Autoscale Cloudcafe's configurations will be installed at: USER_HOME/.cloudcafe/configs/autoscale/. To use framework you will need to create/install your own configurations based on the reference configs. You are now ready to:
-
-1. Execute the test cases for autoscale api.
-                       or
-2. Write entirely new tests in this repository using the CloudCAFE Framework.
-
-**Running Tests**
-
-        **cafe-runner autoscale CONFIG(minus .config) PARAMS**
-
-Example:
-         *cafe-runner autoscale dev -p functional --parallel*    (executes all the autoscale tests under the functional folder, in parallel)
-
-         *cafe-runner autoscale dev -m test_create_scaling_group*     (executes the test 'test_create_scaling_group.py')
-
-**autoscale_cloudcafe**
-
-.. toctree::
-   :maxdepth: 3
-
-   autoscale
-
-*(This documentation is automatically generated from our code comments.
-If this area is empty, please build on your local machine with
-dev_requirements.txt)*
-
-------------------------------------
-**Test Plan (autoscale_cloudroast)**
-------------------------------------
-
-.. toctree::
-   :maxdepth: 3
-
-   test_plan
-
-*(This documentation is automatically generated from our code comments.
-If this area is empty, please build on your local machine with
-dev_requirements.txt)*
 
 =======
 Metrics
