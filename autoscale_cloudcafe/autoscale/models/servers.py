@@ -9,7 +9,7 @@ from cafe.engine.models.base import AutoMarshallingModel
 class Metadata(AutoMarshallingModel):
 
     """
-    @summary: Metadata Request Object for Server
+    :summary: Metadata Request Object for Server
     """
     def __init__(self, metadata_dict):
         for key, value in metadata_dict.items():
@@ -22,9 +22,9 @@ class Metadata(AutoMarshallingModel):
     @classmethod
     def _dict_to_obj(cls, metadata_dict):
         """
-        @summary: Initializes the object from json response
-        @param metadata_dict: metadata details
-        @type metadata_dict: dictionary
+        :summary: Initializes the object from json response
+        :param metadata_dict: metadata details
+        :type metadata_dict: dictionary
         """
         return Metadata(metadata_dict)
 
@@ -52,21 +52,21 @@ class Metadata(AutoMarshallingModel):
 
     def __eq__(self, other):
         """
-        @summary: Overrides the default equals
-        @param other: Links object to compare with
-        @type other: Links
-        @return: True if Links objects are equal, False otherwise
-        @rtype: bool
+        :summary: Overrides the default equals
+        :param other: Links object to compare with
+        :type other: Links
+        :return: True if Links objects are equal, False otherwise
+        :rtype: bool
         """
         return EqualityTools.are_objects_equal(self, other)
 
     def __ne__(self, other):
         """
-        @summary: Overrides the default not-equals
-        @param other: Links object to compare with
-        @type other: Links
-        @return: True if Links objects are not equal, False otherwise
-        @rtype: bool
+        :summary: Overrides the default not-equals
+        :param other: Links object to compare with
+        :type other: Links
+        :return: True if Links objects are not equal, False otherwise
+        :rtype: bool
         """
         return not self == other
 
@@ -74,7 +74,7 @@ class Metadata(AutoMarshallingModel):
 class Links(AutoMarshallingModel):
 
     """
-    @summary: Represents links (url) in the system
+    :summary: Represents links (url) in the system
     """
     ROOT_TAG = 'links'
 
@@ -99,9 +99,9 @@ class Links(AutoMarshallingModel):
     @classmethod
     def _dict_to_obj(cls, list_of_links):
         """
-        @summary: Initializes the object from json response
-        @param list_of_links: links details
-        @type list_of_links: list
+        :summary: Initializes the object from json response
+        :param list_of_links: links details
+        :type list_of_links: list
         """
         return Links(list_of_links)
 
@@ -109,7 +109,7 @@ class Links(AutoMarshallingModel):
 class Network(AutoMarshallingModel):
 
     """
-    @summary: Represents networks in the system
+    :summary: Represents networks in the system
     """
 
     def __init__(self, **kwargs):
@@ -138,7 +138,7 @@ class Network(AutoMarshallingModel):
 class Personality(AutoMarshallingModel):
 
     """
-    @summary: Represents networks in the system
+    :summary: Represents networks in the system
     """
 
     def __init__(self, **kwargs):

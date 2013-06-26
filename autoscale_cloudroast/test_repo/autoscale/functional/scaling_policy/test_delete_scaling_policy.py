@@ -25,7 +25,7 @@ class DeleteScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_delete_scaling_policy(self):
         """
-        Verify the delete policy call for response code, headers.
+        Verify the delete policy call for response code 204, headers.
         """
         delete_policy = self.autoscale_client.delete_scaling_policy(
             group_id=self.group.id,

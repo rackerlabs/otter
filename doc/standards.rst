@@ -119,9 +119,9 @@ Please limit 1 letter variable names (e.g. using 'i' within a for loop is OK.  P
 object as part of an interface method is not).  There is no linter to enforce this policy - this will
 just be enforced through code review.
 
-=======
-Testing
-=======
+============
+Unit Testing
+============
 
 We are using Twisted's testing framework, since the codebase is Twisted-based.  So tests are run using
 ``trial``, and the unit testing framework is :mod:`twisted.trial.unittest` rather than the standard
@@ -250,16 +250,6 @@ expected to have been logged.
 
 (See `similar guidelines for warnings
 <http://twistedmatrix.com/documents/current/core/howto/testing.html#auto5>`_)
-
--------------------
-Integration Testing
--------------------
-#. Some limited integration-y tests exist in ``otter.test.unitgration``, but these may be removed.
-#. `cloudcafe tests <https://github.com/rackerlabs/autoscale_cloudcafe>`_ for autoscale can currently
-   be run from the dev VM.  It currently does not attempt to scale up, but eventually it would be nice
-   to limit the services that ene to be spun up.
-#. TBD: mocking other rackspace REST services (http://sourceforge.net/p/soaprest-mocker/wiki/Home/,
-   http://fog.io/#.6.0/compute/, or we can write our own)
 
 =======
 Metrics

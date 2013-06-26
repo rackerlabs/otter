@@ -14,9 +14,8 @@ from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorExce
 class AutoscaleBehaviors(BaseBehavior):
 
     """
-    @summary: Behavior Module for the Autoscale REST API
-    @note: Should be the primary interface to a test case or external tool
-    @copyright: Copyright (c) 2012 Rackspace US, Inc.
+    :summary: Behavior Module for the Autoscale REST API
+    :note: Should be the primary interface to a test case or external tool
     """
 
     def __init__(self, autoscale_config, autoscale_client):
@@ -109,14 +108,13 @@ class AutoscaleBehaviors(BaseBehavior):
         self, group_id, expected_servers,
             interval_time=None, timeout=None):
         """
-        @summary: verify the desired capacity in group state is equal to expected servers
+        :summary: verify the desired capacity in group state is equal to expected servers
          and waits for the specified number of servers to be active on a group
-        @param group_id: Group id
-        @param expected_servers: Total active servers expected on the group
-        @param interval_time: Time to wait during polling group state
-        @param timeout: Time to wait before exiting this function
-        @return: returns the list of active servers in the group
-        @rtype: returns the active server list
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
         """
         interval_time = interval_time or int(
             self.autoscale_config.interval_time)
@@ -159,10 +157,10 @@ class AutoscaleBehaviors(BaseBehavior):
                           sp_change=None, sp_change_percent=None,
                           sp_desired_capacity=None, sp_policy_type=None):
         """
-        @summary: creates the policy with change set to default config value
-        @params: group_id
-        @return: returns the newly created policy in the form of a dict
-        @rtype: returns the policy dict
+        :summary: creates the policy with change set to default config value
+        :params: group_id
+        :return: returns the newly created policy in the form of a dict
+        :rtype: returns the policy dict
         """
         if sp_name is None:
             sp_name = rand_name('test_sp')
@@ -185,11 +183,11 @@ class AutoscaleBehaviors(BaseBehavior):
                             sp_change=None, sp_change_percent=None,
                             sp_desired_capacity=None, sp_policy_type=None):
         """
-        @summary: creates the specified policy for the given change type
-        @params: group_id
-        @return: returns the newly created policy object with change set
+        :summary: creates the specified policy for the given change type
+        :params: group_id
+        :return: returns the newly created policy object with change set
                  to config's default
-        @rtype: returns the policy object
+        :rtype: returns the policy object
         """
         if sp_name is None:
             sp_name = rand_name('testsp_')
@@ -221,19 +219,19 @@ class AutoscaleBehaviors(BaseBehavior):
     def create_policy_webhook(self, group_id, policy_data,
                               execute_webhook=None, execute_policy=None):
         """
-        @summary: wrapper for create_policy_given. Given a dict with
+        :summary: wrapper for create_policy_given. Given a dict with
                   change type, the change number, cooldown(optional),
                   sets the parameters in create_policy_min and
                   creates a webhook for the policy
-        @param: group id
-        @param: dict of policy details such as change type,
+        :param: group id
+        :param: dict of policy details such as change type,
                 change integer/number, cooldown(optional)
                 Eg: {'change_percent': 100, 'cooldown': 200}
-        @param execute_webhook: Executes the newly created webhook
-        @param execute_policy: Executes the newly created policy
-        @return: dict containing policy id and its webhook id and
+        :param: execute_webhook. Executes the newly created webhook
+        :param: execute_policy. Executes the newly created policy
+        :return: dict containing policy id and its webhook id and
                  capability url
-        @rtye: dict
+        :rtype: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
         response_code = None
@@ -319,7 +317,7 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def policy_details_list(self, data):
         """returns policy details list"""
-        # @todo : make the obj list work for changePercent and desiredCapacity
+        # :todo : make the obj list work for changePercent and desiredCapacity
         policy_name = []
         policy_chng = []
         policy_cooldown = []
@@ -338,7 +336,7 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def get_policy_properties(self, policy_list):
         """converts policy list object to a dict"""
-        # @todo : find the change type
+        # :todo : find the change type
         policy = {}
         for policy_type in policy_list:
             try:

@@ -47,7 +47,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
         """
-        Update minentities=maxentities and verify execution of a scale up policy
+        Update minentities=maxentities and execution of a scale up policy
         fails with a 403
         """
         self._update_group_min_max_entities(group=self.group,
@@ -60,7 +60,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
 
     def test_system_execute_scale_down_on_newly_created_group_with_minentities(self):
         """
-        Update minentities=maxentities and verify execution of a scale down policy
+        Update minentities=maxentities and execution of a scale down policy
         fails with a 403
         """
         self._update_group_min_max_entities(group=self.group,
@@ -76,8 +76,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     def test_system_delete_policy_during_execution(self):
         """
         Policy execution is not affected/paused when the policy is deleted during execution.
-        Also, verify if otter refers to the policy id after it has executed the policy and
-        raise exception.
+        (Also, verify if otter refers to the policy id after it has executed the policy and
+        raises exception.)
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
@@ -99,7 +99,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     def test_system_execute_scale_up_after_maxentities_met(self):
         """
         Update max entities of the scaling group to be 3 and execute scale up policy
-        once to update active servers = maxentities successfully and verify reexecuting the
+        once to update active servers = maxentities successfully and reexecuting the
         policy when max entities are already met fails with 403
         """
         upd_maxentities = 3
@@ -127,7 +127,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     def test_system_scaleup_update_min_max_0_delete_group(self):
         """
         Create a scaling group and execute a scale up policy, update min and max entities
-        to be 0 and delete the group and verify all the on the group servers are deleted
+        to be 0 and delete the group (while the servers from the create group and execute policy
+        are still building). All the servers on the group should be deleted
         before the user can delete the group (AUTO-373)
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
@@ -149,8 +150,8 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
 
     def test_system_scaleup_update_min_scale_down(self):
         """
-        Create a scaling group and execute a scale up policy, update min = current desired capacity
-        execute a scale down policy and verify its unsuccessful.
+        Create a scaling group and execute a scale up policy, update min = current desired capacity.
+        Then executing a scale down policy results in 403
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])

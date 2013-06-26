@@ -37,7 +37,7 @@ class ScalingGroupListTest(AutoscaleFixture):
 
     def test_get_scaling_group(self):
         """
-        Verify the get group for response code, headers and data.
+        Verify the get group for response code 200, headers and data.
         """
         group_info_response = self.autoscale_client.\
             view_manifest_config_for_scaling_group(group_id=self.first_scaling_group.id)
@@ -63,7 +63,7 @@ class ScalingGroupListTest(AutoscaleFixture):
 
     def test_list_scaling_group(self):
         """
-        Verify the list group for response code, headers and data.
+        Verify the list group for response code 200, headers and data.
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = list_groups_response.entity

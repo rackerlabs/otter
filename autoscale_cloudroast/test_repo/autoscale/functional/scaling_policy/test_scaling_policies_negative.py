@@ -32,7 +32,8 @@ class ScalingPolicyNegative(AutoscaleFixture):
 
     def test_scaling_policy_nonexistant(self):
         """
-        Negative Test: Verify for scaling policy on a newly created group
+        Negative Test: A newly created scaling group does not contain a scaling policy,
+        by default
         """
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         group = create_resp.entity

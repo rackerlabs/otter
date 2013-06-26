@@ -137,7 +137,8 @@ class ScalingGroupNegative(AutoscaleFixture):
 
     def test_scaling_group_minentities_max(self):
         """
-        Negative Test: Scaling group should not get created when min entities are max
+        Negative Test: Scaling group should not get created when min entities are over allowed
+        maxentities
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         gc_min_entities = 26
@@ -149,7 +150,7 @@ class ScalingGroupNegative(AutoscaleFixture):
 
     def test_create_scaling_group_minentities_over_max(self):
         """
-        Negative Test: Scaling group should not get created when min entities are over max
+        Negative Test: Scaling group should not get created when min entities are over maxentities
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         gc_min_entities = 22
