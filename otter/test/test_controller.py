@@ -7,7 +7,6 @@ import mock
 
 from testtools.matchers import ContainsDict, Equals
 
-from silverberg.lock import BasicLock
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
@@ -891,19 +890,6 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
             'execute_launch_config': defer.succeed(None)
         }
 
-        self.lock = mock.create_autospec(BasicLock)
-
-        def _acquire(*args, **kwargs):
-            return defer.succeed(None)
-        self.lock.acquire.side_effect = _acquire
-
-        def _release():
-            return defer.succeed(None)
-        self.lock.release.side_effect = _release
-
-        self.BasicLock = patch(self, 'otter.controller.BasicLock',
-                               return_value=self.lock)
-
         for thing, return_val in things_and_return_vals.iteritems():
             self.mocks[thing] = patch(self,
                                       'otter.controller.{0}'.format(thing),
@@ -972,10 +958,6 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         # state should have been updated
         self.mock_state.mark_executed.assert_called_once_with('pol1')
 
-        # Lock should have been acquired and released
-        self.lock.acquire.assert_called_once_with()
-        self.lock.release.assert_called_once_with()
-
     def test_execute_launch_config_failure_on_positive_delta(self):
         """
         If ``execute_launch_config`` fails for some reason, then state should
@@ -1009,10 +991,6 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
 
         # state should not have been updated
         self.assertEqual(self.mock_state.mark_executed.call_count, 0)
-
-        # Lock should have been acquired and released, even on error
-        self.lock.acquire.assert_called_once_with()
-        self.lock.release.assert_called_once_with()
 
     def test_maybe_execute_scaling_policy_cooldown_failure(self):
         """

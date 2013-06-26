@@ -26,7 +26,6 @@ from functools import partial
 import iso8601
 import json
 
-from silverberg.lock import BasicLock, with_lock
 from twisted.internet import defer
 
 from otter import supervisor
@@ -139,12 +138,17 @@ def maybe_execute_scaling_policy(
     bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
+    # make sure that the policy (and the group) exists before doing anything else
+    deferred = scaling_group.get_policy(policy_id)
+
     def _do_get_configs(policy):
         deferred = defer.gatherResults([
             scaling_group.view_config(),
             scaling_group.view_launch_config()
         ])
         return deferred.addCallback(lambda results: results + [policy])
+
+    deferred.addCallbacks(_do_get_configs, unwrap_first_error)
 
     def _do_maybe_execute(config_launch_policy):
         """
@@ -181,18 +185,7 @@ def maybe_execute_scaling_policy(
                                        scaling_group.uuid, policy_id,
                                        error_msg)
 
-    def maybe_execute_wrapper():
-        # make sure that the policy (and the group) exists before doing
-        # anything else
-        deferred = scaling_group.get_policy(policy_id)
-        deferred.addCallbacks(_do_get_configs, unwrap_first_error)
-        deferred.addCallback(_do_maybe_execute)
-        return deferred
-
-    from otter.rest.application import get_store
-    client = get_store().connection
-    lock = BasicLock(client, 'lock', scaling_group.uuid)
-    return with_lock(lock, maybe_execute_wrapper)
+    return deferred.addCallback(_do_maybe_execute)
 
 
 def check_cooldowns(log, state, config, policy, policy_id):
