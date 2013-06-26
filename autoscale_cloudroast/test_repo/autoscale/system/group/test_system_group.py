@@ -27,7 +27,7 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_minentities_to_scaleup(self):
         """
-        The scaling group scales up when the min entities are updated,
+        The scaling group scales up when the minentities are updated,
         to be more than 0
         """
         minentities = 0
@@ -82,7 +82,7 @@ class GroupFixture(AutoscaleFixture):
         """
         Execute policy on scaling group such that the maxentities are met,
         update the maxentities and upon re-executing the scaling policy beyond
-        the older maxentities is successful
+        the older maxentities, the scaling group scales up
         """
         minentities = 0
         maxentities = 2
@@ -195,7 +195,9 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_execute_policy_beyond_maxentities(self):
         """
-        Verify execute policy when executed multiple times to exceed maxentities
+        Scaling policy is executed when change + minentities > maxentities, upto
+        the maxentities. Re-executing policy when maxentities are met fails with 403.
+        The scaling policy can be executed when the maxentities is updated to be higher.
         """
         minentities = 2
         maxentities = 3
@@ -228,8 +230,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
-        Verify scaling group with minentities = maxentities cannot execute scale up
-        policy. Update the maxentities and verify the scaling policy can be executed.
+        Scaling group with minentities = maxentities cannot execute scale up
+        policy. Update the maxentities and the scaling policy can be executed.
         """
         minentities = 2
         maxentities = 2
@@ -261,7 +263,7 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_create_scaling_group_with_same_attributes(self):
         """
-        Verify scaling groups can be created with the exact same attributes
+        Scaling groups can be created with the exact same attributes
         """
         gc_metadata = {'gc_meta_key_1': 'gc_meta_value_1',
                        'gc_meta_key_2': 'gc_meta_value_2'}

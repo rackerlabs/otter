@@ -1,8 +1,5 @@
 """
-@summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
-@note: Correspondes DIRECTLY TO A unittest.TestCase
-@see: http://docs.python.org/library/unittest.html#unittest.TestCase
-@copyright: Copyright (c) 2012 Rackspace US, Inc.
+:summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from autoscale.behaviors import AutoscaleBehaviors
@@ -20,7 +17,7 @@ import os
 class AutoscaleFixture(BaseTestFixture):
 
     """
-    @summary: Fixture for an Autoscale test.
+    :summary: Fixture for an Autoscale test.
     """
 
     @classmethod
@@ -145,7 +142,7 @@ class AutoscaleFixture(BaseTestFixture):
 class ScalingGroupFixture(AutoscaleFixture):
 
     """
-    @summary: Creates a scaling group using the default from
+    :summary: Creates a scaling group using the default from
               the test data
     """
 
@@ -200,8 +197,8 @@ class ScalingGroupFixture(AutoscaleFixture):
 class ScalingGroupPolicyFixture(ScalingGroupFixture):
 
     """
-    @summary: Creates a scaling group with policy using
-    the default from the test data
+    :summary: Creates a scaling group with policy using the default from
+              the test data
     """
 
     @classmethod
@@ -253,8 +250,8 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
 class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
 
     """
-    @summary: Creates a scaling group with a scaling policy
-    and webhook using the default from the test data
+    :summary: Creates a scaling group with a scaling policy
+              and webhook using the default from the test data
     """
 
     @classmethod

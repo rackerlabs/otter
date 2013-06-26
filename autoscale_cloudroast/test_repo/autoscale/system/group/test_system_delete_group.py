@@ -20,7 +20,7 @@ class DeleteGroupTest(AutoscaleFixture):
     def setUp(self):
         """
         Create 2 scaling groups, one with minentities>0 with a scaling up policy and webhook
-        another with minetities=0
+        another with minentities=0
         """
         self.create_group0_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=0)
@@ -95,8 +95,8 @@ class DeleteGroupTest(AutoscaleFixture):
 
     def test_system_delete_group_zero_minentities_execute_webhook(self):
         """
-        Create a scaling group with zero minentities, execute a webhook,
-        and verify the group cannot be deleted as it has active servers
+        Create a scaling group with zero minentities and execute a webhook,
+        the group cannot be deleted as it has active servers
         """
         execute_webhook = self.autoscale_client.execute_webhook(
             self.policy_webhook['webhook_url'])
@@ -111,8 +111,8 @@ class DeleteGroupTest(AutoscaleFixture):
 
     def test_system_delete_group_zero_minentities_execute_policy(self):
         """
-        Create a scaling group with zero min entities, execute a scaling policy,
-        and verify the group cannot be deleted as it has active servers
+        Create a scaling group with zero min entities and execute a scaling policy,
+        the group cannot be deleted as it has active servers
         """
         execute_policy = self.autoscale_client.execute_policy(
             group_id=self.group0.id,

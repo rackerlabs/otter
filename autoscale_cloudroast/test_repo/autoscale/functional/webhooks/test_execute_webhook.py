@@ -25,7 +25,7 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
 
     def test_execute_webhook(self):
         """
-        Execute a webhook and verify response code and headers.
+        Execute a webhook and verify response code 202 and headers.
         """
         cap_url = self.webhook['links'].capability
         execute_wb_resp = self.autoscale_client.execute_webhook(cap_url)

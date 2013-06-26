@@ -35,7 +35,7 @@ class ListScalingPolicies(ScalingGroupPolicyFixture):
 
     def test_list_scaling_policies(self):
         """
-        Verify the list policies call for response code, headers and data
+        Verify the list policies call for response code 201, headers and data
         """
         policy_id_list = []
         list_policies_resp = self.autoscale_client.list_policies(self.group.id)

@@ -27,7 +27,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_scaling_group_links(self):
         """
-        Verify that scaling groups has links for self and bookmark
+        Verify that scaling groups has links for self
+        (no bookmark link)
         """
         self.assertTrue(self.group.links is not None,
                         msg='No links returned upon scaling group creation')
@@ -49,7 +50,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_scaling_policy_links(self):
         """
-        Verify that scaling policy has links for self and bookmark
+        Verify that scaling policy has links for self
         """
         policy_links = self.policy['links']
         self.assertTrue(self.policy['links'] is not None,
@@ -72,7 +73,7 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
 
     def test_webhook_links(self):
         """
-        Verify that webhook has links for self and bookmark
+        Verify that webhook has links for self
         """
         webhook_links = self.webhook['links']
         self.assertTrue(self.webhook['links'] is not None,

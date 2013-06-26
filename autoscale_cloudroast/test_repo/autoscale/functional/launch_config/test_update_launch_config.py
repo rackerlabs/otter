@@ -92,7 +92,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
 
     def test_partial_update_launch_config(self):
         """
-        Verify update launch config with partial request does not fail
+        Update launch config with partial request does not fail with 403, and overwrites the
+        the launch config as per the latest request
         """
         lc_name = rand_name('upd_server_name')
         lc_image_ref = 'XYZ'
