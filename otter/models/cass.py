@@ -732,13 +732,7 @@ class CassScalingGroup(object):
     def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
-
-        TODO: locking!!
-        XXX: What happens if a group is deleted while policie stuff is updating?
-            seems like locking/some kind of coordination must happen.
         """
-        d = self.view_state()
-
         def _maybe_delete(state):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
@@ -754,9 +748,13 @@ class CassScalingGroup(object):
 
             return b.execute(self.connection)
 
-        d.addCallback(_maybe_delete)
+        def _delete_group():
+            d = self.view_state()
+            d.addCallback(_maybe_delete)
+            return d
 
-        return d
+        lock = BasicLock(self.connection, 'lock', self.uuid)
+        return with_lock(lock, _delete_group)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)

@@ -1266,6 +1266,30 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+        self.lock.acquire.assert_called_once_with()
+        self.lock.release.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    def test_delete_lock_not_acquired(self, mock_view_state):
+        """
+        If the lock is not acquired, do not delete the group.
+        """
+        # we mock out delete policy, since that is already tested separately
+
+        def acquire():
+            return defer.fail(BusyLockError('', ''))
+        self.lock.acquire.side_effect = acquire
+
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+
+        d = self.group.delete_group()
+        result = self.failureResultOf(d)
+        self.assertTrue(result.check(BusyLockError))
+
+        self.assertEqual(self.connection.execute.call_count, 0)
+        self.lock.acquire.assert_called_once_with()
+
 
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
 # with this
