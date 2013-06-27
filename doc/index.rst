@@ -17,6 +17,7 @@ Developer documentation
    architecture
    dev_process
    standards
+   getting_started
 
 Endpoint API documentation
 --------------------------
