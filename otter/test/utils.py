@@ -169,13 +169,19 @@ class LockMixin(object):
     """
 
     def mock_lock(acquire_result=None, release_result=None):
+        """
+        :param acquire_result: A value to be returned by acquire.
+        :param release_result: A value to be returned by release.
+
+        :return: A mock BasicLock instance.
+        """
         lock = mock.create_autospec(BasicLock)
 
         def _acquire(*args, **kwargs):
-            return defer.succeed(None)
+            return defer.succeed(acquire_result)
         lock.acquire.side_effect = _acquire
 
         def _release():
-            return defer.succeed(None)
+            return defer.succeed(release_result)
         lock.release.side_effect = _release
         return lock
