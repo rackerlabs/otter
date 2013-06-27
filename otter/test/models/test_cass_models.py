@@ -316,7 +316,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.assertEqual(self.connection.execute.call_count, 0)
         self.lock.acquire.assert_called_once_with()
-        self.assertEqual(self.connection.execute.call_count, 0)
+        self.assertEqual(self.lock.release.call_count, 0)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
