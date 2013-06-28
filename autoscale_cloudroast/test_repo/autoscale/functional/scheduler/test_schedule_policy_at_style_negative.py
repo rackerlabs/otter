@@ -352,3 +352,26 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           msg='Create schedule scaling at style policy with invalid second results'
                           ' in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
+
+    def test_schedule_at_style_policy_with_webhook(self):
+        """
+        Creating a webhook on a scaling policy of type schedule with (at style)
+        results in a 400.
+        """
+        schedule_value = self.autoscale_behaviors.get_time_in_utc(10)
+        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_at=schedule_value)
+        self.assertEquals(schedule_policy_at_style['status_code'], 201,
+                          msg='Create scheduler at style policy with failed'
+                          ' with {0} for group {1}'
+                          .format(schedule_policy_at_style['status_code'], self.group.id))
+        create_webhook_response = self.autoscale_client.create_webhook(
+            group_id=self.group.id,
+            policy_id=schedule_policy_at_style['id'],
+            name=self.wb_name)
+        self.assertEquals(create_webhook_response.status_code, 400,
+                          msg='Create webhook on a scheduler at style policy failed'
+                          ' with {0} for group {1}'
+                          .format(create_webhook_response.status_code, self.group.id))
