@@ -116,7 +116,7 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
 
     def test_get_scheduler_cron_style_policy_after_deletion(self):
         """
-        Negative Test: get scheduler policy with cron style after policy is deleted
+        Negative Test: Get scheduler policy with cron style after policy is deleted
         fails with resource not found 404
         """
         del_resp = self.autoscale_client.delete_scaling_policy(
@@ -136,7 +136,7 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
 
     def test_get_scheduler_at_style_policy_after_deletion(self):
         """
-        Negative Test: get scheduler policy with cron style after policy is deleted
+        Negative Test: Get scheduler policy with cron style after policy is deleted
         fails with resource not found 404
         """
         del_resp = self.autoscale_client.delete_scaling_policy(

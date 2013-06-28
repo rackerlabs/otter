@@ -13,29 +13,46 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
     @classmethod
     def setUpClass(cls):
         """
-        Creates a scaling group with scheduler policy with type change
+        Create a scaling group with minentities=0
         """
         super(DeleteSchedulerPolicy, cls).setUpClass()
 
-    @classmethod
-    def tearDownClass(cls):
+    def setUp(self):
         """
-        Deletes the scaling group
+        Create 2 scheduler policies, one at-style and another cron-style
         """
-        super(DeleteSchedulerPolicy, cls).tearDownClass()
+        self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
+        self.cron_value = '0 */10 * * *'
+        self.at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_at=self.at_value)
+        self.assertEquals(self.at_style_policy['status_code'], 201,
+                          msg='Create schedule policy (at style) failed with {0} for group {1}'
+                          .format(self.at_style_policy['status_code'], self.group.id))
+        self.cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_cron=self.cron_value)
+        self.assertEquals(self.cron_style_policy['status_code'], 201,
+                          msg='Create schedule policy (cron style) failed with {0} for group {1}'
+                          .format(self.cron_style_policy['status_code'], self.group.id))
+
+    def tearDown(self):
+        """
+        Scaling group deleted by the Autoscale fixture's teardown
+        """
+        pass
 
     def test_delete_policy_schedule_at_style(self):
         """
         Verify the delete scheduler policy via at style,
         for response code 204, headers.
-        To Do : verify scaling_schedule, in the database
+        * To Do : verify scaling_schedule, in the database *
         """
-        policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change)
         delete_at_style_policy = self.autoscale_client.delete_scaling_policy(
             group_id=self.group.id,
-            policy_id=policy_at_style['id'])
+            policy_id=self.at_style_policy['id'])
         self.assertEquals(delete_at_style_policy.status_code, 204,
                           msg='Delete scheduler policy (at style) failed with {0}'
                           'for group {1}'
@@ -48,16 +65,11 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
         """
         Verify the delete scheduler policy via cron style,
         for response code 204, headers.
-        To Do : verify scaling_schedule, in the database
+        * To Do : verify scaling_schedule, in the database *
         """
-        schedule_value = '0 */6 * * *'
-        policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_cron=schedule_value)
         delete_at_style_policy = self.autoscale_client.delete_scaling_policy(
             group_id=self.group.id,
-            policy_id=policy_cron_style['id'])
+            policy_id=self.cron_style_policy['id'])
         self.assertEquals(delete_at_style_policy.status_code, 204,
                           msg='Delete scheduler policy (at style) failed with {0}'
                           'for group {1}'

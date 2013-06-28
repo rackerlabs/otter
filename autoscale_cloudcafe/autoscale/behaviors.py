@@ -45,7 +45,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
         if lc_name is None:
-            lc_name = rand_name('test_lc_srv')
+            lc_name = rand_name('test_min_srv')
         else:
             lc_name = rand_name(str(lc_name))
         if lc_image_ref is None:

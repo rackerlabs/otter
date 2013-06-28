@@ -37,7 +37,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with different valid crons results
         in a 201.
-        To Do : validate 'trigger' in scaling_schedule, in the database
+        * To Do : validate 'trigger' in scaling_schedule, in the database *
         """
         schedule_value_list = [
             '* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
