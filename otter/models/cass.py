@@ -105,8 +105,7 @@ _cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} '
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
 
-_cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
-                         'AND WHERE deleted=false;')
+_cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
 
 
 def filter_deleted(cass_result):
