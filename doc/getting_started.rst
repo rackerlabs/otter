@@ -37,16 +37,17 @@ Autoscale can also work in the opposite direction. A policy can say "When my web
 The Scaling Group
 =================
 
-There are three components to Autoscale
+There are three components to Autoscale:
 
 - The Scaling Group Configuration
 - The Scaling Group's Launch Configuration
 - The Scaling Group's Policies
+
 Autoscale Groups at a minimum require the Group Configuration, and a Launch Configuration. Policies are only required to make the group change.
 
 The Group Configuration
 -----------------------
-This configuration specifies the basic elements of the config. Name, how many severs.
+This configuration specifies the basic elements of the config.
 
 The Group Configuration contains:
 
@@ -96,28 +97,43 @@ Scaling Policies Contain:
 Walking Through the Autoscale API
 =================================
 
-This will give you the basic steps to create an Autoscaling group. We recommend using http://docs.autoscale.apiary.io/ to generate CURL commands if you want to follow along in your environment.
+This will give you the basic steps to create an Autoscaling group. We recommend using http://docs.ord.autoscale.apiary.io/ to generate CURL commands if you want to follow along in your environment.
 
 Authentication
 --------------
 
 You will need to generate an auth token and then send it as 'X-Auth-token' header along with all the requests to authenticate yourself.
 
-.. code-block:: bash
-
-    POST https://identity.api.rackspacecloud.com/v2.0/tokens
+Authentication Endpoint: ``https://identity.api.rackspacecloud.com/v2.0/tokens``
 
 You can request a token by providing your username and your API key.
 
 .. code-block:: bash
 
- curl -X POST https://identity.api.rackspacecloud.com/v2.0/tokens -d '{ "auth":{ "RAX-KSKEY:apiKeyCredentials":{ "username":"theUserName", "apiKey":"00a00000a000a0000000a000a00aaa0a" } } }' -H "Content-type: application/json" | python -mjson.tool
+ curl --request POST -H "Content-type: application/json" \
+    --data-binary '{
+      "auth":{
+        "RAX-KSKEY:apiKeyCredentials":{
+          "username":"theUserName",
+          "apiKey":"00a00000a000a0000000a000a00aaa0a"
+        }
+      }
+   }' \
+  https://identity.api.rackspacecloud.com/v2.0/tokens | python -mjson.tool
 
 You can request a token by providing your username and your password.
 
 .. code-block:: bash
 
-  curl -X POST https://identity.api.rackspacecloud.com/v2.0/tokens -d '{"auth":{"passwordCredentials":{"username":"theUserName","password":"thePassword"}}}' -H "Content-type: application/json" | python -mjson.tool
+  curl --request POST  -H "Content-type: application/json" \
+   --data-binary '{
+     "auth":{
+       "passwordCredentials":{
+         "username":"username",
+         "password":"password"}
+       }
+     }' \
+   https://identity.api.rackspacecloud.com/v2.0/tokens | python -mjson.tool
 
 The response will be HUGE (sorry!) We've snipped the serviceCatalog bit for clarity.
 
@@ -157,7 +173,8 @@ Note your token.id and your user.id. That token.tenant.id is your "tenantID" and
 If the auth token received is "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" and your tenantID is 123456 then this example request will list all groups you've created:
 
 .. code-block:: bash
-  $ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token: {auth-token}" https://{region}.autoscale.api.rackspacecloud.com/v1.0/{tenant-id}/groups/ | python -mjson.tool
+
+  $ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token: {auth-token}" https://{region}.ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/ | python -mjson.tool
 
 Step One - Save an Image
 ------------------------
@@ -168,7 +185,10 @@ When that is complete, save your image, and record the imageID.
 
 .. code-block:: bash
 
-  $ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token: {auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool
+  $ curl --request GET --header "Content-Type: application/json" \
+   --header "X-Auth-token: {auth-token}" \
+   https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT \
+   | python -mjson.tool
 
 Step Two - Create the Group
 ---------------------------
@@ -176,81 +196,121 @@ Step Two - Create the Group
 Create a Scaling Group by submitting a POST request containing an edited version of these data. 
 
 
-``POST https://autoscale.api.rackspacecloud.com/v1.0/[TenantID]/groups/``
+.. code-block:: bash
+
+  POST https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/
 
 .. code-block:: bash
 
-    {
-        "groupConfiguration": {
-            "name": "myFirstAutoscalingGroup",
-            "cooldown": 60,
-            "minEntities": 1,
-            "maxEntities": 10,
+    curl --include --header "Accept: application/json" \
+         --header "X-Auth-token: {auth-token}" \
+         --request POST \
+         --data-binary "{
+        \"groupConfiguration\": {
+            \"name\": \"workers\",
+            \"cooldown\": 60,
+            \"minEntities\": 5,
+            \"maxEntities\": 100,
+            \"metadata\": {
+                \"firstkey\": \"this is a string\",
+                \"secondkey\": \"1\"
+            }
         },
-        "launchConfiguration": {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": 3,
-                    "name": "webhead",
-                    "imageRef": "[Your ImageID Here]",
+        \"launchConfiguration\": {
+            \"type\": \"launch_server\",
+            \"args\": {
+                \"server\": {
+                    \"flavorRef\": 3,
+                    \"name\": \"webhead\",
+                    \"imageRef\": \"0d589460-f177-4b0f-81c1-8ab8903ac7d8\",
+                    \"OS-DCF:diskConfig\": \"AUTO\",
+                    \"metadata\": {
+                        \"mykey\": \"myvalue\"
+                    },
+                    \"personality\": [
+                        {
+                            \"path\": \'/root/.ssh/authorized_keys\',
+                            \"contents\": \"ssh-rsa AAAAB3Nza...LiPk== user@example.net\"
+                        }
+                    ],
+                    \"networks\": [
+                        {
+                            \"uuid\": \"11111111-1111-1111-1111-111111111111\"
+                        }
+                    ],
                 },
-                "loadBalancers": [
+                \"loadBalancers\": [
                     {
-                        "loadBalancerId": [Your LoadBalancerID],
-                        "port": 8080
+                        \"loadBalancerId\": 2200,
+                        \"port\": 8081
                     }
                 ]
             }
         },
-        "scalingPolicies": []
-    }
-
+        \"scalingPolicies\": [
+        ]
+    }" \
+         "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/"
 
 This will create your scaling group, spin up the minimum number of servers, and then attach them to the load balancer you specified. To modify the group, you will need to create policies.
 
 Step Three - Policies
 ---------------------
-Scaling Down is not yet implemented. You must manually remove your servers via Nova.
+
 Create scaling policies by sending POST requests
-
-
-``POST https://autoscale.api.rackspacecloud.com/v1.0/[TenantID]/groups/[GroupID]/policies/``
 
 .. code-block:: bash
 
-  [
+  POST https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/
+
+.. code-block:: bash
+
+  curl --include --header "Accepts: application/json" \
+       --header "X-Auth-token: {auth-token}" \
+       --request POST \
+       --data-binary "[
       {
-          "name": "scale up by one server",
-          "change": 1,
-          "cooldown": 150,
-          "type": "webhook"
+          \"name\": \"scale up by one server\",
+          \"change\": 1,
+          \"cooldown\": 150,
+          \"type\": \"webhook\"
       },
       {
-          "name": "scale down by 5.5 percent",
-          "changePercent": -5.5,
-          "cooldown": 6,
-          "type": "webhook"
+          \"name\": \"scale down by 5.5 percent\",
+          \"changePercent\": -5.5,
+          \"cooldown\": 6,
+          \"type\": \"webhook\"
       }
-  ]
+  ]" \
+       "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies"
 
 Step Four - Webhooks
 --------------------
 
 Now that you've created the policy, let's create a few webhooks.
 
-``POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks``
+.. code-block:: bash
+
+  POST https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
+
 
 .. code-block:: bash
 
-  [
-      {
-          "name": "alice",
-          "metadata": {
-              "notes": "this is for Alice"
-          }
-      }
-  ]
+    curl --include --header "Accepts: application/json" \
+         --header "X-Auth-token: {auth-token}" \
+         --request POST \
+         --data-binary "[
+        {
+            \"name\": \"alice\",
+            \"metadata\": {
+                \"notes\": \"this is for Alice\"
+            }
+        },
+        {
+            \"name\": \"bob\"
+        }
+    ]" \
+         "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks"
 
 Will reply with:
 
@@ -270,7 +330,7 @@ Will reply with:
                       "rel": "self"
                   },
                   {
-                      "href": ".../execute/1/{capability_hash1}/,
+                      "href": ".../execute/1/{capabilityHash1}/",
                       "rel": "capability"
                   }
               ]
@@ -285,7 +345,7 @@ Will reply with:
                       "rel": "self"
                   },
                   {
-                      "href": ".../execute/1/{capability_hash2}/,
+                      "href": ".../execute/1/{capabilityHash2}/",
                       "rel": "capability"
                   }
               ]
@@ -296,36 +356,69 @@ Will reply with:
 Step Five - Executing a Scaling Policy
 --------------------------------------
 
-Find the execute URL in your Scaling Policy. If you want to activate that policy, POST against it.
+You can excecute a scaling policy in two ways:
 
-``curl -X POST https://autoscale.api.rackspacecloud.com/v1.0/execute/1/{capability_hash}/ -v``
+**Authenticated Scaling Policy Path**
+
+Identify the path to the desired scaling policy, and append 'execute' to the path. To activate the policy POST against it.
+
+.. code-block:: bash
+
+  curl --include \
+       --header "X-Auth-token: {auth-token}" \
+       --request POST \
+       "https://private-a6a2-autoscale.apiary.io/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/execute"
+
+**Execute Capability URL**
+
+Find the capability URL in your Scaling Policy Webhook. If you want to activate that policy, POST against it.
+
+.. code-block:: bash
+
+  curl --include \
+     --header "X-Auth-token: {auth-token}" \
+     --request POST \
+     "https://ord.autoscale.api.rackspacecloud.com/v1.0/execute/{capabilityVersion}/{capabilityHash}/" -v
+
+Note how authentication is not needed.
 
 The policy will execute, and your group will transform. Do this the right way at the right time, you might just have a working environment!
 
-An execution will always return "202, Accepted", even if it fails to scale because of an invalid configuration. This is done to prevent scraping hashes across the environment.
+An execution will always return ``202, Accepted``, even if it fails to scale because of an invalid configuration. This is done to prevent `information leakage <https://www.owasp.org/index.php/Information_Leakage>`_.
 
 Step Six - Tearing it all down
 ------------------------------
 
-Autoscaling groups will not delete unless all the servers are removed. To do this, upload a new config with minimum and maximum of zero.
+Autoscaling groups can not be deleted while they have active servers. Upload a new config with minimum and maximum of zero to be able to delete a server.
 
-
-``PUT /{tenantId}/groups/{groupId}/config``
 
 .. code-block:: bash
 
-  {
-      "name": "workers",
-      "cooldown": 60,
-      "minEntities": 0,
-      "maxEntities": 0,
-      "metadata": {
-          "firstkey": "this is a string",
-          "secondkey": "1",
-      }
-  }
+  PUT /{tenantId}/groups/{groupId}/config
+
+.. code-block:: bash
+
+ curl --include --header "Accept: application/json" \
+     --header "X-Auth-token: {auth-token}" \
+     --request PUT \
+     --data-binary "{
+    \"name\": \"workers\",
+    \"cooldown\": 60,
+    \"minEntities\": 0,
+    \"maxEntities\": 0,
+    \"metadata\": {
+        \"firstkey\": \"this is a string\",
+        \"secondkey\": \"1\",
+    }
+  }" \
+     "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/config"
 
 
-The autoscale group will start destroying all your servers. When they're gone, you can fire a DELETE command to the Group ID:
+The autoscale group will start destroying all your servers. Now you can fire a DELETE command to the Group ID. Take care that all your servers are deleted before deleting the group.
 
-``DELETE /{tenantId}/groups/{groupId}``
+.. code-block:: bash
+
+  curl --include \
+     --header "X-Auth-token: {auth-token}" \
+     --request DELETE \
+     "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}"

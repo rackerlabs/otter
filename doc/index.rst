@@ -14,10 +14,10 @@ Developer documentation
 .. toctree::
    :maxdepth: 2
 
+   getting_started
    architecture
    dev_process
    standards
-   getting_started
 
 Endpoint API documentation
 --------------------------
