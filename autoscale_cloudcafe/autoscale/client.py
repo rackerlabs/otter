@@ -352,7 +352,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, requestslib_kwargs=None):
+                      policy_type=None, args=None, requestslib_kwargs=None):
         """
         :summary: Update/Create details of a specific scaling policy
         :param name: The name of the policy
@@ -369,11 +369,19 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             '/<string:tenantId>/groups/<groupId>/policy/<policyId>'
         """
         url = '%s/groups/%s/policies/%s/' % (self.url, group_id, policy_id)
-        policy = Update_Policy_Request(
-            name=name, cooldown=cooldown, change=change,
-            change_percent=change_percent,
-            desired_capacity=desired_capacity,
-            policy_type=policy_type)
+        if args is None:
+            policy = Update_Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type)
+        else:
+            policy = Update_Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type,
+                args=args)
         return self.request('PUT', url,
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
