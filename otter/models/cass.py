@@ -70,11 +70,12 @@ _cql_update_group_state = (
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
-                     'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
+                     'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
+_cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
 _cql_update_event = 'UPDATE {cf} SET trigger = {trigger} WHERE "policyId" = {policy_id};'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -566,7 +567,8 @@ class CassScalingGroup(object):
         def _do_delete(_):
             queries = [
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
-                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table),
+                _cql_delete_policy_events.format(cf=self.event_table)]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id},

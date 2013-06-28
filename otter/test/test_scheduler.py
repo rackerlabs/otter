@@ -117,4 +117,5 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_store.delete_events.call_count, 2)
         self.mock_store.delete_events.assert_called_with(['pol44' for i in range(100)])
         deferLater.assert_called_with(mockcalllater, 0, check_for_events,
-                                      self.mock_log, 100, mockcalllater)
+                                      self.mock_log.bind.return_value.bind.return_value,
+                                      100, mockcalllater)

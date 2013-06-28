@@ -34,6 +34,8 @@ from otter.models.cass import CassScalingGroupCollection
 from silverberg.cluster import RoundRobinCassandraCluster
 
 from otter.scheduler import check_for_events
+from otter.log import log as otter_log
+from otter.util.hashkey import generate_transaction_id
 
 
 class Options(usage.Options):
@@ -87,9 +89,10 @@ def run_scheduler(batchsize):
     """
     def eat_errors(err):
         # Eat transient errors
-        log.err(err)
+        sch_log.err(err)
         return None
-    d = check_for_events(log, batchsize)
+    sch_log = otter_log.bind(scheduler_run_id=generate_transaction_id())
+    d = check_for_events(sch_log, batchsize)
     d.addErrback(eat_errors)
     return d
 
