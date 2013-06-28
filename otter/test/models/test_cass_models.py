@@ -1608,12 +1608,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policies": 101,
             "webhooks": 102
         }
-        config_query = ('SELECT COUNT(*) FROM scaling_config WHERE "tenantId" = :tenantId '
-                        'AND WHERE deleted=false;')
-        policy_query = ('SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId '
-                        'AND WHERE deleted=false;')
-        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId '
-                         'AND WHERE deleted=false;')
+        config_query = ('SELECT COUNT(*) FROM scaling_config WHERE "tenantId" = :tenantId')
+        policy_query = ('SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId')
+        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId')
 
         calls = [mock.call(config_query, expectedData, ConsistencyLevel.TWO),
                  mock.call(policy_query, expectedData, ConsistencyLevel.TWO),
