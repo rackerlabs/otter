@@ -306,7 +306,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.side_effect = acquire
 
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+            raise
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
