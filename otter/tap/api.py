@@ -87,13 +87,9 @@ def run_scheduler(batchsize):
     """
     Working guts of the scheduler service
     """
-    def eat_errors(err):
-        # Eat transient errors
-        sch_log.err(err)
-        return None
     sch_log = otter_log.bind(scheduler_run_id=generate_transaction_id())
     d = check_for_events(sch_log, batchsize)
-    d.addErrback(eat_errors)
+    d.addErrback(sch_log.err)
     return d
 
 
