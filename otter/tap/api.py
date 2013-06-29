@@ -6,7 +6,7 @@ import warnings
 
 from twisted.python import usage
 
-from twisted.internet import reactor, task
+from twisted.internet import reactor
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
@@ -31,11 +31,9 @@ from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
-from silverberg.cluster import RoundRobinCassandraCluster
+from otter.scheduler import SchedulerService
 
-from otter.scheduler import check_for_events
-from otter.log import log as otter_log
-from otter.util.hashkey import generate_transaction_id
+from silverberg.cluster import RoundRobinCassandraCluster
 
 
 class Options(usage.Options):
@@ -83,16 +81,6 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-def run_scheduler(batchsize):
-    """
-    Working guts of the scheduler service
-    """
-    sch_log = otter_log.bind(scheduler_run_id=generate_transaction_id())
-    d = check_for_events(sch_log, batchsize)
-    d.addErrback(sch_log.err)
-    return d
-
-
 def makeService(config):
     """
     Set up the otter-api service.
@@ -134,10 +122,6 @@ def makeService(config):
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
-    if config_value('otterclock'):
-        scheduler_task = task.LoopingCall(run_scheduler, int(config_value('otterclock.batchsize')))
-        scheduler_task.start(int(config_value('otterclock.interval')))
-
     s = MultiService()
 
     site = Site(root)
@@ -145,5 +129,10 @@ def makeService(config):
 
     api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
+
+    if config_value('scheduler'):
+        scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
+                                             int(config_value('scheduler.interval')))
+        scheduler_service.setServiceParent(s)
 
     return s

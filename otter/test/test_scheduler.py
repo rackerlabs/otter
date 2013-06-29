@@ -1,22 +1,30 @@
-""" CQL Batch wrapper test """
+"""
+Tests for :mod:`otter.scheduler`
+"""
+
 from twisted.trial.unittest import TestCase
-from otter.scheduler import check_for_events
+from twisted.internet import defer
+from twisted.internet.task import Clock
+
+import mock
+
+from otter.scheduler import SchedulerService
 from otter.test.utils import iMock, DeferredTestMixin, patch
 from otter.models.interface import IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection
 from otter.rest.application import set_store
-from twisted.internet import defer
-import mock
-from twisted.internet.interfaces import IReactorTime
 
 
 class SchedulerTestCase(DeferredTestMixin, TestCase):
     """
-    Test the scheduler
+    Tests for :mod:`SchedulerService`
     """
 
     def setUp(self):
         """
-        setup
+        mock all the dependencies of SchedulingService that includes cass store,
+        store's fetch and delete events methods, scaling group on which controller
+        will execute scaling policy. Hence, controller.maybe_execute_scaling_policy.
+        twisted.internet.task.Clock is used to simulate time
         """
 
         self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
@@ -53,26 +61,27 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_log = mock.MagicMock()
 
-        controller_patcher = mock.patch('otter.scheduler.controller')
-        self.mock_controller = controller_patcher.start()
-        self.addCleanup(controller_patcher.stop)
+        self.mock_controller = patch(self, 'otter.scheduler.controller')
+
+        self.clock = Clock()
+        self.scheduler_service = SchedulerService(100, 1, self.clock)
 
     def test_empty(self):
         """
-        Test what happens when you launch it with no events
+        No policies are executed when empty no events are there before now
         """
         self.returns = [[]]
-        d = check_for_events(self.mock_log, 100)
+        d = self.scheduler_service.check_for_events(100, self.mock_log)
         result = self.successResultOf(d)
         self.assertEqual(self.mock_store.delete_events.call_count, 0)
         self.assertEquals(result, None)
 
     def test_one(self):
         """
-        Test with one event
+        policy is executed when its corresponding event is there before now
         """
         self.returns = [[('1234', 'scal44', 'pol44', 'now')]]
-        d = check_for_events(self.mock_log, 100)
+        d = self.scheduler_service.check_for_events(100, self.mock_log)
         result = self.successResultOf(d)
         self.assertEquals(result, None)
 
@@ -90,32 +99,19 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
     def test_many(self):
         """
-        Test with many events
+        All polices whose event is there before now is executed
         """
-        deferLater_patcher = mock.patch('otter.scheduler.task.deferLater')
-        deferLater = deferLater_patcher.start()
-        self.addCleanup(deferLater_patcher.stop)
-        mockcalllater = iMock(IReactorTime)
-
         self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
-                        [('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        [('1234', 'scal44', 'pol45', 'now') for i in range(100)],
                         []]
 
-        def _second_time(clock, seconds, functions, *args, **kwargs):
-            functions(*args, **kwargs)
-
-        deferLater.side_effect = _second_time
-
-        d = check_for_events(self.mock_log, 100, mockcalllater)
-        result = self.successResultOf(d)
-        self.assertEquals(result, None)
-
+        d = self.scheduler_service.check_for_events(100, self.mock_log)
+        self.clock.pump([1, 1])
+        self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.mock_group.modify_state.call_count, 200)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
-        self.assertEqual(deferLater.call_count, 2)
         self.assertEqual(self.mock_store.delete_events.call_count, 2)
-        self.mock_store.delete_events.assert_called_with(['pol44' for i in range(100)])
-        deferLater.assert_called_with(mockcalllater, 0, check_for_events,
-                                      self.mock_log.bind.return_value.bind.return_value,
-                                      100, mockcalllater)
+        self.assertEqual(self.mock_store.delete_events.mock_calls,
+                         [mock.call(['pol44' for i in range(100)]),
+                          mock.call(['pol45' for i in range(100)])])
