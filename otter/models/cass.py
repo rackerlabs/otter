@@ -20,7 +20,7 @@ import iso8601
 from datetime import datetime
 
 
-LOCK_TABLE_NAME = 'lock'
+LOCK_TABLE_NAME = 'locks'
 
 
 class CassBadDataError(Exception):
