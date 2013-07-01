@@ -71,7 +71,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         No policies are executed when empty no events are there before now
         """
         self.returns = [[]]
-        d = self.scheduler_service.check_for_events(100, self.mock_log)
+        d = self.scheduler_service.check_for_events(100)
         result = self.successResultOf(d)
         self.assertEqual(self.mock_store.delete_events.call_count, 0)
         self.assertEquals(result, None)
@@ -81,7 +81,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         policy is executed when its corresponding event is there before now
         """
         self.returns = [[('1234', 'scal44', 'pol44', 'now')]]
-        d = self.scheduler_service.check_for_events(100, self.mock_log)
+        d = self.scheduler_service.check_for_events(100)
         result = self.successResultOf(d)
         self.assertEquals(result, None)
 
@@ -105,8 +105,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
                         [('1234', 'scal44', 'pol45', 'now') for i in range(100)],
                         []]
 
-        d = self.scheduler_service.check_for_events(100, self.mock_log)
-        self.clock.pump([1, 1])
+        d = self.scheduler_service.check_for_events(100)
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.mock_group.modify_state.call_count, 200)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
@@ -115,3 +114,19 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_store.delete_events.mock_calls,
                          [mock.call(['pol44' for i in range(100)]),
                           mock.call(['pol45' for i in range(100)])])
+
+    def test_timer_works(self):
+        """
+        The scheduler executes every x seconds
+        """
+        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(10)],
+                        [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        self.scheduler_service.startService()
+        self.clock.advance(1)
+        self.assertEqual(self.mock_group.modify_state.call_count, 30)
+        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 30)
+        self.assertEqual(self.mock_store.get_scaling_group.call_count, 30)
+        self.assertEqual(self.mock_store.delete_events.call_count, 2)
+        self.assertEqual(self.mock_store.delete_events.mock_calls,
+                         [mock.call(['pol44' for i in range(10)]),
+                          mock.call(['pol45' for i in range(20)])])

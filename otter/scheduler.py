@@ -7,7 +7,7 @@ in the first place.
 from datetime import datetime
 from functools import partial
 
-from twisted.internet import defer, task, reactor
+from twisted.internet import defer
 from twisted.application.internet import TimerService
 
 from otter.util.hashkey import generate_transaction_id
@@ -32,14 +32,13 @@ class SchedulerService(TimerService):
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
-    def check_for_events(self, batchsize, _log=None):
+    def check_for_events(self, batchsize):
         """
         Check for events in the database before the present time.
 
         :return: a deferred that fires with None
         """
-        clock = self.clock or reactor
-        log = _log if _log else otter_log.bind(scheduler_run_id=generate_transaction_id())
+        log = otter_log.bind(scheduler_run_id=generate_transaction_id())
 
         def process_events(events):
 
@@ -59,7 +58,7 @@ class SchedulerService(TimerService):
 
         def check_for_more(events):
             if len(events) == batchsize:
-                return task.deferLater(clock, 0, self.check_for_events, batchsize, log)
+                return self.check_for_events(batchsize)
             return None
 
         def delete_events(events):
