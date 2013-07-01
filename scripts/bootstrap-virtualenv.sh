@@ -17,5 +17,6 @@ fi
 
 source ${VE_DIR}/bin/activate
 
+pip install -r opt_requirements.txt
 pip install -r dev_requirements.txt
 pip install -r requirements.txt
