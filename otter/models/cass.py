@@ -20,6 +20,9 @@ import iso8601
 from datetime import datetime
 
 
+LOCK_TABLE_NAME = 'lock'
+
+
 class CassBadDataError(Exception):
     """
     Error to be raised when attempting operations on an entity that does not
@@ -418,7 +421,7 @@ class CassScalingGroup(object):
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
-        lock = BasicLock(self.connection, 'lock', self.uuid)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
         return with_lock(lock, _modify_state)
 
     def update_config(self, data):
@@ -753,7 +756,7 @@ class CassScalingGroup(object):
             d.addCallback(_maybe_delete)
             return d
 
-        lock = BasicLock(self.connection, 'lock', self.uuid)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
         return with_lock(lock, _delete_group)
 
 
