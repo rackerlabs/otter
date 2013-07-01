@@ -1243,8 +1243,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         policies and webhooks if the scaling group is empty.
         It uses naive calls all the way down.
         """
-        # we mock out delete policy, since that is already tested separately
-
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, {}, {}, None, {}, False))
 
@@ -1274,8 +1272,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         If the lock is not acquired, do not delete the group.
         """
-        # we mock out delete policy, since that is already tested separately
-
         def acquire():
             return defer.fail(BusyLockError('', ''))
         self.lock.acquire.side_effect = acquire
