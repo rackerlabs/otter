@@ -10,8 +10,10 @@ from cloudcafe.auth.config import UserAuthConfig, UserConfig
 from autoscale.client import AutoscalingAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
+from autoscale.otter_constants import OtterConstants
 
 import os
+from time import sleep
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -81,6 +83,8 @@ class AutoscaleFixture(BaseTestFixture):
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
+        cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
+        cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
 
     def validate_headers(self, headers):
         """
@@ -170,6 +174,21 @@ class AutoscaleFixture(BaseTestFixture):
         if args is 'cron_style':
             self.assertEquals(get_policy.args.cron, created_policy['schedule_value'],
                               msg='Cron style schedule policy value not as expected')
+
+    def create_default_at_style_policy_wait_for_execution(self, group_id, delay=0,
+                                                          scale_down=None):
+        """
+        Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
+        the scheduler config seconds + delay, so that the policy is picked
+        """
+        if scale_down is True:
+            self.sp_change = -self.sp_change
+        self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=group_id,
+            sp_cooldown=0,
+            sp_change=self.sp_change,
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
+        sleep(self.scheduler_interval + delay)
 
     @classmethod
     def tearDownClass(cls):
