@@ -137,13 +137,13 @@ class Lbaas(AutoMarshallingModel):
         return lbaas
 
 
-class Args(AutoMarshallingModel):
+class PolicyArgs(AutoMarshallingModel):
     """
     Marshalling for Args of the scheduler policy
     """
 
     def __init__(self, **kwargs):
-        super(Args, self).__init__()
+        super(PolicyArgs, self).__init__()
         for keys, values in kwargs.items():
             setattr(self, keys, values)
 
@@ -153,7 +153,7 @@ class Args(AutoMarshallingModel):
 
     @classmethod
     def _dict_to_obj(cls, args_dict):
-        args = Args(**args_dict)
+        args = PolicyArgs(**args_dict)
         for each in args_dict:
             if each.startswith('{'):
                 newkey = re.split('}', each)[1]

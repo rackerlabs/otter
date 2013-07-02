@@ -36,18 +36,12 @@ class AutoscaleBehaviors(BaseBehavior):
         """
         Creates a scaling group with only the required fields
         """
-        if gc_name is None:
-            gc_name = rand_name('test_sgroup')
-        else:
-            gc_name = (str(gc_name))
+        gc_name = gc_name and str(gc_name) or rand_name('test_sgroup')
         if gc_cooldown is None:
             gc_cooldown = int(self.autoscale_config.gc_cooldown)
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
-        if lc_name is None:
-            lc_name = rand_name('test_min_srv')
-        else:
-            lc_name = rand_name(str(lc_name))
+        lc_name = lc_name and str(lc_name) or rand_name('test_min_srv')
         if lc_image_ref is None:
             lc_image_ref = self.autoscale_config.lc_image_ref
         if lc_flavor_ref is None:
@@ -72,18 +66,12 @@ class AutoscaleBehaviors(BaseBehavior):
         Creates a scaling group with given parameters and default the other
         required fields if not already given
         """
-        if gc_name is None:
-            gc_name = rand_name('test_sgroup_bhv_')
-        else:
-            gc_name = (str(gc_name))
+        gc_name = gc_name and str(gc_name) or rand_name('test_sgroup_bhv_')
         if gc_cooldown is None:
             gc_cooldown = int(self.autoscale_config.gc_cooldown)
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
-        if lc_name is None:
-            lc_name = rand_name('test_sg_bhv_srv')
-        else:
-            lc_name = (str(lc_name))
+        lc_name = lc_name and str(lc_name) or rand_name('test_sg_bhv_srv')
         if lc_image_ref is None:
             lc_image_ref = self.autoscale_config.lc_image_ref
         if lc_flavor_ref is None:
@@ -163,10 +151,7 @@ class AutoscaleBehaviors(BaseBehavior):
         :return: returns the newly created policy in the form of a dict
         :rtype: returns the policy dict
         """
-        if sp_name is None:
-            sp_name = rand_name('test_sp')
-        else:
-            sp_name = (str(sp_name))
+        sp_name = sp_name and str(sp_name) or rand_name('test_sp')
         if sp_cooldown is None:
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
@@ -191,10 +176,7 @@ class AutoscaleBehaviors(BaseBehavior):
                  to config's default
         :rtype: returns the policy object
         """
-        if sp_name is None:
-            sp_name = rand_name('testsp_')
-        else:
-            sp_name = (str(sp_name))
+        sp_name = sp_name and str(sp_name) or rand_name('testsp_')
         if sp_cooldown is None:
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
@@ -228,10 +210,7 @@ class AutoscaleBehaviors(BaseBehavior):
         :return: returns the newly created policy object
         :rtype: returns the policy object
         """
-        if sp_name is None:
-            sp_name = rand_name('testscheduler_')
-        else:
-            sp_name = (str(sp_name))
+        sp_name = sp_name and str(sp_name) or rand_name('testscheduler_')
         if sp_cooldown is None:
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if schedule_cron:

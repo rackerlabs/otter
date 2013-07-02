@@ -3,7 +3,7 @@ Marshalling for autoscale reponses
 """
 from cafe.engine.models.base import AutoMarshallingModel
 from autoscale.models.response.group_response import Active, Pending,\
-    Server, Lbaas, Args
+    Server, Lbaas, PolicyArgs
 from autoscale.models.servers import Metadata, Links
 import json
 import re
@@ -195,7 +195,7 @@ class Policy(AutoMarshallingModel):
         if hasattr(policy, 'links'):
             policy.links = Links._dict_to_obj(policy.links)
         if hasattr(policy, 'args'):
-            policy.args = Args._dict_to_obj(policy.args)
+            policy.args = PolicyArgs._dict_to_obj(policy.args)
         attr_list = ['id', 'name', 'change', 'changePercent', 'desiredCapacity', 'cooldown', 'type']
         for k in attr_list:
             if hasattr(policy, k):

@@ -33,7 +33,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         pass
 
-    def test_schedule_cron_style_policy_invalid_cron(self):
+    def test_schedule_cron_style_policy_valid_cron(self):
         """
         Creating a scaling policy of type schedule with different valid crons results
         in a 201.
@@ -52,3 +52,34 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                               ' for group {2}'
                               .format(each_schedule_value,
                                       schedule_policy_cron_style['status_code'], self.group.id))
+            self.assertEquals(
+                schedule_policy_cron_style['schedule_type'], 'cron',
+                msg="Scaling policy's schedule type does not match")
+            self.assertEquals(
+                schedule_policy_cron_style[
+                    'schedule_value'], each_schedule_value,
+                msg="Scaling policy's schedule value does not match")
+
+    def test_schedule_at_style_policy_without_seconds(self):
+        """
+        Creating a scaling policy of type schedule with (at style) without seconds
+        results in a 201.
+        """
+        schedule_value_list = [self.autoscale_behaviors.get_time_in_utc(3155760000),
+                               '2013-12-05T03:12Z']
+        for each_schedule_value in schedule_value_list:
+            schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+                group_id=self.group.id,
+                sp_change=self.sp_change,
+                schedule_at=each_schedule_value)
+            self.assertEquals(schedule_policy_at_style['status_code'], 201,
+                              msg='Create schedule scaling at style policy without seconds results'
+                              'in {0} for group {1}'
+                              .format(schedule_policy_at_style['status_code'], self.group.id))
+            self.assertEquals(
+                schedule_policy_at_style['schedule_type'], 'at',
+                msg="Scaling policy's schedule type does not match")
+            self.assertEquals(
+                schedule_policy_at_style[
+                    'schedule_value'], each_schedule_value,
+                msg="Scaling policy's schedule value does not match")

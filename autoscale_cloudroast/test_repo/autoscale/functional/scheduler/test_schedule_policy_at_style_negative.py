@@ -21,8 +21,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
-        self.create_group_response = self.autoscale_behaviors.create_scaling_group_min(
-        )
+        self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
                            self.autoscale_client.delete_scaling_group)
@@ -111,21 +110,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
-    def test_schedule_at_style_policy_without_seconds(self):
-        """
-        Creating a scaling policy of type schedule with (at style) without seconds
-        results in a 400.
-        """
-        schedule_value = '2013-12-05T03:12Z'
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_at=schedule_value)
-        self.assertEquals(schedule_policy_at_style['status_code'], 400,
-                          msg='Create schedule scaling at style policy without seconds results'
-                          'in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
-
     def test_schedule_at_style_policy_with_date_in_the_past(self):
         """
         Creating a scaling policy of type schedule with (at style) date in the past
@@ -140,22 +124,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with date in the past'
                           'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
-
-    def test_at_style_policy_scheduled_date_100_years_in_the_future(self):
-        """
-        Creating a scaling policy of type schedule with at style date 100 years in the future
-        fails with 400.
-        ** fails with 201 **
-        """
-        schedule_value = self.autoscale_behaviors.get_time_in_utc(3155760000)
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_at=schedule_value)
-        self.assertEquals(schedule_policy_at_style['status_code'], 400,
-                          msg='Create schedule scaling at style policy with date 100 years in'
-                          'the future {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
     def test_schedule_at_style_policy_with_only_date(self):
