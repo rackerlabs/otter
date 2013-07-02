@@ -31,7 +31,7 @@ class SchedulerService(TimerService):
         :param int interval: time between each iteration
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
-        # TODO: Getting impl details on store. Not good
+        # TODO: Getting impl details not part of interface. NOT GOOD
         slv_client = get_store().connection
         self.lock = BasicLock(slv_client, 'lock', 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
