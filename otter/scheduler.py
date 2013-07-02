@@ -16,6 +16,7 @@ from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
+from otter.models.cass import LOCK_TABLE_NAME
 
 
 class SchedulerService(TimerService):
@@ -23,7 +24,7 @@ class SchedulerService(TimerService):
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, clock=None):
+    def __init__(self, batchsize, interval, slv_client, clock=None):
         """
         Initializes the scheduler service with batch size and interval
 
@@ -31,9 +32,7 @@ class SchedulerService(TimerService):
         :param int interval: time between each iteration
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
-        # TODO: Getting impl details not part of interface. NOT GOOD
-        slv_client = get_store().connection
-        self.lock = BasicLock(slv_client, 'lock', 'schedule', max_retry=0)
+        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
@@ -43,24 +42,27 @@ class SchedulerService(TimerService):
 
         :return: a deferred that fires with None
         """
-        d = with_lock(self.lock, self.fetch_and_process, batchsize)
 
         def check_for_more(events):
             if len(events) == batchsize:
-                return with_lock(self.lock, self.fetch_and_process, batchsize)
+                return _do_check()
             return None
 
-        d.addCallback(check_for_more)
-        # Return if we do not get lock as other process might be processing current events
-        d.addErrback(lambda f: f.trap(BusyLockError))
-        return d
+        def _do_check():
+            d = with_lock(self.lock, self.fetch_and_process, batchsize)
+            d.addCallback(check_for_more)
+            # Return if we do not get lock as other process might be processing current events
+            d.addErrback(lambda f: f.trap(BusyLockError) and None)
+            return d
+
+        return _do_check()
 
     def fetch_and_process(self, batchsize):
         """
         Fetch the events to be processed and process them.
         Also delete/update after processing them
 
-        :return: a deferred that fires with None
+        :return: a deferred that fires with list of events processed
         """
         log = otter_log.bind(scheduler_run_id=generate_transaction_id())
 

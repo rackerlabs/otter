@@ -8,10 +8,13 @@ from twisted.internet.task import Clock
 
 import mock
 
+from silverberg.lock import BusyLockError
+
 from otter.scheduler import SchedulerService
 from otter.test.utils import iMock, DeferredTestMixin, patch
 from otter.models.interface import IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection
 from otter.rest.application import set_store
+from otter.models.cass import LOCK_TABLE_NAME
 
 
 class SchedulerTestCase(DeferredTestMixin, TestCase):
@@ -63,8 +66,16 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_controller = patch(self, 'otter.scheduler.controller')
 
+        def _mock_with_lock(lock, func, *args, **kwargs):
+            return defer.maybeDeferred(func, *args, **kwargs)
+
+        self.mock_lock = patch(self, 'otter.scheduler.BasicLock')
+        self.mock_with_lock = patch(self, 'otter.scheduler.with_lock')
+        self.mock_with_lock.side_effect = _mock_with_lock
+        self.slv_client = mock.MagicMock()
+
         self.clock = Clock()
-        self.scheduler_service = SchedulerService(100, 1, self.clock)
+        self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
 
     def test_empty(self):
         """
@@ -99,17 +110,18 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
     def test_many(self):
         """
-        All polices whose event is there before now is executed
+        Events are fetched and processed as batches of 100. Its corresponding policies
+        are executed.
         """
         self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
                         [('1234', 'scal44', 'pol45', 'now') for i in range(100)],
                         []]
-
         d = self.scheduler_service.check_for_events(100)
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.mock_group.modify_state.call_count, 200)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 3)
         self.assertEqual(self.mock_store.delete_events.call_count, 2)
         self.assertEqual(self.mock_store.delete_events.mock_calls,
                          [mock.call(['pol44' for i in range(100)]),
@@ -130,3 +142,83 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_store.delete_events.mock_calls,
                          [mock.call(['pol44' for i in range(10)]),
                           mock.call(['pol45' for i in range(20)])])
+
+    def test_called_with_lock(self):
+        """
+        ``fetch_and_process`` is called with a lock
+        """
+        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+                                               max_retry=0)
+
+        d = self.scheduler_service.check_for_events(100)
+
+        self.assertIsNone(self.successResultOf(d))
+        lock = self.mock_lock.return_value
+        self.assertEqual(self.mock_with_lock.call_count, 2)
+        self.assertEqual(self.mock_with_lock.mock_calls,
+                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
+        self.assertEqual(self.mock_group.modify_state.call_count, 120)
+        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 120)
+        self.assertEqual(self.mock_store.get_scaling_group.call_count, 120)
+        self.assertEqual(self.mock_store.delete_events.call_count, 2)
+        self.assertEqual(self.mock_store.delete_events.mock_calls,
+                         [mock.call(['pol44' for i in range(100)]),
+                          mock.call(['pol45' for i in range(20)])])
+
+    def test_does_nothing_on_no_lock(self):
+        """
+        ``check_for_events`` gracefully does nothing when it does not get a lock. It
+        does not call ``fetch_and_process``
+        """
+        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+                                               max_retry=0)
+
+        with_lock_impl = lambda *args: defer.fail(BusyLockError(LOCK_TABLE_NAME, 'schedule'))
+        self.mock_with_lock.side_effect = with_lock_impl
+
+        d = self.scheduler_service.check_for_events(100)
+
+        self.assertIsNone(self.successResultOf(d))
+        lock = self.mock_lock.return_value
+        self.assertEqual(self.mock_with_lock.call_count, 1)
+        self.assertEqual(self.mock_with_lock.mock_calls,
+                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 0)
+        self.assertEqual(self.mock_group.modify_state.call_count, 0)
+        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 0)
+        self.assertEqual(self.mock_store.get_scaling_group.call_count, 0)
+        self.assertEqual(self.mock_store.delete_events.call_count, 0)
+
+    def test_does_nothing_on_no_lock_second_time(self):
+        """
+        ``check_for_events`` gracefully does nothing when it does not get a lock after
+        finishing first batch of 100 events. It does not call ``fetch_and_process`` second time
+        """
+        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
+                        [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+                                               max_retry=0)
+
+        _with_lock_first_time = [True]
+
+        def _with_lock(lock, func, *args, **kwargs):
+            if _with_lock_first_time[0]:
+                _with_lock_first_time[0] = False
+                return defer.maybeDeferred(func, *args, **kwargs)
+            raise BusyLockError(LOCK_TABLE_NAME, 'schedule')
+
+        self.mock_with_lock.side_effect = _with_lock
+
+        d = self.scheduler_service.check_for_events(100)
+
+        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.mock_with_lock.call_count, 2)
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
+        self.assertEqual(self.mock_group.modify_state.call_count, 100)
+        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 100)
+        self.assertEqual(self.mock_store.get_scaling_group.call_count, 100)
+        self.assertEqual(self.mock_store.delete_events.call_count, 1)
