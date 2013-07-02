@@ -26,7 +26,7 @@ from otter.rest.application import root, set_store
 from otter.test.resources import OtterKeymaster
 
 from otter.test.rest.request import path_only, request, RequestTestMixin
-from otter.test.utils import patch
+from otter.test.utils import LockMixin, patch
 from otter.util.config import set_config_data
 
 
@@ -39,7 +39,7 @@ else:
     store = CassScalingGroupCollection(keyspace.client)
 
 
-class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
+class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
     """
     Test case for testing the REST API for the scaling group specific endpoints
     (not policies or webhooks) against the Cassandra model.
@@ -71,6 +71,9 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
                 state.tenant_id, state.group_id, *self.active_pending_etc))
 
         self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
+
+        self.lock = self.mock_lock()
+        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
     def tearDown(self):
         """
@@ -246,7 +249,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin):
         yield self.assert_state(path, 2, False)
 
 
-class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
+class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
     """
     Test case for testing the REST API for the scaling policy specific endpoints
     (but not webhooks) against the mock model.
@@ -269,6 +272,9 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin):
         self._launch = launch_server_config()[0]
 
         self.mock_controller = patch(self, 'otter.rest.policies.controller')
+
+        self.lock = self.mock_lock()
+        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
         def _set_group_id(manifest):
             self.group_id = manifest['id']

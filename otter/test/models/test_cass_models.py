@@ -22,6 +22,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError)
 
+from otter.test.utils import LockMixin
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -31,6 +32,7 @@ from otter.test.utils import patch
 
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
+from silverberg.lock import BusyLockError
 
 
 def _de_identify(json_obj):
@@ -119,7 +121,7 @@ class FilterDeletedTestCase(TestCase):
         self.assertEqual(filter_deleted(rows), [rows[0], rows[2]])
 
 
-class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
+class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
     """
@@ -172,6 +174,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
+
+        self.lock = self.mock_lock()
+        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
     def _test_view_things_errors(self, callback_to_test, *args, **kwargs):
         """
@@ -286,6 +291,32 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
+
+        self.lock.acquire.assert_called_once_with()
+        self.lock.release.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.serialize_json_data',
+                side_effect=lambda *args: _S(args[0]))
+    def test_modify_state_lock_not_acquired(self, mock_serial):
+        """
+        ``modify_state`` writes the state the modifier returns to the database
+        """
+        def acquire():
+            return defer.fail(BusyLockError('', ''))
+        self.lock.acquire.side_effect = acquire
+
+        def modifier(group, state):
+            raise
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+
+        d = self.group.modify_state(modifier)
+        result = self.failureResultOf(d)
+        self.assertTrue(result.check(BusyLockError))
+
+        self.assertEqual(self.connection.execute.call_count, 0)
+        self.lock.acquire.assert_called_once_with()
+        self.assertEqual(self.lock.release.call_count, 0)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -1213,8 +1244,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         policies and webhooks if the scaling group is empty.
         It uses naive calls all the way down.
         """
-        # we mock out delete policy, since that is already tested separately
-
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, {}, {}, None, {}, False))
 
@@ -1235,6 +1264,28 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
+
+        self.lock.acquire.assert_called_once_with()
+        self.lock.release.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    def test_delete_lock_not_acquired(self, mock_view_state):
+        """
+        If the lock is not acquired, do not delete the group.
+        """
+        def acquire():
+            return defer.fail(BusyLockError('', ''))
+        self.lock.acquire.side_effect = acquire
+
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+
+        d = self.group.delete_group()
+        result = self.failureResultOf(d)
+        self.assertTrue(result.check(BusyLockError))
+
+        self.assertEqual(self.connection.execute.call_count, 0)
+        self.lock.acquire.assert_called_once_with()
 
 
 # wrapper for serialization mocking - 'serialized' things will just be wrapped

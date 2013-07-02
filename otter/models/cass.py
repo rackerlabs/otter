@@ -13,10 +13,14 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
 from silverberg.client import ConsistencyLevel
+from silverberg.lock import BasicLock, with_lock
 
 import json
 import iso8601
 from datetime import datetime
+
+
+LOCK_TABLE_NAME = 'locks'
 
 
 class CassBadDataError(Exception):
@@ -398,8 +402,6 @@ class CassScalingGroup(object):
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
-
-        TODO: locking!!
         """
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -416,9 +418,12 @@ class CassScalingGroup(object):
             return self.connection.execute(_cql_update_group_state, params,
                                            get_consistency_level('update', 'state'))
 
-        d = self.view_state()
-        d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
-        return d.addCallback(_write_state)
+        def _modify_state():
+            d = self.view_state()
+            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
+            return d.addCallback(_write_state)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        return with_lock(lock, _modify_state)
 
     def update_config(self, data):
         """
@@ -732,13 +737,7 @@ class CassScalingGroup(object):
     def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
-
-        TODO: locking!!
-        XXX: What happens if a group is deleted while policie stuff is updating?
-            seems like locking/some kind of coordination must happen.
         """
-        d = self.view_state()
-
         def _maybe_delete(state):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
@@ -754,9 +753,13 @@ class CassScalingGroup(object):
 
             return b.execute(self.connection)
 
-        d.addCallback(_maybe_delete)
+        def _delete_group():
+            d = self.view_state()
+            d.addCallback(_maybe_delete)
+            return d
 
-        return d
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        return with_lock(lock, _delete_group)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
