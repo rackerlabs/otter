@@ -41,8 +41,6 @@ def run(args):
                  "Number of group states (should be same as above): {0}"),
                 ("SELECT COUNT(*) FROM scaling_policies WHERE deleted=false;", True,
                  "Number of scaling policies: {0}"),
-                ("SELECT COUNT(*) FROM scaling_config WHERE deleted=false;", True,
-                 "Number of scaling groups: {0}"),
                 ("SELECT COUNT(*) FROM policy_webhooks WHERE deleted=false;", True,
                  "Number of webhooks: {0}"),
                 ]
