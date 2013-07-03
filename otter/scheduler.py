@@ -30,6 +30,8 @@ class SchedulerService(TimerService):
 
         :param int batchsize: number of events to fetch on each iteration
         :param int interval: time between each iteration
+        :param slv_client: a :class:`silverberg.client.CQLClient` or
+                    :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
