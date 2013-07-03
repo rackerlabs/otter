@@ -41,14 +41,13 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.mock_store.fetch_batch_of_events.side_effect = _responses
 
-        # Tribal knowledge: When you are returning a defer that succeeds, you
-        # need to return it as a side effect instead of just a return value.
-        self.mock_store.delete_events.side_effect = lambda _: defer.succeed(None)
+        self.mock_store.delete_events.return_value = defer.succeed(None)
 
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
             return_value='transaction-id')
         set_store(self.mock_store)
+        self.addCleanup(set_store, None)
 
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
@@ -68,11 +67,13 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
     def test_empty(self):
         """
-        No policies are executed when empty no events are there before now
+        No policies are executed when ``fetch_batch_of_events`` return empty list
+        i.e. no events are there before now
         """
         self.returns = [[]]
         d = self.scheduler_service.check_for_events(100)
         result = self.successResultOf(d)
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
         self.assertEqual(self.mock_store.delete_events.call_count, 0)
         self.assertEquals(result, None)
 
@@ -85,6 +86,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         result = self.successResultOf(d)
         self.assertEquals(result, None)
 
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '1234', 'scal44')
         self.assertEqual(self.mock_group.modify_state.call_count, 1)
         self.mock_store.delete_events.assert_called_once_with(['pol44'])
@@ -107,6 +109,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         d = self.scheduler_service.check_for_events(100)
         self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 3)
         self.assertEqual(self.mock_group.modify_state.call_count, 200)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
@@ -121,8 +124,14 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(10)],
                         [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        # events not fetched before startService
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 0)
         self.scheduler_service.startService()
+        # events fetched after calling startService
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
         self.clock.advance(1)
+        # events are fetched again after timer expires
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 2)
         self.assertEqual(self.mock_group.modify_state.call_count, 30)
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 30)
         self.assertEqual(self.mock_store.get_scaling_group.call_count, 30)
