@@ -51,7 +51,9 @@ def run(args):
     try:
         connection = connect(args.host, args.port, cql_version='3.0.4')
     except Exception as e:
-        print "CONNECTION ERROR: {0}".format(e.why)
+        if getattr(e, 'why', False):
+            e.message = e.why
+        print "CONNECTION ERROR: {0}".format(e.message)
         sys.exit(1)
 
     cursor = connection.cursor()
