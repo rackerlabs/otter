@@ -76,6 +76,21 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.clock = Clock()
         self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
 
+    def validate_calls(self, d, fetch_call_count, events):
+        """
+        Validate all the calls made in the service w.r.t to the events
+        """
+        num_events = len(events)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, fetch_call_count)
+        self.assertEqual(self.mock_group.modify_state.call_count, num_events)
+        self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
+                         [mock.call(mock.ANY, tid, gid) for tid, gid, pid, t in events])
+        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.mock_calls,
+                         [mock.call(mock.ANY, 'transaction-id', self.mock_group,
+                          self.mock_state, policy_id=policy_id)
+                         for tid, gid, policy_id, t in events])
+
     def test_empty(self):
         """
         No policies are executed when ``fetch_batch_of_events`` return empty list
@@ -83,74 +98,50 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         self.returns = [[]]
         d = self.scheduler_service.check_for_events(100)
-        result = self.successResultOf(d)
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
-        self.assertEqual(self.mock_store.delete_events.call_count, 0)
-        self.assertEquals(result, None)
+        self.validate_calls(d, 1, [])
 
     def test_one(self):
         """
         policy is executed when its corresponding event is there before now
         """
-        self.returns = [[('1234', 'scal44', 'pol44', 'now')]]
+        events = [('1234', 'scal44', 'pol44', 'now')]
+        self.returns = [events]
+
         d = self.scheduler_service.check_for_events(100)
-        result = self.successResultOf(d)
-        self.assertEquals(result, None)
 
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
-        self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '1234', 'scal44')
-        self.assertEqual(self.mock_group.modify_state.call_count, 1)
-        self.mock_store.delete_events.assert_called_once_with(['pol44'])
-
-        self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            mock.ANY,
-            'transaction-id',
-            self.mock_group,
-            self.mock_state,
-            policy_id='pol44'
-        )
+        self.validate_calls(d, 1, events)
 
     def test_many(self):
         """
         Events are fetched and processed as batches of 100. Its corresponding policies
         are executed.
         """
-        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(100)],
-                        [('1234', 'scal44', 'pol45', 'now') for i in range(100)],
-                        []]
+        events1 = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
+        events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(100)]
+        self.returns = [events1, events2, []]
+
         d = self.scheduler_service.check_for_events(100)
-        self.assertIsNone(self.successResultOf(d))
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 3)
-        self.assertEqual(self.mock_group.modify_state.call_count, 200)
-        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 200)
-        self.assertEqual(self.mock_store.get_scaling_group.call_count, 200)
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 3)
-        self.assertEqual(self.mock_store.delete_events.call_count, 2)
-        self.assertEqual(self.mock_store.delete_events.mock_calls,
-                         [mock.call(['pol44' for i in range(100)]),
-                          mock.call(['pol45' for i in range(100)])])
+
+        self.validate_calls(d, 3, events1 + events2)
 
     def test_timer_works(self):
         """
         The scheduler executes every x seconds
         """
-        self.returns = [[('1234', 'scal44', 'pol44', 'now') for i in range(10)],
-                        [('1234', 'scal44', 'pol45', 'now') for i in range(20)]]
+        events1 = [('1234', 'scal44', 'pol44', 'now') for i in range(10)]
+        events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(20)]
+        self.returns = [events1, events2]
+
         # events not fetched before startService
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 0)
-        self.scheduler_service.startService()
+        self.validate_calls(defer.succeed(None), 0, [])
+
         # events fetched after calling startService
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
-        self.clock.advance(1)
+        self.scheduler_service.startService()
+        self.validate_calls(defer.succeed(None), 1, events1)
+
         # events are fetched again after timer expires
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 2)
-        self.assertEqual(self.mock_group.modify_state.call_count, 30)
-        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.call_count, 30)
-        self.assertEqual(self.mock_store.get_scaling_group.call_count, 30)
-        self.assertEqual(self.mock_store.delete_events.call_count, 2)
-        self.assertEqual(self.mock_store.delete_events.mock_calls,
-                         [mock.call(['pol44' for i in range(10)]),
-                          mock.call(['pol45' for i in range(20)])])
+        self.clock.advance(1)
+        self.validate_calls(defer.succeed(None), 2, events1 + events2)
 
     def test_called_with_lock(self):
         """
