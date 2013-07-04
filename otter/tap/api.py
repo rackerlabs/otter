@@ -31,6 +31,8 @@ from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
+from otter.scheduler import SchedulerService
+
 from silverberg.cluster import RoundRobinCassandraCluster
 
 
@@ -127,5 +129,10 @@ def makeService(config):
 
     api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
+
+    if config_value('scheduler'):
+        scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
+                                             int(config_value('scheduler.interval')))
+        scheduler_service.setServiceParent(s)
 
     return s

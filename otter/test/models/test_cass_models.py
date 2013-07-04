@@ -704,7 +704,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
                        'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
-                       'VALUES (:tenantId, :groupId, :policy0, :policy0Trigger) '
+                       'VALUES (:tenantId, :groupId, :policy0Id, :policy0Trigger) '
                        'APPLY BATCH;')
         expectedData = {"policy0": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
                                     '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
@@ -746,6 +746,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             '"groupId" = :groupId AND "policyId" = :policyId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND '
             '"groupId" = :groupId AND "policyId" = :policyId '
+            'DELETE FROM scaling_schedule WHERE "policyId" = :policyId; '
             'APPLY BATCH;')
         expected_data = {
             "tenantId": self.group.tenant_id,
