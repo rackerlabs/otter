@@ -169,6 +169,11 @@ documentation.  Here are a couple more suggestions:
    http://www.voidspace.org.uk/python/mock/helpers.html#autospeccing), so your tests do not pass by
    accident (e.g. when a mock evaluates to true, or when calling assert_X just calls a mock rather than
    the actually assert method)
+#. Be careful when mocking functions that return Deferred and expected to be called again in a single test.
+   If you set return_value to a Deferred, that same object is returned every time the function is
+   called. So, if in first call this returned Deferred is waiting on on another Deferred and this
+   function is called again then same deferred is returned and results will be unexpected. Instead,
+   use side_effect since a new Deferred object is returned everytime
 
 ----------------------------
 Interface testing guidelines
