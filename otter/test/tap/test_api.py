@@ -281,5 +281,6 @@ class APIMakeServiceTests(TestCase):
         mock_config['scheduler'] = {'interval': 10, 'batchsize': 100}
 
         expected_parent = makeService(mock_config)
-        scheduler_service.assert_called_once_with(100, 10)
+        scheduler_service.assert_called_once_with(100, 10,
+                                                  self.RoundRobinCassandraCluster.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)

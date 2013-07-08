@@ -132,7 +132,8 @@ def makeService(config):
 
     if config_value('scheduler'):
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
-                                             int(config_value('scheduler.interval')))
+                                             int(config_value('scheduler.interval')),
+                                             cassandra_cluster)
         scheduler_service.setServiceParent(s)
 
     return s
