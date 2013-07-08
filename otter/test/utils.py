@@ -5,6 +5,8 @@ import json
 import mock
 import os
 
+from silverberg.lock import BasicLock
+from twisted.internet import defer
 from zope.interface import directlyProvides
 
 
@@ -15,7 +17,8 @@ class matches(object):
     with mock.
 
     It allows testtools matchers to be used in places where comparisons for
-    equality would normally be used, such as the ``mock.Mock.assert_*`` methods.
+    equality would normally be used, such as the ``mock.Mock.assert_*``
+    methods.
 
     Example::
 
@@ -25,7 +28,8 @@ class matches(object):
                 ContainsDict(
                     {'baz': Equals('bax')})))
 
-    See `testtools.matchers <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
+    See `testtools.matchers
+    <http://mumak.net/testtools/apidocs/testtools.matchers.html>`_
     for a complete list of matchers provided with testtools.
 
     :param matcher: A testtools matcher that will be matched when this object
@@ -157,3 +161,27 @@ class SameJSON(object):
         repr containing the expected object.
         """
         return 'SameJSON({0!r})'.format(self._expected)
+
+
+class LockMixin(object):
+    """
+    A mixin for patching BasicLock.
+    """
+
+    def mock_lock(acquire_result=None, release_result=None):
+        """
+        :param acquire_result: A value to be returned by acquire.
+        :param release_result: A value to be returned by release.
+
+        :return: A mock BasicLock instance.
+        """
+        lock = mock.create_autospec(BasicLock)
+
+        def _acquire(*args, **kwargs):
+            return defer.succeed(acquire_result)
+        lock.acquire.side_effect = _acquire
+
+        def _release():
+            return defer.succeed(release_result)
+        lock.release.side_effect = _release
+        return lock

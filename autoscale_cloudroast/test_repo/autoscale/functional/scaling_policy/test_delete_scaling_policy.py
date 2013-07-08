@@ -25,14 +25,14 @@ class DeleteScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_delete_scaling_policy(self):
         """
-        Verify the delete policy call for response code, headers.
+        Verify the delete policy call for response code 204, headers.
         """
         delete_policy = self.autoscale_client.delete_scaling_policy(
             group_id=self.group.id,
             policy_id=self.policy['id'])
         self.assertEquals(delete_policy.status_code, 204,
-                          msg='Delete scaling policy failed with %s'
-                          % delete_policy.status_code)
+                          msg='Delete scaling policy failed with {0}'
+                          .format(delete_policy.status_code))
         self.assertTrue(delete_policy.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(delete_policy.headers)

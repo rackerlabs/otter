@@ -6,7 +6,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -53,8 +53,8 @@ fake_service_catalog = [
 
 class UtilityTests(TestCase):
     """
-    Tests for non-specific utilities that should be refactored out of the worker
-    implementation eventually.
+    Tests for non-specific utilities that should be refactored out of the
+    worker implementation eventually.
     """
 
     def test_private_ip_addresses(self):
@@ -92,7 +92,8 @@ class UtilityTests(TestCase):
         in a specific region.
         """
         self.assertEqual(
-            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack', 'DFW'),
+            public_endpoint_url(fake_service_catalog, 'cloudServersOpenStack',
+                                'DFW'),
             'http://dfw.openstack/')
 
 
@@ -183,11 +184,15 @@ class LoadBalancersTests(TestCase):
         Add to load balancers will call add_to_load_balancer multiple times and
         for each load balancer configuration and return all of the results.
         """
+        d1 = Deferred()
+        d2 = Deferred()
+        add_to_load_balancer_deferreds = [d1, d2]
+
         def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
             # Include the ID and port in the response so that we can verify
             # that add_to_load_balancers associates the response with the correct
             # load balancer.
-            return succeed((lb_config['loadBalancerId'], lb_config['port']))
+            return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
@@ -197,6 +202,9 @@ class LoadBalancersTests(TestCase):
                                    {'loadBalancerId': 54321,
                                     'port': 81}],
                                   '192.168.1.1')
+
+        d2.callback((54321, 81))
+        d1.callback((12345, 80))
 
         results = self.successResultOf(d)
 
@@ -230,7 +238,8 @@ class LoadBalancersTests(TestCase):
         self.treq.delete.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token', '12345', '1')
+        d = remove_from_load_balancer('http://url/', 'my-auth-token',
+                                      '12345', '1')
         failure = self.failureResultOf(d)
 
         self.assertTrue(failure.check(RequestError))
@@ -255,7 +264,9 @@ class ServerTests(TestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
-        self.generate_server_name = patch(self, 'otter.worker.launch_server_v1.generate_server_name')
+        self.generate_server_name = patch(
+            self,
+            'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name.return_value = 'as000000'
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
@@ -355,17 +366,19 @@ class ServerTests(TestCase):
         server_details.side_effect = _server_status
 
         d = wait_for_status(self.log,
-                            'http://url/', 'my-auth-token', 'serverId', 'ACTIVE',
-                            clock=clock)
+                            'http://url/', 'my-auth-token', 'serverId',
+                            'ACTIVE', clock=clock)
 
-        server_details.assert_called_with('http://url/', 'my-auth-token', 'serverId')
+        server_details.assert_called_with('http://url/', 'my-auth-token',
+                                          'serverId')
         self.assertEqual(server_details.call_count, 1)
 
         server_status[0] = 'ACTIVE'
 
         clock.advance(5)
 
-        server_details.assert_called_with('http://url/', 'my-auth-token', 'serverId')
+        server_details.assert_called_with('http://url/', 'my-auth-token',
+                                          'serverId')
         self.assertEqual(server_details.call_count, 2)
 
         result = self.successResultOf(d)
@@ -375,7 +388,8 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server(self, wait_for_status, create_server, add_to_load_balancers):
+    def test_launch_server(self, wait_for_status, create_server,
+                           add_to_load_balancers):
         """
         launch_server creates a server, waits until the server is active then
         adds the server's first private IPv4 address to any load balancers.
@@ -399,12 +413,14 @@ class ServerTests(TestCase):
 
         expected_server_config = {
             'imageRef': '1', 'flavorRef': '1', 'name': 'as000000',
-            'metadata': {'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}}
+            'metadata': {
+                'rax:auto_scaling_group_id': '1111111-11111-11111-11111111'}}
 
         server_details = {
             'server': {
                 'id': '1',
-                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
 
         create_server.return_value = succeed(server_details)
 
@@ -440,7 +456,8 @@ class ServerTests(TestCase):
                                                 'ACTIVE')
 
         add_to_load_balancers.assert_called_once_with(
-            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers, '10.0.0.1')
+            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            '10.0.0.1')
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -482,7 +499,8 @@ class ServerTests(TestCase):
         server_details = {
             'server': {
                 'id': '1',
-                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
 
         create_server.return_value = succeed(server_details)
 
@@ -518,7 +536,8 @@ class ServerTests(TestCase):
         server_details = {
             'server': {
                 'id': '1',
-                'addresses': {'private': [{'version': 4, 'addr': '10.0.0.1'}]}}}
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
 
         create_server.return_value = succeed(server_details)
 
@@ -551,7 +570,8 @@ class ConfigPreparationTests(TestCase):
         """
         Configure mocks.
         """
-        generate_server_name_patcher = mock.patch('otter.worker.launch_server_v1.generate_server_name')
+        generate_server_name_patcher = mock.patch(
+            'otter.worker.launch_server_v1.generate_server_name')
         self.generate_server_name = generate_server_name_patcher.start()
         self.addCleanup(generate_server_name_patcher.stop)
         self.generate_server_name.return_value = 'as000000'
@@ -566,7 +586,8 @@ class ConfigPreparationTests(TestCase):
         test_config = {'server': {'name': 'web.example.com'}}
         expected_name = 'as000000-web.example.com'
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
         self.assertEqual(expected_name, launch_config['server']['name'])
 
@@ -577,7 +598,8 @@ class ConfigPreparationTests(TestCase):
         test_config = {'server': {}}
         expected_name = 'as000000'
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
         self.assertEqual(expected_name, launch_config['server']['name'])
 
@@ -586,23 +608,29 @@ class ConfigPreparationTests(TestCase):
         The auto scaling group should be added to the server metadata.
         """
         test_config = {'server': {}}
-        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid}
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
-        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+        self.assertEqual(expected_metadata,
+                         launch_config['server']['metadata'])
 
     def test_server_merge_metadata(self):
         """
         The auto scaling metadata should be merged with specified metadata.
         """
         test_config = {'server': {'metadata': {'foo': 'bar'}}}
-        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
-                             'foo': 'bar'}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'foo': 'bar'}
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
-        self.assertEqual(expected_metadata, launch_config['server']['metadata'])
+        self.assertEqual(expected_metadata,
+                         launch_config['server']['metadata'])
 
     def test_load_balancer_metadata(self):
         """
@@ -611,12 +639,15 @@ class ConfigPreparationTests(TestCase):
         """
         test_config = {'server': {}, 'loadBalancers': [{'id': 1, 'port': 80}]}
 
-        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
-                             'rax:auto_scaling_server_name': 'as000000'}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:auto_scaling_server_name': 'as000000'}
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
-        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+        self.assertEqual(expected_metadata,
+                         launch_config['loadBalancers'][0]['metadata'])
 
     def test_load_balancer_metadata_merge(self):
         """
@@ -625,13 +656,16 @@ class ConfigPreparationTests(TestCase):
         test_config = {'server': {}, 'loadBalancers': [
             {'id': 1, 'port': 80, 'metadata': {'foo': 'bar'}}]}
 
-        expected_metadata = {'rax:auto_scaling_group_id': self.scaling_group_uuid,
-                             'rax:auto_scaling_server_name': 'as000000',
-                             'foo': 'bar'}
+        expected_metadata = {
+            'rax:auto_scaling_group_id': self.scaling_group_uuid,
+            'rax:auto_scaling_server_name': 'as000000',
+            'foo': 'bar'}
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
-        self.assertEqual(expected_metadata, launch_config['loadBalancers'][0]['metadata'])
+        self.assertEqual(expected_metadata,
+                         launch_config['loadBalancers'][0]['metadata'])
 
     def test_launch_config_is_copy(self):
         """
@@ -639,7 +673,8 @@ class ConfigPreparationTests(TestCase):
         """
         test_config = {'server': {}}
 
-        launch_config = prepare_launch_config(self.scaling_group_uuid, test_config)
+        launch_config = prepare_launch_config(self.scaling_group_uuid,
+                                              test_config)
 
         self.assertNotIdentical(test_config, launch_config)
 
@@ -667,7 +702,8 @@ class DeleteServerTests(TestCase):
         patch(self, 'otter.util.http.treq', new=self.treq)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_deletes_load_balancer_node(self, remove_from_load_balancer):
+    def test_delete_server_deletes_load_balancer_node(
+            self, remove_from_load_balancer):
         """
         delete_server removes the nodes specified in instance details from
         the associated load balancers.
@@ -696,14 +732,16 @@ class DeleteServerTests(TestCase):
         """
         remove_from_load_balancer.return_value = succeed(None)
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog,
+                          'my-auth-token', instance_details)
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
             'http://dfw.openstack/servers/a', headers=expected_headers)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_propagates_loadbalancer_failures(self, remove_from_load_balancer):
+    def test_delete_server_propagates_loadbalancer_failures(
+            self, remove_from_load_balancer):
         """
         delete_server propagates any errors from removing server from load
         balancers
@@ -711,13 +749,15 @@ class DeleteServerTests(TestCase):
         remove_from_load_balancer.return_value = fail(
             APIError(500, '')).addErrback(wrap_request_error, 'url')
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog,
+                          'my-auth-token', instance_details)
         failure = unwrap_first_error(self.failureResultOf(d))
 
         self.assertEqual(failure.value.reason.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
-    def test_delete_server_propagates_delete_server_api_failures(self, remove_from_load_balancer):
+    def test_delete_server_propagates_delete_server_api_failures(
+            self, remove_from_load_balancer):
         """
         delete_server fails with an APIError if deleting the server fails.
         """
@@ -730,7 +770,8 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(response)
         self.treq.content.return_value = succeed(error_body)
 
-        d = delete_server(self.log, 'DFW', fake_service_catalog, 'my-auth-token', instance_details)
+        d = delete_server(self.log, 'DFW', fake_service_catalog,
+                          'my-auth-token', instance_details)
         failure = self.failureResultOf(d)
 
         self.assertEqual(failure.value.reason.value.code, 500)

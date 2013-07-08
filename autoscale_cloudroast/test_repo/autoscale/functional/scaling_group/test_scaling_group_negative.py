@@ -3,7 +3,6 @@ Test negative scenarios for a scaling group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from autoscale.status_codes import HttpStatusCodes
-import sys
 
 
 class ScalingGroupNegative(AutoscaleFixture):
@@ -34,8 +33,8 @@ class ScalingGroupNegative(AutoscaleFixture):
     #     list_groups_resp = self.autoscale_client.list_scaling_groups()
     #     list_groups = list_groups_resp.entity
     #     self.assertEquals(list_groups_resp.status_code, 200,
-    #                       msg='The list group call when no groups exists failed with %s'
-    #                       % list_groups_resp.status_code)
+    #                       msg='The list group call when no groups exists failed with {0}'
+    #                       .format(list_groups_resp.status_code)
     #     self.validate_headers(list_groups_resp.headers)
     #     self.assertEquals(list_groups, [],
     #                       msg='Some scaling groups exist on the account')
@@ -50,11 +49,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_name='')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_group_name_whitespace(self):
         """
@@ -66,15 +65,15 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_name=' ')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_group_minentities_lessthan_zero(self):
         """
-        Negative Test: SCaling group should not get created when min entities
+        Negative Test: Scaling group should not get created when min entities
         are less than Zero
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
@@ -82,11 +81,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_min_entities='-100')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_group_maxentities_lessthan_zero(self):
         """
@@ -98,11 +97,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_max_entities='-0.01')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_group_maxentities_over_25(self):
         """
@@ -114,11 +113,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_max_entities='25.9')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_scaling_group_cooldown_lessthan_zero(self):
         """
@@ -130,38 +129,64 @@ class ScalingGroupNegative(AutoscaleFixture):
             gc_cooldown='-0.08')
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create scaling group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create scaling group with invalid request returned: {0}'
+                        .format(create_error))
 
-    #@unittest.skip('spinning up servers upon group creation not yet implemented')
     def test_scaling_group_minentities_max(self):
         """
-        Negative Test: Scaling group should not get created when min entities are max
+        Negative Test: Scaling group should not get created when min entities are over allowed
+        maxentities
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         gc_min_entities = 26
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=gc_min_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
-                          msg='Create scaling group passed with max minentities. Response: %s'
-                          % create_resp.status_code)
+                          msg='Create scaling group passed with max minentities. Response: {0}'
+                          .format(create_resp.status_code))
 
-    def test_scaling_group_maxentities_cooldown_max(self):
+    def test_create_scaling_group_minentities_over_max(self):
+        """
+        Negative Test: Scaling group should not get created when min entities are over maxentities
+        """
+        expected_status_code = HttpStatusCodes.BAD_REQUEST
+        gc_min_entities = 22
+        gc_max_entities = 2
+        create_resp = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=gc_min_entities,
+            gc_max_entities=gc_max_entities)
+        self.assertEquals(create_resp.status_code, expected_status_code,
+                          msg='Create scaling group passed with max < minentities. Response: {0}'
+                          .format(create_resp.status_code))
+
+    def test_scaling_group_maxentities_max(self):
         """
         Negative Test: Scaling group should not get created when max entities
-        and cooldown are maxint
+        is over 25
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         gc_max_entities = 26
-        gc_cooldown = sys.maxint
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_max_entities=gc_max_entities, gc_cooldown=gc_cooldown)
+            gc_max_entities=gc_max_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
-                          msg='Create group passed when maxntities and cooldown are max. Response: %s'
-                          % create_resp.status_code)
+                          msg='Create group passed when maxntities is over 25 with response: {0}'
+                          .format(create_resp.status_code))
+
+    def test_scaling_group_with_max_cooldown(self):
+        """
+        Negative Test: Scaling group should not get created when cooldown
+        is over 86400 seconds (24 hrs)
+        """
+        expected_status_code = HttpStatusCodes.BAD_REQUEST
+        gc_cooldown = 86401
+        create_resp = self.autoscale_behaviors.create_scaling_group_given(
+            gc_cooldown=gc_cooldown)
+        self.assertEquals(create_resp.status_code, expected_status_code,
+                          msg='Create group passed when cooldown is over 24 hrs with response: {0}'
+                          .format(create_resp.status_code))
 
     def test_get_invalid_group_id(self):
         """
@@ -174,11 +199,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             group_id=group)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_update_invalid_group_id(self):
         """
@@ -196,11 +221,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             metadata={})
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_get_group_after_deletion(self):
         """
@@ -218,11 +243,11 @@ class ScalingGroupNegative(AutoscaleFixture):
             group_id=group.id)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: %s'
-                          % error_create_resp.status_code)
+                          msg='Create group succeeded with invalid request: {0}'
+                          .format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create group with invalid request returned: {0}'
+                        .format(create_error))
 
     def test_update_group_after_deletion(self):
         """
@@ -245,8 +270,8 @@ class ScalingGroupNegative(AutoscaleFixture):
             metadata={})
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: %s, groupid: %s'
-                          % (error_create_resp.status_code, group.id))
+                          msg='Create group succeeded with invalid request: {0}, groupid: {1}'
+                          .format(error_create_resp.status_code, group.id))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: %s'
-                        % create_error)
+                        msg='Create group with invalid request returned: {0}'
+                        .format(create_error))

@@ -13,7 +13,7 @@ Talk with us! Join us in:
 
 irc.freenode.net #rackspace
 
-fsargent, wirehead_, oubiwann, dreid, cyli
+fsargent, wirehead_, oubiwann, dreid, cyli, rockstar
 
 
 ## Make Tasks:

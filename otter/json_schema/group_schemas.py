@@ -4,6 +4,10 @@ scaling group configuration, and policies.
 """
 
 from copy import deepcopy
+from croniter import croniter
+
+from otter.util.timestamp import from_timestamp
+from otter.json_schema import format_checker
 
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
@@ -27,6 +31,7 @@ from copy import deepcopy
 #
 
 MAX_ENTITIES = 25
+MAX_COOLDOWN = 86400   # 24 * 60 * 60
 
 metadata = {
     "type": "object",
@@ -154,8 +159,10 @@ config = {
             "type": "integer",
             "description": ("Cooldown period before more entities are added, "
                             "given in seconds.  This number must be an "
-                            "integer."),
+                            "integer. Min is 0 seconds, max is 86400 seconds "
+                            "(24 hrs * 60 min * 60 sec)."),
             "minimum": 0,
+            "maximum": MAX_COOLDOWN,
             "required": True
         },
         "minEntities": {
@@ -191,39 +198,34 @@ zero = {
     "maximum": 0
 }
 
+
+# Register cron and ISO8601 date-time format checkers with the global checker.
+format_checker.checks('cron', raises=ValueError)(croniter)
+format_checker.checks('date-time', raises=Exception)(from_timestamp)
+
+_policy_base_type = {
+    "type": "object",
+    "properties": {
+        "name": {},
+        "cooldown": {},
+    },
+    "additionalProperties": False
+}
+
+# Couldn't add "there MUST be 'args' when type is schedule" rule in the schema
+# Hence, this dirty hack: It creates all possible types
+_policy_types = []
+for change in ['change', 'changePercent', 'desiredCapacity']:
+    for _type in ['schedule', 'webhook']:
+        _policy_type = deepcopy(_policy_base_type)
+        _policy_type['properties'][change] = {'required': True}
+        _policy_type['properties']['type'] = {'pattern': _type}
+        if _type == 'schedule':
+            _policy_type['properties']['args'] = {'required': True}
+        _policy_types.append(_policy_type)
+
 policy = {
-    "type": [
-        {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "type": {},
-                "changePercent": {"required": True}
-            },
-            "additionalProperties": False
-        },
-        {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "type": {},
-                "change": {"required": True}
-            },
-            "additionalProperties": False
-        },
-        {
-            "type": "object",
-            "properties": {
-                "name": {},
-                "cooldown": {},
-                "type": {},
-                "desiredCapacity": {"required": True}
-            },
-            "additionalProperties": False
-        }
-    ],
+    "type": _policy_types,
     "description": (
         "A Scaling Policy defines how the current number of servers in the "
         "scaling group should change, and how often this exact change can "
@@ -277,13 +279,57 @@ policy = {
             "description": (
                 "Cooldown period (given in seconds) before this particular "
                 "scaling policy can be executed again.  This cooldown period "
-                "does not affect the global scaling group cooldown."),
+                "does not affect the global scaling group cooldown.  Min is 0 "
+                "seconds, max is 86400 seconds (24 hrs * 60 min * 60 sec)."),
             "minimum": 0,
+            "maximum": MAX_COOLDOWN,
             "required": True
         },
         "type": {
-            "enum": ["webhook"],
+            "enum": ["webhook", "schedule"],
             "required": True
+        },
+        "args": {
+            "type": [
+                {
+                    "type": "object",
+                    "properties": {"at": {"required": True}},
+                    "additionalProperties": False
+                },
+                {
+                    "type": "object",
+                    "properties": {"cron": {"required": True}},
+                    "additionalProperties": False
+                }
+            ],
+            "properties": {
+                "cron": {
+                    "type": "string",
+                    "description": (
+                        "The recurrence pattern as a cron entry. This describes at what times"
+                        "in the future will the scaling policy get executed. For example, if this is"
+                        "'1 0 * * *' then the policy will get executed at one minute past midnight"
+                        "(00:01) of every day of the month, of every day of the week."
+                        "Kindly check http://en.wikipedia.org/wiki/Cron"),
+                    "format": "cron"
+                },
+                "at": {
+                    "type": "string",
+                    "description": (
+                        "The time at which this policy will be executed. This property is mutually"
+                        "exclusive w.r.t 'cron'. Either 'cron' or 'at' can be given. Not both."),
+                    "format": "date-time"
+                }
+            }
+        }
+    },
+    "dependencies": {
+        "args": {
+            # args can be there only when type is 'schedule'
+            "type": "object",
+            "properties": {
+                "type": {"pattern": "schedule"}
+            }
         }
     }
 }

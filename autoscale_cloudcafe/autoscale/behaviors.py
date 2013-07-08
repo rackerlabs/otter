@@ -1,17 +1,21 @@
 """
 Behaviors for Autoscale
 """
+import time
+from decimal import Decimal, ROUND_HALF_UP
+
+
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.compute.common.datagen import rand_name
 from autoscale.models.servers import Metadata
+from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 
 class AutoscaleBehaviors(BaseBehavior):
 
     """
-    @summary: Behavior Module for the Autoscale REST API
-    @note: Should be the primary interface to a test case or external tool
-    @copyright: Copyright (c) 2012 Rackspace US, Inc.
+    :summary: Behavior Module for the Autoscale REST API
+    :note: Should be the primary interface to a test case or external tool
     """
 
     def __init__(self, autoscale_config, autoscale_client):
@@ -40,7 +44,7 @@ class AutoscaleBehaviors(BaseBehavior):
         if gc_min_entities is None:
             gc_min_entities = int(self.autoscale_config.gc_min_entities)
         if lc_name is None:
-            lc_name = rand_name('test_lc_srv_hmm')
+            lc_name = rand_name('test_lc_srv')
         else:
             lc_name = rand_name(str(lc_name))
         if lc_image_ref is None:
@@ -100,14 +104,63 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_list=sp_list)
         return create_response
 
+    def wait_for_expected_number_of_active_servers(
+        self, group_id, expected_servers,
+            interval_time=None, timeout=None):
+        """
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and waits for the specified number of servers to be active on a group
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
+        """
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if group_state.desiredCapacity != expected_servers:
+            raise BuildErrorException(
+                'Group %s should have %s servers, but is trying to build %s servers'
+                % (group_id, expected_servers, group_state.desiredCapacity))
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+
+            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
+                raise BuildErrorException(
+                    'Group Id %s failed to attempt server creation. Group has no servers'
+                    % group_id)
+
+            if len(active_list) == expected_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
+            print "waiting for servers to be active..."
+
+            if group_state.desiredCapacity != expected_servers:
+                raise BuildErrorException(
+                    'Group %s should have %s servers, but has reduced the build %s servers'
+                    % (group_id, expected_servers, group_state.desiredCapacity))
+        else:
+            raise TimeoutException(
+                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
+                "observe the active server list achieving the expected servers count: {2}.".format(
+                    timeout, group_id, expected_servers))
+
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,
                           sp_desired_capacity=None, sp_policy_type=None):
         """
-        @summary: creates the policy with change set to default config value
-        @params: group_id
-        @return: returns the newly created policy in the form of a dict
-        @rtype: returns the policy dict
+        :summary: creates the policy with change set to default config value
+        :params: group_id
+        :return: returns the newly created policy in the form of a dict
+        :rtype: returns the policy dict
         """
         if sp_name is None:
             sp_name = rand_name('test_sp')
@@ -130,11 +183,11 @@ class AutoscaleBehaviors(BaseBehavior):
                             sp_change=None, sp_change_percent=None,
                             sp_desired_capacity=None, sp_policy_type=None):
         """
-        @summary: creates the specified policy for the given change type
-        @params: group_id
-        @return: returns the newly created policy object with change set
+        :summary: creates the specified policy for the given change type
+        :params: group_id
+        :return: returns the newly created policy object with change set
                  to config's default
-        @rtype: returns the policy object
+        :rtype: returns the policy object
         """
         if sp_name is None:
             sp_name = rand_name('testsp_')
@@ -144,17 +197,17 @@ class AutoscaleBehaviors(BaseBehavior):
             sp_cooldown = int(self.autoscale_config.sp_cooldown)
         if sp_policy_type is None:
             sp_policy_type = self.autoscale_config.sp_policy_type
-        if sp_change:
+        if sp_change is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change=sp_change, policy_type=sp_policy_type)
-        if sp_change_percent:
+        elif sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change_percent=sp_change_percent, policy_type=sp_policy_type)
-        if sp_desired_capacity:
+        elif sp_desired_capacity is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
@@ -163,19 +216,25 @@ class AutoscaleBehaviors(BaseBehavior):
             self, create_response.entity)
         return policy
 
-    def create_policy_webhook(self, group_id, policy_data):
+    def create_policy_webhook(self, group_id, policy_data,
+                              execute_webhook=None, execute_policy=None):
         """
-        @summary: wrapper for create_policy_min. Given a dict with
+        :summary: wrapper for create_policy_given. Given a dict with
                   change type, the change number, cooldown(optional),
                   sets the parameters in create_policy_min and
                   creates a webhook for the policy
-        @param: group id
-        @param: dict of policy details such as change type,
+        :param: group id
+        :param: dict of policy details such as change type,
                 change integer/number, cooldown(optional)
-        @return: dict containing policy id and its webhook id
-        @rtye: dict
+                Eg: {'change_percent': 100, 'cooldown': 200}
+        :param: execute_webhook. Executes the newly created webhook
+        :param: execute_policy. Executes the newly created policy
+        :return: dict containing policy id and its webhook id and
+                 capability url
+        :rtype: dict
         """
         sp_change = sp_change_percent = sp_desired_capacity = sp_cooldown = None
+        response_code = None
         if policy_data.get('change_percent'):
             sp_change_percent = policy_data['change_percent']
         if policy_data.get('change'):
@@ -195,8 +254,25 @@ class AutoscaleBehaviors(BaseBehavior):
             name=wb_name)
         webhook = AutoscaleBehaviors.get_webhooks_properties(
             self, create_webhook.entity)
-        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'])
+        if execute_webhook is True:
+            execute_webhook_response = self.autoscale_client.execute_webhook(
+                webhook['links'].capability)
+            response_code = execute_webhook_response.status_code
+        if execute_policy is True:
+            execute_policy_response = self.autoscale_client.execute_policy(
+                group_id=group_id,
+                policy_id=policy['id'])
+            response_code = execute_policy_response.status_code
+        rdata = dict(policy_id=policy['id'], webhook_id=webhook['id'],
+                     webhook_url=webhook['links'].capability, execute_response=response_code)
         return rdata
+
+    def calculate_servers(self, current, percentage):
+        """
+        Given the current number of servers and change percentage,
+        returns the servers expected for the percentage.
+        """
+        return int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_HALF_UP)) + current
 
     def to_data(self, data):
         """converts metadata obj to type dict"""
@@ -241,7 +317,7 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def policy_details_list(self, data):
         """returns policy details list"""
-        # @todo : make the obj list work for changePercent and desiredCapacity
+        # :todo : make the obj list work for changePercent and desiredCapacity
         policy_name = []
         policy_chng = []
         policy_cooldown = []
@@ -260,7 +336,7 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def get_policy_properties(self, policy_list):
         """converts policy list object to a dict"""
-        # @todo : find the change type
+        # :todo : find the change type
         policy = {}
         for policy_type in policy_list:
             try:

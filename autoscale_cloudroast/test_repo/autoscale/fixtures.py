@@ -1,8 +1,5 @@
 """
-@summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
-@note: Correspondes DIRECTLY TO A unittest.TestCase
-@see: http://docs.python.org/library/unittest.html#unittest.TestCase
-@copyright: Copyright (c) 2012 Rackspace US, Inc.
+:summary: Base Classes for Autoscale Test Suites (Collections of Test Cases)
 """
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from autoscale.behaviors import AutoscaleBehaviors
@@ -12,13 +9,15 @@ from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
 from autoscale.client import AutoscalingAPIClient
 from cloudcafe.auth.provider import AuthProvider
+from cloudcafe.compute.servers_api.client import ServersClient
+
 import os
 
 
 class AutoscaleFixture(BaseTestFixture):
 
     """
-    @summary: Fixture for an Autoscale test.
+    :summary: Fixture for an Autoscale test.
     """
 
     @classmethod
@@ -37,27 +36,39 @@ class AutoscaleFixture(BaseTestFixture):
         autoscale_service = access_data.get_service(
             cls.autoscale_config.autoscale_endpoint_name)
 
+        server_service = access_data.get_service(
+            cls.autoscale_config.server_endpoint_name)
+        server_url = server_service.get_endpoint(
+            cls.autoscale_config.region).public_url
+
         cls.tenant_id = cls.autoscale_config.tenant_id
         env = os.environ['OSTNG_CONFIG_FILE']
         if 'dev' in env.lower():
             url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
         elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(cls.tenant_id)
+            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
+                cls.tenant_id)
         else:
             url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
 
-        cls.autoscale_client = AutoscalingAPIClient(url, access_data.token.id_,
-                                                    'json', 'json')
+        cls.autoscale_client = AutoscalingAPIClient(
+            url, access_data.token.id_,
+            'json', 'json')
+        cls.server_client = ServersClient(
+            server_url, access_data.token.id_,
+            'json', 'json')
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
         cls.gc_name = cls.autoscale_config.gc_name
         cls.gc_cooldown = int(cls.autoscale_config.gc_cooldown)
         cls.gc_min_entities = int(cls.autoscale_config.gc_min_entities)
         cls.gc_min_entities_alt = int(cls.autoscale_config.gc_min_entities_alt)
+        cls.gc_max_entities = int(cls.autoscale_config.gc_max_entities)
         cls.lc_name = cls.autoscale_config.lc_name
         cls.lc_flavor_ref = cls.autoscale_config.lc_flavor_ref
         cls.lc_image_ref = cls.autoscale_config.lc_image_ref
+        cls.lc_image_ref_alt = cls.autoscale_config.lc_image_ref_alt
         cls.sp_name = rand_name(cls.autoscale_config.sp_name)
         cls.sp_cooldown = int(cls.autoscale_config.sp_cooldown)
         cls.sp_change = int(cls.autoscale_config.sp_change)
@@ -68,6 +79,8 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
+        cls.interval_time = int(cls.autoscale_config.interval_time)
+        cls.timeout = int(cls.autoscale_config.timeout)
 
     def validate_headers(self, headers):
         """
@@ -85,6 +98,38 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
+    def empty_scaling_group(self, group):
+        """
+        Given the group, updates the group to be of 0 minentities and maxentities.
+        """
+        self.autoscale_client.update_group_config(
+            group_id=group.id,
+            name="delete_me_please",
+            cooldown=0,
+            min_entities=0,
+            max_entities=0,
+            metadata={})
+
+    def verify_group_state(self, group_id, desired_capacity):
+        """
+        Given the group id and the expected desired capacity,
+        asserts if the desired capacity is being met by the scaling group
+        through the list group status call
+        """
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        self.assertEquals(group_state_response.status_code, 200)
+        group_state = group_state_response.entity
+        self.assertEquals(
+            group_state.pendingCapacity + group_state.activeCapacity,
+            desired_capacity,
+            msg='Active + Pending servers ({0}) != ({1}) minentities on the group {2}'
+            .format((group_state.pendingCapacity + group_state.activeCapacity),
+                desired_capacity, group_id))
+        self.assertEquals(group_state.desiredCapacity, desired_capacity,
+                          msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
+                          .format(group_state.desiredCapacity, desired_capacity, group_id))
+
     @classmethod
     def tearDownClass(cls):
         """
@@ -97,7 +142,7 @@ class AutoscaleFixture(BaseTestFixture):
 class ScalingGroupFixture(AutoscaleFixture):
 
     """
-    @summary: Creates a scaling group using the default from
+    :summary: Creates a scaling group using the default from
               the test data
     """
 
@@ -152,8 +197,8 @@ class ScalingGroupFixture(AutoscaleFixture):
 class ScalingGroupPolicyFixture(ScalingGroupFixture):
 
     """
-    @summary: Creates a scaling group with policy using
-    the default from the test data
+    :summary: Creates a scaling group with policy using the default from
+              the test data
     """
 
     @classmethod
@@ -205,8 +250,8 @@ class ScalingGroupPolicyFixture(ScalingGroupFixture):
 class ScalingGroupWebhookFixture(ScalingGroupPolicyFixture):
 
     """
-    @summary: Creates a scaling group with a scaling policy
-    and webhook using the default from the test data
+    :summary: Creates a scaling group with a scaling policy
+              and webhook using the default from the test data
     """
 
     @classmethod

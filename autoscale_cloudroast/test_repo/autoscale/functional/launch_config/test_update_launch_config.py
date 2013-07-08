@@ -3,7 +3,6 @@ Test to update launch config.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 from cloudcafe.compute.common.datagen import rand_name
-import unittest
 
 
 class UpdateLaunchConfigTest(ScalingGroupFixture):
@@ -54,8 +53,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             self.group.id)
         updated_launchconfig = launchconfig_response.entity
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with %s as against a 204'
-                          % update_lc_response.status_code)
+                          msg='Update launch config failed with {0} as against a 204'
+                          .format(update_lc_response.status_code))
         self.assertTrue(update_lc_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_lc_response.headers)
@@ -91,10 +90,10 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
                 lc_load_balancers),
             msg='Load balancers in the launch config did not update')
 
-    @unittest.skip("AUTO-332")
     def test_partial_update_launch_config(self):
         """
-        Verify update luanch config with partial request
+        Update launch config with partial request does not fail with 403, and overwrites the
+        the launch config as per the latest request
         """
         lc_name = rand_name('upd_server_name')
         lc_image_ref = 'XYZ'
@@ -117,8 +116,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             networks=lc_networks,
             load_balancers=lc_load_balancers)
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with %s as against a 204'
-                          % update_lc_response.status_code)
+                          msg='Update launch config failed with {0} as against a 204, success'
+                          .format(update_lc_response.status_code))
         lc_name = "test_upd_lc"
         image_ref = "88876868"
         flavor_ref = "0"
@@ -127,5 +126,5 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
             name=lc_name,
             image_ref=image_ref,
             flavor_ref=flavor_ref)
-        self.assertEquals(update_launchconfig_response, 400,
-                          msg="Update launch config allows partial requests")
+        self.assertEquals(update_launchconfig_response.status_code, 204,
+                          msg="Update launch config does not allow partial requests")

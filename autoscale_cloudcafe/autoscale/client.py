@@ -37,43 +37,43 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                              lc_load_balancers=None, sp_list=None,
                              requestslib_kwargs=None):
         """
-        @summary: Create scaling group
-        @param gc_name: The name of the scaling group
-        @type name: String
-        @param gc_cooldown: period before more entities are added in seconds
-        @type cooldown: Integer
-        @param gc_min_entities: Minimum number of entities in the scaling
+        :summary: Create scaling group
+        :param gc_name: The name of the scaling group
+        :type name: String
+        :param gc_cooldown: period before more entities are added in seconds
+        :type cooldown: Integer
+        :param gc_min_entities: Minimum number of entities in the scaling
                                 group
-        @type change: Integer
-        @param gc_max_entities: Maximum number of entities in the scaling
+        :type change: Integer
+        :param gc_max_entities: Maximum number of entities in the scaling
                                 group
-        @type change_percent: Integer
-        @param gc_metadata: User-provided key-value metadata
-        @type gc_metadata: String
-        @param lc_name: The name of the server.
-        @type lc_name: String
-        @param lc_image_ref: The reference to the image used to build the server
-        @type lc_image_ref: String
-        @param lc_flavor_ref: The flavor used to build the server.
-        @type lc_flavor_ref: String
-        @param lc_metadata: A dictionary of values to be used as metadata.
-        @type lc_metadata: Dictionary. The limit is 5 key/values.
-        @param lc_personality: A list of dictionaries for files to be
+        :type change_percent: Integer
+        :param gc_metadata: User-provided key-value metadata
+        :type gc_metadata: String
+        :param lc_name: The name of the server.
+        :type lc_name: String
+        :param lc_image_ref: The reference to the image used to build the server
+        :type lc_image_ref: String
+        :param lc_flavor_ref: The flavor used to build the server.
+        :type lc_flavor_ref: String
+        :param lc_metadata: A dictionary of values to be used as metadata.
+        :type lc_metadata: Dictionary. The limit is 5 key/values.
+        :param lc_personality: A list of dictionaries for files to be
                               injected into the server.
-        @type lc_personality: List
-        @param lc_disk_config: MANUAL/AUTO/None
-        @type lc_disk_config: String
-        @param lc_networks: The network for the server
-        @type lc_networks: Numbers
-        @param lc_load_balancers: List of the load balancers
-        @type lc_loadbalancers: List
-        @param sp_list: List of scaling policies
-        @type sp_list: List
-        @return: Response Object containing response code 201
+        :type lc_personality: List
+        :param lc_disk_config: MANUAL/AUTO/None
+        :type lc_disk_config: String
+        :param lc_networks: The network for the server
+        :type lc_networks: Numbers
+        :param lc_load_balancers: List of the load balancers
+        :type lc_loadbalancers: List
+        :param sp_list: List of scaling policies
+        :type sp_list: List
+        :return: Response Object containing response code 201
                  on success and body containg the scaling group
                  details such as group config, launch config and
                  list of scaling policies
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         '/{tenantId}/groups'
@@ -100,14 +100,13 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def list_scaling_groups(self, requestslib_kwargs=None):
         """
-        @TBD : can we filter/query by params?Should the response include name?
-        @summary: Lists IDs and links for all scaling groups
-        @return: Response Object containing response code 200 and body with
+        :summary: Lists IDs and links for all scaling groups
+        :return: Response Object containing response code 200 and body with
                 details of autoscaling groups such as id and links
-        @rtype: Response Object
+        :rtype: Response Object
 
-            GET
-           {tenant_id}/groups/
+        GET
+        {tenant_id}/groups/
         """
 
         url = '%s/groups/' % (self.url)
@@ -118,15 +117,15 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def view_manifest_config_for_scaling_group(self, group_id,
                                                requestslib_kwargs=None):
         """
-        @summary: List full details of scaling configuration, including launch
+        :summary: List full details of scaling configuration, including launch
                   configs and scaling policies
-        @return: Response Object containing response code 200 and body with
+        :return: Response Object containing response code 200 and body with
                  details of autoscaling group such as launch config, group
                  config and scaling policies
-        @rtype: Response Object
+        :rtype: Response Object
 
-            GET
-           {tenant_id}/groups/{group_id}
+        GET
+        {tenant_id}/groups/{group_id}
         """
 
         self.group_id = group_id
@@ -139,10 +138,10 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def pause_scaling_group(self, group_id, requestslib_kwargs=None):
         """
-        @summary: Pause a scaling group. (no scaling policies will be executed)
-        @return: Response object containing the response code 204 on success
+        :summary: Pause a scaling group. (no scaling policies will be executed)
+        :return: Response object containing the response code 204 on success
                   and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         /{tenantId}/groups/{groupId}/pause/
@@ -154,10 +153,10 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def resume_scaling_group(self, group_id, requestslib_kwargs=None):
         """
-        @summary: Resume a scaling group. (scaling policies will continue to execute)
-        @return: Response object containing the response code 204 on success
+        :summary: Resume a scaling group. (scaling policies will continue to execute)
+        :return: Response object containing the response code 204 on success
                   and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         /{tenantId}/groups/{groupId}/resume/
@@ -169,13 +168,13 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def delete_scaling_group(self, group_id, requestslib_kwargs=None):
         """
-        @summary: Deletes the scaling group when empty. Rejects when group
+        :summary: Deletes the scaling group when empty. Rejects when group
                   has entities.
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @return: Response Object containing response code 204
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 204
                  on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
             DELETE
             '/{tenantId}/groups/{groupId}'
@@ -188,14 +187,13 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def list_status_entities_sgroups(self, group_id, requestslib_kwargs=None):
         """
-        TBD : Similar to addresses
-        @summary: List status of entities in autoscaling group
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @return: Response Object containing response code 200 and body
+        :summary: List status of entities in autoscaling group
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 200 and body
                  with current state of the group including list of active
                  & pending entities and desired capacity number of servers
-        @rtype: Response Object
+        :rtype: Response Object
 
             GET
             '/{tenantId}/groups/{groupId}'/state'
@@ -208,12 +206,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def view_scaling_group_config(self, group_id, requestslib_kwargs=None):
         """
-        @summary: List scaling group configuration details
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @return: Response Object containing response code 200 and body with the
+        :summary: List scaling group configuration details
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 200 and body with the
                  attributes of the group_config
-        @rtype: Response Object
+        :rtype: Response Object
          GET
          '/<string:tenantId>/groups/<string:groupId>/config'
         """
@@ -228,20 +226,20 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             max_entities=None, metadata=None,
                             requestslib_kwargs=None):
         """
-        @summary: Update/Create scaling group configuration details
-        @param name: The name of the scaling group
-        @type name: String
-        @param cooldown: The cooldown time for the scaling group
-        @type cooldown: Number
-        @param min_entities: Minimum number of entities in the scaling group
-        @type min_entities: Integer
-        @param max_entities: Maximum number of entities in the scaling group
-        @type max_entities: Integer or null
-        @param metadata: User-provided key-value metadata
-        @type metadata: object
-        @return: Response Object containing response code 204
+        :summary: Update/Create scaling group configuration details
+        :param name: The name of the scaling group
+        :type name: String
+        :param cooldown: The cooldown time for the scaling group
+        :type cooldown: Number
+        :param min_entities: Minimum number of entities in the scaling group
+        :type min_entities: Integer
+        :param max_entities: Maximum number of entities in the scaling group
+        :type max_entities: Integer or null
+        :param metadata: User-provided key-value metadata
+        :type metadata: object
+        :return: Response Object containing response code 204
                  on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         PUT
         '/<string:tenantId>/groups/<string:groupId>/config'
@@ -257,13 +255,13 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def view_launch_config(self, group_id, requestslib_kwargs=None):
         """
-        @summary: List the scaling group's launch configuration
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @return: Response Object containing response code 200 and body
+        :summary: List the scaling group's launch configuration
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 200 and body
                  with the attributes of the launch config such as the
                  server and loadbalancer configs
-        @rtype: Response Object
+        :rtype: Response Object
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/launch'
@@ -279,10 +277,10 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                              load_balancers=None,
                              requestslib_kwargs=None):
         """
-        @summary: Update/Create launch configuration
-        @return: Response Object containing response code 204
+        :summary: Update/Create launch configuration
+        :return: Response Object containing response code 204
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
             PUT
             '/<string:tenantId>/groups/<string:groupId>/launch'
@@ -302,26 +300,25 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                       desired_capacity=None, policy_type=None,
                       requestslib_kwargs=None):
         """
-        TBD : this is a list of policies -- need different implementation
-        @summary: Create scaling policy
-        @param name: A unique name for the scaling policy
-        @type name: String
-        @param cooldown: The cooldown time for the policy
-        @type cooldown: Number
-        @param change: The change to make in the number of servers in the
+        :summary: Create scaling policy
+        :param name: A unique name for the scaling policy
+        :type name: String
+        :param cooldown: The cooldown time for the policy
+        :type cooldown: Number
+        :param change: The change to make in the number of servers in the
                       scaling group (non-zero)
-        @type change: Integer
-        @param change_percent: The changepercent to make in the number of
+        :type change: Integer
+        :param change_percent: The changepercent to make in the number of
                               servers in the scaling group
-        @type change_percent: Number
-        @param desired_capacity: The desired capacity is the no of servers to be
+        :type change_percent: Number
+        :param desired_capacity: The desired capacity is the no of servers to be
                             in the scaling group
-        @type desired_capacity: Integer
-        @param policy_type: What type of policy this is
-        @type policy_type: String
-        @return: Response Object containing response code 201
+        :type desired_capacity: Integer
+        :param policy_type: What type of policy this is
+        :type policy_type: String
+        :return: Response Object containing response code 201
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         '/{tenantId}/groups/{groupId}/policy'
@@ -338,12 +335,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def list_policies(self, group_id, requestslib_kwargs=None):
         """
-        @summary: List the scaling group's policy configurations
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @return: Response Object containing response code 200 and body with
+        :summary: List the scaling group's policy configurations
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :return: Response Object containing response code 200 and body with
                  the list of the policy configs
-        @rtype: Response Object
+        :rtype: Response Object
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
@@ -357,16 +354,16 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                       change_percent=None, desired_capacity=None,
                       policy_type=None, requestslib_kwargs=None):
         """
-        @summary: Update/Create details of a specific scaling policy
-        @param name: The name of the policy
-        @type name: String
-        @param cooldown: The cooldown time for the policy
-        @type cooldown: Number
-        @param policy_type: What type of policy this is
-        @type policy_type: String
-        @return: Response Object containing response code 204
+        :summary: Update/Create details of a specific scaling policy
+        :param name: The name of the policy
+        :type name: String
+        :param cooldown: The cooldown time for the policy
+        :type cooldown: Number
+        :param policy_type: What type of policy this is
+        :type policy_type: String
+        :return: Response Object containing response code 204
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
             PUT
             '/<string:tenantId>/groups/<groupId>/policy/<policyId>'
@@ -383,14 +380,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def get_policy_details(self, group_id, policy_id, requestslib_kwargs=None):
         """
-        @summary: Get details of a specific scaling policy
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @param policy_id: The id of an existing scaling policy.
-        @type policy_id: String
-        @return: Response Object containing response code 200 and body with
+        :summary: Get details of a specific scaling policy
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :param policy_id: The id of an existing scaling policy.
+        :type policy_id: String
+        :return: Response Object containing response code 200 and body with
                  the attributes of the given policy
-        @rtype: Response Object
+        :rtype: Response Object
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy/<string:policyId>'
@@ -407,14 +404,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def delete_scaling_policy(self, group_id, policy_id,
                               requestslib_kwargs=None):
         """
-        @summary: Delete a specific scaling policy
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-         @param policy_id: The id of an existing scaling group policy.
-        @type policy_id: String
-        @return: Response Object containing response code 204
+        :summary: Delete a specific scaling policy
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+         :param policy_id: The id of an existing scaling group policy.
+        :type policy_id: String
+        :return: Response Object containing response code 204
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
             DELETE
             '/{tenantId}/groups/{groupId}/policy/{policyId}'
@@ -426,14 +423,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def execute_policy(self, group_id, policy_id,
                        requestslib_kwargs=None):
         """
-        @summary: Execute a policy
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-         @param policy_id: The id of an existing scaling policy.
-        @type policy_id: String
-        @return: Response Object containing response code 202
+        :summary: Execute a policy
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+         :param policy_id: The id of an existing scaling policy.
+        :type policy_id: String
+        :return: Response Object containing response code 202
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         '/{tenantId}/groups/{groupId}/policy/{policyId}/execute'
@@ -446,14 +443,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def create_webhook(self, group_id, policy_id, name, metadata=None,
                        requestslib_kwargs=None):
         """
-        @summary: Create a new public webhook for Scaling Policy
-        @param name: The name of the webhook
-        @type name: String
-        @param metadata: The metadata for the webhook
-        @type cooldown: dict
-        @return: Response Object containing response code 201
+        :summary: Create a new public webhook for Scaling Policy
+        :param name: The name of the webhook
+        :type name: String
+        :param metadata: The metadata for the webhook
+        :type cooldown: dict
+        :return: Response Object containing response code 201
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
             POST
             '/{tenantId}/groups/{groupId}/policy/{policyId}/webhooks/'
@@ -468,14 +465,14 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def list_webhooks(self, group_id, policy_id, requestslib_kwargs=None):
         """
-        @summary: List basic info for all webhooks under scaling policy
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @param policy_id: The id of an existing scaling group policy.
-        @type policy_id: String
-        @return: Response Object containing response code 200 and body with
+        :summary: List basic info for all webhooks under scaling policy
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :param policy_id: The id of an existing scaling group policy.
+        :type policy_id: String
+        :return: Response Object containing response code 200 and body with
                  the list of the webhooks for the given policy
-        @rtype: Response Object
+        :rtype: Response Object
 
         GET
         '/<tenantId>/groups/<groupId>/policy/<policyId>/webhook'
@@ -489,17 +486,17 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def update_webhook(self, group_id, policy_id, webhook_id, name,
                        metadata=None, requestslib_kwargs=None):
         """
-        @summary: Update webhook under scaling policy
+        :summary: Update webhook under scaling policy
                   (TBD: Update all webhooks on a policy???)
-        @param name: The name of the webhook
-        @type name: String
-        @param cooldown: The cooldown time for the webhook
-        @type cooldown: Integer
-        @param URL: The URL of the webhook
-        @type URL: String
-        @return: Response Object containing response code 204
+        :param name: The name of the webhook
+        :type name: String
+        :param cooldown: The cooldown time for the webhook
+        :type cooldown: Integer
+        :param URL: The URL of the webhook
+        :type URL: String
+        :return: Response Object containing response code 204
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         PUT
         '/{tenantId}/groups/{groupId}/policy/{policyId}/webhook/{webhookId}'
@@ -515,16 +512,16 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def get_webhook(self, group_id, policy_id, webhook_id,
                     requestslib_kwargs=None):
         """
-        @summary: Get details of a specific webhook (name, URL, access details)
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @param policy_id: The id of an existing scaling group policy.
-        @type policy_id: String
-        @param webhook_id: The id of an existing scaling webhook.
-        @type webhook_id: String
-        @return: Response Object containing response code 200 and body with the
+        :summary: Get details of a specific webhook (name, URL, access details)
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :param policy_id: The id of an existing scaling group policy.
+        :type policy_id: String
+        :param webhook_id: The id of an existing scaling webhook.
+        :type webhook_id: String
+        :return: Response Object containing response code 200 and body with the
                  attributes of the given webhook
-        @rtype: Response Object
+        :rtype: Response Object
 
         GET
         '/<string:tenantId>/groups/<string:groupId>/webhook/<string:webhookId>'
@@ -544,16 +541,16 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def delete_webhook(self, group_id, policy_id, webhook_id,
                        requestslib_kwargs=None):
         """
-        @summary: Delete a public webhook
-        @param group_id: The id of an existing scaling group.
-        @type group_id: String
-        @param policy_id: The id of an existing scaling group policy.
-        @type policy_id: String
-        @param webhook_id: The id of an existing webhook.
-        @type webhook_id: String
-        @return: Response Object containing response code 204
+        :summary: Delete a public webhook
+        :param group_id: The id of an existing scaling group.
+        :type group_id: String
+        :param policy_id: The id of an existing scaling group policy.
+        :type policy_id: String
+        :param webhook_id: The id of an existing webhook.
+        :type webhook_id: String
+        :return: Response Object containing response code 204
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         DELETE
         '/{tenantId}/groups/{groupId}/policy/{policy_id}/webhook/{webhookId}'
@@ -567,11 +564,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def execute_webhook(self, webhook_url,
                         requestslib_kwargs=None):
         """
-        @summary: Execute a webhook
-        @param webhook_url: The capability url generated when a webhook is created
-        @return: Response Object containing response code 202
+        :summary: Execute a webhook
+        :param webhook_url: The capability url generated when a webhook is created
+        :return: Response Object containing response code 202
          on success and empty body
-        @rtype: Response Object
+        :rtype: Response Object
 
         POST
         '/execute/<string:capability_version>/<string:capability_hash>/'

@@ -26,11 +26,11 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
 
     def test_create_scaling_policy(self):
         """
-        Verify the create policy call for response code, headers and data.
+        Verify the create policy call for response code 201, headers and data.
         """
         self.assertEquals(self.create_policy_response.status_code, 201,
-                          msg='Create scaling policy failed with %s'
-                          % self.create_policy_response.status_code)
+                          msg='Create scaling policy failed with {0}'
+                          .format(self.create_policy_response.status_code))
         self.assertTrue(self.create_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(self.create_policy_response.headers)

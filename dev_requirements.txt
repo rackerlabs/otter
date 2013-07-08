@@ -11,8 +11,9 @@ terrarium==1.0.0rc2
 python-subunit==0.0.8
 junitxml==0.7
 paramiko==1.10.0
-requests==1.1.0
+requests==1.2.0
 decorator==3.4.0
 unittest2==0.5.1
 git+https://github.com/stackforge/opencafe.git#egg=opencafe
 git+https://github.com/stackforge/cloudcafe.git#egg=cloudcafe
+IPy==0.81

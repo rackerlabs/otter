@@ -123,5 +123,23 @@ def policy():
             "desiredCapacity": 10,
             "cooldown": 3,
             "type": "webhook"
+        },
+        {
+            "name": "Schedule policy to run at May 20 2015",
+            "cooldown": 3,
+            "changePercent": -5.5,
+            "type": "schedule",
+            "args": {
+                "at": "2015-05-20T00:00:00"
+            }
+        },
+        {
+            "name": "Schedule policy to run repeately",
+            "cooldown": 3,
+            "change": 10,
+            "type": "schedule",
+            "args": {
+                "cron": "0 */2 * * *"
+            }
         }
     ]

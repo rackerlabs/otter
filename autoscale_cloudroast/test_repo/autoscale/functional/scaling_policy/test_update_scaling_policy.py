@@ -26,7 +26,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
     def test_update_change_scaling_policy(self):
         """
         Verify the update policy call by updating the exiting change
-        and verify the response code, headers and data
+        and verify the response code 204, headers and data
         """
         update_policy_response = self.autoscale_client.update_policy(
             group_id=self.group.id,
@@ -40,8 +40,8 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             self.policy['id'])
         updated_policy = policy_response.entity
         self.assertEquals(update_policy_response.status_code, 204,
-                          msg='Update scaling policy failed with %s'
-                          % update_policy_response.status_code)
+                          msg='Update scaling policy failed with {0}'
+                          .format(update_policy_response.status_code))
         self.assertTrue(update_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_policy_response.headers)
@@ -60,7 +60,7 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
     def test_update_to_desiredcapacity_scaling_policy(self):
         """
         Verify the update policy call by updating change to be desired capacity
-        and verify the response code, headers and data
+        and verify the response code 204, headers and data
         """
         update_policy_response = self.autoscale_client.update_policy(
             group_id=self.group.id,
@@ -74,8 +74,8 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
             self.policy['id'])
         updated_policy = policy_response.entity
         self.assertEquals(update_policy_response.status_code, 204,
-                          msg='Update scaling policy failed with %s'
-                          % update_policy_response.status_code)
+                          msg='Update scaling policy failed with {0}'
+                          .format(update_policy_response.status_code))
         self.assertTrue(update_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_policy_response.headers)
