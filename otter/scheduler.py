@@ -10,10 +10,13 @@ from functools import partial
 from twisted.internet import defer
 from twisted.application.internet import TimerService
 
+from silverberg.lock import BasicLock, BusyLockError, with_lock
+
 from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
+from otter.models.cass import LOCK_TABLE_NAME
 
 
 class SchedulerService(TimerService):
@@ -21,14 +24,17 @@ class SchedulerService(TimerService):
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, clock=None):
+    def __init__(self, batchsize, interval, slv_client, clock=None):
         """
         Initializes the scheduler service with batch size and interval
 
         :param int batchsize: number of events to fetch on each iteration
         :param int interval: time between each iteration
+        :param slv_client: a :class:`silverberg.client.CQLClient` or
+                    :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
+        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
@@ -37,6 +43,28 @@ class SchedulerService(TimerService):
         Check for events in the database before the present time.
 
         :return: a deferred that fires with None
+        """
+
+        def check_for_more(events):
+            if len(events) == batchsize:
+                return _do_check()
+            return None
+
+        def _do_check():
+            d = with_lock(self.lock, self.fetch_and_process, batchsize)
+            d.addCallback(check_for_more)
+            # Return if we do not get lock as other process might be processing current events
+            d.addErrback(lambda f: f.trap(BusyLockError) and None)
+            return d
+
+        return _do_check()
+
+    def fetch_and_process(self, batchsize):
+        """
+        Fetch the events to be processed and process them.
+        Also delete/update after processing them
+
+        :return: a deferred that fires with list of events processed
         """
         log = otter_log.bind(scheduler_run_id=generate_transaction_id())
 
@@ -56,11 +84,6 @@ class SchedulerService(TimerService):
 
             return d
 
-        def check_for_more(events):
-            if len(events) == batchsize:
-                return self.check_for_events(batchsize)
-            return None
-
         def delete_events(events):
             if len(events) != 0:
                 policy_ids = [event[2] for event in events]
@@ -75,7 +98,6 @@ class SchedulerService(TimerService):
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
         deferred.addCallback(delete_events)
-        deferred.addCallback(check_for_more)
         deferred.addErrback(log.err)
         return deferred
 
