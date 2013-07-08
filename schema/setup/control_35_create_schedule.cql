@@ -22,6 +22,6 @@ CREATE TABLE scaling_schedule (
     "groupId" ascii, 
     "policyId" ascii, 
     trigger timestamp,
-    cron ascii
+    cron ascii,
     PRIMARY KEY("policyId", "trigger")
     );
