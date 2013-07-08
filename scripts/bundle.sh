@@ -12,7 +12,8 @@
 
 set -e
 
-NAME="otter-deploy"
+JOB_NAME=${JOB_NAME:="otter"}
+NAME="${JOB_NAME}-deploy"
 TARGET=${TARGET:="$NAME"}
 DIST_DIR=${DIST_DIR:="."}
 
