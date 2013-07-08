@@ -11,6 +11,8 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.util import timestamp
+from otter.scheduler import Recurrence
 
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
@@ -19,6 +21,7 @@ import json
 import iso8601
 from datetime import datetime
 
+from otter.log import log as otter_log
 
 LOCK_TABLE_NAME = 'locks'
 
@@ -75,8 +78,15 @@ _cql_update_group_state = (
     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
                      'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
+_cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
+                               'trigger, cron) '
+                               'VALUES (:tenantId, :groupId, {name}Id, '
+                               '{name}Trigger, {name}cron)')
+_cql_insert_event_batch = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
+                           'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
+                           '{name}trigger, {name}cron);')
 _cql_fetch_batch_of_events = (
-    'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
+    'SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
 _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
@@ -186,18 +196,24 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
 
             if "type" in policy:
                 if policy["type"] == 'schedule':
-                    queries.append(_cql_insert_event.format(cf=event_table,
-                                                            name=':' + polname))
-                    if 'at' in policy["args"]:
-                        data[polname + "Trigger"] = iso8601.parse_date(policy["args"]["at"])
-                    elif 'cron' in policy["args"]:
-                        # TODO
-                        #recurrence = Recurrence(cron=policy["args"]["cron"])
-                        # Temporarily storing date in far future to not trigger this
-                        # This is done to pass unitgration/test_rest_cass_model tests
-                        data[polname + "Trigger"] = datetime(2037, 12, 31)
+                    _build_schedule_policy(policy, event_table, queries, data, polname)
 
             outpolicies[polId] = policy
+
+
+def _build_schedule_policy(policy, event_table, queries, data, polname):
+    """
+    Build schedule-type policy
+    """
+    if 'at' in policy["args"]:
+        queries.append(_cql_insert_event.format(cf=event_table, name=':' + polname))
+        data[polname + "Trigger"] = timestamp.from_timestamp(policy["args"]["at"])
+    elif 'cron' in policy["args"]:
+        queries.append(_cql_insert_event_with_cron.format(cf=event_table, name=':' + polname))
+        cron = policy["args"]["cron"]
+        recurrence = Recurrence(cron=cron)
+        data[polname + "Trigger"] = recurrence.get_next_datetime()
+        data[polname + 'cron'] = cron
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
@@ -873,21 +889,34 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
                                     get_consistency_level('list', 'events'))
-        d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
-                                     row['policyId'], row['trigger'])
-                                    for row in rows])
         return d
 
-    def delete_events(self, policy_ids):
+    def update_delete_events(self, delete_policy_ids, update_events):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_delete_events`
         """
-        policy_ids_cql = ','.join([':policyid{0}'.format(i) for i in range(len(policy_ids))])
-        id_values_dict = {'policyid{0}'.format(i): policy_id for i, policy_id in enumerate(policy_ids)}
-        d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
-                                                              policy_ids=policy_ids_cql),
-                                    id_values_dict, get_consistency_level('delete', 'events'))
-        return d
+        queries, data = list(), dict()
+
+        # First delete all events
+        all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
+        delete_policy_ids_cql = ','.join([':delpolicyid{0}'.format(i)
+                                          for i in range(len(all_delete_ids))])
+        delete_id_values_dict = {'delpolicyid{0}'.format(i): policy_id
+                                 for i, policy_id in enumerate(all_delete_ids)}
+        queries.append(_cql_delete_events.format(cf=self.event_table,
+                                                 policy_ids=delete_policy_ids_cql))
+        data.update(delete_id_values_dict)
+
+        # Now insert rows for trigger times to be updated. This is because trigger cannot be
+        # updated on an existing row since it is part of primary key
+        for i, event in enumerate(update_events):
+            polname = 'policy{}'.format(i)
+            queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
+            data.update({polname + key: event[key] for key in event})
+
+        otter_log.msg('update_delete_events', queries=queries, data=data)
+        b = Batch(queries, data, get_consistency_level('update', 'events'))
+        return b.execute(self.connection)
 
     def update_events_trigger(self, policy_and_triggers):
         """

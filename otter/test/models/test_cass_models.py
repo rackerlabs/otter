@@ -1336,6 +1336,22 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+    def test_update_delete_events(self):
+        """
+        Tests for `update_delete_events`
+        """
+        #expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
+        #expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
+        del_ids = ['p1', 'p2', 'p3']
+        up_events = [
+                {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100, 'cron': 'c1'},
+                {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122, 'cron': 'c2'}]
+        #result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
+        #self.assertEqual(result, None)
+        #self.connection.execute.assert_called_once_with(expectedCql,
+        #                                                expectedData,
+        #                                                ConsistencyLevel.TWO)
+
     def test_delete_events(self):
         """
         Tests that you can delete event of a given policy_ids

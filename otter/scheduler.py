@@ -4,8 +4,17 @@ is right all the time and is probably what caused your regular clock to get brok
 in the first place.
 """
 
+"""
+TODO to get cron working
+* A class to manage cron entry
+    - take en entry and gives next date
+* update schema and model API to store cron entry in scaling_schedule
+* After executing event, if the event has cron then find next time and update it
+"""
+
 from datetime import datetime
 from functools import partial
+from croniter import croniter
 
 from twisted.internet import defer
 from twisted.application.internet import TimerService
@@ -16,7 +25,20 @@ from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
-from otter.models.cass import LOCK_TABLE_NAME
+
+
+class Recurrence(object):
+    """
+    Represents a recurrence either from cron entry or from any other format
+    """
+
+    def __init__(self, cron=None, start=None):
+        if not cron:
+            raise ValueError('no cron')
+        self.croniter = croniter(cron, start_time=start or datetime.utcnow())
+
+    def get_next_datetime(self):
+        return self.croniter.get_next(ret_type=datetime)
 
 
 class SchedulerService(TimerService):
@@ -34,6 +56,7 @@ class SchedulerService(TimerService):
                     :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
+        from otter.models.cass import LOCK_TABLE_NAME
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
@@ -79,17 +102,33 @@ class SchedulerService(TimerService):
             ]
             d = defer.gatherResults(deferreds, consumeErrors=True)
 
+            # TODO: If any of the executions give NoSuchPolicyError,
+            # delete it and do not update its trigger time
+
             d.addErrback(log.err)
-            d.addCallback(lambda _: events)
+            return d.addCallback(lambda _: events)
 
-            return d
+        def update_delete_events(events):
+            """
+            Update events with cron entry with next trigger time
+            Delete other events
+            """
+            if not len(events):
+                return events
 
-        def delete_events(events):
-            if len(events) != 0:
-                policy_ids = [event[2] for event in events]
-                log.bind(num_policy_ids=len(policy_ids)).msg('Deleting events')
-                get_store().delete_events(policy_ids)
-            return events
+            events_to_delete, events_to_update = list(), list()
+            for event in events:
+                if event['cron']:
+                    event['trigger'] = Recurrence(cron=event['cron']).get_next_datetime()
+                    events_to_update.append(event)
+                else:
+                    events_to_delete.append(event['policyId'])
+
+            log.bind(num_policy_ids_deleting=len(events_to_delete)).msg('Deleting events')
+            log.bind(num_policy_ids_updating=len(events_to_update)).msg('Updating events')
+            d = get_store().update_delete_events(events_to_delete, events_to_update)
+
+            return d.addCallback(lambda _: events)
 
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
@@ -97,7 +136,7 @@ class SchedulerService(TimerService):
         log.msg('Checking for events')
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
-        deferred.addCallback(delete_events)
+        deferred.addCallback(update_delete_events)
         deferred.addErrback(log.err)
         return deferred
 
@@ -109,10 +148,9 @@ class SchedulerService(TimerService):
 
         :return: a deferred with the results of execution
         """
-        tenant_id, group_id, policy_id, trigger = event
-        log.msg('Executing policy', group_id=group_id, policy_id=policy_id)
-        group = get_store().get_scaling_group(log, tenant_id, group_id)
+        log.msg('Executing policy', group_id=event['groupId'], policy_id=event['policyId'])
+        group = get_store().get_scaling_group(log, event['tenantId'], event['groupId'])
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
-                                       policy_id=policy_id))
+                                       policy_id=event['policyId']))
         return d
