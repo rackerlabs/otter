@@ -1229,6 +1229,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_schedule WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(

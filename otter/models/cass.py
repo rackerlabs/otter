@@ -723,7 +723,7 @@ class CassScalingGroup(object):
             queries = [
                 _cql_delete_all_in_group.format(cf=table) for table in
                 (self.config_table, self.launch_table, self.policies_table,
-                 self.webhooks_table, self.state_table)]
+                 self.webhooks_table, self.state_table, self.event_table)]
 
             b = Batch(queries,
                       {"tenantId": self.tenant_id, "groupId": self.uuid},
