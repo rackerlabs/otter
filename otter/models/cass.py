@@ -21,8 +21,6 @@ import json
 import iso8601
 from datetime import datetime
 
-from otter.log import log as otter_log
-
 LOCK_TABLE_NAME = 'locks'
 
 
@@ -899,48 +897,26 @@ class CassScalingGroupCollection:
 
         # First delete all events
         all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
-        delete_policy_ids_cql = ','.join([':delpolicyid{0}'.format(i)
+        delete_policy_ids_cql = ','.join([':delpolicyid{}'.format(i)
                                           for i in range(len(all_delete_ids))])
-        delete_id_values_dict = {'delpolicyid{0}'.format(i): policy_id
-                                 for i, policy_id in enumerate(all_delete_ids)}
-        queries.append(_cql_delete_events.format(cf=self.event_table,
-                                                 policy_ids=delete_policy_ids_cql))
-        data.update(delete_id_values_dict)
-        b = Batch(queries, data, get_consistency_level('delete', 'events'))
-        otter_log.msg('delete_events', queries=queries, data=data)
-        d = b.execute(self.connection)
+        data = {'delpolicyid{}'.format(i): policy_id
+                for i, policy_id in enumerate(all_delete_ids)}
+        query = _cql_delete_events.format(cf=self.event_table,
+                                          policy_ids=delete_policy_ids_cql)
+        d = self.connection.execute(query, data, get_consistency_level('delete', 'events'))
 
         # Then insert rows for trigger times to be updated. This is because trigger cannot be
         # updated on an existing row since it is part of primary key
         def _do_update(_):
-            if not len(update_events):
-                return
             queries, data = list(), dict()
             for i, event in enumerate(update_events):
                 polname = 'policy{}'.format(i)
                 queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
                 data.update({polname + key: event[key] for key in event})
             b = Batch(queries, data, get_consistency_level('update', 'events'))
-            otter_log.msg('update_events', queries=queries, data=data)
             return b.execute(self.connection)
 
-
-        return d.addCallback(_do_update)
-
-    def update_events_trigger(self, policy_and_triggers):
-        """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
-        """
-        queries = []
-        data = {}
-        for i, (policy_id, trigger) in enumerate(policy_and_triggers):
-            queries.append(_cql_update_event.format(cf=self.event_table,
-                                                    trigger=':trigger{0}'.format(i),
-                                                    policy_id=':policyid{0}'.format(i)))
-            data.update({'trigger{0}'.format(i): trigger,
-                         'policyid{0}'.format(i): policy_id})
-        b = Batch(queries, data, get_consistency_level('update', 'events'))
-        return b.execute(self.connection)
+        return update_events and d.addCallback(_do_update) or d
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

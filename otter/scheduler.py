@@ -69,7 +69,7 @@ class SchedulerService(TimerService):
         """
 
         def check_for_more(events):
-            if len(events) == batchsize:
+            if events and len(events) == batchsize:
                 return _do_check()
             return None
 
