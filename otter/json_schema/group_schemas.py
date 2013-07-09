@@ -200,7 +200,7 @@ zero = {
 
 
 # Register cron and ISO8601 date-time format checkers with the global checker.
-format_checker.checks('cron', raises=ValueError)(croniter)
+format_checker.checks('cron', raises=Exception)(croniter)
 format_checker.checks('date-time', raises=Exception)(from_timestamp)
 
 _policy_base_type = {

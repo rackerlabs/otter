@@ -532,9 +532,11 @@ class ScalingPolicyTestCase(TestCase):
         """
         policy with invalid cron entry raises ``ValidationError``
         """
+        invalid_crons = ['junk', '* * -32 * *', '-90 * * *', '* 0 * *']
         invalid = self.cron_policy
-        invalid['args']['cron'] = 'junk'
-        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+        for invalid_cron in invalid_crons:
+            invalid['args']['cron'] = invalid_cron
+            self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
 
 class CreateScalingGroupTestCase(TestCase):
