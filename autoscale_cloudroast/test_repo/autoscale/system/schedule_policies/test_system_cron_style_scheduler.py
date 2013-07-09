@@ -29,6 +29,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         Scaling group deleted by the Autoscale fixture's teardown
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_cron_style_change_policy_up_down(self):

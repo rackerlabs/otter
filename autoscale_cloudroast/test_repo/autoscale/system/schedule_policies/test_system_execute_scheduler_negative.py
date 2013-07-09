@@ -4,6 +4,7 @@ cron style scheduler policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+import unittest
 
 
 class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
@@ -12,19 +13,20 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     Verify update scheduler policy
     """
 
-    def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
-        """
-        An at style scheduler policy's execution to scale up will fails with 403,
-        if the maxentities on the group are already met
-        """
-        group = self._create_group(minentities=self.gc_min_entities,
-                                   maxentities=self.gc_min_entities, cooldown=0)
-        self.create_default_at_style_policy_wait_for_execution(group.id)
-        self.verify_group_state(group.id, self.gc_min_entities)
-        self.create_default_at_style_policy_wait_for_execution(
-            group.id, scale_down=True)
-        self.verify_group_state(group.id, self.gc_min_entities)
+    # def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
+    #     """
+    #     An at style scheduler policy's execution to scale up will fails with 403,
+    #     if the maxentities on the group are already met
+    #     """
+    #     group = self._create_group(minentities=self.gc_min_entities,
+    #                                maxentities=self.gc_min_entities, cooldown=0)
+    #     self.create_default_at_style_policy_wait_for_execution(group.id)
+    #     self.verify_group_state(group.id, self.gc_min_entities)
+    #     self.create_default_at_style_policy_wait_for_execution(
+    #         group.id, scale_down=True)
+    #     self.verify_group_state(group.id, self.gc_min_entities)
 
+    @unittest.skip('Cron not implemented yet')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
         A cron style scheduler policy's execution to scale up will fails with 403,
@@ -36,25 +38,32 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group_id=group.id,
             sp_cooldown=0,
             sp_change=self.sp_change,
-            schedule_at='* * * * *')
-        sleep(11)
+            schedule_cron='* * * * *')
+        sleep(self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
-        sleep(15)
+        sleep(self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
-
-    def test_system_at_style_date_no_t_z_scheduled_time(self):
-        """
-        Create an at style scheduler policy without the T and Z in the date.
-        The policy triggers at the time provided, considering it to be UTC.
-        """
-        pass
 
     def test_system_at_cron_style_execution_after_delete(self):
         """
-        Create an at style and cron scheduler policy and delete them. Verify they do not
-        trigger after they have been deleted.
+        Create an at style and cron scheduler policy and delete them.
+        Verify they do not trigger after they have been deleted.
         """
-        pass
+        group = self._create_group()
+        at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=group.id,
+            sp_cooldown=0,
+            sp_change=self.sp_change,
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(10))
+        cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=group.id,
+            sp_cooldown=0,
+            sp_change=self.sp_change,
+            schedule_cron='* * * * *')
+        self.autoscale_client.delete_scaling_policy(group.id, at_style_policy['id'])
+        self.autoscale_client.delete_scaling_policy(group.id, cron_style_policy['id'])
+        sleep(2*self.scheduler_interval)
+        self.verify_group_state(group.id, self.gc_min_entities)
 
     def test_system_scheduler_down(self):
         """
@@ -64,10 +73,10 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    def test_batch(self):
+    def test_system_scheduler_batch(self):
         """
-        Create more policies than specified in batch and verify all of them are executed
-        eventually
+        Create more policies than specified in batch and verify all of
+        them are executed eventually
         """
         pass
 

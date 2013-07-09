@@ -84,6 +84,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
+        cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
 
     def validate_headers(self, headers):
         """

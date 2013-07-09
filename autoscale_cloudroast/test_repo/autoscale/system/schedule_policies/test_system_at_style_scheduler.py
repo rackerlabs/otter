@@ -16,6 +16,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         """
         Create a scaling group with minentities=0 and cooldown=0
         """
+        super(AutoscaleFixture, self).setUp()
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             lc_name="scheduled",
             gc_cooldown=0)
@@ -27,6 +28,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         """
         Scaling group deleted by the Autoscale fixture's teardown
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_at_style_to_execute_using_utc_time_now(self):
