@@ -2,9 +2,10 @@
 Test scenarios for scaling policy of type schedule with cron style.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+import unittest
 
 
-class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
+class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
 
     """
     Scenarios for scaling policy of type schedule with cron style.
@@ -14,16 +15,11 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
+        super(AutoscaleFixture, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
                            self.autoscale_client.delete_scaling_group)
-
-    def tearDown(self):
-        """
-        Scaling group deleted by the Autoscale fixture's teardown
-        """
-        pass
 
     def test_schedule_cron_style_policy_valid_cron(self):
         """
@@ -52,6 +48,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                     'schedule_value'], each_schedule_value,
                 msg="Scaling policy's schedule value does not match")
 
+    @unittest.skip('AUTO-434')
     def test_schedule_at_style_policy_without_seconds(self):
         """
         Creating a scaling policy of type schedule with (at style) without seconds

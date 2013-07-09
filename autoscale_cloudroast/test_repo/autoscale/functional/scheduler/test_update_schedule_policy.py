@@ -15,6 +15,7 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         Create 2 scheduler policies, one at-style and another cron-style
         on a scaling group with 0 minentities
         """
+        super(ScalingGroupFixture, self).setUp()
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'
         self.at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
@@ -31,12 +32,6 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         self.assertEquals(self.cron_style_policy['status_code'], 201,
                           msg='Create schedule policy (cron style) failed with {0} for group {1}'
                           .format(self.cron_style_policy['status_code'], self.group.id))
-
-    def tearDown(self):
-        """
-        Scaling group deleted by the Autoscale fixture's teardown
-        """
-        pass
 
     def test_update_at_style_scaling_policy(self):
         """

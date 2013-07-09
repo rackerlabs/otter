@@ -2,6 +2,7 @@
 Test for negative scenarios to a scaling policy of type schedule.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+import unittest
 
 
 class ScheduleScalingPolicyNegative(AutoscaleFixture):
@@ -14,16 +15,11 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
+        super(AutoscaleFixture, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
                            self.autoscale_client.delete_scaling_group)
-
-    def tearDown(self):
-        """
-        Scaling group deleted by the Autoscale fixture's teardown
-        """
-        pass
 
     def test_schedule_at_style_policy_with_different_date_format_1(self):
         """
@@ -55,6 +51,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
+    @unittest.skip('AUTO-405')
     def test_schedule_at_style_policy_with_no_z_in_date(self):
         """
         Creating a scaling policy of type schedule with (at style) with no Z in date
@@ -71,6 +68,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
+    @unittest.skip('AUTO-405')
     def test_schedule_at_style_policy_with_no_t_in_date(self):
         """
         Creating a scaling policy of type schedule with (at style) with no T in date
@@ -87,6 +85,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
+    @unittest.skip('AUTO-405')
     def test_schedule_at_style_policy_with_no_z_or_t_in_date(self):
         """
         Creating a scaling policy of type schedule with (at style) with no Z or T in date
@@ -103,6 +102,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
+    @unittest.skip('AUTO-404')
     def test_schedule_at_style_policy_with_date_in_the_past(self):
         """
         Creating a scaling policy of type schedule with (at style) date in the past
@@ -314,6 +314,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           ' in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
+    @unittest.skip('AUTO-418')
     def test_schedule_at_style_policy_with_webhook(self):
         """
         Creating a webhook on a scaling policy of type schedule with (at style)
@@ -336,6 +337,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           ' with {0} for group {1}'
                           .format(create_webhook_response.status_code, self.group.id))
 
+    @unittest.skip('AUTO-418')
     def test_schedule_at_style_policy_execute(self):
         """
         Create scaling policy of type schedule with (at style) and execute it,
