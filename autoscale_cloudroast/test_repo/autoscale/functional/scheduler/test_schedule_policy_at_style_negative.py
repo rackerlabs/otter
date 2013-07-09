@@ -10,13 +10,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
     Negative scenarios for scaling policy of type schedule.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScheduleScalingPolicyNegative, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities=0
@@ -66,7 +59,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with (at style) with no Z in date
         format results in a 400.
-        ** fails with 201**
+        ** AUTO-405, fails with 201**
         """
         schedule_value = '2013-12-05T03:12:09'
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -82,7 +75,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with (at style) with no T in date
         format results in a 400.
-        ** fails with 201**
+        ** AUTO-405, fails with 201**
         """
         schedule_value = '2013-12-05 03:12:09Z'
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -98,7 +91,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with (at style) with no Z or T in date
         format results in a 400.
-        ** fails with 201**
+        ** AUTO-405, fails with 201**
         """
         schedule_value = '2013-12-05 03:12:09'
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -114,7 +107,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with (at style) date in the past
         results in a 400.
-        ** fails with 201 **
+        ** Auto 404, fails with 201 **
         """
         schedule_value = self.autoscale_behaviors.get_time_in_utc(-172800)
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -325,7 +318,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Creating a webhook on a scaling policy of type schedule with (at style)
         results in a 400.
-        ** fails with 201 for webhook creation **
+        ** AUTO-418, fails with 201 for webhook creation **
         """
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -347,7 +340,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Create scaling policy of type schedule with (at style) and execute it,
         results in a 400.
-        ** fails with 202 upon execution, and creates/deletes servers as per policy **
+        ** AUTO-418, fails with 202 upon execution, and creates/deletes servers as
+        per policy **
         """
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,

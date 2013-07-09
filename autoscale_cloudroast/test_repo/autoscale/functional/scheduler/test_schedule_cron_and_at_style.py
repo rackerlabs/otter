@@ -10,13 +10,6 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
     Scenarios for scaling policy of type schedule with cron style.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScheduleScalingPolicyCronStyleNegative, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities=0
@@ -40,7 +33,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         schedule_value_list = [
             '* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
-            '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0']
+            '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0', '* * * * * *']
         for each_schedule_value in schedule_value_list:
             schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
                 group_id=self.group.id,
@@ -63,6 +56,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with (at style) without seconds
         results in a 201.
+        ** fails with 400, AUTO-434**
         """
         schedule_value_list = [self.autoscale_behaviors.get_time_in_utc(3155760000),
                                '2013-12-05T03:12Z']

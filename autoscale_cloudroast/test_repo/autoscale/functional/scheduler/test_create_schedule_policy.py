@@ -10,20 +10,6 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
     Verify create schedule policy.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(CreateScheduleScalingPolicy, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(CreateScheduleScalingPolicy, cls).tearDownClass()
-
     def test_create_schedule_cron_style_scaling_policy(self):
         """
         Create a scaling policy of type schedule and via cron style,

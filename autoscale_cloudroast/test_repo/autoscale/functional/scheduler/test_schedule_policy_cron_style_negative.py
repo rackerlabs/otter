@@ -10,14 +10,6 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
     Negative scenarios for scaling policy of type schedule with cron style.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScheduleScalingPolicyCronStyleNegative, cls).setUpClass()
-        cls.scheduler_type = 'schedule'
-
     def setUp(self):
         """
         Create a scaling group with minentities=0
@@ -37,10 +29,10 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule with invalid cron results
         in a 400.
-        ** '* * * * * *' -> 201 **
+        ** AUTO-407 '- - - - -' -> 500 **
         """
-        schedule_value_list = ['* * * *', '* * * * * *', '* * * * * * * *', '*'
-                               '12345', 'dfsdfdf', '0-59 0-23 1-31 1-12 0-6', '- - - - -']
+        schedule_value_list = ['* * * *', '* * * * * * * *', '*'
+                               '12345', 'dfsdfdf', '- - - - -']
         for each_schedule_value in schedule_value_list:
             schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
                 group_id=self.group.id,
@@ -116,7 +108,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule via cron style with invalid minute value in
         cron results in a 400.
-        ** '-090 * * * *' -> 500 **
+        ** AUTO-407, '-090 * * * *' -> 500 **
         """
         schedule_value_list = ['60 * * * *', '-090 * * * *',
                                '2- * * * *', '6-0 * * * *',
@@ -136,7 +128,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule via cron style with invalid hour value in
         cron results in a 400.
-        ** '* -089 * * *' -> 500 **
+        ** AUTO-407 '* -089 * * *' -> 500 **
         """
         schedule_value_list = ['* 24 * * *', '* -089 * * *',
                                '* 2- * * *', '* 6-0 * * *',
@@ -156,7 +148,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule via cron style with invalid day value in
         cron results in a 400.
-        ** '* * -32 * *' -> 500, '* * 0 * *' -> 201 **
+        ** AUTO-407 '* * -32 * *' -> 500, '* * 0 * *' -> 201 **
         """
         schedule_value_list = ['* * 0 * *', '* * -32 * *',
                                '* * 0-0 * *', '* * 2- * *',
@@ -176,7 +168,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule via cron style with invalid month value in
         cron results in a 400.
-        ** '* * * -30 *' -> 500 **
+        ** AUTO-407 '* * * -30 *' -> 500 **
         """
         schedule_value_list = ['* * * -30 *', '* * * 13 *',
                                '* * * 0-0 *', '* * * 2- *',
@@ -196,7 +188,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a scaling policy of type schedule via cron style with invalid week value in
         cron results in a 400.
-        ** fails with 201 for '* * * * 7' **
+        ** AUTO-407 fails with 201 for '* * * * 7' **
         """
         schedule_value_list = ['* * * * 7', '* * * * 0-0',
                                '* * * * 2-', '* * * * 6-0',
@@ -221,7 +213,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                                                                 name=self.sp_name,
                                                                 cooldown='-00.01',
                                                                 change=self.sp_change,
-                                                                policy_type=self.scheduler_type,
+                                                                policy_type='schedule',
                                                                 args={'at': '2013-12-23T11:11:11Z'})
         self.assertEquals(error_create_resp.status_code, 400,
                           msg='Create scaling policy succeeded with invalid request: {0}'
@@ -235,7 +227,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                                                                 name=self.sp_name,
                                                                 cooldown=self.sp_cooldown,
                                                                 change=-00.01,
-                                                                policy_type=self.scheduler_type,
+                                                                policy_type='schedule',
                                                                 args={'cron': '* * * * *'})
         self.assertEquals(error_create_resp.status_code, 400,
                           msg='Create scaling policy succeeded with invalid request: {0}'
@@ -245,7 +237,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Creating a webhook on a scaling policy of type schedule with (at style)
         results in a 400.
-        ** fails with 201 for webhook creation **
+        ** AUTO-418 fails with 201 for webhook creation **
         """
         schedule_value = '* * * * *'
         schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -269,7 +261,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         """
         Create scaling policy of type schedule via cron style and execute it,
         results in a 400.
-        ** fails with 202 upon execution, and creates/deletes servers as per policy **
+        ** AUTO-418 fails with 202 upon execution, and creates/deletes servers as per policy **
         """
         schedule_value = '* * * * *'
         schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(

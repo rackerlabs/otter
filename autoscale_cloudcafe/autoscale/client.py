@@ -22,7 +22,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                                    deserialize_format)
         self.url = url
         self.auth_token = auth_token
-        #self.tenant_id = tenant_id
+        # self.tenant_id = tenant_id
         self.default_headers['X-Auth-Token'] = auth_token
         self.default_headers['Content-Type'] = 'application/%s' % \
                                                self.serialize_format
@@ -369,19 +369,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             '/<string:tenantId>/groups/<groupId>/policy/<policyId>'
         """
         url = '%s/groups/%s/policies/%s/' % (self.url, group_id, policy_id)
-        if args is None:
-            policy = Update_Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type)
-        else:
-            policy = Update_Policy_Request(
-                name=name, cooldown=cooldown, change=change,
-                change_percent=change_percent,
-                desired_capacity=desired_capacity,
-                policy_type=policy_type,
-                args=args)
+        policy = Update_Policy_Request(
+            name=name, cooldown=cooldown, change=change,
+            change_percent=change_percent,
+            desired_capacity=desired_capacity,
+            policy_type=policy_type,
+            args=args)
         return self.request('PUT', url,
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)

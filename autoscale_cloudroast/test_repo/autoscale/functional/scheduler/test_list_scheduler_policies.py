@@ -10,18 +10,10 @@ class UpdateSchedulerScalingPolicy(ScalingGroupPolicyFixture):
     Verify list scheduler policies
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create a scaling group with minentities=0 and scaling policy
-        of type webhook via change
-        """
-        super(UpdateSchedulerScalingPolicy, cls).setUpClass()
-        cls.policy1 = cls.policy
-
     def setUp(self):
         """
         Create 2 scheduler policies, one at-style and another cron-style
+        on a scaling group with an existing webhook type policy
         """
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'

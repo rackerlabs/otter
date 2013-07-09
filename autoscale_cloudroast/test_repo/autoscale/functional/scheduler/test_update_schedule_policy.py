@@ -10,16 +10,10 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
     Verify update scheduler policy
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Creates a scaling group with minentities=0
-        """
-        super(UpdateSchedulerScalingPolicy, cls).setUpClass()
-
     def setUp(self):
         """
         Create 2 scheduler policies, one at-style and another cron-style
+        on a scaling group with 0 minentities
         """
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'
