@@ -37,8 +37,5 @@ CREATE COLUMNFAMILY group_state (
     "groupTouched" ascii,
     "policyTouched" ascii,
     paused boolean,
-    deleted boolean,
     PRIMARY KEY("tenantId", "groupId")
     );
-
-CREATE INDEX deleted_group_state ON group_state (deleted);

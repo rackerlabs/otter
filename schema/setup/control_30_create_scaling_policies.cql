@@ -5,7 +5,7 @@ USE @@KEYSPACE@@;
 -- plus the policy ID, with the data contained as JSON
 --
 -- In CQL3, the primary key is split such that the first part
--- ends up in the row key, the rest of the key ends up 
+-- ends up in the row key, the rest of the key ends up
 -- as a composite column key.
 --
 -- This does a good job of making things a bit more rational
@@ -17,11 +17,8 @@ USE @@KEYSPACE@@;
 
 CREATE TABLE scaling_policies (
     "tenantId" ascii,
-    "groupId" ascii, 
-    "policyId" ascii, 
+    "groupId" ascii,
+    "policyId" ascii,
     data ascii,
-    deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId")
     );
-    
-CREATE INDEX deleted_scaling_policies ON scaling_policies (deleted);

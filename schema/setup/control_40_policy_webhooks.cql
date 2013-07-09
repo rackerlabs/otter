@@ -36,9 +36,7 @@ CREATE TABLE policy_webhooks (
     data ascii,
     capability ascii,
     "webhookKey" ascii,
-    deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId", "webhookId")
     );
 
-CREATE INDEX deleted_policy_webhooks ON policy_webhooks (deleted);
 CREATE INDEX webhooks_by_token ON policy_webhooks ("webhookKey");

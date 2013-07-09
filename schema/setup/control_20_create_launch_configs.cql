@@ -5,7 +5,7 @@ USE @@KEYSPACE@@;
 -- the data contained as JSON
 --
 -- In CQL3, the primary key is split such that the first part
--- ends up in the row key, the rest of the key ends up 
+-- ends up in the row key, the rest of the key ends up
 -- as a composite column key.
 --
 -- This does a good job of making things a bit more rational
@@ -17,10 +17,7 @@ USE @@KEYSPACE@@;
 
 CREATE COLUMNFAMILY launch_config (
     "tenantId" ascii,
-    "groupId" ascii, 
-    data ascii, 
-    deleted boolean,
+    "groupId" ascii,
+    data ascii,
     PRIMARY KEY("tenantId", "groupId")
     );
-    
-CREATE INDEX deleted_launch_config ON launch_config (deleted);
