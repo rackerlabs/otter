@@ -166,7 +166,7 @@ def maybe_execute_scaling_policy(
             execute_bound_log = bound_log.bind(server_delta=delta)
             if delta == 0:
                 execute_bound_log.msg("cooldowns checked, no change in servers")
-                error_msg = "Policy execution would violate min/max constraints."
+                error_msg = "No change in servers"
                 raise CannotExecutePolicyError(scaling_group.tenant_id,
                                                scaling_group.uuid, policy_id,
                                                error_msg)
