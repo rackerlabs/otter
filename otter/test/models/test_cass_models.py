@@ -15,8 +15,7 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     CassBadDataError,
-    serialize_json_data,
-    filter_deleted)
+    serialize_json_data)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -91,34 +90,6 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
-
-
-class FilterDeletedTestCase(TestCase):
-    """
-    Filtering out tombstone deletes happens in the API, so it does not slow
-    down the Cassandra query.  This is temporary until we stop doing tombstone
-    deletes.
-    """
-
-    def test_filters_deleted(self):
-        """
-        Out of all the rows that get returned from Cassandra, only the
-        ones whose delete column is False are returned.
-        """
-        rows = [{'deleted': '\x00', 'name': 'value1'},
-                {'deleted': '\x01', 'name': 'value2'},
-                {'deleted': '\x00', 'name': 'value3'}]
-        expected = [{'name': 'value1'}, {'name': 'value3'}]
-        self.assertEqual(filter_deleted(rows), expected)
-
-    def test_ignores_rows_without_delete(self):
-        """
-        If a row does not have a deleted parameter, it will not be filtered out.
-        """
-        rows = [{'name': 'value1'},
-                {'deleted': '\x01', 'name': 'value2'},
-                {'name': 'value3'}]
-        self.assertEqual(filter_deleted(rows), [rows[0], rows[2]])
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
@@ -206,7 +177,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_config()
         r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -220,15 +191,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'deleted': '\x00'}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00'}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
                        '"groupTouched", "policyTouched", paused FROM group_state '
-                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-                       'AND deleted = False;')
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -255,7 +225,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'deleted': '\x00'}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x01'}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
@@ -372,7 +342,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self._test_view_things_errors(self.group.view_config)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
@@ -387,7 +357,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_config()
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -415,7 +385,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_launch_config()
         r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM launch_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -429,7 +399,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self._test_view_things_errors(self.group.view_launch_config)
         expectedCql = ('SELECT data FROM launch_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
@@ -444,7 +414,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_launch_config()
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM launch_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -526,7 +496,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.get_policy("3444")
         r = self.successResultOf(d)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -540,7 +510,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self._test_view_things_errors(self.group.get_policy, "3444")
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
         for call in self.connection.execute.call_args_list:
             self.assertEqual(call, mock.call(expectedCql, expectedData,
@@ -555,7 +525,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.get_policy('3444')
         self.assert_deferred_failed(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -578,12 +548,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Naive list policies lists existing scaling policies
         """
         self.returns = [[
-            {'policyId': 'policy1', 'data': '{}', 'deleted': '\x00'},
-            {'policyId': 'policy2', 'data': '{}', 'deleted': '\x00'}]]
+            {'policyId': 'policy1', 'data': '{}'},
+            {'policyId': 'policy2', 'data': '{}'}]]
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111'}
-        expectedCql = ('SELECT "policyId", data, deleted FROM scaling_policies '
+        expectedCql = ('SELECT "policyId", data FROM scaling_policies '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
@@ -677,7 +647,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.create_policies([{"b": "lah"}])
         result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
-                       'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
+                       'data) VALUES (:tenantId, :groupId, :policy0Id, :policy0) '
                        'APPLY BATCH;')
         expectedData = {"policy0": '{"_ver": 1, "b": "lah"}',
                         "groupId": '12345678g',
@@ -702,7 +672,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.create_policies([pol])
         result = self.successResultOf(d)
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
-                       'data, deleted) VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
+                       'data) VALUES (:tenantId, :groupId, :policy0Id, :policy0) '
                        'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                        'VALUES (:tenantId, :groupId, :policy0Id, :policy0Trigger) '
                        'APPLY BATCH;')
@@ -796,7 +766,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.assert_deferred_failed(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"groupId": '12345678g',
                         "policyId": '12345678',
                         "tenantId": '11111'}
@@ -814,7 +784,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.update_config({"b": "lah"})
         self.assert_deferred_failed(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId AND deleted = False;')
+                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -890,11 +860,11 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expected_cql = (
             'BEGIN BATCH '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
-            'data, capability, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
-            ':webhook0Id, :webhook0, :webhook0Capability, :webhook0Key, False) '
+            'data, capability, "webhookKey") VALUES (:tenantId, :groupId, :policyId, '
+            ':webhook0Id, :webhook0, :webhook0Capability, :webhook0Key) '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
-            'data, capability, "webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, '
-            ':webhook1Id, :webhook1, :webhook1Capability, :webhook1Key, False) '
+            'data, capability, "webhookKey") VALUES (:tenantId, :groupId, :policyId, '
+            ':webhook1Id, :webhook1, :webhook1Capability, :webhook1Key) '
             'APPLY BATCH;')
 
         # can't test the parameters, because they contain serialized JSON.
@@ -953,7 +923,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
                         "policyId": '23456789'}
-        expectedCql = ('SELECT "webhookId", data, capability, deleted FROM '
+        expectedCql = ('SELECT "webhookId", data, capability FROM '
                        'policy_webhooks WHERE "tenantId" = :tenantId AND '
                        '"groupId" = :groupId AND "policyId" = :policyId;')
         r = self.successResultOf(
@@ -1048,8 +1018,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.successResultOf(d)
         expectedCql = ('SELECT data, capability FROM policy_webhooks WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId AND '
-                       '"policyId" = :policyId AND "webhookId" = :webhookId AND '
-                       'deleted = False;')
+                       '"policyId" = :policyId AND "webhookId" = :webhookId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g",
                         "policyId": "3444", "webhookId": "4555"}
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -1456,12 +1425,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupId': '12345678',
             'tenantId': '123'}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
-                       ':scaling, False) INSERT INTO launch_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       '"groupId", data) VALUES (:tenantId, :groupId, '
+                       ':scaling) INSERT INTO launch_config("tenantId", '
+                       '"groupId", data) VALUES (:tenantId, :groupId, :launch) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
-                       '\'{}\', \'{}\', False, False) APPLY BATCH;')
+                       '"policyTouched", paused) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False) APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
         result = self.validate_create_return_value(self.mock_log, '123',
@@ -1491,14 +1460,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'policy0Id': '12345678',
             'policy0': _S(policy)}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
-                       ':scaling, False) INSERT INTO launch_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       '"groupId", data) VALUES (:tenantId, :groupId, '
+                       ':scaling) INSERT INTO launch_config("tenantId", '
+                       '"groupId", data) VALUES (:tenantId, :groupId, :launch) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
-                       '\'{}\', \'{}\', False, False) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
-                       'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
+                       '"policyTouched", paused) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False) '
+                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+                       'VALUES (:tenantId, :groupId, :policy0Id, :policy0) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
         policy = group_examples.policy()[0]
@@ -1532,16 +1501,16 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'policy1Id': '3',
             'policy1': _S(policies[1])}
         expectedCql = ('BEGIN BATCH INSERT INTO scaling_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, '
-                       ':scaling, False) INSERT INTO launch_config("tenantId", '
-                       '"groupId", data, deleted) VALUES (:tenantId, :groupId, :launch, False) '
+                       '"groupId", data) VALUES (:tenantId, :groupId, '
+                       ':scaling) INSERT INTO launch_config("tenantId", '
+                       '"groupId", data) VALUES (:tenantId, :groupId, :launch) '
                        'INSERT INTO group_state("tenantId", "groupId", active, pending, '
-                       '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{}\', '
-                       '\'{}\', \'{}\', False, False) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
-                       'VALUES (:tenantId, :groupId, :policy0Id, :policy0, False) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, deleted) '
-                       'VALUES (:tenantId, :groupId, :policy1Id, :policy1, False) '
+                       '"policyTouched", paused) VALUES(:tenantId, :groupId, \'{}\', '
+                       '\'{}\', \'{}\', False) '
+                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+                       'VALUES (:tenantId, :groupId, :policy0Id, :policy0) '
+                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+                       'VALUES (:tenantId, :groupId, :policy1Id, :policy1) '
                        'APPLY BATCH;')
 
         counter = [0]
@@ -1576,13 +1545,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'pending': '{}',
             'groupTouched': None,
             'policyTouched': '{}',
-            'paused': '\x00',
-            'deleted': '\x00'
+            'paused': '\x00'
         } for i in range(2)])]
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       '"groupTouched", "policyTouched", paused FROM '
                        'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -1601,7 +1569,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused, deleted FROM '
+                       '"groupTouched", "policyTouched", paused FROM '
                        'group_state WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
@@ -1624,11 +1592,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Test that you can get webhook info by hash.
         """
         self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': '\x00'}]),
+            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1'}]),
             _cassandrify_data([{'data': '{}'}])
         ]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         r = self.successResultOf(d)
@@ -1638,7 +1606,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                   ConsistencyLevel.TWO)
 
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "123", "groupId": "group1", "policyId": "pol1"}
         self.connection.execute.assert_called_any(expectedCql,
                                                   expectedData,
@@ -1650,27 +1618,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [[]]
         expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
         self.assert_deferred_failed(d, UnrecognizedCapabilityError)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
-    def test_webhook_deleted(self):
-        """
-        Test that deletion works
-        """
-        self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': '\x01'}])
-        ]
-        expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
-                       '"webhookKey" = :webhookKey;')
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
-
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
