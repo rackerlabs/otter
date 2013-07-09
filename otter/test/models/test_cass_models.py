@@ -1340,17 +1340,32 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         Tests for `update_delete_events`
         """
-        #expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
-        #expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
         del_ids = ['p1', 'p2', 'p3']
         up_events = [
                 {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100, 'cron': 'c1'},
                 {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122, 'cron': 'c2'}]
-        #result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
-        #self.assertEqual(result, None)
-        #self.connection.execute.assert_called_once_with(expectedCql,
-        #                                                expectedData,
-        #                                                ConsistencyLevel.TWO)
+        expectedCql = ('BEGIN BATCH '
+                       'DELETE FROM scaling_schedule WHERE "policyId" IN (:delpolicyid0,:delpolicyid1,'
+                       ':delpolicyid2,:delpolicyid3,:delpolicyid4); '
+                       'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                       'VALUES (:policy0tenantId, :policy0groupId, :policy0policyId, :policy0trigger, '
+                       ':policy0cron); '
+                       'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                       'VALUES (:policy1tenantId, :policy1groupId, :policy1policyId, :policy1trigger, '
+                       ':policy1cron); '
+                       'APPLY BATCH;')
+        expectedData = {'delpolicyid0': 'p1', 'delpolicyid1': 'p2', 'delpolicyid2': 'p3',
+                'delpolicyid3': 'ef', 'delpolicyid4': 'ex',
+                'policy0tenantId': '1d2', 'policy0groupId': 'gr2', 'policy0policyId': 'ef',
+                'policy0trigger': 100, 'policy0cron': 'c1',
+                'policy1tenantId': '1d2', 'policy1groupId': 'gr2', 'policy1policyId': 'ex',
+                'policy1trigger': 122, 'policy1cron': 'c2'}
+
+        result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
+        self.assertEqual(result, None)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
 
     def test_delete_events(self):
         """
