@@ -679,7 +679,6 @@ class CassScalingGroup(object):
 
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
 
-
     def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
