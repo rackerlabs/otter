@@ -10,17 +10,11 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     System tests to verify execute scaling policies scenarios
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScalingPoliciesNegativeFixture, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities = maxentities, scale up by 2
         """
+        super(AutoscaleFixture, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=2,
             gc_cooldown=0)
@@ -43,6 +37,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):

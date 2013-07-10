@@ -10,18 +10,12 @@ class DeleteGroupTest(AutoscaleFixture):
     System tests to verify various delete scaling group scenarios
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client, behaviours and configs
-        """
-        super(DeleteGroupTest, cls).setUpClass()
-
     def setUp(self):
         """
         Create 2 scaling groups, one with minentities>0 with a scaling up policy and webhook
         another with minentities=0
         """
+        super(AutoscaleFixture, self).setUp()
         self.create_group0_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=0)
         self.group0 = self.create_group0_response.entity
@@ -44,6 +38,7 @@ class DeleteGroupTest(AutoscaleFixture):
         """
         Empty the scaling groups by setting min and maxentities=0 and delete groups
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.group0)
         self.empty_scaling_group(self.group1)
 

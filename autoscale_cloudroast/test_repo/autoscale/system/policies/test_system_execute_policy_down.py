@@ -10,17 +10,11 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
     System tests to verify execute scale down policies
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client, behaviors and configs
-        """
-        super(ExecutePoliciesDownTest, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities as 2 and scale up by 2
         """
+        super(AutoscaleFixture, self).setUp()
         minentities = 2
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=minentities,
@@ -39,6 +33,7 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_scale_down_policy_execution_change(self):

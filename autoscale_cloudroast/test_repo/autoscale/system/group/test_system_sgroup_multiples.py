@@ -10,17 +10,11 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
     System tests to verify multiple groups on an account
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScalingGroupMultiplesTest, cls).setUpClass()
-
     def setUp(self):
         """
         Create 3 scaling groups
         """
+        super(AutoscaleFixture, self).setUp()
         first_group = self.autoscale_behaviors.create_scaling_group_given(
             gc_cooldown=0)
         self.first_scaling_group = first_group.entity
@@ -41,6 +35,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
         Delete scaling groups
         """
+        super(AutoscaleFixture, self).tearDown()
         self.empty_scaling_group(self.first_scaling_group)
         self.empty_scaling_group(self.second_scaling_group)
         self.empty_scaling_group(self.third_scaling_group)
