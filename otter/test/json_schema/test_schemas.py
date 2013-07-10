@@ -2,6 +2,7 @@
 Tests for :mod:`otter.jsonschema.group_schemas`
 """
 from copy import deepcopy
+from datetime import datetime, timedelta
 
 from twisted.trial.unittest import TestCase
 from jsonschema import Draft3Validator, ValidationError
@@ -527,6 +528,37 @@ class ScalingPolicyTestCase(TestCase):
         invalid = self.at_policy
         invalid['args']['at'] = '11:25'
         self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_localtime_timestamp(self):
+        """
+        policy with localtime in timestamp raises ``ValidationError``
+        """
+        invalid = self.at_policy
+        invalid['args']['at'] = '2012-10-20T11:25:00'
+        self.assertRaisesRegexp(ValueError, 'Expecting Zulu-format UTC time',
+                                group_schemas.validate_datetime, invalid['args']['at'])
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_past_timestamp(self):
+        """
+        policy with past date raises `ValidationError`
+        """
+        invalid = self.at_policy
+        past = datetime.utcnow() - timedelta(days=1)
+        invalid['args']['at'] = past.isoformat() + 'Z'
+        self.assertRaisesRegexp(ValueError, 'time must be in future',
+                                group_schemas.validate_datetime, invalid['args']['at'])
+        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_valid_UTC_timestamp(self):
+        """
+        policy with valid UTC timestamp validates
+        """
+        valid = self.at_policy
+        future = datetime.utcnow() + timedelta(days=1)
+        valid['args']['at'] = future.isoformat() + 'Z'
+        group_schemas.validate_datetime(valid['args']['at'])
+        validate(valid, group_schemas.policy)
 
     def test_invalid_cron(self):
         """
