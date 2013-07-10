@@ -48,7 +48,7 @@ class AutoscaleFixture(BaseTestFixture):
         if 'dev' in env.lower():
             url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
         elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
+            url = 'https://ord.autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
                 cls.tenant_id)
         else:
             url = autoscale_service.get_endpoint(

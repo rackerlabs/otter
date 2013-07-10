@@ -42,22 +42,15 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=0,
             sp_change=self.sp_change,
             schedule_cron='* * * * 1-5')
-        sleep(11)
+        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=0,
             sp_change=-self.sp_change,
             schedule_cron='* * * * 1-5')
-        sleep(11)
+        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
-
-    def test_system_cron_style_change_percent_policy_up_down(self):
-        """
-        Create an cron style schedule via change percent to scale up and then scale down
-        with 0 cooldown
-        """
-        pass
 
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
@@ -69,14 +62,14 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=0,
             sp_desired_capacity=1,
             schedule_cron='* * * * 1-5')
-        sleep(11)
+        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=0,
             sp_desired_capacity=0,
             schedule_cron='* * * * 1-5')
-        sleep(11)
+        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
     def test_system_cron_style_policy_cooldown(self):
@@ -89,12 +82,12 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=20,
             sp_change=self.sp_change,
             schedule_cron='* * * * * *')
-        sleep(11)
+        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         execute_scheduled_policy = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=cron_style_policy['id'])
         self.assertEquals(execute_scheduled_policy.status_code, 403)
         self.verify_group_state(self.group.id, self.sp_change)
-        sleep(20)
-        self.verify_group_state(self.group.id, self.sp_change*2)
+        sleep(self.scheduler_interval * 2)
+        self.verify_group_state(self.group.id, self.sp_change * 2)

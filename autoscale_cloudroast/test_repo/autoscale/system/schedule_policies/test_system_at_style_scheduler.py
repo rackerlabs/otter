@@ -62,14 +62,14 @@ class AtStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=0,
             sp_desired_capacity=1,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(10))
-        sleep(20)
+        sleep(10 + self.scheduler_interval)
         self.verify_group_state(self.group.id, 1)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=0,
             sp_desired_capacity=0,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(20))
-        sleep(30)
+        sleep(20 + self.scheduler_interval)
         self.verify_group_state(
             self.group.id, self.group.groupConfiguration.minEntities)
 
@@ -83,7 +83,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=600,
             sp_change=self.sp_change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(5))
-        sleep(5 + 11)
+        sleep(5 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         execute_scheduled_policy = self.autoscale_client.execute_policy(
             group_id=self.group.id,
@@ -101,7 +101,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
             sp_cooldown=10,
             sp_change=self.sp_change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(5))
-        sleep(5 + 10 + 11)
+        sleep(5 + 10 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         execute_scheduled_policy = self.autoscale_client.execute_policy(
             group_id=self.group.id,

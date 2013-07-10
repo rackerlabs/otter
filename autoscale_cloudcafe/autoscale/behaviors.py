@@ -167,8 +167,7 @@ class AutoscaleBehaviors(BaseBehavior):
 
     def create_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
                             sp_change=None, sp_change_percent=None,
-                            sp_desired_capacity=None, sp_policy_type=None,
-                            schedule_at=None, schedule_cron=None):
+                            sp_desired_capacity=None, sp_policy_type=None):
         """
         :summary: creates the specified policy for the given change type
         :params: group_id
