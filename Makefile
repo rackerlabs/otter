@@ -89,8 +89,9 @@ clean: cleandocs
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
-	rm -rf otter-deploy*
+	rm -rf otter*deploy*
 	rm -rf schema/setup-*.cql
+	rm -rf schema/migrations-*.cql
 	rm -rf schema/teardown-*.cql
 
 bundle:
