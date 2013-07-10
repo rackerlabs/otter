@@ -39,6 +39,9 @@ CREATE COLUMNFAMILY group_state (
     paused boolean,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;
 
 CREATE INDEX deleted_group_state ON group_state (deleted);
