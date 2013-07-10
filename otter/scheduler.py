@@ -18,6 +18,7 @@ from croniter import croniter
 
 from twisted.internet import defer
 from twisted.application.internet import TimerService
+from twisted.python.failure import Failure
 
 from silverberg.lock import BasicLock, BusyLockError, with_lock
 
@@ -78,7 +79,7 @@ class SchedulerService(TimerService):
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
             # Return if we do not get lock as other process might be processing current events
-            d.addErrback(lambda f: f.trap(BusyLockError) and None)
+            d.addErrback(lambda f: f.trap(BusyLockError) and otter_log.msg('No lock in scheduler'))
             return d
 
         return _do_check()
@@ -98,23 +99,21 @@ class SchedulerService(TimerService):
                 return events
 
             log.msg('Processing events', num_events=len(events))
-            deferreds = [
-                self.execute_event(log, event) for event in events
-            ]
-            d = defer.DeferredList(deferreds, consumeErrors=True)
+            deferreds = [self.execute_event(log, event) for event in events]
+            d = defer.gatherResults(deferreds, consumeErrors=True)
 
             def _check_events_execution(results):
                 deleted_policy_ids = set()
-                for succeeded, result in results:
-                    if not succeeded:
-                        if result.check(NoSuchPolicyError):
-                            deleted_policy_ids.add(result.value.policy_id)
+                for event, result in zip(events, results):
+                    if isinstance(result, Failure):
+                        if result.check(NoSuchPolicyError, NoSuchScalingGroupError):
+                            deleted_policy_ids.add(event['policy_id'])
                         else:
                             log.err(result)
                 return deleted_policy_ids
 
             d.addCallback(_check_events_execution)
-            return d.addCallback(lambda del_pol_ids: events, del_pol_ids)
+            return d.addCallback(lambda del_pol_ids: (events, del_pol_ids))
 
         def update_delete_events((events, deleted_policy_ids)):
             """
@@ -161,6 +160,4 @@ class SchedulerService(TimerService):
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
-        return d.addErrback(lambda f: (f.trap(NoSuchScalingGroupError)
-                                       and NoSuchPolicyError(event['tenantId'], event['groupId'],
-                                                             policy_id)))
+        return d
