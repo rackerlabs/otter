@@ -716,20 +716,36 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
         """
+        # Events can only be deleted by policy id, since that and trigger are
+        # the only parts of the compound key
+        def _delete_everything(policies):
+            params = {
+                'tenantId': self.tenant_id,
+                'groupId': self.uuid
+            }
+            queries = [
+                _cql_delete_all_in_group.format(cf=table) for table in
+                (self.config_table, self.launch_table, self.policies_table,
+                 self.webhooks_table, self.state_table)]
+
+            if len(policies) > 0:
+                events_query, events_params = _delete_events_query_and_params(
+                    policies.keys(), self.event_table)
+                queries.append(events_query.rstrip(';'))
+                params.update(events_params)
+
+            b = Batch(queries, params,
+                      consistency=get_consistency_level('delete', 'group'))
+
+            return b.execute(self.connection)
+
         def _maybe_delete(state):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
 
-            queries = [
-                _cql_delete_all_in_group.format(cf=table) for table in
-                (self.config_table, self.launch_table, self.policies_table,
-                 self.webhooks_table, self.state_table, self.event_table)]
-
-            b = Batch(queries,
-                      {"tenantId": self.tenant_id, "groupId": self.uuid},
-                      consistency=get_consistency_level('delete', 'group'))
-
-            return b.execute(self.connection)
+            d = self._naive_list_policies()
+            d.addCallback(_delete_everything)
+            return d
 
         def _delete_group():
             d = self.view_state()
@@ -738,6 +754,23 @@ class CassScalingGroup(object):
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
         return with_lock(lock, _delete_group)
+
+
+def _delete_events_query_and_params(policy_ids, event_table):
+    """
+    Given an iterable of policy_ids, returns the query and params needed to
+    execute deleting all events associated with the policy ids.
+
+    :param iterable policy_ids: strings representing the policy ids
+    :return: ``tuple`` of query, params that can be passed to execute
+    """
+    policy_ids_cql = ','.join(
+        [':policyid{0}'.format(i) for i in range(len(policy_ids))])
+    params = {'policyid{0}'.format(i): policy_id
+              for i, policy_id in enumerate(policy_ids)}
+    query = _cql_delete_events.format(cf=event_table,
+                                      policy_ids=policy_ids_cql)
+    return (query, params)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
@@ -859,11 +892,9 @@ class CassScalingGroupCollection:
         """
         see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
         """
-        policy_ids_cql = ','.join([':policyid{0}'.format(i) for i in range(len(policy_ids))])
-        id_values_dict = {'policyid{0}'.format(i): policy_id for i, policy_id in enumerate(policy_ids)}
-        d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
-                                                              policy_ids=policy_ids_cql),
-                                    id_values_dict, get_consistency_level('delete', 'events'))
+        query, params = _delete_events_query_and_params(policy_ids, self.event_table)
+        d = self.connection.execute(query, params,
+                                    get_consistency_level('delete', 'events'))
         return d
 
     def update_events_trigger(self, policy_and_triggers):
