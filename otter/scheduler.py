@@ -25,6 +25,7 @@ from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
+from otter.model.interfaces import NoSuchPolicyError, NoSuchScalingGroupError
 
 
 class Recurrence(object):
@@ -100,15 +101,22 @@ class SchedulerService(TimerService):
             deferreds = [
                 self.execute_event(log, event) for event in events
             ]
-            d = defer.gatherResults(deferreds, consumeErrors=True)
+            d = defer.DeferredList(deferreds, consumeErrors=True)
 
-            # TODO: If any of the executions give NoSuchPolicyError,
-            # delete it and do not update its trigger time
+            def _check_events_execution(results):
+                deleted_policy_ids = set()
+                for succeeded, result in results:
+                    if not succeeded:
+                        if result.check(NoSuchPolicyError):
+                            deleted_policy_ids.add(result.value.policy_id)
+                        else:
+                            log.err(result)
+                return deleted_policy_ids
 
-            d.addErrback(log.err)
-            return d.addCallback(lambda _: events)
+            d.addCallback(_check_events_execution)
+            return d.addCallback(lambda del_pol_ids: events, del_pol_ids)
 
-        def update_delete_events(events):
+        def update_delete_events((events, deleted_policy_ids)):
             """
             Update events with cron entry with next trigger time
             Delete other events
@@ -118,7 +126,7 @@ class SchedulerService(TimerService):
 
             events_to_delete, events_to_update = list(), list()
             for event in events:
-                if event['cron']:
+                if event['cron'] and event['policyId'] not in deleted_policy_ids:
                     event['trigger'] = Recurrence(cron=event['cron']).get_next_datetime()
                     events_to_update.append(event)
                 else:
@@ -145,12 +153,14 @@ class SchedulerService(TimerService):
         Execute a single event
 
         :param log: A bound log for logging
-
         :return: a deferred with the results of execution
         """
         log.msg('Executing policy', group_id=event['groupId'], policy_id=event['policyId'])
         group = get_store().get_scaling_group(log, event['tenantId'], event['groupId'])
+        policy_id = event['policyId']
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
-                                       policy_id=event['policyId']))
-        return d
+                                       policy_id=policy_id))
+        return d.addErrback(lambda f: (f.trap(NoSuchScalingGroupError)
+                                       and NoSuchPolicyError(event['tenantId'], event['groupId'],
+                                                             policy_id)))

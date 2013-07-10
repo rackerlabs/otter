@@ -156,6 +156,7 @@ class NoSuchPolicyError(Exception):
     exist.
     """
     def __init__(self, tenant_id, group_id, policy_id):
+        self.policy_id = policy_id
         super(NoSuchPolicyError, self).__init__(
             "No such scaling policy {p} for group {g} for tenant {t}"
             .format(t=tenant_id, g=group_id, p=policy_id))
