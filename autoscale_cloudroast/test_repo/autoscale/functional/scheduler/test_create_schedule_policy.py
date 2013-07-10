@@ -24,8 +24,6 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
         self.assertEquals(schedule_policy_cron_style['status_code'], 201,
                           msg='Create schedule scaling policy failed with {0} for group {1}'
                           .format(schedule_policy_cron_style['status_code'], self.group.id))
-        self.assertTrue(schedule_policy_cron_style['headers'] is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(schedule_policy_cron_style['headers'])
         self.assertTrue(schedule_policy_cron_style['id'] is not None,
                         msg='Scaling policy id is None')
@@ -56,8 +54,6 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
         self.assertEquals(schedule_policy_at_style['status_code'], 201,
                           msg='Create schedule scaling policy failed with {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
-        self.assertTrue(schedule_policy_at_style['headers'] is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(schedule_policy_at_style['headers'])
         self.assertTrue(schedule_policy_at_style['id'] is not None,
                         msg='Scaling policy id is None')

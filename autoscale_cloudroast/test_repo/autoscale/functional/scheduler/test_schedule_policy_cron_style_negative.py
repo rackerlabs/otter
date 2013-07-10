@@ -220,9 +220,9 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
                           msg='Create scaling policy succeeded with invalid request: {0}'
                           .format(error_create_resp.status_code))
 
-    def test_scaling_policy_change_lessthan_zero(self):
+    def test_scaling_policy_change_as_float(self):
         """
-        Negative Test: Scheduler policy should not get created with change less than zero
+        Negative Test: Scheduler policy should not get created with change as a float
         """
         error_create_resp = self.autoscale_client.create_policy(group_id=self.group.id,
                                                                 name=self.sp_name,

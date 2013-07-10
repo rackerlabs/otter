@@ -33,9 +33,9 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
                           msg='Create schedule policy (cron style) failed with {0} for group {1}'
                           .format(self.cron_style_policy['status_code'], self.group.id))
 
-    def test_delete_policy_schedule_at_style(self):
+    def test_delete_at_style_scheduler(self):
         """
-        Verify the delete scheduler policy via at style,
+        Verify deleting the scheduler policy via at style,
         for response code 204, headers.
         """
         delete_at_style_policy = self.autoscale_client.delete_scaling_policy(
@@ -51,9 +51,9 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
         self.assertTrue(self.at_style_policy['id'] not in self._policy_list_for_group(self.group.id))
         self.assertTrue(self.cron_style_policy['id'] in self._policy_list_for_group(self.group.id))
 
-    def test_delete_policy_schedule_cron_style(self):
+    def test_delete_cron_style_scheduler(self):
         """
-        Verify the delete scheduler policy via cron style,
+        Verify deleting the scheduler policy via cron style,
         for response code 204, headers.
         """
         delete_at_style_policy = self.autoscale_client.delete_scaling_policy(

@@ -4,7 +4,7 @@ Test get scheduler policies (at and cron style).
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 
 
-class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
+class GetSchedulerScalingPolicy(ScalingGroupFixture):
 
     """
     Verify get scheduler policies
@@ -47,26 +47,9 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         self.assertTrue(get_at_style_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(get_at_style_policy_response.headers)
-        get_at_style_policy = get_at_style_policy_response.entity
-        self.assertEquals(
-            get_at_style_policy.id, self.at_style_policy['id'],
-            msg='Policy Id is not as expected upon get')
-        self.assertEquals(
-            get_at_style_policy.links, self.at_style_policy['links'],
-            msg='Links for the scaling policy is none upon the get')
-        self.assertEquals(
-            get_at_style_policy.name, self.at_style_policy['name'],
-            msg='Name of the policy is None upon get')
-        self.assertEquals(
-            get_at_style_policy.cooldown, self.at_style_policy['cooldown'],
-            msg='Cooldown of the policy in null upon an get')
-        self.assertEquals(
-            get_at_style_policy.change, self.at_style_policy['change'],
-            msg='Change in the policy is not as expected')
-        self.assertEquals(get_at_style_policy.args.at, self.at_value,
-                          msg='At style schedule policy value not as expected'
-                          ' get for group {0}'
-                          .format(self.group.id))
+        self.assert_get_policy(self.at_style_policy,
+                               get_at_style_policy_response.entity,
+                               args='at_style')
 
     def test_get_cron_style_scaling_policy(self):
         """
@@ -82,26 +65,9 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         self.assertTrue(get_cron_style_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(get_cron_style_policy_response.headers)
-        get_cron_style_policy = get_cron_style_policy_response.entity
-        self.assertEquals(
-            get_cron_style_policy.id, self.cron_style_policy['id'],
-            msg='Policy Id is not as expected upon get')
-        self.assertEquals(
-            get_cron_style_policy.links, self.cron_style_policy['links'],
-            msg='Links for the scaling policy is none upon the get')
-        self.assertEquals(
-            get_cron_style_policy.name, self.cron_style_policy['name'],
-            msg='Name of the policy is None upon get')
-        self.assertEquals(
-            get_cron_style_policy.cooldown, self.cron_style_policy['cooldown'],
-            msg='Cooldown of the policy in null upon an get')
-        self.assertEquals(
-            get_cron_style_policy.change, self.cron_style_policy['change'],
-            msg='Change in the policy is not as expected')
-        self.assertEquals(get_cron_style_policy.args.cron, self.cron_value,
-                          msg='Cron style schedule policy value not as expected'
-                          ' get for group {0}'
-                          .format(self.group.id))
+        self.assert_get_policy(self.cron_style_policy,
+                               get_cron_style_policy_response.entity,
+                               args='cron_style')
 
     def test_get_scheduler_cron_style_policy_after_deletion(self):
         """
