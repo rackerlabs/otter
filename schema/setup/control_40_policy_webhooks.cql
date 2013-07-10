@@ -38,7 +38,10 @@ CREATE TABLE policy_webhooks (
     "webhookKey" ascii,
     deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId", "webhookId")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;
 
 CREATE INDEX deleted_policy_webhooks ON policy_webhooks (deleted);
 CREATE INDEX webhooks_by_token ON policy_webhooks ("webhookKey");
