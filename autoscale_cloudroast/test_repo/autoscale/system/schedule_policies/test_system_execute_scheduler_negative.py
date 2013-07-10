@@ -99,7 +99,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             sp_list=at_style_list)
         group = create_group_reponse.entity
         sleep(self.scheduler_interval)
-        self.verify_group_state(group.id, 1+2+3)
+        self.verify_group_state(group.id, 1 + 2 + 3)
 
     def _create_group(self, minentities=None, maxentities=None, cooldown=None):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(

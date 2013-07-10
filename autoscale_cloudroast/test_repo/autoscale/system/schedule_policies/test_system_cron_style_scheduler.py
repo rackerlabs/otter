@@ -52,13 +52,6 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
-    def test_system_cron_style_change_percent_policy_up_down(self):
-        """
-        Create an cron style schedule via change percent to scale up and then scale down
-        with 0 cooldown
-        """
-        pass
-
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
         Create an at style schedule via change percent to scale up and then scale down
@@ -96,5 +89,5 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             policy_id=cron_style_policy['id'])
         self.assertEquals(execute_scheduled_policy.status_code, 403)
         self.verify_group_state(self.group.id, self.sp_change)
-        sleep(self.scheduler_interval*2)
-        self.verify_group_state(self.group.id, self.sp_change*2)
+        sleep(self.scheduler_interval * 2)
+        self.verify_group_state(self.group.id, self.sp_change * 2)
