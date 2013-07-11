@@ -13,10 +13,14 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 
 from silverberg.client import ConsistencyLevel
+from silverberg.lock import BasicLock, with_lock
 
 import json
 import iso8601
 from datetime import datetime
+
+
+LOCK_TABLE_NAME = 'locks'
 
 
 class CassBadDataError(Exception):
@@ -46,40 +50,41 @@ def serialize_json_data(data, ver):
 #
 # Thus, selects have a semicolon, everything else doesn't.
 _cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
-             '"groupId" = :groupId AND deleted = False;')
+             '"groupId" = :groupId;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
-                    '"groupId" = :groupId AND "policyId" = :policyId AND deleted = False;')
+                    '"groupId" = :groupId AND "policyId" = :policyId;')
 _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
-                     '"webhookId" = :webhookId AND deleted = False;')
-_cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data, deleted) '
-               'VALUES (:tenantId, :groupId, {name}, False)')
-_cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data, deleted) '
-                      'VALUES (:tenantId, :groupId, {name}Id, {name}, False)')
+                     '"webhookId" = :webhookId;')
+_cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data) '
+               'VALUES (:tenantId, :groupId, {name})')
+_cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
+                      'VALUES (:tenantId, :groupId, {name}Id, {name})')
 _cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, '
-                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, \'{{}}\', '
-                           '\'{{}}\', \'{{}}\', False, False)')
+                           '"policyTouched", paused) VALUES(:tenantId, :groupId, \'{{}}\', '
+                           '\'{{}}\', \'{{}}\', False)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused, deleted) VALUES(:tenantId, :groupId, :active:'
-                           ':pending, :groupTouched, :policyTouched, :paused, False)')
+                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active:'
+                           ':pending, :groupTouched, :policyTouched, :paused)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                          '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
-                         '"groupId" = :groupId AND deleted = False;')
+                         '"groupId" = :groupId;')
 _cql_update_group_state = (
     'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
     '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
-                     'VALUES (:tenantId, :groupId, {name}, {name}Trigger)')
+                     'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
+_cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
 _cql_update_event = 'UPDATE {cf} SET trigger = {trigger} WHERE "policyId" = {policy_id};'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
-    '"webhookKey", deleted) VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
-    ':{name}Capability, :{name}Key, False)')
+    '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
+    ':{name}Capability, :{name}Key)')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -94,38 +99,18 @@ _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                    '"policyTouched", paused, deleted FROM {cf} WHERE '
+                    '"policyTouched", paused FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
-_cql_list_policy = ('SELECT "policyId", data, deleted FROM {cf} WHERE '
+_cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
-_cql_list_webhook = ('SELECT "webhookId", data, capability, deleted FROM {cf} '
+_cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                      '"policyId" = :policyId;')
 
-_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId", deleted FROM {cf} WHERE '
+_cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
-
-
-def filter_deleted(cass_result):
-    """
-    Filters out all rows with a ``deleted`` column whose value is True.
-    Also removes the ``deleted`` column from the resulting rows.
-
-    This is intended to be used as a temporary callback to ``execute`` as part
-    of phasing out manual tombstone deletes.  ``deleted`` is an index, and
-    Cassandra queries the index for all undeleted items first before checking
-    the other items, which takes a long time.  This doesn't seem to happen
-    when selecting just one item (with both parts of the compound key in the
-    where clause.)
-    """
-    filtered = []
-    for dictionary in cass_result:
-        deleted = dictionary.pop('deleted', '\x00')  # default is false
-        if not bool(ord(deleted)):
-            filtered.append(dictionary)
-    return filtered
 
 
 def get_consistency_level(operation, resource):
@@ -399,8 +384,6 @@ class CassScalingGroup(object):
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
-
-        TODO: locking!!
         """
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -417,9 +400,12 @@ class CassScalingGroup(object):
             return self.connection.execute(_cql_update_group_state, params,
                                            get_consistency_level('update', 'state'))
 
-        d = self.view_state()
-        d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
-        return d.addCallback(_write_state)
+        def _modify_state():
+            d = self.view_state()
+            d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
+            return d.addCallback(_write_state)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        return with_lock(lock, _modify_state)
 
     def update_config(self, data):
         """
@@ -475,7 +461,6 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(filter_deleted)
         d.addCallback(construct_dictionary)
         return d
 
@@ -568,7 +553,8 @@ class CassScalingGroup(object):
         def _do_delete(_):
             queries = [
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
-                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table),
+                _cql_delete_policy_events.format(cf=self.event_table)]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id},
@@ -601,7 +587,6 @@ class CassScalingGroup(object):
                                             "groupId": self.uuid,
                                             "policyId": policy_id},
                                     get_consistency_level('list', 'webhook'))
-        d.addCallback(filter_deleted)
         d.addCallback(_assemble_webhook_results)
         return d
 
@@ -732,13 +717,7 @@ class CassScalingGroup(object):
     def delete_group(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
-
-        TODO: locking!!
-        XXX: What happens if a group is deleted while policie stuff is updating?
-            seems like locking/some kind of coordination must happen.
         """
-        d = self.view_state()
-
         def _maybe_delete(state):
             if len(state.active) + len(state.pending) > 0:
                 raise GroupNotEmptyError(self.tenant_id, self.uuid)
@@ -754,9 +733,13 @@ class CassScalingGroup(object):
 
             return b.execute(self.connection)
 
-        d.addCallback(_maybe_delete)
+        def _delete_group():
+            d = self.view_state()
+            d.addCallback(_maybe_delete)
+            return d
 
-        return d
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        return with_lock(lock, _delete_group)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
@@ -852,7 +835,6 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
-        d.addCallback(filter_deleted)
         d.addCallback(_build_states)
         return d
 
@@ -904,31 +886,12 @@ class CassScalingGroupCollection:
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
-
-        Note: We have to post-filter deleted items because of the way that Cassandra works
-
-        Cassandra has a notion of a 'primary key' that you use to look up a record.  It behooves
-        you to construct your data in such a way that it can always look up a primary key
-        (or, for that matter, a secondary index).  CQL3 lets you create a secondary index, but
-        only on one key at a time.... because they realized that everybody using the previous
-        version of CQL was spending bunches of time writing code to generate these secondary
-        indicies.
-
-        Furthermore, Cassandra doesn't have a proper query planner like a real SQL database,
-        so it doesn't actually have any way to determine which index to query first.
-
-        We have two secondary indicies.  One for finding the non-deleted records, one for
-        finding the records by capability_hash.  And we can only use one of them at a time.
-        It's more efficient for us to use the index that maps from the capability_hash to
-        the row instead of the index that picks out what has not been deleted.
         """
         def _do_webhook_lookup(webhook_rec):
             res = webhook_rec
             if len(res) == 0:
                 raise UnrecognizedCapabilityError(capability_hash, 1)
             res = res[0]
-            if bool(ord(res['deleted'])) is True:
-                raise UnrecognizedCapabilityError(capability_hash, 1)
             return (res['tenantId'], res['groupId'], res['policyId'])
 
         query = _cql_find_webhook_token.format(cf=self.webhooks_table)

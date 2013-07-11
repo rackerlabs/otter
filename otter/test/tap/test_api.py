@@ -271,3 +271,16 @@ class APIMakeServiceTests(TestCase):
         warnings = self.flushWarnings([makeService])
         self.assertEqual(warnings,
                          [matches(ContainsDict({'message': message}))])
+
+    @mock.patch('otter.tap.api.SchedulerService')
+    def test_scheduler_service(self, scheduler_service):
+        """
+        SchedulerService is added to MultiService when 'scheduler' settings are there in config file
+        """
+        mock_config = test_config.copy()
+        mock_config['scheduler'] = {'interval': 10, 'batchsize': 100}
+
+        expected_parent = makeService(mock_config)
+        scheduler_service.assert_called_once_with(100, 10,
+                                                  self.RoundRobinCassandraCluster.return_value)
+        scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)

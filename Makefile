@@ -11,7 +11,7 @@ CASSANDRA_HOST ?= localhost
 CASSANDRA_PORT ?= 9160
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
-CLOUDCAFE ?= $(shell cafe-runner autoscale -l configs | grep dev)
+CLOUDCAFE ?= $(shell which cafe-runner)
 
 test: unit integration
 
@@ -37,12 +37,12 @@ endif
 
 integration:
 ifneq ($(and $(CLOUDCAFE),$(JENKINS_URL)), )
-	cafe-runner autoscale prod -p functional --parallel
+	@echo "Waiting on preprod node before running tests here."
+#	cafe-runner autoscale prod -p functional --parallel
 else ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
 else
-	@echo "Are you on the VM?  cloudcafe is not set up as desired."
-	@echo "So can't run integration tests."
+	@echo "Cloudcafe is not set up as desired, so can't run those tests."
 endif
 
 coverage:
@@ -73,6 +73,9 @@ schema-teardown:
 load-dev-schema:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/setup --ban-unsafe --outfile schema/setup-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
 
+migrate-dev-schema:
+	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/migrations --outfile schema/migrations-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
+
 teardown-dev-schema:
 	PATH=${SCRIPTSDIR}:${PATH} load_cql.py schema/teardown --outfile schema/teardown-dev.cql --replication 1 --keyspace ${CONTROL_KEYSPACE} --host ${CASSANDRA_HOST} --port ${CASSANDRA_PORT}
 
@@ -86,8 +89,9 @@ clean: cleandocs
 	find . -name '_trial_coverage' -print0 | xargs rm -rf
 	find . -name '_trial_temp' -print0 | xargs rm -rf
 	rm -rf dist build *.egg-info
-	rm -rf otter-deploy*
+	rm -rf otter*deploy*
 	rm -rf schema/setup-*.cql
+	rm -rf schema/migrations-*.cql
 	rm -rf schema/teardown-*.cql
 
 bundle:

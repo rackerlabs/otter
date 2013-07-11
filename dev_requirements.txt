@@ -16,3 +16,4 @@ decorator==3.4.0
 unittest2==0.5.1
 git+https://github.com/stackforge/opencafe.git#egg=opencafe
 git+https://github.com/stackforge/cloudcafe.git#egg=cloudcafe
+IPy==0.81
