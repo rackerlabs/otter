@@ -17,7 +17,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         Create a scaling group with min entities>0, scale up with cooldown=1 second
         and execute the policy
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ExecuteUpdatedPoliciesTest, self).setUp()
         self.cooldown = 1
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
@@ -36,7 +36,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(ExecuteUpdatedPoliciesTest, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_update_policy_from_change_to_desired_capacity_scale_down(self):

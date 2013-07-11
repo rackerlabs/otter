@@ -16,7 +16,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         Create a scaling group with minentities > 0, with multiple scaling policies
         and execute one scale up policy to create 2 servers
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ExecuteMultiplePoliciesTest, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             gc_cooldown=0)
@@ -52,7 +52,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(ExecuteMultiplePoliciesTest, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_policy_up_cooldown(self):

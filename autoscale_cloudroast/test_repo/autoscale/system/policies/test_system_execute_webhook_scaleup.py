@@ -14,7 +14,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         """
         Create a scaling group with minentities over zero
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ScalingUpExecuteWebhookTest, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt)
         self.group = self.create_group_response.entity
@@ -26,7 +26,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(ScalingUpExecuteWebhookTest, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_execute_webhook_scale_up_change(self):
