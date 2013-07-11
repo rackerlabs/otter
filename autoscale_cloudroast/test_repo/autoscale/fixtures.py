@@ -175,7 +175,7 @@ class AutoscaleFixture(BaseTestFixture):
             self.assertEquals(get_policy.args.cron, created_policy['schedule_value'],
                               msg='Cron style schedule policy value not as expected')
 
-    def create_default_at_style_policy_wait_for_execution(self, group_id, delay=0,
+    def create_default_at_style_policy_wait_for_execution(self, group_id, delay=3,
                                                           scale_down=None):
         """
         Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
