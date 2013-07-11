@@ -16,7 +16,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         """
         Create a scaling group with minentities=0 and cooldown=0
         """
-        super(AutoscaleFixture, self).setUp()
+        super(AtStyleSchedulerTests, self).setUp()
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             lc_name="scheduled",
             gc_cooldown=0)
@@ -28,7 +28,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
         """
         Scaling group deleted by the Autoscale fixture's teardown
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(AtStyleSchedulerTests, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_at_style_to_execute_using_utc_time_now(self):
@@ -43,7 +43,7 @@ class AtStyleSchedulerTests(AutoscaleFixture):
     def test_system_at_style_change_policy_up_down(self):
         """
         Create an at style schedule via change to scale up and then scale down
-        with 0 cooldown
+        one to with 0 cooldown
         """
         self.create_default_at_style_policy_wait_for_execution(self.group.id, 10)
         self.verify_group_state(self.group.id, self.sp_change)
@@ -54,8 +54,8 @@ class AtStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_at_style_desired_capacity_policy_up_down(self):
         """
-        Create an at style schedule via change percent to scale up and then scale down
-        with 0 cooldown
+        Create an at style schedule via change percent to scale up and then one to
+        scale down with 0 cooldown
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,

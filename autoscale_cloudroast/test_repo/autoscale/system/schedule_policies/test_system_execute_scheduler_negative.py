@@ -15,16 +15,17 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
 
     def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
         """
-        An at style scheduler policy's execution to scale up will fails with 403,
-        if the maxentities on the group are already met
+        When min and max entities are already met on a scaling group, scheduled policies
+        to scale up or scale down will not be executed i.e. the desired capacity does
+        not change.
         """
         group = self._create_group(minentities=self.gc_min_entities,
                                    maxentities=self.gc_min_entities, cooldown=0)
         self.create_default_at_style_policy_wait_for_execution(group.id)
-        self.verify_group_state(group.id, self.gc_min_entities)
+        self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         self.create_default_at_style_policy_wait_for_execution(
             group.id, scale_down=True)
-        self.verify_group_state(group.id, self.gc_min_entities)
+        self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
 
     @unittest.skip('Cron not implemented yet')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
