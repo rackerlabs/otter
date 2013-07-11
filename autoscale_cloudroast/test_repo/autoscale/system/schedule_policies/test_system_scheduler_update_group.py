@@ -61,7 +61,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change)
         sleep(60 - self.scheduler_interval)
         self.create_default_at_style_policy_wait_for_execution(group.id)
-        self.verify_group_state(group.id, self.sp_change*2)
+        self.verify_group_state(group.id, self.sp_change * 2)
         self.empty_scaling_group(group)
 
     @unittest.skip('Cron not implemented yet')
