@@ -97,7 +97,7 @@ class ScalingGroupNegative(AutoscaleFixture):
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_max_entities=self.max_maxentities+1)
+            gc_max_entities=self.max_maxentities + 1)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
                           msg='Create scaling group succeeded with invalid request: {0}'
