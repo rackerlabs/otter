@@ -34,25 +34,22 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
-
-        autoscale_service = access_data.get_service(
-            cls.autoscale_config.autoscale_endpoint_name)
-
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         server_url = server_service.get_endpoint(
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
+        cls.otter_endpoint = cls.autoscale_config.server_endpoint
+
         env = os.environ['OSTNG_CONFIG_FILE']
-        if 'dev' in env.lower():
-            url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
-        elif 'prod' in env.lower():
-            url = 'https://ord.autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
-                cls.tenant_id)
-        else:
+        if ('prod.ord' in env.lower()) or ('prod.dfw' in env.lower()):
+            autoscale_service = access_data.get_service(
+                cls.autoscale_config.autoscale_endpoint_name)
             url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
+        else:
+            url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
 
         cls.autoscale_client = AutoscalingAPIClient(
             url, access_data.token.id_,
