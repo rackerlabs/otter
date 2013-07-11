@@ -110,6 +110,8 @@ _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
 
+_cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
+
 
 def get_consistency_level(operation, resource):
     """
@@ -897,4 +899,21 @@ class CassScalingGroupCollection:
                                     {"webhookKey": capability_hash},
                                     get_consistency_level('list', 'group'))
         d.addCallback(_do_webhook_lookup)
+        return d
+
+    def get_counts(self, log, tenant_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
+        """
+
+        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        deferred = [self.connection.execute(_cql_count_for_tenant.format(cf=field),
+                                            {'tenantId': tenant_id},
+                                            get_consistency_level('count', 'group'))
+                    for field in fields]
+
+        d = defer.gatherResults(deferred)
+        d.addCallback(lambda results: [r[0]['count'] for r in results])
+        d.addCallback(lambda results: dict(zip(
+            ('groups', 'policies', 'webhooks'), results)))
         return d

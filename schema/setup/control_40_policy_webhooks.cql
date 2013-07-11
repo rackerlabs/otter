@@ -37,6 +37,9 @@ CREATE TABLE policy_webhooks (
     capability ascii,
     "webhookKey" ascii,
     PRIMARY KEY("tenantId", "groupId", "policyId", "webhookId")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;
 
 CREATE INDEX webhooks_by_token ON policy_webhooks ("webhookKey");

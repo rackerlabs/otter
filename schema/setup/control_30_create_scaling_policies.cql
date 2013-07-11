@@ -21,4 +21,7 @@ CREATE TABLE scaling_policies (
     "policyId" ascii,
     data ascii,
     PRIMARY KEY("tenantId", "groupId", "policyId")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;

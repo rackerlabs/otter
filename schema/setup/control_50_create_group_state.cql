@@ -38,4 +38,7 @@ CREATE COLUMNFAMILY group_state (
     "policyTouched" ascii,
     paused boolean,
     PRIMARY KEY("tenantId", "groupId")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;

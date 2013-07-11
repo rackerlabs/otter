@@ -16,4 +16,4 @@ Functional Tests
     test_repo.autoscale.functional.scaling_group
     test_repo.autoscale.functional.scaling_policy
     test_repo.autoscale.functional.webhooks
-
+    test_repo.autoscale.functional.scheduler
