@@ -26,7 +26,7 @@ from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
-from otter.model.interfaces import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 
 
 class Recurrence(object):
@@ -96,18 +96,18 @@ class SchedulerService(TimerService):
         def process_events(events):
 
             if not len(events):
-                return events
+                return events, set()
 
             log.msg('Processing events', num_events=len(events))
             deferreds = [self.execute_event(log, event) for event in events]
-            d = defer.gatherResults(deferreds, consumeErrors=True)
+            d = defer.DeferredList(deferreds, consumeErrors=True)
 
             def _check_events_execution(results):
                 deleted_policy_ids = set()
-                for event, result in zip(events, results):
-                    if isinstance(result, Failure):
+                for event, (success, result) in zip(events, results):
+                    if not success:
                         if result.check(NoSuchPolicyError, NoSuchScalingGroupError):
-                            deleted_policy_ids.add(event['policy_id'])
+                            deleted_policy_ids.add(event['policyId'])
                         else:
                             log.err(result)
                 return deleted_policy_ids
@@ -131,8 +131,8 @@ class SchedulerService(TimerService):
                 else:
                     events_to_delete.append(event['policyId'])
 
-            log.bind(num_policy_ids_deleting=len(events_to_delete)).msg('Deleting events')
-            log.bind(num_policy_ids_updating=len(events_to_update)).msg('Updating events')
+            log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
+            log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
             d = get_store().update_delete_events(events_to_delete, events_to_update)
 
             return d.addCallback(lambda _: events)
