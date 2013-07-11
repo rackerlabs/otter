@@ -4,10 +4,10 @@ USE @@KEYSPACE@@;
 -- the account ID and the column key to be the group ID
 -- plus the policy ID.
 --
--- This is used as a trigger for the next 
+-- This is used as a trigger for the next
 --
 -- In CQL3, the primary key is split such that the first part
--- ends up in the row key, the rest of the key ends up 
+-- ends up in the row key, the rest of the key ends up
 -- as a composite column key.
 --
 -- This does a good job of making things a bit more rational
@@ -19,9 +19,12 @@ USE @@KEYSPACE@@;
 
 CREATE TABLE scaling_schedule (
     "tenantId" ascii,
-    "groupId" ascii, 
-    "policyId" ascii, 
+    "groupId" ascii,
+    "policyId" ascii,
     trigger timestamp,
     cron ascii,
     PRIMARY KEY("policyId", "trigger")
-    );
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;

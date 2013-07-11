@@ -86,6 +86,8 @@ class AutoscaleFixture(BaseTestFixture):
         """
         Module to validate headers
         """
+        self.assertTrue(headers is not None,
+                        msg='No headers returned')
         if headers.get('transfer-encoding'):
             self.assertEqual(headers['transfer-encoding'], 'chunked',
                              msg='Response header transfer-encoding is not chunked')
@@ -129,6 +131,45 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertEquals(group_state.desiredCapacity, desired_capacity,
                           msg='Desired capacity ({0}) != ({1}) minentities on the group {2}'
                           .format(group_state.desiredCapacity, desired_capacity, group_id))
+
+    def assert_get_policy(self, created_policy, get_policy, args=False):
+        """
+        Given the newly created policy dict and the response object from the get
+        policy call, asserts all the attributes are equal. args can be at_style,
+        cron_style or maas
+        """
+        self.assertEquals(
+            get_policy.id, created_policy['id'],
+            msg='Policy Id upon get is not as when created')
+        self.assertEquals(
+            get_policy.links, created_policy['links'],
+            msg='Links for the scaling policy upon get is not as when created')
+        self.assertEquals(
+            get_policy.name, created_policy['name'],
+            msg='Name of the policy upon get is not as when was created')
+        self.assertEquals(
+            get_policy.cooldown, created_policy['cooldown'],
+            msg='Cooldown of the policy upon get != when created')
+        if created_policy.get('change'):
+            self.assertEquals(
+                get_policy.change, created_policy['change'],
+                msg='Change in the policy is not as expected')
+        elif created_policy.get('change_percent'):
+            self.assertEquals(
+                get_policy.changePercent, created_policy['change_percent'],
+                msg='Change percent in the policy is not as expected')
+        elif created_policy.get('desired_capacity'):
+            self.assertEquals(
+                get_policy.desiredCapacity, created_policy['desired_capacity'],
+                msg='Desired capacity in the policy is not as expected')
+        else:
+            self.fail(msg='Policy does not have a change type')
+        if args is 'at_style':
+            self.assertEquals(get_policy.args.at, created_policy['schedule_value'],
+                              msg='At style schedule policy value not as expected')
+        if args is 'cron_style':
+            self.assertEquals(get_policy.args.cron, created_policy['schedule_value'],
+                              msg='Cron style schedule policy value not as expected')
 
     @classmethod
     def tearDownClass(cls):

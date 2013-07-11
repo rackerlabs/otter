@@ -599,3 +599,21 @@ class IScalingGroupCollection(Interface):
         :raises: :class:`UnrecognizedCapabilityError` if the capability hash
             does not match any non-deleted policy
         """
+
+    def get_counts(log, tenant_id):
+        """
+        Returns total current count of policies, webhooks and groups in the
+        following format::
+
+            {
+                "groups": 100,
+                "policies": 100,
+                "webhooks": 100
+            }
+
+        :param tenant_id: the tenant ID of the scaling groups
+        :type tenant_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` containing current
+            count of tenants policies, webhooks and groups as ``dict``
+        """

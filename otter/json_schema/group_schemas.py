@@ -4,6 +4,9 @@ scaling group configuration, and policies.
 """
 
 from copy import deepcopy
+from datetime import datetime
+import calendar
+
 from croniter import croniter
 
 from otter.util.timestamp import from_timestamp
@@ -199,9 +202,23 @@ zero = {
 }
 
 
-# Register cron and ISO8601 date-time format checkers with the global checker.
+# Datetime validator. Allow only zulu-based UTC timestamp
+@format_checker.checks('date-time', raises=Exception)
+def validate_datetime(dt_str):
+    """
+    Validate date-time string in json. Return True if valid and raise exceptions if invalid
+    """
+    if dt_str[-1] != 'Z':
+        raise ValueError('Expecting Zulu-format UTC time')
+    dt = from_timestamp(dt_str)
+    # Ensure time is in future
+    if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
+        raise ValueError('time must be in future')
+    return True
+
+
+# Register cron format checker with the global checker.
 format_checker.checks('cron', raises=ValueError)(croniter)
-format_checker.checks('date-time', raises=Exception)(from_timestamp)
 
 _policy_base_type = {
     "type": "object",

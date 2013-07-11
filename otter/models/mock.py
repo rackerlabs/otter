@@ -447,3 +447,9 @@ class MockScalingGroupCollection:
                             return defer.succeed((tenant_id, group_id, policy_id))
 
         return defer.fail(UnrecognizedCapabilityError(capability_hash, 1))
+
+    def get_counts(self, log, tenant_id):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
+        """
+        return defer.succeed(None)
