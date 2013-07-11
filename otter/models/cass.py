@@ -18,8 +18,6 @@ from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
 
 import json
-import iso8601
-from datetime import datetime
 
 LOCK_TABLE_NAME = 'locks'
 

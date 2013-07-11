@@ -18,7 +18,6 @@ from croniter import croniter
 
 from twisted.internet import defer
 from twisted.application.internet import TimerService
-from twisted.python.failure import Failure
 
 from silverberg.lock import BasicLock, BusyLockError, with_lock
 

@@ -81,7 +81,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.otter_log.msg.return_value = None
 
         self.recurrence = patch(self, 'otter.scheduler.Recurrence')
-        self.recurrence.return_value.get_next_datetime.return_value ='newtrigger'
+        self.recurrence.return_value.get_next_datetime.return_value = 'newtrigger'
 
     def validate_calls(self, d, fetch_returns, update_delete_args):
         """
@@ -117,7 +117,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         policy is executed when its corresponding event is there before now
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId':'pol44',
+        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
                    'trigger': 'now', 'cron': None}]
         self.returns = [events]
 
@@ -295,7 +295,6 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
                    'trigger': 'now', 'cron': None}]
         self.returns = [events]
 
-        _modify_state_first_time = [True]
         events_indexes = range(len(events))
 
         def _mock_modify_state(modifier, *args, **kwargs):
