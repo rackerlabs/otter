@@ -14,7 +14,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
         Create 3 scaling groups
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ScalingGroupMultiplesTest, self).setUp()
         first_group = self.autoscale_behaviors.create_scaling_group_given(
             gc_cooldown=0)
         self.first_scaling_group = first_group.entity
@@ -35,7 +35,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
         Delete scaling groups
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(ScalingGroupMultiplesTest, self).tearDown()
         self.empty_scaling_group(self.first_scaling_group)
         self.empty_scaling_group(self.second_scaling_group)
         self.empty_scaling_group(self.third_scaling_group)

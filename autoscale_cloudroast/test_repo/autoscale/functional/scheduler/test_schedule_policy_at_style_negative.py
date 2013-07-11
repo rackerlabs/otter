@@ -15,7 +15,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ScheduleScalingPolicyNegative, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,

@@ -14,7 +14,7 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
         """
         Create a scaling group with minentities over zero and maxentities two times minentities
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ExecutePoliciesUpTest, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             gc_max_entities=self.gc_min_entities_alt * 2)
@@ -27,7 +27,7 @@ class ExecutePoliciesUpTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
-        super(AutoscaleFixture, self).tearDown()
+        super(ExecutePoliciesUpTest, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_scale_up_policy_execution_change(self):

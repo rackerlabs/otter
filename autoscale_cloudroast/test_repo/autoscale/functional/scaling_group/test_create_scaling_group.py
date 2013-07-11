@@ -87,7 +87,6 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         Verify the group configuration of the group is as expected.
         """
-        #assert name set during creation is same as name of server
         self.assertEqual(
             self.gc_name, self.scaling_group.groupConfiguration.name,
             msg='Scaling group name did not match')

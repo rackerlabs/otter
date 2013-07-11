@@ -2,7 +2,6 @@
 Test to create and verify the state of the group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import unittest
 
 
 class GetListEntityStatusTest(AutoscaleFixture):
