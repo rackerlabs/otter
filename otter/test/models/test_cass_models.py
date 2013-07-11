@@ -1595,23 +1595,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-    def test_webhook_deleted(self):
-        """
-        Test that deletion works
-        """
-        self.returns = [_cassandrify_data([
-            {'tenantId': '123', 'groupId': 'group1', 'policyId': 'pol1', 'deleted': '\x01'}])
-        ]
-        expectedData = {'webhookKey': 'x'}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", deleted FROM policy_webhooks WHERE '
-                       '"webhookKey" = :webhookKey;')
-        d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
-
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
     def test_get_counts(self):
         """
         Check get_count returns dictionary in proper format
