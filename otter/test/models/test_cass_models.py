@@ -1617,9 +1617,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         Check get_count returns dictionary in proper format
         """
         self.returns = [
-            {'count(*)': 100},
-            {'count(*)': 101},
-            {'count(*)': 102},
+            {'count': 100},
+            {'count': 101},
+            {'count': 102},
         ]
 
         expectedData = {'tenantId': '123'}

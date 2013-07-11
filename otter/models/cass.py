@@ -913,7 +913,7 @@ class CassScalingGroupCollection:
                     for field in fields]
 
         d = defer.gatherResults(deferred)
-        d.addCallback(lambda results: [i.values()[0] for i in results])
+        d.addCallback(lambda results: [r['count'] for r in results])
         d.addCallback(lambda results: dict(zip(
             ('groups', 'policies', 'webhooks'), results)))
         return d
