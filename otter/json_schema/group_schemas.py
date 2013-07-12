@@ -217,8 +217,8 @@ def validate_datetime(dt_str):
     return True
 
 
-# Register cron format checker with the global checker.
-format_checker.checks('cron', raises=Exception)(croniter)
+# Register cron format checker with the global checker. Also, ensure it does not have seconds arg
+format_checker.checks('cron', raises=Exception)(lambda c: croniter(c) and len(c.split()) <= 5)
 
 _policy_base_type = {
     "type": "object",

@@ -560,11 +560,24 @@ class ScalingPolicyTestCase(TestCase):
         group_schemas.validate_datetime(valid['args']['at'])
         validate(valid, group_schemas.policy)
 
+    def test_valid_cron(self):
+        """
+        policy with valid cron entry validates
+        """
+        valid_crons = ['* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
+                       '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0']
+        valid = self.cron_policy
+        for valid_cron in valid_crons:
+            valid['args']['cron'] = valid_cron
+            validate(valid, group_schemas.policy)
+
     def test_invalid_cron(self):
         """
         policy with invalid cron entry raises ``ValidationError``
         """
-        invalid_crons = ['junk', '* * -32 * *', '-90 * * *', '* 0 * *']
+        invalid_crons = ['junk', '* * -32 * *', '-90 * * *', '* 0 * *',
+                         '* * * * * *', '0 * * 0 * *', '* * * *', '* * * * * * * *',
+                         '*12345', 'dfsdfdf', '- - - - -', '-090 * * * *', '* -089 * * *']
         invalid = self.cron_policy
         for invalid_cron in invalid_crons:
             invalid['args']['cron'] = invalid_cron
