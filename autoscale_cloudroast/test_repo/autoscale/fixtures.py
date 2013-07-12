@@ -46,13 +46,13 @@ class AutoscaleFixture(BaseTestFixture):
         if ('prod.ord' in env.lower()) or ('prod.dfw' in env.lower()):
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
-            url = autoscale_service.get_endpoint(
+            cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
         else:
-            url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
+            cls.url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
 
         cls.autoscale_client = AutoscalingAPIClient(
-            url, access_data.token.id_,
+            cls.url, access_data.token.id_,
             'json', 'json')
         cls.server_client = ServersClient(
             server_url, access_data.token.id_,
