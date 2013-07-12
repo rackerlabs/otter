@@ -34,16 +34,5 @@ class GetScalingPolicy(ScalingGroupPolicyFixture):
         self.assertEquals(self.get_policy_response.status_code, 200,
                           msg='Get scaling policy failed with {0}'
                           .format(self.get_policy_response.status_code))
-        self.assertTrue(self.get_policy_response.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(self.get_policy_response.headers)
-        self.assertEquals(self.get_policy.id, self.policy['id'],
-                          msg='Policy Id is none upon creation')
-        self.assertEquals(self.get_policy.links, self.policy['links'],
-                          msg='Links for the scaling policy is none')
-        self.assertEquals(self.get_policy.name, self.sp_name,
-                          msg='Name of the policy did not match')
-        self.assertEquals(self.get_policy.cooldown, self.sp_cooldown,
-                          msg='Cooldown time in the policy did not match')
-        self.assertEquals(self.get_policy.changePercent, 100,
-                          msg='Change in the policy did not match')
+        self.assert_get_policy(self.policy, self.get_policy)

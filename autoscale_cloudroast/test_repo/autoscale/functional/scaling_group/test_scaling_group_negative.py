@@ -10,19 +10,6 @@ class ScalingGroupNegative(AutoscaleFixture):
     """
     Verify negative scenarios for scaling group.
     """
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create a scaling group.
-        """
-        super(ScalingGroupNegative, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(ScalingGroupNegative, cls).tearDownClass()
 
     # @unittest.skip('invalid when tests are running in parallel and on a tenant that has groups')
     # def test_list_scaling_group_when_none_exist(self):
@@ -39,21 +26,21 @@ class ScalingGroupNegative(AutoscaleFixture):
     #     self.assertEquals(list_groups, [],
     #                       msg='Some scaling groups exist on the account')
 
-    def test_scaling_group_name_blank(self):
-        """
-        Negative Test: Scaling group should not get created with an empty
-        group configuration name
-        """
-        expected_status_code = HttpStatusCodes.BAD_REQUEST
-        error_create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_name='')
-        create_error = error_create_resp.entity
-        self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create scaling group succeeded with invalid request: {0}'
-                          .format(error_create_resp.status_code))
-        self.assertTrue(create_error is None,
-                        msg='Create scaling group with invalid request returned: {0}'
-                        .format(create_error))
+    # def test_scaling_group_name_blank(self):
+    #     """
+    #     Negative Test: Scaling group should not get created with an empty
+    #     group configuration name
+    #     """
+    #     expected_status_code = HttpStatusCodes.BAD_REQUEST
+    #     error_create_resp = self.autoscale_behaviors.create_scaling_group_given(
+    #         gc_name='')
+    #     create_error = error_create_resp.entity
+    #     self.assertEquals(error_create_resp.status_code, expected_status_code,
+    #                       msg='Create scaling group succeeded with invalid request: {0}'
+    #                       .format(error_create_resp.status_code))
+    #     self.assertTrue(create_error is None,
+    #                     msg='Create scaling group with invalid request returned: {0}'
+    #                     .format(create_error))
 
     def test_scaling_group_name_whitespace(self):
         """

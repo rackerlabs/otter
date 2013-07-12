@@ -22,7 +22,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                                    deserialize_format)
         self.url = url
         self.auth_token = auth_token
-        #self.tenant_id = tenant_id
+        # self.tenant_id = tenant_id
         self.default_headers['X-Auth-Token'] = auth_token
         self.default_headers['Content-Type'] = 'application/%s' % \
                                                self.serialize_format
@@ -298,7 +298,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def create_policy(self, group_id, name, cooldown,
                       change=None, change_percent=None,
                       desired_capacity=None, policy_type=None,
-                      requestslib_kwargs=None):
+                      args=None, requestslib_kwargs=None):
         """
         :summary: Create scaling policy
         :param name: A unique name for the scaling policy
@@ -327,7 +327,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         policy = Policy_Request(name=name, cooldown=cooldown, change=change,
                                 change_percent=change_percent,
                                 desired_capacity=desired_capacity,
-                                policy_type=policy_type)
+                                policy_type=policy_type, args=args)
         return self.request('POST', url,
                             response_entity_type=Policy,
                             request_entity=policy,
@@ -352,7 +352,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, requestslib_kwargs=None):
+                      policy_type=None, args=None, requestslib_kwargs=None):
         """
         :summary: Update/Create details of a specific scaling policy
         :param name: The name of the policy
@@ -373,7 +373,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             name=name, cooldown=cooldown, change=change,
             change_percent=change_percent,
             desired_capacity=desired_capacity,
-            policy_type=policy_type)
+            policy_type=policy_type,
+            args=args)
         return self.request('PUT', url,
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
