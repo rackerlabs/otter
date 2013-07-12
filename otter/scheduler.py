@@ -39,6 +39,9 @@ class Recurrence(object):
         self.croniter = croniter(cron, start_time=start or datetime.utcnow())
 
     def get_next_datetime(self):
+        """
+        Return the next time of this recurrence as `datetime` instance
+        """
         return self.croniter.get_next(ret_type=datetime)
 
 
