@@ -55,8 +55,6 @@ class ListLaunchConfigTest(AutoscaleFixture):
         """
         self.assertEquals(self.launch_config_response.status_code, 200, msg='List launch'
                           'config failed with {0}' .format(self.launch_config_response.status_code))
-        self.assertTrue(self.launch_config_response.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(self.launch_config_response.headers)
         self.assertEquals(
             self.launch_config.server.name, self.autoscale_config.lc_name,

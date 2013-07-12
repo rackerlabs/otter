@@ -55,8 +55,6 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
         self.assertEquals(update_lc_response.status_code, 204,
                           msg='Update launch config failed with {0} as against a 204'
                           .format(update_lc_response.status_code))
-        self.assertTrue(update_lc_response.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(update_lc_response.headers)
         self.assertEquals(updated_launchconfig.server.name, lc_name,
                           msg='Prefix/Suffix server name in the launch config did not update')

@@ -15,7 +15,9 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
     def test_system_min_max_entities_at_style(self):
         """
         Create a scaling group with minentities>0<max and maxentities=change, with 2
-        at style scheduler policies with change= +2 and -2, cooldown=0.
+        at style scheduler policies with change= +2 and -2, cooldown=0 and verify that
+        the scale up scheduler policy scales upto the max entities specified on the group
+        and scale down scheduler policy scales down upto the minentities.
         """
         change = 2
         group = self._create_group(cooldown=0, minentities=1, maxentities=change)
@@ -28,8 +30,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
     @unittest.skip('Cron not implemented yet')
     def test_system_min_max_entities_cron_style(self):
         """
-        Create a scaling group with minentities>0<max, cooldown=0 and maxentities=change,
-        with 2 at style scheduler policies with change= +2 and -2, cooldown=0.
+        Create a scaling group with minentities>0<max and maxentities=change, with 2
+        cron style scheduler policies with change= +2 and -2, cooldown=0 and verify that
+        the scale up scheduler policy scales upto the maxentities specified on the group
+        and scale down scheduler policy scales down upto the minentities.
         """
         change = 2
         group = self._create_group(cooldown=0, minentities=1, maxentities=change)
@@ -51,8 +55,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
 
     def test_system_group_cooldown_atstyle(self):
         """
-        Create a scaling group with cooldown>0, schedule at style policies
-        before and after cooldown, only the ones after the cooldown executed.
+        Create a scaling group with cooldown>0, create a scheduler at style policy
+        and wait for its execution, creating another at style policy scheduled
+        to execute before the cooldown period expires does not trigger.
+        Creating a 3rd at style policy after the cooldown, executes successfully.
         """
         group = self._create_group(cooldown=60)
         self.create_default_at_style_policy_wait_for_execution(group.id)
@@ -67,8 +73,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
     @unittest.skip('Cron not implemented yet')
     def test_system_group_cooldown_cronstyle(self):
         """
-        Create a scaling group with cooldown>0, schedule cron style policies
-        before and after cooldown, only the ones after the cooldown executed.
+        Create a scaling group with cooldown greater than a minute, create a scheduler
+        cron style policy to execute every minute. The scheduler running every scheduler
+        interval period does not cause the next cron policy to trigger. After the group
+        cooldown the cron style policy is triggered. (*test it)
         """
         group = self._create_group(cooldown=60)
         self.autoscale_behaviors.create_schedule_policy_given(
@@ -88,33 +96,42 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
 
     def test_system_upd_launch_config_at_style_scheduler(self):
         """
-        Create a scaling group with minnetities>0, update launch config, schedule at style
-        scheduler to scale up followed by at style scheduler to scle down
+        Create a scaling group with minentities>0, update launch config, schedule at style
+        policy to scale up and verify the new servers of the latest launch config,
+        then schedule an at style policy to scale down and verify the servers remaining
+        are of the latest launch config.
         """
-        group = self._create_group(minentities=self.gc_min_entities_alt)
+        group = self._create_group(minentities=self.sp_change)
         active_list_b4_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
-            expected_servers=self.gc_min_entities_alt)
+            expected_servers=group.groupConfiguration.minEntities)
         self._update_launch_config(group)
         self.create_default_at_style_policy_wait_for_execution(group.id)
         active_servers = self.sp_change + group.groupConfiguration.minEntities
-        active_list_after_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=active_servers)
-        upd_lc_server = set(active_list_after_upd) - set(active_list_b4_upd)
+        upd_lc_server = set(active_list_after_scale_up) - set(active_list_b4_upd)
         self._verify_server_list_for_launch_config(upd_lc_server)
+        self.create_default_at_style_policy_wait_for_execution(self.group.id, scale_down=True)
+        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=group.groupConfiguration.minEntities)
+        self._verify_server_list_for_launch_config(active_list_on_scale_down)
         self.empty_scaling_group(group)
 
     @unittest.skip('Cron not implemented yet')
     def test_system_upd_launch_config_cron_style_scheduler(self):
         """
-        Create a scaling group with minnetities>0, update launch config, schedule cron style
-        scheduler to scale up followed by cron style scheduler to scle down
+        Create a scaling group with minentities>0, update launch config, schedule cron style
+        policy to scale up and verify the new servers of the latest launch config,
+        then schedule another cron style policy to scale down and verify the servers remaining
+        are of the latest launch config.
         """
-        group = self._create_group(minentities=self.gc_min_entities_alt)
+        group = self._create_group(minentities=self.sp_change)
         active_list_b4_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
-            expected_servers=self.gc_min_entities_alt)
+            expected_servers=group.groupConfiguration.minEntities)
         self._update_launch_config(group)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
@@ -123,11 +140,21 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         sleep(self.scheduler_interval)
         active_servers = self.sp_change + group.groupConfiguration.minEntities
-        active_list_after_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=active_servers)
-        upd_lc_server = set(active_list_after_upd) - set(active_list_b4_upd)
+        upd_lc_server = set(active_list_after_scale_up) - set(active_list_b4_upd)
         self._verify_server_list_for_launch_config(upd_lc_server)
+        self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=group.id,
+            sp_cooldown=0,
+            sp_change=-self.sp_change,
+            schedule_cron='* * * * *')
+        sleep(self.scheduler_interval)
+        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=group.groupConfiguration.minEntities)
+        self._verify_server_list_for_launch_config(active_list_on_scale_down)
         self.empty_scaling_group(group)
 
     def _create_group(self, cooldown=None, minentities=None, maxentities=None):

@@ -90,14 +90,14 @@ class ScalingGroupNegative(AutoscaleFixture):
                         msg='Create scaling group with invalid request returned: {0}'
                         .format(create_error))
 
-    def test_scaling_group_maxentities_over_25(self):
+    def test_scaling_group_maxentities_over_max(self):
         """
         Negative Test: Scaling group should not get created when max entities
         are over 25
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
         error_create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_max_entities='25.9')
+            gc_max_entities=self.max_maxentities+1)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
                           msg='Create scaling group succeeded with invalid request: {0}'
@@ -128,14 +128,14 @@ class ScalingGroupNegative(AutoscaleFixture):
         maxentities
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
-        gc_min_entities = 26
+        gc_min_entities = self.max_maxentities + 1
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=gc_min_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
                           msg='Create scaling group passed with max minentities. Response: {0}'
                           .format(create_resp.status_code))
 
-    def test_create_scaling_group_minentities_over_max(self):
+    def test_create_scaling_group_minentities_over_maxentities(self):
         """
         Negative Test: Scaling group should not get created when min entities are over maxentities
         """
@@ -155,7 +155,7 @@ class ScalingGroupNegative(AutoscaleFixture):
         is over 25
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
-        gc_max_entities = 26
+        gc_max_entities = self.max_maxentities + 1
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
             gc_max_entities=gc_max_entities)
         self.assertEquals(create_resp.status_code, expected_status_code,
@@ -168,9 +168,8 @@ class ScalingGroupNegative(AutoscaleFixture):
         is over 86400 seconds (24 hrs)
         """
         expected_status_code = HttpStatusCodes.BAD_REQUEST
-        gc_cooldown = 86401
         create_resp = self.autoscale_behaviors.create_scaling_group_given(
-            gc_cooldown=gc_cooldown)
+            gc_cooldown=self.max_cooldown + 1)
         self.assertEquals(create_resp.status_code, expected_status_code,
                           msg='Create group passed when cooldown is over 24 hrs with response: {0}'
                           .format(create_resp.status_code))

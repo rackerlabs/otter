@@ -15,9 +15,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
 
     def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
         """
-        When min and max entities are already met on a scaling group, scheduled policies
-        to scale up or scale down will not be executed i.e. the desired capacity does
-        not change.
+        When min and max entities are already met on a scaling group, an at style
+        scheduler policy to scale up or scale down will not be triggered.
         """
         group = self._create_group(minentities=self.gc_min_entities,
                                    maxentities=self.gc_min_entities, cooldown=0)
@@ -30,8 +29,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     @unittest.skip('Cron not implemented yet')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
-        A cron style scheduler policy's execution to scale up will fails with 403,
-        if the maxentities on the hroup are already met
+        When min and max entities are already met on a scaling group, an cron style
+        scheduler policy to scale up or scale down will not be triggered.
         """
         group = self._create_group(
             0, self.gc_min_entities, self.gc_min_entities)
@@ -45,6 +44,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
 
+    @unittest.skip('Cron not implemented yet')
     def test_system_at_cron_style_execution_after_delete(self):
         """
         Create an at style and cron scheduler policy and delete them.
@@ -72,21 +72,35 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         Stop the scheduler. Create at style and cron style schedule (every n seconds)and
         verify events accumulate in scaling schedule table.
-        Start scheduler and ensure all policies are executed
+        Start scheduler and ensure all policies are executed.
         """
         pass
 
+    @unittest.skip('AUTO-442')
     def test_system_scheduler_batch(self):
         """
-        Create more policies than specified in scheduler batch and verify all of
-        them are executed in the batch specified.
+        Create more number of policies than specified in scheduler batch size and verify all
+        of them are executed in the batch size specified.
+        (currently blocked by AUTO-443)
         """
-        pass
+        at_style_list = []
+        for each in (range(1, self.scheduler_batch + 2)):
+            each = dict(
+                args=dict(at=self.autoscale_behaviors.get_time_in_utc(0)),
+                cooldown=0, type='schedule', name='multi_at_style{0}'.format(each), change=1)
+            at_style_list.append(each)
+        create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
+            lc_name='multi_scheduling', gc_cooldown=0,
+            sp_list=at_style_list)
+        sleep(self.scheduler_interval + self.scheduler_interval / 2)
+        self.verify_group_state(create_group_reponse.entity.id, self.scheduler_batch + 2)
 
+    @unittest.skip('AUTO-442')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):
         """
-        Create multiple scheduler policies such that all of them execute at the
-        same time (within the scheduler interval)
+        Create multiple scheduler policies within the same group such that all of them are
+        triggered by the scheduler, at the same time, and ensure all the policies
+        are executed successfully.
         ** fails due to the locks presumably, see gist**
         """
         at_style_list = []
@@ -103,6 +117,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, 1 + 2 + 3)
 
     def _create_group(self, minentities=None, maxentities=None, cooldown=None):
+        """
+        Create a group, add group to resource pool and return the group
+        """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_cooldown=cooldown,
             gc_min_entities=minentities,

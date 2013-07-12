@@ -20,13 +20,6 @@ class LaunchConfigTest(AutoscaleFixture):
         cls.upd_image_ref = cls.lc_image_ref_alt
         cls.upd_flavor_ref = "3"
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group
-        """
-        super(LaunchConfigTest, cls).tearDownClass()
-
     def test_system_update_launchconfig_scale_up(self):
         """
         Create a scaling group with a scaling policy, update the launch config.

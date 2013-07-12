@@ -42,8 +42,10 @@ class AtStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_at_style_change_policy_up_down(self):
         """
-        Create an at style schedule via change to scale up and then scale down
-        one to with 0 cooldown
+        Create an at style schedule policy via change to scale up by 2, followed by an
+        at style schedule policy to scale down by -2, each policy with 0 cooldown.
+        The total servers after execution of both policies is the minentities with
+        which the group was created.
         """
         self.create_default_at_style_policy_wait_for_execution(self.group.id, 10)
         self.verify_group_state(self.group.id, self.sp_change)
@@ -54,8 +56,10 @@ class AtStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_at_style_desired_capacity_policy_up_down(self):
         """
-        Create an at style schedule via change percent to scale up and then one to
-        scale down with 0 cooldown
+        Create an at style schedule policy via desired capacity to scale up by 1,
+        followed by an at style schedule policy to scale down to 0,
+        each policy with 0 cooldown. The total servers after execution of both
+        is 0.
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -70,13 +74,13 @@ class AtStyleSchedulerTests(AutoscaleFixture):
             sp_desired_capacity=0,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(20))
         sleep(20 + self.scheduler_interval)
-        self.verify_group_state(
-            self.group.id, self.group.groupConfiguration.minEntities)
+        self.verify_group_state(self.group.id, 0)
 
     def test_system_at_style_execute_before_cooldown(self):
         """
-        Create 2 at style scheduler via change and cooldown>0 to execute before
-        the cooldown expires
+        Create an at style scheduler policy via change to scale up with cooldown>0,
+        and wait for it to execute. Re-execute the policy manually before the
+        cooldown results in 403
         """
         at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -93,8 +97,10 @@ class AtStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_at_style_execute_after_cooldown(self):
         """
-        Create 2 at style scheduler via change and cooldown>0 to execute after
-        the cooldown expires
+        Create an at style scheduler policy via change to scale up with cooldown>0,
+        and wait for it to execute. Re-executing the policy manually after the
+        cooldown period, results in total active servers on the group to be 2 times
+        the change value specifies in scale up policy
         """
         at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,

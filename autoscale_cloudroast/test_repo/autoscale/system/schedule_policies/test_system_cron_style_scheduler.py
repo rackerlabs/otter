@@ -36,8 +36,10 @@ class CronStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_cron_style_change_policy_up_down(self):
         """
-        Create an cron style schedule via change to scale up and then one to
-        scale down with 0 cooldown
+        Create a cron style schedule policy via change to scale up by 2, followed by
+        a cron style schedule policy to scale down by -2, each policy with 0 cooldown.
+        The total servers after execution of both policies is the minentities with
+        which the group was created.
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -56,8 +58,10 @@ class CronStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
-        Create an at style schedule via change percent to scale up and one to
-        then scale down with 0 cooldown
+        Create a cron style schedule policy via desired capacity to scale up by 1,
+        followed by a cron style schedule policy to scale down to 0,
+        each policy with 0 cooldown. The total servers after execution of both
+        policies is 0.
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -76,8 +80,11 @@ class CronStyleSchedulerTests(AutoscaleFixture):
 
     def test_system_cron_style_policy_cooldown(self):
         """
-        Create cron style scheduler via change and cooldown>0 to repeat execution before
-        and after the cooldown expires
+        Create a cron style scheduler policy via change to scale up with cooldown>0,
+        wait for it to execute. Re-execute the policy manually before the
+        cooldown results in 403. Then wait for the cron style policy to re-trigger
+        after the cooldown period and verify the total active servers on the group
+        are equal to be 2 times the change value specifies in scale up policy
         """
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
