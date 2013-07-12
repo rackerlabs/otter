@@ -114,10 +114,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         upd_lc_server = set(active_list_after_scale_up) - set(active_list_b4_upd)
         self._verify_server_list_for_launch_config(upd_lc_server)
         self.create_default_at_style_policy_wait_for_execution(self.group.id, scale_down=True)
-        active_list_after_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
-        self._verify_server_list_for_launch_config(active_list_after_scale_down)
+        self._verify_server_list_for_launch_config(active_list_on_scale_down)
         self.empty_scaling_group(group)
 
     @unittest.skip('Cron not implemented yet')
@@ -151,10 +151,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             sp_change=-self.sp_change,
             schedule_cron='* * * * *')
         sleep(self.scheduler_interval)
-        active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
-        self._verify_server_list_for_launch_config(active_list_after_scale_up)
+        self._verify_server_list_for_launch_config(active_list_on_scale_down)
         self.empty_scaling_group(group)
 
     def _create_group(self, cooldown=None, minentities=None, maxentities=None):
