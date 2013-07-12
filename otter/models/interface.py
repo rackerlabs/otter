@@ -156,7 +156,6 @@ class NoSuchPolicyError(Exception):
     exist.
     """
     def __init__(self, tenant_id, group_id, policy_id):
-        self.policy_id = policy_id
         super(NoSuchPolicyError, self).__init__(
             "No such scaling policy {p} for group {g} for tenant {t}"
             .format(t=tenant_id, g=group_id, p=policy_id))
@@ -506,7 +505,7 @@ class IScalingScheduleCollection(Interface):
         :param delete_policy_ids: list of policy IDs to delete
         :type policy_ids: ``list``
 
-        :param update_policy_ids: list of (policyID, trigger, cron) tuple to update
+        :param update_policies: list of `dict` returned in `fetch_batch_of_events`
         :type policy_ids: ``list``
 
         :return: None

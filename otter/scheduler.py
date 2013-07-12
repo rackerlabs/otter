@@ -4,14 +4,6 @@ is right all the time and is probably what caused your regular clock to get brok
 in the first place.
 """
 
-"""
-TODO to get cron working
-* A class to manage cron entry
-    - take en entry and gives next date
-* update schema and model API to store cron entry in scaling_schedule
-* After executing event, if the event has cron then find next time and update it
-"""
-
 from datetime import datetime
 from functools import partial
 from croniter import croniter
