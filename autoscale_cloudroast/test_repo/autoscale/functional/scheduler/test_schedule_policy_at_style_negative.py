@@ -241,7 +241,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_year(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid year in the year
+        Creating a scaling policy of type schedule with (at style) with invalid year in the date
         results in a 400.
         """
         schedule_value = '0000-12-05T03:12:00Z'
@@ -256,7 +256,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_day(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid day in the day
+        Creating a scaling policy of type schedule with (at style) with invalid day in the date
         results in a 400.
         """
         schedule_value = '2013-12-33T03:12:00Z'
@@ -271,7 +271,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_hour(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid hour in the hour
+        Creating a scaling policy of type schedule with (at style) with invalid hour in the date
         results in a 400.
         """
         schedule_value = '2013-12-10T27:12:00Z'
@@ -286,7 +286,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_minute(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid minute in the minute
+        Creating a scaling policy of type schedule with (at style) with invalid minute in the date
         results in a 400.
         """
         schedule_value = '2013-12-31T10:70:00Z'
@@ -301,7 +301,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_second(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid minute in the second
+        Creating a scaling policy of type schedule with (at style) with invalid second in the date
         results in a 400.
         """
         schedule_value = '2013-12-31T10:10:80Z'
