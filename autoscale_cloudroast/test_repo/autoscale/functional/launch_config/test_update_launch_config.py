@@ -2,7 +2,7 @@
 Test to update launch config.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class UpdateLaunchConfigTest(ScalingGroupFixture):

@@ -4,7 +4,7 @@
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from autoscale.behaviors import AutoscaleBehaviors
 from cloudcafe.common.resources import ResourcePool
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
 from autoscale.client import AutoscalingAPIClient

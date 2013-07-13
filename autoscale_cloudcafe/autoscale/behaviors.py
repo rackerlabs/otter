@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 
 from cafe.engine.behaviors import BaseBehavior
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 from autoscale.models.servers import Metadata
 from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 

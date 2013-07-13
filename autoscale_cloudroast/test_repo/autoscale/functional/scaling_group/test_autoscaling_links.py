@@ -21,9 +21,9 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         """
         super(AutoscalingLinksTest, cls).setUpClass()
         if 'dev' in os.environ['OSTNG_CONFIG_FILE']:
-            cls.url = 'http://127.0.0.1:9000/v1.0'
+            cls.url = 'http://127.0.0.1:9000/v1.0/' + str(cls.tenant_id)
         if 'preprod' in os.environ['OSTNG_CONFIG_FILE']:
-            cls.url = 'http://api0.preprod.ord.as.rax.io:9000/v1.0'
+            cls.url = 'http://api0.preprod.ord.as.rax.io:9000/v1.0/' + str(cls.tenant_id)
 
     @classmethod
     def tearDownClass(cls):
@@ -70,7 +70,11 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         """
         Verify that webhooks capability link is a full url with a version
         """
-        self._validate_links(self.webhook['links'].capability)
+        endpoint = self.url.strip(str(self.tenant_id)) + 'execute/'
+        self.assertTrue(endpoint in self.webhook['links'].capability,
+                        msg='The url used to create the group {0} doesnt match'
+                        ' the url in self link{1}'.format(endpoint,
+                            self.webhook['links'].capability))
 
     def _has_version(self, link):
         """
@@ -79,12 +83,11 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         """
         return re.search('^/v+\d', urlparse(link).path) is not None
 
-    def _validate_links(self, self_link, item_id=None):
+    def _validate_links(self, self_link, item_id):
         """
         """
-        if item_id:
-            self.assertTrue(item_id in self_link,
-                            msg='The ID does not exist in self links')
+        self.assertTrue(item_id in self_link,
+                        msg='The ID does not exist in self links')
         self.assertTrue(self.url in self_link,
                         msg='The url used to create the group doesnt match'
                         ' the url in self link')
