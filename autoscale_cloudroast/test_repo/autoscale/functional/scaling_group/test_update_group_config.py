@@ -2,7 +2,7 @@
 Test to create and update the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class UpdateGroupConfigTest(AutoscaleFixture):

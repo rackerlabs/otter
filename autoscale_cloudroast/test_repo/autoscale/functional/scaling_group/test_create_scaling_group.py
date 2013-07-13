@@ -3,7 +3,7 @@ Test to create and verify the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import base64
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class CreateScalingGroupTest(AutoscaleFixture):
