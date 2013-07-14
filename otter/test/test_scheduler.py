@@ -9,6 +9,7 @@ from twisted.internet.task import Clock
 import mock
 
 from silverberg.lock import BusyLockError
+from silverberg.cassandra.ttypes import TimedOutException
 
 from otter.scheduler import SchedulerService
 from otter.test.utils import iMock, DeferredTestMixin, patch
@@ -80,8 +81,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.otter_log = patch(self, 'otter.scheduler.otter_log')
         self.otter_log.msg.return_value = None
 
-        self.recurrence = patch(self, 'otter.scheduler.Recurrence')
-        self.recurrence.return_value.get_next_datetime.return_value = 'newtrigger'
+        self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence')
+        self.next_cron_occurrence.return_value = 'newtrigger'
 
     def validate_calls(self, d, fetch_returns, update_delete_args):
         """
@@ -162,6 +163,29 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.clock.advance(1)
         self.validate_calls(defer.succeed(None), [events1, events2],
                             [(['pol44'] * 30, []), (['pol45'] * 20, [])])
+
+    def test_timer_works_on_error(self):
+        """
+        The scheduler executes every x seconds even if an occurs occurs while fetching events
+        """
+        # Copy fetch function from setUp and set it to fail
+        fetch_func = self.mock_store.fetch_batch_of_events.side_effect
+        self.mock_store.fetch_batch_of_events.side_effect = None
+        self.mock_store.fetch_batch_of_events.return_value = defer.fail(TimedOutException())
+
+        # Start service and see if update_delete_events got called
+        self.scheduler_service.startService()
+        self.assertFalse(self.mock_store.update_delete_events.called)
+
+        # fix fetch function and advance clock to see if works next time
+        self.mock_store.fetch_batch_of_events.side_effect = fetch_func
+        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
+                   'trigger': 'now', 'cron': None} for i in range(30)]
+        self.returns = [events]
+        self.clock.advance(1)
+        self.validate_calls(defer.succeed(None),
+                            [[], events],  # first [] to account for failed fetch call
+                            [(['pol44'] * 30, [])])
 
     def test_called_with_lock(self):
         """

@@ -20,21 +20,11 @@ from otter.log import log as otter_log
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 
 
-class Recurrence(object):
+def next_cron_occurrence(cron):
     """
-    Represents a recurrence either from cron entry or from any other format
+    Return next occurence of given cron entry
     """
-
-    def __init__(self, cron=None, start=None):
-        if not cron:
-            raise ValueError('no cron')
-        self.croniter = croniter(cron, start_time=start or datetime.utcnow())
-
-    def get_next_datetime(self):
-        """
-        Return the next time of this recurrence as `datetime` instance
-        """
-        return self.croniter.get_next(ret_type=datetime)
+    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 class SchedulerService(TimerService):
@@ -69,11 +59,16 @@ class SchedulerService(TimerService):
                 return _do_check()
             return None
 
+        def check_fetch_error(failure):
+            # Return if we do not get lock as other process might be processing current events
+            failure.trap(BusyLockError)
+            otter_log.msg('No lock in scheduler')
+
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            # Return if we do not get lock as other process might be processing current events
-            d.addErrback(lambda f: f.trap(BusyLockError) and otter_log.msg('No lock in scheduler'))
+            d.addErrback(check_fetch_error)
+            d.addErrback(otter_log.err)
             return d
 
         return _do_check()
@@ -117,10 +112,10 @@ class SchedulerService(TimerService):
             if not len(events):
                 return events
 
-            events_to_delete, events_to_update = list(), list()
+            events_to_delete, events_to_update = [], []
             for event in events:
                 if event['cron'] and event['policyId'] not in deleted_policy_ids:
-                    event['trigger'] = Recurrence(cron=event['cron']).get_next_datetime()
+                    event['trigger'] = next_cron_occurrence(event['cron'])
                     events_to_update.append(event)
                 else:
                     events_to_delete.append(event['policyId'])

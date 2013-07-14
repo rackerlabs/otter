@@ -12,7 +12,7 @@ from otter.models.interface import (
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
-from otter.scheduler import Recurrence
+from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
@@ -189,8 +189,7 @@ def _build_schedule_policy(policy, event_table, queries, data, polname):
     elif 'cron' in policy["args"]:
         queries.append(_cql_insert_event_with_cron.format(cf=event_table, name=':' + polname))
         cron = policy["args"]["cron"]
-        recurrence = Recurrence(cron=cron)
-        data[polname + "Trigger"] = recurrence.get_next_datetime()
+        data[polname + "Trigger"] = next_cron_occurrence(cron)
         data[polname + 'cron'] = cron
 
 
