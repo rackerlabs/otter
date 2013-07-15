@@ -1225,18 +1225,61 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.flushLoggedErrors(GroupNotEmptyError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_empty_scaling_group_with_policies(self, mock_view_state):
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    def test_delete_empty_scaling_group_with_policies(self, mock_naive,
+                                                      mock_view_state):
         """
         ``delete_group`` deletes config, launch config, state, and the group's
-        policies and webhooks if the scaling group is empty.
-        It uses naive calls all the way down.
+        policies and webhooks and events if the scaling group is empty.
+        It uses naive list policies to figure out what events to delete.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, {}, {}, None, {}, False))
+        mock_naive.return_value = defer.succeed({'policyA': {}, 'policyB': {}})
 
         self.returns = [None]
         result = self.successResultOf(self.group.delete_group())
         self.assertIsNone(result)  # delete returns None
+        mock_naive.assert_called_once_with()
+
+        expected_data = {'tenantId': self.tenant_id,
+                         'groupId': self.group_id,
+                         'policyid0': 'policyA',
+                         'policyid1': 'policyB'}
+        expected_cql = (
+            'BEGIN BATCH '
+            'DELETE FROM scaling_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM launch_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM group_state WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+            'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1) '
+            'APPLY BATCH;')
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+        self.lock.acquire.assert_called_once_with()
+        self.lock.release.assert_called_once_with()
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    def test_delete_empty_scaling_group_with_zero_policies(self, mock_naive,
+                                                           mock_view_state):
+        """
+        ``delete_group`` deletes config, launch config, state, and the group's
+        policies and webhooks but not events if the scaling group is empty but
+        has no policies.
+        It uses naive list policies to figure out what events to delete.
+        """
+        mock_view_state.return_value = defer.succeed(GroupState(
+            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+        mock_naive.return_value = defer.succeed({})
+
+        self.returns = [None]
+        result = self.successResultOf(self.group.delete_group())
+        self.assertIsNone(result)  # delete returns None
+        mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
                          'groupId': self.group_id}
