@@ -3,7 +3,7 @@ Test to create and verify the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import base64
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class CreateScalingGroupTest(AutoscaleFixture):
@@ -87,7 +87,6 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         Verify the group configuration of the group is as expected.
         """
-        #assert name set during creation is same as name of server
         self.assertEqual(
             self.gc_name, self.scaling_group.groupConfiguration.name,
             msg='Scaling group name did not match')

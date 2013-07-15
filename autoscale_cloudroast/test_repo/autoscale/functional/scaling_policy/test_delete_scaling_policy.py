@@ -33,6 +33,4 @@ class DeleteScalingPolicy(ScalingGroupPolicyFixture):
         self.assertEquals(delete_policy.status_code, 204,
                           msg='Delete scaling policy failed with {0}'
                           .format(delete_policy.status_code))
-        self.assertTrue(delete_policy.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(delete_policy.headers)
