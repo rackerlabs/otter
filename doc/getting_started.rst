@@ -7,7 +7,7 @@ Getting Started
 Core Concepts
 =============
 
-Autoscale is an API based tool that enables you to scale your servers up and down in response to variation in load.
+Autoscale is an API based tool that enables you to scale your application by adding or removing servers based on monitoring events, a schedule, or arbitrary webhooks.
 
 Autoscale functions by linking three services:
 
@@ -24,12 +24,12 @@ Alarms may trigger scaling up or scaling down. Currently scale down events alway
 
 Cooldowns allow you to ensure that you don't scale up or down too fast. When a scaling policy is hit, both the scaling policy cooldown and the group cooldown start. Any additional requests to the group are discarded while the group cooldown is active. Any additional requests to the specific policy are discarded when the policy cooldown is active.
 
-Autoscale does not configure anything within a server. It is up to you to make sure that your services are configured to function properly when the server is started. We recommend using something like Chef.
+**Autoscale does not configure anything within a server.** This means that all images should be self provisioning. It is up to you to make sure that your services are configured to function properly when the server is started. We recommend using something like Chef, Salt, or Puppet.
 
 Example Use Case
 ----------------
 
-Five servers are in an autoscaling group, with Rackspace Cloud Monitoring monitoring their CPU usage. Monitoring will trigger an alarm when CPU is at 90%. That alarm will trigger a webhook that Autoscale created previously. When that webhook is hit, autoscale receives the alert, and carries out a policy specific to that webhook. This policy says "When my webhook is hit, create five servers according to the launch configuration, and add them to the load balancer." Autoscale will then ensure those servers are stood up.
+Five servers are in an autoscaling group, with Rackspace Cloud Monitoring monitoring their CPU usage. Monitoring will trigger an alarm when CPU is at 90%. That alarm will trigger a webhook that Autoscale created previously. When that webhook is hit, autoscale receives the alert, and carries out a policy specific to that webhook. This policy says "When my webhook is hit, create five servers according to the launch configuration, and add them to the load balancer."
 
 Autoscale can also work in the opposite direction. A policy can say "When my webhook is hit, scale down by five servers."
 
@@ -47,13 +47,14 @@ Autoscale Groups at a minimum require the Group Configuration, and a Launch Conf
 
 The Group Configuration
 -----------------------
-This configuration specifies the basic elements of the config.
+
+This specifies the basic elements of the group.
 
 The Group Configuration contains:
 
 - Group Name
 - Group Cooldown (how long a group has to wait before you can scale again in seconds)
-- Minimum and Maximum of entities allowed in the autoscaling Group.
+- Minimum and Maximum number of entities
 
 The Launch Configuration
 ------------------------
@@ -200,51 +201,51 @@ Create a Scaling Group by submitting a POST request containing an edited version
     curl --include --header "Accept: application/json" \
          --header "X-Auth-token: {auth-token}" \
          --request POST \
-         --data-binary "{
-        \"groupConfiguration\": {
-            \"name\": \"workers\",
-            \"cooldown\": 60,
-            \"minEntities\": 5,
-            \"maxEntities\": 100,
-            \"metadata\": {
-                \"firstkey\": \"this is a string\",
-                \"secondkey\": \"1\"
+         --data-binary '{
+        "groupConfiguration": {
+            "name": "workers",
+            "cooldown": 60,
+            "minEntities": 5,
+            "maxEntities": 100,
+            "metadata": {
+                "firstkey": "this is a string",
+                "secondkey": "1"
             }
         },
-        \"launchConfiguration\": {
-            \"type\": \"launch_server\",
-            \"args\": {
-                \"server\": {
-                    \"flavorRef\": 3,
-                    \"name\": \"webhead\",
-                    \"imageRef\": \"0d589460-f177-4b0f-81c1-8ab8903ac7d8\",
-                    \"OS-DCF:diskConfig\": \"AUTO\",
-                    \"metadata\": {
-                        \"mykey\": \"myvalue\"
+        "launchConfiguration": {
+            "type": "launch_server",
+            "args": {
+                "server": {
+                    "flavorRef": 3,
+                    "name": "webhead",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "OS-DCF:diskConfig": "AUTO",
+                    "metadata": {
+                        "mykey": "myvalue"
                     },
-                    \"personality\": [
+                    "personality": [
                         {
-                            \"path\": \'/root/.ssh/authorized_keys\',
-                            \"contents\": \"ssh-rsa AAAAB3Nza...LiPk== user@example.net\"
+                            "path": '/root/.ssh/authorized_keys',
+                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
-                    \"networks\": [
+                    "networks": [
                         {
-                            \"uuid\": \"11111111-1111-1111-1111-111111111111\"
+                            "uuid": "11111111-1111-1111-1111-111111111111"
                         }
                     ],
                 },
-                \"loadBalancers\": [
+                "loadBalancers": [
                     {
-                        \"loadBalancerId\": 2200,
-                        \"port\": 8081
+                        "loadBalancerId": 2200,
+                        "port": 8081
                     }
                 ]
             }
         },
-        \"scalingPolicies\": [
+        "scalingPolicies": [
         ]
-    }" \
+    }' \
          "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/"
 
 This will create your scaling group, spin up the minimum number of servers, and then attach them to the load balancer you specified. To modify the group, you will need to create policies.
@@ -263,26 +264,29 @@ Create scaling policies by sending POST requests
   curl --include --header "Accepts: application/json" \
        --header "X-Auth-token: {auth-token}" \
        --request POST \
-       --data-binary "[
+       --data-binary '[
       {
-          \"name\": \"scale up by one server\",
-          \"change\": 1,
-          \"cooldown\": 150,
-          \"type\": \"webhook\"
+          "name": "scale up by one server",
+          "change": 1,
+          "cooldown": 150,
+          "type": "webhook"
       },
       {
-          \"name\": \"scale down by 5.5 percent\",
-          \"changePercent\": -5.5,
-          \"cooldown\": 6,
-          \"type\": \"webhook\"
+          "name": "scale down by 5.5 percent",
+          "changePercent": -5.5,
+          "cooldown": 6,
+          "type": "webhook"
       }
-  ]" \
+  ]' \
        "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies"
 
 Step Four - Webhooks
 --------------------
 
-Now that you've created the policy, let's create a few webhooks.
+Now that you've created the policy, let's create a few webhooks. Webhooks are URLs that can activate the policy without authentication. Webhooks are used with third party services that may trigger Autoscale policies, such as Nagios.
+
+An execution call will always return ``202, Accepted``, even if it fails to scale because of an invalid configuration. This is done to prevent `information leakage <https://www.owasp.org/index.php/Information_Leakage>`_.
+
 
 .. code-block:: bash
 
@@ -294,17 +298,17 @@ Now that you've created the policy, let's create a few webhooks.
     curl --include --header "Accepts: application/json" \
          --header "X-Auth-token: {auth-token}" \
          --request POST \
-         --data-binary "[
+         --data-binary '[
         {
-            \"name\": \"alice\",
-            \"metadata\": {
-                \"notes\": \"this is for Alice\"
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Alice"
             }
         },
         {
-            \"name\": \"bob\"
+            "name": "bob"
         }
-    ]" \
+    ]' \
          "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks"
 
 Will reply with:
@@ -362,7 +366,7 @@ Identify the path to the desired scaling policy, and append 'execute' to the pat
   curl --include \
        --header "X-Auth-token: {auth-token}" \
        --request POST \
-       "https://private-a6a2-autoscale.apiary.io/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/execute"
+       "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/policies/{policyId}/execute"
 
 **Execute Capability URL**
 
@@ -372,13 +376,12 @@ An execution call will always return ``202, Accepted``, even if it fails to scal
 .. code-block:: bash
 
   curl --include \
-     --header "X-Auth-token: {auth-token}" \
      --request POST \
-     "https://ord.autoscale.api.rackspacecloud.com/v1.0/execute/{capabilityVersion}/{capabilityHash}/" -v
+     "https://ord.autoscale.api.rackspacecloud.com/v1.0/execute/1/be624bfb20f07baddc278cd978c1ddca56bdb29a1c7b70bbeb229fe0b862c134" -v
 
 Note how authentication is not needed.
 
-The policy will execute, and your group will transform. Do this the right way at the right time, you might just have a working environment!
+The policy will execute, and your group will transform.
 
 
 Step Six - Tearing it all down
@@ -396,16 +399,16 @@ Autoscaling groups can not be deleted while they have active servers. Upload a n
  curl --include --header "Accept: application/json" \
      --header "X-Auth-token: {auth-token}" \
      --request PUT \
-     --data-binary "{
-    \"name\": \"workers\",
-    \"cooldown\": 60,
-    \"minEntities\": 0,
-    \"maxEntities\": 0,
-    \"metadata\": {
-        \"firstkey\": \"this is a string\",
-        \"secondkey\": \"1\",
+     --data-binary '{
+    "name": "workers",
+    "cooldown": 60,
+    "minEntities": 0,
+    "maxEntities": 0,
+    "metadata": {
+        "firstkey": "this is a string",
+        "secondkey": "1",
     }
-  }" \
+  }' \
      "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/{groupId}/config"
 
 
