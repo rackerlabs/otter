@@ -1,0 +1,10 @@
+{
+    "name": "workers",
+    "cooldown": 60,
+    "minEntities": 0,
+    "maxEntities": 0,
+    "metadata": {
+        "firstkey": "this is a string",
+        "secondkey": "1"
+    }
+}

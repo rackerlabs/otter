@@ -1,0 +1,659 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book [
+<!-- Some useful entities borrowed from HTML -->
+<!ENTITY ndash  "&#x2013;">
+<!ENTITY mdash  "&#x2014;">
+<!ENTITY hellip "&#x2026;">
+
+<!-- Useful for describing APIs -->
+<!ENTITY GET    '<command xmlns="http://docbook.org/ns/docbook">GET</command>'>
+<!ENTITY PUT    '<command xmlns="http://docbook.org/ns/docbook">PUT</command>'>
+<!ENTITY POST   '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
+<!ENTITY DELETE '<command xmlns="http://docbook.org/ns/docbook">DELETE</command>'>
+
+<!ENTITY PRODNAME "Rackspace Autoscale"> <!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODABBV "Rackspace Autoscale"> <!-- in PDF: for page headers -->
+<!ENTITY PROD "Autoscale">               <!-- in body -->
+
+<!-- changing authentication endpoints; define entities for US & UK rather than maintaining in text -->
+<!ENTITY ENDPOINT-US "https://identity.api.rackspacecloud.com/v1.1/">
+<!ENTITY ENDPOINT-UK "https://lon.identity.api.rackspacecloud.com/v1.1/">
+<!ENTITY ENDPOINT-US-20 "https://identity.api.rackspacecloud.com/v2.0/">
+<!ENTITY ENDPOINT-UK-20 "https://lon.identity.api.rackspacecloud.com/v2.0/">
+
+<!ENTITY CHECK  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<imageobject>
+<imagedata fileref="img/Check_mark_23x20_02.svg"
+format="SVG" scale="60"/>
+</imageobject>
+</inlinemediaobject>'>
+
+<!ENTITY ARROW  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<imageobject>
+<imagedata fileref="img/Arrow_east.svg"
+format="SVG" scale="60"/>
+</imageobject>
+</inlinemediaobject>'>
+
+<!-- Useful for specs -->
+<!ENTITY MAY    '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MAY</emphasis>'>
+<!ENTITY SHOULD '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">SHOULD</emphasis>'>
+<!ENTITY MUST   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
+<!ENTITY MUST_NOT   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
+]>
+
+<book version="5.0"
+         status="draft"
+         xmlns="http://docbook.org/ns/docbook"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         xmlns:xi="http://www.w3.org/2001/XInclude"
+         xmlns:svg="http://www.w3.org/2000/svg"
+         xmlns:m="http://www.w3.org/1998/Math/MathML"
+         xmlns:html="http://www.w3.org/1999/xhtml"
+         xml:id="autoscale-getting-started">
+    
+    <!-- this Getting Started content comes directly from a wiki page, 
+         https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
+    <!-- some sample code displayed on that page does NOT validate via JSONlint;
+         use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
+    
+    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+    <?rax status.bar.text="PREVIEW" ?>
+    <info>
+        <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
+        <title>&PRODNAME; Getting Started Guide</title>
+        <titleabbrev>&PRODABBV; Intro</titleabbrev>
+        <releaseinfo>API v1.0</releaseinfo>
+        <productname>&PRODNAME;</productname>
+        <!-- enter the publication date of this document; in revhistory, explain what changed -->
+        <pubdate>2013-07-02</pubdate>
+        <copyright>
+            <year>2013</year>
+            <holder>Rackspace US, Inc.</holder>
+        </copyright>
+        <legalnotice role="rs-api">
+            <annotation>
+                <remark>Copyright details are filled in by the template.</remark>
+            </annotation>
+        </legalnotice>
+        <revhistory>
+             <revision>
+                <date>2013-07-02</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Initial draft for preview release.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>           
+        </revhistory>
+	<raxm:metadata
+	    xmlns:raxm="http://docs.rackspace.com/api/metadata">
+	  <raxm:displayname>Getting Started Guide</raxm:displayname>
+	  <!-- fix product code when get one; this is just so it builds -->
+	  <raxm:product version="v1.0">cdb</raxm:product>
+	  <raxm:priority>1</raxm:priority>
+	</raxm:metadata>
+    </info>
+    <chapter xml:id="Overview">
+        <title>Overview</title>
+        <para>
+            The &PRODNAME; service responds to events by changing capacity to meet current needs.
+            This ability to expand the configuration in response to increased workload 
+            means that you can begin with a minimal cloud configuration and grow only when the cost of that growth is 
+            justified.
+        </para>
+        <section xml:id="Doc_Change_History">
+            <title>Document Change History</title>
+            <para>
+                This version of the document replaces and
+                obsoletes all previous versions. The most recent changes
+                are described in the following table:
+            </para>
+            <?rax revhistory?>
+        </section>
+        <!-- try again later
+            <xi:include href="./chapters/resources.xml"/>
+        -->
+        <section xml:id="Resources"
+            xmlns:xlink="http://www.w3.org/1999/xlink">
+            <title>Additional Resources</title>
+            <para>
+                You can see and experiment with all &PRODNAME; API calls at
+                <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
+            </para>
+            <para> To use &PRODNAME;, you must be able to set
+                cloud monitoring alarms and create cloud servers and
+                cloud load balancers. You can read API documentation
+                for those and other Rackspace services at <link
+                    xlink:href="http://docs.rackspace.com/"
+                    >http://docs.rackspace.com/</link>. </para>
+        </section>
+    </chapter>
+    <chapter xml:id="Core_Concepts">
+        <title>Core Concepts</title>
+        <para> &PROD; is an API-based tool that enables you to
+            scale your servers in response to variation in
+            load. &PROD; functions by linking three services: 
+            <itemizedlist>
+                <listitem>
+                    <para>
+                        a monitoring service, such as 
+                        <link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/Introduction.html">Rackspace Cloud Monitoring</link>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        the &PROD; API
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        load-balanced cloud servers, such as 
+                        <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/Create_Cloud_Server.html">Rackspace Cloud Load Balancers working with Cloud Servers</link>
+                    </para>
+                </listitem>
+            </itemizedlist>
+        </para>
+        <section xml:id="Basic_Workflow">
+            <title>Basic Workflow</title>
+            <para>
+                A scaling group is monitored by Rackspace Cloud Monitoring. 
+                When Cloud Monitoring triggers an alarm for high utilization within the scaling group, a webhook is triggered. 
+                The webhook stimulates the &PROD; service, which consults a policy associated with the webhook. 
+                The policy determines how many cloud servers should be added (scaled up) or removed (scaled down) 
+                in response to the alarm.
+            </para>
+            <para>
+                Scale down events remove the oldest server in the group.
+            </para>
+            <note>
+                <para>
+                    For the Preview release, scaling down is not implemented.
+                    &PROD; can create servers, but you must manually remove those servers when you no longer want them to be active.
+                </para>
+            </note>
+            <para> A cooldown is a period during which no other
+                scaling activity occurs. Cooldowns allow some time for
+                the initial scaling response to take effect,
+                potentially resolving the situation that triggered the
+                policy. When a scaling policy is triggered, cooldown
+                periods begin for both the scaling policy and the
+                group. <itemizedlist>
+                    <listitem>
+                        <para> While the group cooldown is active, any
+                            scaling requests to the group are
+                            discarded. </para>
+                    </listitem>
+                    <listitem>
+                        <para> While the policy cooldown is active,
+                            any scaling requests related to the policy
+                            are discarded. </para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                After the cooldown period ends, if Cloud Monitoring still detects the situation 
+                that triggered the initial scaling activity, then another alarm triggers another round of scaling 
+                activity. By configuring cooldown periods between triggers, you can control 
+                how quickly &PROD; scales up toward the scaling group's maximum size 
+                or down toward the scaling group's minimum size.
+            </para>
+            <para>
+                &PROD; does not configure anything within a server. 
+                You must configure your services to function properly when each server is started. 
+                We recommend automating your servers' startup processes with 
+                <link xlink:href="http://www.opscode.com/chef/">Chef</link> or a similar tool.
+            </para>
+        </section>
+        <section xml:id="Sample_Use_Case">
+            <title>Sample Use Case</title>
+            <para>
+                Five cloud servers are in a scaling group, with Rackspace Cloud Monitoring monitoring their CPU usage. 
+                Monitoring is configured to trigger an alarm when CPU utilization for any server 
+                within the group is at 90%. 
+                That alarm triggers a webhook that Autoscale created previously. 
+                When that webhook is activated, &PROD; receives the alert and carries out a policy specific to that webhook. 
+                This policy says "When this webhook is triggered, create five servers according to the launch configuration, and add them to the load balancer." 
+                &PROD; then initates creation of those servers within the scaling group.
+            </para>
+            <para>
+                Autoscaling can also work in the opposite direction. 
+                A policy can say "When this webhook is triggered, scale down by five servers." 
+            </para>
+            <note>
+                <para>
+                    For the Preview release, scaling down is not implemented.
+                    &PROD; can create servers, but you must manually remove those servers when you no longer want them to be active.
+                </para>
+            </note>
+        </section>
+    </chapter>
+    <chapter xml:id="Autoscale_Components">
+        <title>Autoscale Components</title>
+        <para>
+            &PROD; consists of the following components:
+            <itemizedlist spacing="compact">
+                <listitem>
+                    <para>
+                        scaling group configuration
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        launch configuration
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        scaling policies
+                    </para>
+                </listitem>
+            </itemizedlist>
+        </para>
+        <section xml:id="Group_Configuration">
+            <title>Scaling Group Configuration</title>
+            <para>
+                The scaling group configuration specifies the basic elements of scaling. 
+                It controls how many servers can participate in the scaling group.
+            </para>
+            <para>
+                The group configuration describes the following items:
+                <itemizedlist spacing="compact">
+                    <listitem>
+                        <para>
+                            group name
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            group cooldown
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            minimum number of entities required in the scaling group
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            maximum number of entities allowed in the scaling group
+                        </para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                Within the group configuration, group cooldown describes, in seconds, 
+                how long the group must wait after a scaling policy is triggered before another request for scaling is accepted.
+            </para>
+        </section>
+        <section xml:id="Launch_Configuration">
+            <title>Launch Configuration</title>
+            <para>
+                The launch configuration specifies how to create new servers.
+                It controls what image a new server starts on,
+                what flavor the new server is,
+                and which load balancer the new server connects to.
+            </para>
+            <para>
+                The launch configuration describes the following items:
+                <itemizedlist>
+                    <listitem>
+                        <para>
+                            launch configuration type
+                        </para>
+                        <itemizedlist>
+                            <listitem>
+                                <para>
+                                    Launch Server 
+                                    <?sbr?>
+                                    <emphasis role="italic">
+                                        (For the Preview release, this is the only configuration type.)
+                                    </emphasis>
+                                </para>
+                            </listitem>
+                        </itemizedlist>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            server
+                        </para>
+                        <itemizedlist>
+                            <listitem>
+                                <para>
+                                    name
+                                </para>
+                            </listitem>
+                            <listitem>
+                                <para>
+                                    flavorRef
+                                </para>
+                            </listitem>
+                            <listitem>
+                                <para> 
+                                    imageRef 
+                                    <?sbr?>
+                                    <emphasis role="italic">
+                                        (This is the ID of the Cloud Server image to start.)
+                                    </emphasis>
+                                </para>
+                            </listitem>
+                        </itemizedlist>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            load balancer
+                        </para>
+                        <itemizedlist>
+                            <listitem>
+                                <para>
+                                    loadBalancerId
+                                </para>
+                            </listitem>
+                            <listitem>
+                                <para>
+                                    port
+                                </para>
+                            </listitem>
+                        </itemizedlist>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <tip>
+                <para>
+                    To learn more about configuring cloud servers through an API, see the following information:
+                    <itemizedlist>
+                        <listitem>
+                            <para>
+                                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/overview.html">Next Generation Cloud Servers Getting Started</link>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para>
+                                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_api_operations.html">Next Generation Cloud Servers Developer Guide</link>
+                            </para>
+                        </listitem>
+                    </itemizedlist>
+                </para>
+                <para>
+                    To learn more about configuring cloud load balancers through an API, see the following information:
+                    <itemizedlist>
+                        <listitem>
+                            <para>
+                                <link
+                                   xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-getting-started/content/DB_Overview.html"
+                                   >Rackspace Cloud Load Balancers
+                                   Getting Started</link>
+                            </para>
+                        </listitem>
+                        <listitem>
+                            <para>
+                                <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/API_Operations-d1e1354.html">Rackspace Cloud Load Balancers Developer Guide</link>
+                            </para>
+                        </listitem>
+                    </itemizedlist>
+                </para>
+                <para>
+                    The Rackspace Open Cloud Community is another place to learn about working with cloud resources through APIs.
+                    Within the community, the Developer Forum begins at <link xlink:href="https://community.rackspace.com/developers/default">https://community.rackspace.com/developers/default</link>.
+                </para>
+            </tip>
+        </section>
+        <section xml:id="Scaling_Policies">
+            <title>Scaling Policies</title>
+            <para>
+                Scaling policies specify how to change the scaling group. 
+                A group can be managed by multiple scaling policies.
+            </para>
+            <para>
+                The scaling policy describes the following items:
+                <itemizedlist spacing="compact">
+                    <listitem>
+                        <para>
+                            scaling policy name
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            change value
+                            <?sbr?>
+                            <emphasis role="italic">
+                                (incremental or per cent)
+                            </emphasis>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            policy cooldown
+                            <?sbr?>
+                            <emphasis role="italic">
+                                (in seconds)
+                            </emphasis>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>
+                            execute webhook
+                            <?sbr?>
+                            <emphasis role="italic">
+                                (generated)
+                            </emphasis>
+                        </para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+            <para>
+                Within the policy configuration, policy cooldown describes, in seconds, how long a group managed by this policy must wait after scaling before beginning to scale again.
+            </para>
+        </section>
+    </chapter>
+    <chapter xml:id="Autoscale_API">
+        <title>Using the &PROD; API</title>
+        <para> You can create a oscaling group by following the
+            steps described in this chapter. <tip>
+                <para> If you want to try these steps in your own
+                    environment, you can use <link
+                        xlink:href="http://docs.autoscale.apiary.io/"
+                        >http://docs.autoscale.apiary.io/</link> to
+                    generate cURL commands. </para>
+            </tip>
+        </para>
+        <section xml:id="Authenticate">
+            <title>Step 1: Authenticate</title>
+            <para> As with all Rackspace APIs, before you can use the
+                &PRODNAME; API you must authenticate with your
+                Rackspace credentials. </para>
+            <para>
+                When you authenticate, you give your credentials to the Rackspace Cloud Identity Service.  
+                If your credentials are valid, the Identity Service responds with your 
+                Service Catalog, which includes your token, token ID, user ID, and token tenant ID. 
+                To make requests of &PROD;, you must use your token tenant id, also known as the tenantID.
+            </para>
+            <para>
+                If you subscribe to many Rackspace services, your Service Catalog response might be lengthy. 
+                For an example of an annotated Service Catalog response, showing how to recognize the token and other elements in both JSON and XML formats, see 
+                <link
+                    xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Sample_Request_Response-d1e64.html"
+                    >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/Sample_Request_Response-d1e64.html</link>.
+            </para>
+            <para>
+                After you have your token, you can use it to identify yourself to &PRODNAME; and other services.
+            </para>
+            <tip>
+                <para>
+                    For detailed information about the Rackspace
+                    Cloud Identity Service, visit <link
+                        xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html"
+                        >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html</link>. 
+                </para>
+            </tip>
+        </section>
+        <section xml:id="Save_Image">
+            <title>Step 2: Create a Server and Save its Image</title>
+            <para>
+                Create a cloud server. 
+                You can create a server through the 
+                <link xlink:href="http://mycloud.rackspace.com/">control panel</link>.
+                You can also create a server through the Cloud Servers API by using a
+                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html">Create Server</link> request.
+            </para>
+            <para> With the Cloud Servers API, you can use a 
+                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html">List Images</link> request 
+                to retrieve a list of options available for configuring your server. 
+                <example>
+                    <title>Requesting a List of Cloud Server Images</title>
+                    <screen> 
+curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool 
+                    </screen>
+                </example>
+            </para>
+            <para>
+                Customize your cloud server so that it can process your requests. 
+                For example, if you are building a webhead scaling group, 
+                configure Apache to start on launch and serve the files that you need.
+            </para>
+            <para>
+                After you have created and customized your server, save its image and record the imageID.
+            </para>
+        </section>
+        <section xml:id="Create_Group">
+            <title>Step 3: Create a Scaling Group</title>
+            <para> Create a scaling group by submitting a &POST; request 
+                customized with the tenant ID that you obtained during the 
+                <link linkend="Authenticate">Authentication</link> step.
+            </para>
+            <example>
+                <title>Creating a Scaling Group</title>
+                <screen>
+POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/groupConfiguration.json" parse="text"/>
+		</programlisting>
+            </example>
+            <para>
+                This action creates your scaling group, starts the minimum number of servers, 
+                and attaches those servers to the specified load balancer. 
+            </para>
+            <para>
+                To change this scaling group, you must 
+                <link linkend="Create_Policy">create policies</link>.
+            </para>
+        </section>
+        <section xml:id="Create_Policy">
+            <title>Step 4: Create Scaling Policies</title>
+            <para> You can use multiple policies to manage your <link
+                    linkend="Create_Group">scaling group</link>. </para>
+            <para> Create a policy by submitting a &POST; request 
+                customized with the tenant ID that you obtained during the 
+                <link linkend="Authenticate">Authentication</link> step
+                and the group ID that you obtained during the 
+                <link linkend="Create_Group">Create a Scaling Group</link> step.
+            </para>
+            <example>
+                <title>Creating a Scaling Policy</title>
+                <screen>
+POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/scalingPolicy.json" parse="text"/>
+		</programlisting>
+            </example>
+            <note>
+                <para>
+                    For the Preview release, scaling down is not implemented.
+                    &PROD; can create servers, but you must manually remove those servers when you no longer want them to be active.
+                </para>
+            </note>
+        </section>
+        <section xml:id="Create_Webhooks">
+            <title>Step 5: Create Webhooks</title>
+            <para>
+                You can use webhooks to tie 
+                <link linkend="Create_Policy">policies</link> 
+                to events.
+                When a webhook is set, a configured event causes
+                an HTTP &POST; callback request to be sent to a configured URI.
+            </para>
+            <example>
+                <title>Creating a Scaling Webhook: Request</title>
+                <screen>
+POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks         
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/webhook-request.json" parse="text"/>
+		        </programlisting>
+            </example> 
+            <example>
+                <title>Creating a Scaling Webhook: Response</title>
+                <programlisting language="json">
+<xi:include href="./samples/webhook-response.json" parse="text"/>
+		        </programlisting>
+            </example> 
+        </section>
+        <section xml:id="Execute_Policy">
+            <title>Step 6: Execute a Scaling Policy</title>
+            <para>
+                After you define a <link linkend="Create_Policy">policy</link>,
+                you can activate that policy by issuing a &POST; request against its URL.
+            </para>
+            <example>
+                <title>Activating a Scaling Policy: cURL</title>
+                <screen>
+curl -X POST https://autoscale.api.rackspacecloud.com/v1.0/execute/1/{capability_hash}/ -v                
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/scalingPolicy.json" parse="text"/>
+		</programlisting>
+            </example>
+            <para> The &POST; request causes the <link linkend="Create_Policy"
+                    >scaling policy</link> to execute, which causes
+                the <link linkend="Create_Group">scaling group</link>
+                to transform if it is able to do so. </para>
+            <para> 
+                Execution of a scaling policy always returns a <code>202 Accepted</code> status. 
+                This status indicates that the scaling policy was executed but does not 
+                indicate whether the execution successfully caused the scaling group to scale. 
+                If some element of the configuration is invalid,
+                scaling can fail even if the scaling policy is executed.
+            </para>
+        </section>
+        <section xml:id="Delete_Group">
+            <title>Step 7: Deactivate and Delete a Scaling Group</title>
+            <para> 
+                You can stop a  
+                <link linkend="Create_Group">scaling group</link> from scaling
+                by configuring both its minimum and maximum sizes to <code>0</code>.
+            </para>
+            <example>
+                <title>Deactivating a Scaling Group</title>
+                <screen>
+PUT /{tenantId}/groups/{groupID}/config
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/groupConfiguration-size0.json" parse="text"/>
+		        </programlisting>
+            </example> 
+            <para>
+                Setting <code>maxEntities</code> to <code>0</code> prevents the scaling group from expanding.
+            </para>
+            <note>
+                <para>
+                    For the Preview release, scaling down is not implemented.
+                    &PROD; can create servers, but you must manually remove those servers when you no longer want them to be active.
+                </para>
+            </note>
+            <para>
+                You cannot delete a scaling group until all the servers within the group are removed. 
+            </para>
+            <para>
+                When a group contains no servers, you can eliminate the group by sending a
+                &DELETE; request to its group ID.
+            </para>
+            <screen>
+DELETE /[tenantId]/groups/[groupId[
+            </screen>
+        </section>
+    </chapter>
+</book>
