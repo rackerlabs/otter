@@ -62,24 +62,19 @@ This configuration specifies what to do when we want to create a new server. Wha
 
 The Launch Configuration Contains:
 
-- Launch Configuration Type
+- Launch Configuration Type (Only type currently supported is "launch_server")
+- Arguments:
 
-  - Launch Server
+  - Server
 
-    - Note: This is the only choice right now
+    - name
+    - flavor
+    - imageRef (This is the ID of the Cloud Server image you will boot)
 
-- Server. Note: This is the same as a Cloud Server Configuration
+  - Load Balancer
 
-  - name
-  - flavor
-  - imageRef
-
-    - Note: This is the ID of the Cloud Server image you will boot
-
-- Load Balancer
-
-  - loadBalancerId
-  - port
+    - loadBalancerId
+    - port
 
 
 Scaling Policies
@@ -193,7 +188,7 @@ When that is complete, save your image, and record the imageID.
 Step Two - Create the Group
 ---------------------------
 
-Create a Scaling Group by submitting a POST request containing an edited version of these data. 
+Create a Scaling Group by submitting a POST request containing an edited version of these data.
 
 
 .. code-block:: bash
@@ -372,6 +367,7 @@ Identify the path to the desired scaling policy, and append 'execute' to the pat
 **Execute Capability URL**
 
 Find the capability URL in your Scaling Policy Webhook. If you want to activate that policy, POST against it.
+An execution call will always return ``202, Accepted``, even if it fails to scale because of an invalid configuration. This is done to prevent `information leakage <https://www.owasp.org/index.php/Information_Leakage>`_.
 
 .. code-block:: bash
 
@@ -384,7 +380,6 @@ Note how authentication is not needed.
 
 The policy will execute, and your group will transform. Do this the right way at the right time, you might just have a working environment!
 
-An execution will always return ``202, Accepted``, even if it fails to scale because of an invalid configuration. This is done to prevent `information leakage <https://www.owasp.org/index.php/Information_Leakage>`_.
 
 Step Six - Tearing it all down
 ------------------------------

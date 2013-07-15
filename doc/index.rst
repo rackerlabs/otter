@@ -8,13 +8,20 @@ Welcome to otter's documentation!
 
 Otter be an autoscaling system!
 
-Developer documentation
+Getting Started
 -----------------------
 
 .. toctree::
    :maxdepth: 2
 
    getting_started
+
+Developer documentation
+-----------------------
+
+.. toctree::
+   :maxdepth: 2
+
    architecture
    dev_process
    standards
