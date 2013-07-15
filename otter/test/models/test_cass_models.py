@@ -91,6 +91,12 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
+class DummyException(Exception):
+    """
+    Specific exception class, to be used in testing exception handling
+    """
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -431,14 +437,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         for callback in updates:
             self.group.view_config = mock.MagicMock(
-                return_value=defer.fail(Exception('boo')))
-            self.assert_deferred_failed(callback(), Exception)
+                return_value=defer.fail(DummyException('boo')))
+            self.assert_deferred_failed(callback(), DummyException)
 
             # view is called
             self.group.view_config.assert_called_once_with()
             # but extra executes, to update, are not called
             self.assertFalse(self.connection.execute.called)
-            self.flushLoggedErrors(Exception)
 
     def test_view_policy(self):
         """
@@ -736,15 +741,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         the rest of the update does not continue
         """
         self.group.get_policy = mock.MagicMock(
-            return_value=defer.fail(Exception("Cassandra failure")))
+            return_value=defer.fail(DummyException("Cassandra failure")))
         self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
-                                    Exception)
+                                    DummyException)
 
         # view is called
         self.group.get_policy.assert_called_once_with('1')
         # but extra executes, to update, are not called
         self.assertFalse(self.connection.execute.called)
-        self.flushLoggedErrors(Exception)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
