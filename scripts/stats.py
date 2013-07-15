@@ -48,14 +48,8 @@ def run(args):
     # connect
     if args.verbose > 0:
         print "Attempting to connect to {0}:{1}".format(args.host, args.port)
-    try:
-        connection = connect(args.host, args.port, cql_version='3.0.4')
-    except Exception as e:
-        if getattr(e, 'why', False):
-            e.message = e.why
-        print "CONNECTION ERROR: {0}".format(e.message)
-        sys.exit(1)
 
+    connection = connect(args.host, args.port, cql_version='3.0.4')
     cursor = connection.cursor()
 
     for command, displayResults, label in commands:
