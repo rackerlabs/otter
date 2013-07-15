@@ -21,6 +21,19 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         self.resources.add(self.group.id,
                            self.autoscale_client.delete_scaling_group)
 
+    def test_at_style_to_execute_using_utc_time_now(self):
+        """
+        Create an at style scheduler via change and date as utc.now, should result in 400.
+        """
+        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(0))
+        self.assertEquals(schedule_policy_at_style['status_code'], 400,
+                          msg='Create schedule policy via at style with current time'
+                          'results in {0} for group {1}'
+                          .format(schedule_policy_at_style['status_code'], self.group.id))
+
     def test_schedule_at_style_policy_with_different_date_format_1(self):
         """
         Creating a scaling policy of type schedule with (at style) with non iso8601 date

@@ -23,7 +23,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         group = self._create_group(cooldown=0, minentities=1, maxentities=change)
         self.create_default_at_style_policy_wait_for_execution(group.id)
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
-        self.create_default_at_style_policy_wait_for_execution(self.group.id, scale_down=True)
+        self.create_default_at_style_policy_wait_for_execution(group.id, scale_down=True)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         self.empty_scaling_group(group)
 
