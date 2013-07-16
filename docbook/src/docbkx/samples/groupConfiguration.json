@@ -1,0 +1,25 @@
+{
+    "groupConfiguration": {
+        "name": "myFirstAutoscalingGroup",
+        "cooldown": 60,
+        "minEntities": 1,
+        "maxEntities": 10
+    },
+    "launchConfiguration": {
+        "type": "launch_server",
+        "args": {
+            "server": {
+                "flavorRef": 3,
+                "name": "webhead",
+                "imageRef": "8de09731-2172-456f-9aab-13b8698fd530"
+            },
+            "loadBalancers": [
+                {
+                    "loadBalancerId": 141869,
+                    "port": 80
+                }
+            ]
+        }
+    },
+    "scalingPolicies": []
+}

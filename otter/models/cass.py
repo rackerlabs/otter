@@ -22,14 +22,6 @@ import json
 LOCK_TABLE_NAME = 'locks'
 
 
-class CassBadDataError(Exception):
-    """
-    Error to be raised when attempting operations on an entity that does not
-    exist.
-    """
-    pass
-
-
 def serialize_json_data(data, ver):
     """
     Serialize json data to cassandra by adding a version and dumping it to a
@@ -262,15 +254,17 @@ def _assemble_webhook_from_row(row):
     return webhook_base
 
 
+def _check_empty_and_grab_data(results, exception_if_empty):
+    if len(results) == 0:
+        raise exception_if_empty
+    return _jsonloads_data(results[0]['data'])
+
+
 def _jsonloads_data(raw_data):
-    try:
-        data = json.loads(raw_data)
-    except ValueError:
-        raise CassBadDataError("Bad data in database - not JSON")
-    else:
-        if "_ver" in data:
-            del data["_ver"]
-        return data
+    data = json.loads(raw_data)
+    if "_ver" in data:
+        del data["_ver"]
+    return data
 
 
 def _unmarshal_state(state_dict):
@@ -359,7 +353,9 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('view', 'partial'))
-        d.addCallback(self._grab_json_data)
+
+        d.addCallback(_check_empty_and_grab_data,
+                      NoSuchScalingGroupError(self.tenant_id, self.uuid))
         return d
 
     def view_launch_config(self):
@@ -371,7 +367,8 @@ class CassScalingGroup(object):
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('view', 'partial'))
-        d.addCallback(self._grab_json_data)
+        d.addCallback(_check_empty_and_grab_data,
+                      NoSuchScalingGroupError(self.tenant_id, self.uuid))
         return d
 
     def view_state(self):
@@ -507,7 +504,8 @@ class CassScalingGroup(object):
                                      "groupId": self.uuid,
                                      "policyId": policy_id},
                                     get_consistency_level('view', 'policy'))
-        d.addCallback(self._grab_json_data, policy_id)
+        d.addCallback(_check_empty_and_grab_data,
+                      NoSuchPolicyError(self.tenant_id, self.uuid, policy_id))
         return d
 
     def create_policies(self, data):
@@ -583,15 +581,8 @@ class CassScalingGroup(object):
         irregardless of whether the scaling policy still exists.
         """
         def _assemble_webhook_results(results):
-            new_results = {}
-            for row in results:
-                try:
-                    new_results[row['webhookId']] = _assemble_webhook_from_row(row)
-                except KeyError as e:
-                    raise CassBadDataError('Received malformed response without the '
-                                           'required field "{0!s}"'.format(e))
-
-            return new_results
+            return {row['webhookId']: _assemble_webhook_from_row(row)
+                    for row in results}
 
         query = _cql_list_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query, {"tenantId": self.tenant_id,
@@ -648,11 +639,7 @@ class CassScalingGroup(object):
             if len(cass_data) == 0:
                 raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
                                          webhook_id)
-            try:
-                return _assemble_webhook_from_row(cass_data[0])
-            except KeyError as e:
-                raise CassBadDataError('Received malformed response without the '
-                                       'required field "{0!s}"'.format(e))
+            return _assemble_webhook_from_row(cass_data[0])
 
         query = _cql_view_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query,
@@ -704,26 +691,6 @@ class CassScalingGroup(object):
             return d
 
         return self.get_webhook(policy_id, webhook_id).addCallback(_do_delete)
-
-    def _grab_json_data(self, rawResponse, policy_id=None, webhook_id=None):
-        results = rawResponse
-        if len(results) == 0:
-            if webhook_id is not None:
-                raise NoSuchWebhookError(self.tenant_id, self.uuid, policy_id,
-                                         webhook_id)
-            elif policy_id is not None:
-                raise NoSuchPolicyError(self.tenant_id, self.uuid, policy_id)
-            else:
-                raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
-
-        elif len(results) > 1:
-            raise CassBadDataError("Recieved more than one expected response")
-
-        if 'data' not in results[0]:
-            raise CassBadDataError('Received malformed response without the '
-                                   'required field "data"')
-
-        return _jsonloads_data(results[0]['data'])
 
     def delete_group(self):
         """

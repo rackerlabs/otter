@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE book [
+<!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!-- in PDF: for page headers -->
+<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!-- in body -->
+<!ENTITY PROD "Autoscale">               
+]>
+<section xml:id="Resources"
+    xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Additional Resources</title>
+    <para>
+        You can see and experiment with all &PRODNAME; API calls at
+        <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
+    </para>
+    <para> To use &PRODNAME;, you will have to be able to set
+        cloud monitoring alarms and create cloud servers and
+        cloud load balancers. You can read API documentation
+        for those and other Rackspace services at <link
+            xlink:href="http://docs.rackspace.com/"
+            >http://docs.rackspace.com/</link>. </para>
+</section>
