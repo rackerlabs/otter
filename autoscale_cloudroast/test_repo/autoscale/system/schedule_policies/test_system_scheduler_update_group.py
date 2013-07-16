@@ -11,6 +11,15 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
     """
     Verify update scheduler policy
     """
+    @classmethod
+    def setUpClass(cls):
+        """
+        Define updates to launch config
+        """
+        super(UpdateSchedulerScalingPolicy, cls).setUpClass()
+        cls.upd_server_name = "upd_lc_config"
+        cls.upd_image_ref = cls.lc_image_ref_alt
+        cls.upd_flavor_ref = "3"
 
     def test_system_min_max_entities_at_style(self):
         """
@@ -30,26 +39,27 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
     @unittest.skip('Cron not implemented yet')
     def test_system_min_max_entities_cron_style(self):
         """
-        Create a scaling group with minentities>0<max and maxentities=change, with 2
-        cron style scheduler policies with change= +2 and -2, cooldown=0 and verify that
+        Create a scaling group with minentities between 0 and maxentities and maxentities=change,
+        with 2 cron style scheduler policies with change= +2 and -2, cooldown=0 and verify that
         the scale up scheduler policy scales upto the maxentities specified on the group
         and scale down scheduler policy scales down upto the minentities.
         """
-        change = 2
-        group = self._create_group(cooldown=0, minentities=1, maxentities=change)
+        minentities = 1
+        maxentities = 2
+        group = self._create_group(cooldown=0, minentities=minentities, maxentities=maxentities)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
             sp_cooldown=0,
-            sp_change=change,
+            sp_change=maxentities + 1,
             schedule_cron='* * * * *')
-        sleep(self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
             sp_cooldown=0,
-            sp_change=-change,
+            sp_change=-maxentities,
             schedule_cron='* * * * *')
-        sleep(self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         self.empty_scaling_group(group)
 
@@ -67,30 +77,6 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change)
         sleep(60 - self.scheduler_interval)
         self.create_default_at_style_policy_wait_for_execution(group.id)
-        self.verify_group_state(group.id, self.sp_change * 2)
-        self.empty_scaling_group(group)
-
-    @unittest.skip('Cron not implemented yet')
-    def test_system_group_cooldown_cronstyle(self):
-        """
-        Create a scaling group with cooldown greater than a minute, create a scheduler
-        cron style policy to execute every minute. The scheduler running every scheduler
-        interval period does not cause the next cron policy to trigger. After the group
-        cooldown the cron style policy is triggered. (*test it)
-        """
-        group = self._create_group(cooldown=60)
-        self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=group.id,
-            sp_cooldown=0,
-            sp_change=self.sp_change,
-            schedule_at='* * * * * *')
-        sleep(self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(self.scheduler_interval)
-        self.verify_group_state(group.id, self.sp_change)
-        sleep(60 - (3 * self.scheduler_interval))
         self.verify_group_state(group.id, self.sp_change * 2)
         self.empty_scaling_group(group)
 
@@ -135,10 +121,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self._update_launch_config(group)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
-            sp_cooldown=0,
+            sp_cooldown=3600,
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
-        sleep(self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         active_servers = self.sp_change + group.groupConfiguration.minEntities
         active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
@@ -147,10 +133,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self._verify_server_list_for_launch_config(upd_lc_server)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
-            sp_cooldown=0,
+            sp_cooldown=3600,
             sp_change=-self.sp_change,
             schedule_cron='* * * * *')
-        sleep(self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
@@ -172,14 +158,11 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         Update the scaling group's launch configuration and
         assert the update was successful.
         """
-        upd_server_name = "upd_lc_config"
-        upd_image_ref = self.lc_image_ref_alt
-        upd_flavor_ref = "3"
         update_launch_config_response = self.autoscale_client.update_launch_config(
             group_id=group.id,
-            name=upd_server_name,
-            image_ref=upd_image_ref,
-            flavor_ref=upd_flavor_ref)
+            name=self.upd_server_name,
+            image_ref=self.upd_image_ref,
+            flavor_ref=self.upd_flavor_ref)
         self.assertEquals(update_launch_config_response.status_code, 204,
                           msg='Updating launch config failed with {0} for group {1}'
                           .format(update_launch_config_response, group.id))
@@ -188,6 +171,6 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         for each in list(server_list):
             get_server_resp = self.server_client.get_server(each)
             server = get_server_resp.entity
-            self.assertTrue("upd_lc_config" in server.name)
+            self.assertTrue(self.upd_server_name in server.name)
             self.assertEquals(server.image.id, self.lc_image_ref_alt)
-            self.assertEquals(server.flavor.id, "3")
+            self.assertEquals(server.flavor.id, self.upd_flavor_ref)

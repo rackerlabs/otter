@@ -43,17 +43,17 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_cooldown=0,
+            sp_cooldown=360,
             sp_change=self.sp_change,
-            schedule_cron='* * * * 1-5')
-        sleep(self.scheduler_interval)
+            schedule_cron='* * * * *')
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_cooldown=0,
+            sp_cooldown=360,
             sp_change=-self.sp_change,
-            schedule_cron='* * * * 1-5')
-        sleep(self.scheduler_interval)
+            schedule_cron='* * * * *')
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
     def test_system_cron_style_desired_capacity_policy_up_down(self):
@@ -65,17 +65,17 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_cooldown=0,
+            sp_cooldown=360,
             sp_desired_capacity=1,
-            schedule_cron='* * * * 1-5')
-        sleep(self.scheduler_interval)
+            schedule_cron='* * * * *')
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_cooldown=0,
+            sp_cooldown=360,
             sp_desired_capacity=0,
-            schedule_cron='* * * * 1-5')
-        sleep(self.scheduler_interval)
+            schedule_cron='* * * * *')
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
     def test_system_cron_style_policy_cooldown(self):
@@ -88,15 +88,15 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            sp_cooldown=20,
+            sp_cooldown=50,
             sp_change=self.sp_change,
-            schedule_cron='* * * * * *')
-        sleep(self.scheduler_interval)
+            schedule_cron='* * * * *')
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change)
         execute_scheduled_policy = self.autoscale_client.execute_policy(
             group_id=self.group.id,
             policy_id=cron_style_policy['id'])
         self.assertEquals(execute_scheduled_policy.status_code, 403)
         self.verify_group_state(self.group.id, self.sp_change)
-        sleep(self.scheduler_interval * 2)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.sp_change * 2)
