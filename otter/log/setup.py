@@ -39,4 +39,3 @@ def observer_factory_debug():
     Log pretty JSON formatted GELF structures to sys.stdout.
     """
     return make_observer_chain(StreamObserverWrapper(sys.stdout), 2)
-
