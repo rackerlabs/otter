@@ -19,7 +19,7 @@ GET /{tenantId}/groups
             "id": "{groupId1}"
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId1}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId1}"
                     "rel": "self"
                 }
             ],
@@ -33,7 +33,7 @@ GET /{tenantId}/groups
             "id": "{groupId2}"
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId2}",
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId2}",
                     "rel": "self"
                 }
             ],
@@ -124,7 +124,7 @@ POST /{tenantId}/groups
         "id": "{groupId}",
         "links": [
           {
-            "href": "{url_root}/v1.0/010101/groups/{groupId}"
+            "href": "{urlRoot}/v1.0/010101/groups/{groupId}"
             "rel": "self"
           }
         ],
@@ -174,7 +174,7 @@ POST /{tenantId}/groups
                 "id": "{policyId1}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
                     "rel": "self"
                   }
                 ],
@@ -187,7 +187,7 @@ POST /{tenantId}/groups
                 "id": "{policyId2}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
                     "rel": "self"
                   }
                 ],
@@ -200,7 +200,7 @@ POST /{tenantId}/groups
                 "id": "{policyId3}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
                     "rel": "self"
                   }
                 ],
@@ -225,7 +225,7 @@ GET /{tenantId}/groups/{groupId}
         "id": "{groupId}",
         "links": [
           {
-            "href": "{url_root}/v1.0/010101/groups/{groupId}"
+            "href": "{urlRoot}/v1.0/010101/groups/{groupId}"
             "rel": "self"
           }
         ],
@@ -275,7 +275,7 @@ GET /{tenantId}/groups/{groupId}
                 "id": "{policyId1}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
                     "rel": "self"
                   }
                 ],
@@ -288,7 +288,7 @@ GET /{tenantId}/groups/{groupId}
                 "id": "{policyId2}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
                     "rel": "self"
                   }
                 ],
@@ -301,7 +301,7 @@ GET /{tenantId}/groups/{groupId}
                 "id": "{policyId3}",
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
                     "rel": "self"
                   }
                 ],
@@ -335,7 +335,7 @@ GET /{tenantId}/groups/{groupId}/state
         "id": "{groupId}",
         "links": [
             {
-                "href": "{url_root}/v1.0/010101/groups/{groupId},
+                "href": "{urlRoot}/v1.0/010101/groups/{groupId},
                 "rel": "self"
             }
         ],
@@ -534,7 +534,7 @@ GET /{tenantId}/groups/{groupId}/policies
             },
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId1}/policy/{policyId1}"
                     "rel": "self"
                 }
             ]
@@ -549,7 +549,7 @@ GET /{tenantId}/groups/{groupId}/policies
             },
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId1}/policy/{policyId2}"
                     "rel": "self"
                 }
             ]
@@ -564,7 +564,7 @@ GET /{tenantId}/groups/{groupId}/policies
             },
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId1}/policy/{policyId3}"
                     "rel": "self"
                 }
             ]
@@ -579,7 +579,7 @@ GET /{tenantId}/groups/{groupId}/policies
             },
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId1}/policy/{policyId4}"
                     "rel": "self"
                 }
             ]
@@ -616,7 +616,7 @@ POST /{tenantId}/groups/{groupId}/policies
             "id": {policyId1},
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policy/{policyId1}"
                     "rel": "self"
                 }
             ],
@@ -629,7 +629,7 @@ POST /{tenantId}/groups/{groupId}/policies
             "id": {policyId2},
             "links": [
                 {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
+                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policy/{policyId2}"
                     "rel": "self"
                 }
             ],
@@ -653,7 +653,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}
         "id": {policyId},
         "links": [
             {
-                "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}"
+                "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policy/{policyId}"
                 "rel": "self"
             }
         ],
@@ -695,11 +695,11 @@ Execute Resource
 Autoscale REST Endpoints having to do with executing policies without
 authentication.
 
-(/execute/{capability_version}/{capability_hash}/)
+(/execute/{capabilityVersion}/{capabilityHash}/)
 --
 
 Execute a webhook
-POST /execute/{capability_version}/{capability_hash}/
+POST /execute/{capabilityVersion}/{capabilityHash}/
 < 202
 < Content-Type: application/json
 {}
@@ -735,7 +735,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash1}/,
+                    "href": ".../execute/1/{capabilityHash1}/,
                     "rel": "capability"
                 }
             ]
@@ -752,7 +752,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash2}/,
+                    "href": ".../execute/1/{capabilityHash2}/,
                     "rel": "capability"
                 }
             ]
@@ -795,7 +795,7 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash1}/,
+                    "href": ".../execute/1/{capabilityHash1}/,
                     "rel": "capability"
                 }
             ]
@@ -810,7 +810,7 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash2}/,
+                    "href": ".../execute/1/{capabilityHash2}/,
                     "rel": "capability"
                 }
             ]
@@ -836,7 +836,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 "rel": "self"
             },
             {
-                "href": ".../execute/1/{capability_hash2},
+                "href": ".../execute/1/{capabilityHash2},
                 "rel": "capability"
             }
         ]
