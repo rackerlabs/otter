@@ -17,13 +17,18 @@ def make_observer_chain(ultimate_observer, indent):
     """
     Return our feature observers wrapped our the ultimate_observer
     """
+    kwargs = {}
+
+    if indent is not False:
+        kwargs['indent'] = indent
+
     return PEP3101FormattingWrapper(
         SystemFilterWrapper(
             GELFObserverWrapper(
                 JSONObserverWrapper(
                     ultimate_observer,
                     sort_keys=True,
-                    indent=indent),
+                    **kwargs),
                 hostname=socket.gethostname())))
 
 
