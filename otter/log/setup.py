@@ -13,7 +13,7 @@ from otter.log.formatters import (
 )
 
 
-def make_observer_chain(ultimate_observer):
+def make_observer_chain(ultimate_observer, indent):
     """
     Return our feature observers wrapped our the ultimate_observer
     """
@@ -23,14 +23,20 @@ def make_observer_chain(ultimate_observer):
                 JSONObserverWrapper(
                     ultimate_observer,
                     sort_keys=True,
-                    indent=2),
+                    indent=indent),
                 hostname=socket.gethostname())))
 
 
 def observer_factory():
     """
+    Log non-pretty JSON formatted GELF structures to sys.stdout.
+    """
+    return make_observer_chain(StreamObserverWrapper(sys.stdout), False)
+
+
+def observer_factory_debug():
+    """
     Log pretty JSON formatted GELF structures to sys.stdout.
     """
-    return make_observer_chain(StreamObserverWrapper(sys.stdout))
+    return make_observer_chain(StreamObserverWrapper(sys.stdout), 2)
 
-observer_factory_debug = observer_factory
