@@ -2,6 +2,7 @@
 System tests for scaling policies negative scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+import unittest
 
 
 class ScalingPoliciesNegativeFixture(AutoscaleFixture):
@@ -164,6 +165,44 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Scale down policy executed when minentities=maxentities'
                           ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
+
+    @unittest.skip('AUTO-425')
+    def test_system_update_webhook_policy_to_at_style_scheduler(self):
+        """
+        Policy updation fails when a webhook type policy is updated to be of type
+        at style scheduler, with error 400
+        """
+        upd_policy_response = self.autoscale_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_up['policy_id'],
+            name='upd_webhook_to_scheduler',
+            cooldown=self.sp_cooldown,
+            change=self.sp_change,
+            args={'at': self.autoscale_behaviors.get_time_in_utc(60)},
+            policy_type='schedule')
+        self.assertEquals(upd_policy_response.status_code, 403,
+                          msg='Update webhook policy to schedule policy type'
+                          ' on the group {0} with response code {1}'.format(
+                              self.group.id, upd_policy_response.status_code))
+
+    @unittest.skip('AUTO-425')
+    def test_system_update_webhook_policy_to_cron_style_scheduler(self):
+        """
+        Policy updation fails when a webhook type policy is updated to be of type
+        cron style scheduler, with error 400
+        """
+        upd_policy_response = self.autoscale_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_down['policy_id'],
+            name='upd_webhook_to_scheduler',
+            cooldown=self.sp_cooldown,
+            change=self.sp_change,
+            args={'cron': '* 3 * * *'},
+            policy_type='schedule')
+        self.assertEquals(upd_policy_response.status_code, 403,
+                          msg='Update webhook policy to schedule policy type'
+                          ' on the group {0} with response code {1}'.format(
+                              self.group.id, upd_policy_response.status_code))
 
     def _update_group_min_max_entities(self, group, maxentities=None, minentities=None):
         """

@@ -138,6 +138,21 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    def test_system_multiple_webhook_policies_in_group_in_different_requests(self):
+        """
+        Creating multiple webhook policies with the same payload, using multiple
+        create policy requests is successful.
+        """
+        group = (self.autoscale_behaviors.create_group_min()).entity
+        for each in range(3):
+            create_policy_response = self.autoscale_behaviors.create_policy_given(
+                group_id=group.id,
+                sp_name='multi_web_policy',
+                sp_change=1)
+            self.assertEquals(create_policy_response['status_code'], 201,
+                              msg='Created multiple scaling policies with same policy data'
+                              ', response code: {0}'.format(create_policy_response['status_code']))
+
     def _execute_policy_after_cooldown(self, group_id, policy_id):
         """
         After the cooldown period, executes the policy and asserts if the policy
