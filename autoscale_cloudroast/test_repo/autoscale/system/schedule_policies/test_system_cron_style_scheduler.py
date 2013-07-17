@@ -7,7 +7,7 @@ from time import sleep
 import unittest
 
 
-#@unittest.skip('cron not implemented yet')
+@unittest.skip('cron not implemented yet')
 class CronStyleSchedulerTests(AutoscaleFixture):
 
     """
