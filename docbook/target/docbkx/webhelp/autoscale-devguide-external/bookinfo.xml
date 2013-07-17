@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<products xmlns:xlink="http://www.w3.org/1999/xlink">
+   <latestpdf>autoscale-devguide-latest.pdf</latestpdf>
+   <pdfoutname>autoscale-devguide-20130722.pdf</pdfoutname>
+   <docname>Rackspace Autoscale Developer Guide</docname>
+   <productname>Cloud Databases</productname>
+   <webappname>autoscale-devguide</webappname>
+   <pominfo>
+      <groupid>com.rackspace.cloud.apidocs</groupid>
+      <artifactid>Autoscaling</artifactid>
+      <version>1.0.0-SNAPSHOT</version>
+      <pomname>Autoscaling Docs, 1.0.0-SNAPSHOT</pomname>
+   </pominfo>
+   <product>
+      <id>cdb-v1.0</id>
+      <types>
+         <type>
+            <id>100</id>
+            <displayname>Reference</displayname>
+            <url>/cdb/api/v1.0/autoscale-devguide/content/Overview.html</url>
+            <sequence>1</sequence>
+         </type>
+      </types>
+   </product>
+   <emails>
+      <email>
+         <name>CDT Publication Events</name>
+         <to>cdt-publication-events@lists.rackspace.com</to>
+         <from>clouddoctoolsteam@lists.rackspace.com</from>
+      </email>
+   </emails>
+</products>

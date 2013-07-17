@@ -153,6 +153,10 @@ format="SVG" scale="60"/>
             xmlns:xlink="http://www.w3.org/1999/xlink">
             <title>Additional Resources</title>
             <para>
+              &PRODNAME; is an open-source project. You can see and contribute to source code in our GitHub repository, 
+              <link xlink:href="https://github.com/rackerlabs/otter">https://github.com/rackerlabs/otter</link>.
+            </para>
+            <para>
                 You can see and experiment with all &PRODNAME; API calls at
                 <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
             </para>
