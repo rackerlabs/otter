@@ -203,6 +203,10 @@ zero = {
 
 
 # Datetime validator. Allow only zulu-based UTC timestamp
+# It is checking for any exception by catching Exception instance since from_timestamp throws
+# TypeError instead of ParseError with certain invalid inputs like only date or time.
+# This issue has been raised and tracked http://code.google.com/p/pyiso8601/issues/detail?id=8
+# and http://code.google.com/p/pyiso8601/issues/detail?id=24
 @format_checker.checks('date-time', raises=Exception)
 def validate_datetime(dt_str):
     """
