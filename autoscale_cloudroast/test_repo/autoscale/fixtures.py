@@ -175,17 +175,20 @@ class AutoscaleFixture(BaseTestFixture):
                               msg='Cron style schedule policy value not as expected')
 
     def create_default_at_style_policy_wait_for_execution(self, group_id, delay=3,
+                                                          change=None,
                                                           scale_down=None):
         """
         Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
         the scheduler config seconds + delay, so that the policy is picked
         """
+        if change is None:
+            change = self.sp_change
         if scale_down is True:
-            self.sp_change = -self.sp_change
+            change = -change
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group_id,
             sp_cooldown=0,
-            sp_change=self.sp_change,
+            sp_change=change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         sleep(self.scheduler_interval + delay)
 

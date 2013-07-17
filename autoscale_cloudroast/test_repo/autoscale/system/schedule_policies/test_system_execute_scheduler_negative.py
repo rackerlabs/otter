@@ -27,7 +27,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
         self.empty_scaling_group(group)
 
-    @unittest.skip('Cron not implemented yet')
+    @unittest.skip('AUTO-442')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, a cron style
@@ -51,7 +51,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.gc_min_entities)
         self.empty_scaling_group(group)
 
-    @unittest.skip('Cron not implemented yet')
     def test_system_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
         When policy cooldown is set to be greater than a minute by few seconds for a
@@ -72,7 +71,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change * 2)
         self.empty_scaling_group(group)
 
-    @unittest.skip('Cron not implemented yet')
     def test_system_cron_style_when_group_cooldown_over_trigger_period(self):
         """
         When group cooldown is set to be greater than a minute by few seconds for a
@@ -93,7 +91,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change * 2)
         self.empty_scaling_group(group)
 
-    @unittest.skip('Cron not implemented yet')
     def test_system_at_cron_style_execution_after_delete(self):
         """
         Create an at style and cron scheduler policy and delete them.
@@ -214,7 +211,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_cooldown=cooldown,
             gc_min_entities=minentities,
-            gc_max_entities=maxentities)
+            gc_max_entities=maxentities,
+            lc_name='execute_scheduled')
         group = create_group_response.entity
         self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)

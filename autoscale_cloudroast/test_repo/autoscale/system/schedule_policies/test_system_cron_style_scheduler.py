@@ -21,7 +21,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         super(CronStyleSchedulerTests, self).setUp()
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            lc_name="scheduled",
+            lc_name="cron_style_scheduled",
             gc_cooldown=0)
         self.group = create_group_response.entity
         self.resources.add(self.group.id,
@@ -34,6 +34,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         super(CronStyleSchedulerTests, self).tearDown()
         self.empty_scaling_group(self.group)
 
+    @unittest.skip('AUTO-442')
     def test_system_cron_style_change_policy_up_down(self):
         """
         Create a cron style schedule policy via change to scale up by 2, followed by
@@ -57,6 +58,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
+    @unittest.skip('AUTO-442')
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
         Create a cron style schedule policy via desired capacity to scale up by 1,
