@@ -218,6 +218,9 @@ def validate_datetime(dt_str):
 
 
 # Register cron format checker with the global checker. Also, ensure it does not have seconds arg
+# It is checking for any exception by catching Exception instance since croniter throws
+# KeyError with some invalid inputs. This issue has been raised in
+# https://github.com/taichino/croniter/issues/25
 format_checker.checks('cron', raises=Exception)(lambda c: croniter(c) and len(c.split()) <= 5)
 
 _policy_base_type = {
