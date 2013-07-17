@@ -7,7 +7,7 @@ from time import sleep
 import unittest
 
 
-@unittest.skip('cron not implemented yet')
+#@unittest.skip('cron not implemented yet')
 class CronStyleSchedulerTests(AutoscaleFixture):
 
     """
@@ -40,6 +40,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         a cron style schedule policy to scale down by -2, each policy with 0 cooldown.
         The total servers after execution of both policies is the minentities with
         which the group was created.
+        ** fails cause of lock error AUTO-442 **
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -62,18 +63,19 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         followed by a cron style schedule policy to scale down to 0,
         each policy with 0 cooldown. The total servers after execution of both
         policies is 0.
+        ** fails cause of lock error AUTO-442 **
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=360,
-            sp_desired_capacity=1,
+            sp_desired_capacity=self.sp_desired_capacity,
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
-        self.verify_group_state(self.group.id, self.sp_change)
+        self.verify_group_state(self.group.id, self.sp_desired_capacity)
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=360,
-            sp_desired_capacity=0,
+            sp_desired_capacity=self.group.groupConfiguration.minEntities,
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
