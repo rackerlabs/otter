@@ -400,7 +400,6 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         self.assert_response(wrapper, 204, "Update policy failed.")
         self.assertEqual(wrapper.content, "")
 
-
         # now try to view
         wrapper = yield request(root, 'GET', path)
         self.assert_response(wrapper, 200)
