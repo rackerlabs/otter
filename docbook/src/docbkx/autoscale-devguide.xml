@@ -51,13 +51,9 @@ format="SVG" scale="60"/>
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
          xml:id="autoscale-getting-started">
-    
-    <!-- this Getting Started content comes directly from a wiki page, 
-         https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
-    <!-- some sample code displayed on that page does NOT validate via JSONlint;
-         use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
-    
-    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+     
+    <?rax title.font.size="35px" subtitle.font.size="20px"
+          canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <?rax status.bar.text="PREVIEW" ?>
     <info>
         <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
@@ -97,7 +93,7 @@ format="SVG" scale="60"/>
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Initial internal draft of API
-                                Operations section for Preview
+                                Operations chapter for Preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -300,9 +296,9 @@ format="SVG" scale="60"/>
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
           values shown here. </para>
-          <!-- fix the auth code samples soon 
+
         <example>
-          <title>Auth Request for US Endpoint: XML</title>
+          <title>Authentication Request for US Endpoint: XML</title>
           <programlistingco>
             <areaspec>
               <area xml:id="credentials.xml.user"
@@ -316,7 +312,7 @@ format="SVG" scale="60"/>
           </programlistingco>
         </example>
         <example>
-          <title>Auth Request for US Endpoint: JSON</title>
+          <title>Authentication Request for US Endpoint: JSON</title>
           <programlistingco>
             <areaspec>
               <area xml:id="credentials.json.user"
@@ -346,20 +342,20 @@ format="SVG" scale="60"/>
           </callout>
         </calloutlist>
         <example>
-          <title>Auth Response for US Endpoint: XML</title>
+          <title>Authentication Response for US Endpoint: XML</title>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.xml.namespaces" units="linecolumn" coords="7 9"/>
-              <area xml:id="response.xml.token" units="linecolumn" coords="15 10"/>
-              <area xml:id="response.xml.dfltregion" units="linecolumn" coords="16 67"/>
-              <area xml:id="response.xml.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.xml.catalog" units="linecolumn" coords="22 21"/>
-              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 34"/>
-              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 54"/>
-              <area xml:id="response.xml.region" units="linecolumn" coords="52 30"/>
-              <area xml:id="response.xml.tenant" units="linecolumn" coords="53 66"/>
-              <area xml:id="response.xml.url" units="linecolumn" coords="54 9"/>
+              <area xml:id="response.xml.namespaces" units="linecolumn"  coords="7 5"/>
+              <area xml:id="response.xml.token" units="linecolumn"       coords="15 9"/>
+              <area xml:id="response.xml.dfltregion" units="linecolumn"  coords="16 41"/>
+              <area xml:id="response.xml.role" units="linecolumn"        coords="17 13"/>
+              <area xml:id="response.xml.catalog" units="linecolumn"     coords="22 9"/>
+              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 22"/>
+              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 42"/>
+              <area xml:id="response.xml.region" units="linecolumn"      coords="52 27"/>
+              <area xml:id="response.xml.tenant" units="linecolumn"      coords="53 21"/>
+              <area xml:id="response.xml.url" units="linecolumn"         coords="54 21"/>
             </areaspec>
             <programlisting language="xml"><xi:include href="samples/auth-20.xml" parse="text"/></programlisting>
           </programlistingco>
@@ -367,7 +363,7 @@ format="SVG" scale="60"/>
         
         
         <example xml:id="auth-response-example-json">
-          <title>Auth Response for US Endpoint: JSON</title>
+          <title>Authentication Response for US Endpoint: JSON</title>
           
           <programlistingco>
             <areaspec>
@@ -581,7 +577,7 @@ format="SVG" scale="60"/>
           UK-based accounts will see different values in the
           service catalog. Refer to the next section for
           more information about service endpoints. </para>  
-          -->
+
       </section>  </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access/Endpoints</title>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<?rax-warinfo cdb-v1.0-autoscale-reference?><book xmlns="http://docbook.org/ns/docbook" xmlns:html="http://www.w3.org/1999/xhtml"
+<?rax-warinfo cas-v1.0-autoscale-reference?><book xmlns="http://docbook.org/ns/docbook" xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:svg="http://www.w3.org/2000/svg"
       xmlns:m="http://www.w3.org/1998/Math/MathML"
@@ -50,9 +50,8 @@
         </revhistory>
 	     <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>Reference</raxm:displayname>
-            <!-- fix product code when get one; this is just so it builds -->
-            <raxm:product version="v1.0">cdb</raxm:product>
-            <raxm:priority>1</raxm:priority>
+            <raxm:product version="v1.0">cas</raxm:product>
+            <raxm:priority>30</raxm:priority>
         </raxm:metadata>
     </info>
    <chapter xml:id="Overview">
@@ -126,7 +125,7 @@
          </thead>
          <tbody>
             <tr>
-               <th colspan="3" align="center">Group Resource</th>
+               <th colspan="3" align="center">Groups</th>
             </tr>
             <tr>
                <td>
@@ -195,7 +194,7 @@ of the response in JSON format.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Configuration Resource</th>
+               <th colspan="3" align="center">Configurations</th>
             </tr>
             <tr>
                <td>
@@ -281,7 +280,7 @@ group.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Policies Resource</th>
+               <th colspan="3" align="center">Policies</th>
             </tr>
             <tr>
                <td>
@@ -361,7 +360,7 @@ returned.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Execute Resource</th>
+               <th colspan="3" align="center">Executions</th>
             </tr>
             <tr>
                <td>
@@ -375,7 +374,7 @@ returned.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Webhooks Resource</th>
+               <th colspan="3" align="center">Webhooks</th>
             </tr>
             <tr>
                <td>
@@ -444,7 +443,7 @@ will be returned.</para>
          </tbody>
       </informaltable>
       <section xml:id="Group_Resource">
-         <title>Group Resource</title>
+         <title>Groups</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -1246,7 +1245,7 @@ of the response in JSON format.</para>
          </section>
       </section>
       <section xml:id="Config_Resource">
-         <title>Configuration Resource</title>
+         <title>Configurations</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -1909,7 +1908,7 @@ group.</para>
          </section>
       </section>
       <section xml:id="Policies_Resource">
-         <title>Policies Resource</title>
+         <title>Policies</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -2648,7 +2647,7 @@ returned.</para>
          </section>
       </section>
       <section xml:id="Execute_Resource">
-         <title>Execute Resource</title>
+         <title>Executions</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -2758,7 +2757,7 @@ returned.</para>
          </section>
       </section>
       <section xml:id="Webhooks_Resource">
-         <title>Webhooks Resource</title>
+         <title>Webhooks</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>

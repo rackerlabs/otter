@@ -3,22 +3,22 @@
    <latestpdf>autoscale-reference-latest.pdf</latestpdf>
    <pdfoutname>autoscale-reference-20130702.pdf</pdfoutname>
    <docname>Rackspace Autoscale Reference</docname>
-   <productname>Cloud Databases</productname>
+   <productname>Rackspace Autoscale</productname>
    <webappname>autoscale-reference</webappname>
    <pominfo>
       <groupid>com.rackspace.cloud.apidocs</groupid>
-      <artifactid>Autoscaling</artifactid>
+      <artifactid>autoscale</artifactid>
       <version>1.0.0-SNAPSHOT</version>
-      <pomname>Autoscaling Docs, 1.0.0-SNAPSHOT</pomname>
+      <pomname>Autoscale Docs, 1.0.0-SNAPSHOT</pomname>
    </pominfo>
    <product>
-      <id>cdb-v1.0</id>
+      <id>cas-v1.0</id>
       <types>
          <type>
             <id>100</id>
             <displayname>Reference</displayname>
-            <url>/cdb/api/v1.0/autoscale-reference/content/Overview.html</url>
-            <sequence>1</sequence>
+            <url>/cas/api/v1.0/autoscale-reference/content/Overview.html</url>
+            <sequence>30</sequence>
          </type>
       </types>
    </product>

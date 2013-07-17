@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<?rax-warinfo cdb-v1.0-autoscale-devguide?><book xmlns="http://docbook.org/ns/docbook" xmlns:html="http://www.w3.org/1999/xhtml"
+<?rax-warinfo cas-v1.0-autoscale-devguide?><book xmlns="http://docbook.org/ns/docbook" xmlns:html="http://www.w3.org/1999/xhtml"
       xmlns:xi="http://www.w3.org/2001/XInclude"
       xmlns:svg="http://www.w3.org/2000/svg"
       xmlns:m="http://www.w3.org/1998/Math/MathML"
@@ -8,13 +8,9 @@
       status="draft"
       xml:id="autoscale-getting-started"
       xml:base="file:/Users/rose.coste/Documents/EclipseWorkspace/otter-github/otter/docbook/src/docbkx/autoscale-devguide.xml">
-    
-    <!-- this Getting Started content comes directly from a wiki page, 
-         https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
-    <!-- some sample code displayed on that page does NOT validate via JSONlint;
-         use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
-    
-    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+     
+    <?rax title.font.size="35px" subtitle.font.size="20px"
+          canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <?rax status.bar.text="PREVIEW" ?>
     <info>
         <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
@@ -54,7 +50,7 @@
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Initial internal draft of API
-                                Operations section for Preview
+                                Operations chapter for Preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -62,10 +58,9 @@
             </revision>           
         </revhistory>
 	     <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
-            <raxm:displayname>Reference</raxm:displayname>
-            <!-- fix product code when get one; this is just so it builds -->
-            <raxm:product version="v1.0">cdb</raxm:product>
-            <raxm:priority>1</raxm:priority>
+            <raxm:displayname>API Developer Guide</raxm:displayname>
+            <raxm:product version="v1.0">cas</raxm:product>
+            <raxm:priority>20</raxm:priority>
         </raxm:metadata>
     </info>
    <chapter xml:id="Overview">
@@ -132,7 +127,7 @@
                      <itemizedlist spacing="compact">
                         <listitem>
                             <para>Initial internal draft of API
-                                Operations section for Preview
+                                Operations chapter for Preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -286,112 +281,355 @@
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
           values shown here. </para>
-            <!-- fix the auth code samples soon 
-        <example>
-          <title>Auth Request for US Endpoint: XML</title>
-          <programlistingco>
-            <areaspec>
-              <area xml:id="credentials.xml.user"
-                units="linecolumn" coords="13 17"/>
-              <area xml:id="credentials.xml.key"
-                units="linecolumn" coords="14 15"/>
-            </areaspec>
-            <programlisting language="xml">
-<xi:include href="samples/credentials-20.xml" parse="text"/>
+
+            <example>
+               <title>Authentication Request for US Endpoint: XML</title>
+               <programlistingco>
+                  <areaspec>
+                     <area xml:id="credentials.xml.user" units="linecolumn" coords="13 17"/>
+                     <area xml:id="credentials.xml.key" units="linecolumn" coords="14 15"/>
+                  </areaspec>
+                  <programlisting language="xml">
+POST /v2.0/tokens HTTP/1.1
+User-Agent: curl/7.21.0 (x86_64-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6
+Host: identity.api.rackspacecloud.com
+Accept: application/xml
+Content-Type: application/xml
+Content-Length: 88
+
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;auth&gt;
+   &lt;apiKeyCredentials
+       xmlns="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0"
+       username="jsmith"
+       apiKey="aaaaa-bbbbb-ccccc-12345678"/&gt;
+&lt;/auth&gt;
+
                     </programlisting>
-          </programlistingco>
-        </example>
-        <example>
-          <title>Auth Request for US Endpoint: JSON</title>
-          <programlistingco>
-            <areaspec>
-              <area xml:id="credentials.json.user"
-                units="linecolumn" coords="14 22"/>
-              <area xml:id="credentials.json.key"
-                units="linecolumn" coords="15 20"/>
-            </areaspec>
-            <programlisting language="json">
-<xi:include href="samples/credentials-20.json" parse="text"/>
+               </programlistingco>
+            </example>
+            <example>
+               <title>Authentication Request for US Endpoint: JSON</title>
+               <programlistingco>
+                  <areaspec>
+                     <area xml:id="credentials.json.user" units="linecolumn" coords="14 22"/>
+                     <area xml:id="credentials.json.key" units="linecolumn" coords="15 20"/>
+                  </areaspec>
+                  <programlisting language="json">
+POST /v2.0/tokens HTTP/1.1
+User-Agent: curl/7.21.0 (x86_64-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6
+Host: identity.api.rackspacecloud.com
+Accept: application/json
+Content-Type: application/json
+Content-Length: 54
+
+{
+   "auth":
+   {
+      "RAX-KSKEY:apiKeyCredentials":
+      {
+         "username": "jsmith",
+         "apiKey": "aaaaa-bbbbb-ccccc-12345678"
+      }
+   }
+}
+
                     </programlisting>
-          </programlistingco>
-        </example>
-        <calloutlist>
-          <callout arearefs="credentials.xml.user">
-            <para> The username supplied here is your
+               </programlistingco>
+            </example>
+            <calloutlist>
+               <callout arearefs="credentials.xml.user">
+                  <para> The username supplied here is your
               common Rackspace Cloud username. </para>
-          </callout>
-          <callout arearefs="credentials.xml.key">
-            <para> The key is your API access key. The key
+               </callout>
+               <callout arearefs="credentials.xml.key">
+                  <para> The key is your API access key. The key
               can be obtained from the Rackspace Cloud
               Control Panel in the <guimenu>&lt;Your
-                Account></guimenu>/<guimenuitem>API
+                Account&gt;</guimenu>/<guimenuitem>API
                   Access</guimenuitem> section (login
-              here: <link
-                xlink:href="http://mycloud.rackspace.com/"
-                >Control Panel Login</link>). </para>
-          </callout>
-        </calloutlist>
-        <example>
-          <title>Auth Response for US Endpoint: XML</title>
+              here: <link xlink:href="http://mycloud.rackspace.com/">Control Panel Login</link>). </para>
+               </callout>
+            </calloutlist>
+            <example>
+               <title>Auth Response for US Endpoint: XML</title>
           
-          <programlistingco>
-            <areaspec>
-              <area xml:id="response.xml.namespaces" units="linecolumn" coords="7 9"/>
-              <area xml:id="response.xml.token" units="linecolumn" coords="15 10"/>
-              <area xml:id="response.xml.dfltregion" units="linecolumn" coords="16 67"/>
-              <area xml:id="response.xml.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.xml.catalog" units="linecolumn" coords="22 21"/>
-              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 34"/>
-              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 54"/>
-              <area xml:id="response.xml.region" units="linecolumn" coords="52 30"/>
-              <area xml:id="response.xml.tenant" units="linecolumn" coords="53 66"/>
-              <area xml:id="response.xml.url" units="linecolumn" coords="54 9"/>
-            </areaspec>
-            <programlisting language="xml"><xi:include href="samples/auth-20.xml" parse="text"/></programlisting>
-          </programlistingco>
-        </example>
+               <programlistingco>
+                  <areaspec>
+                     <area xml:id="response.xml.namespaces" units="linecolumn" coords="7 5"/>
+                     <area xml:id="response.xml.token" units="linecolumn" coords="15 9"/>
+                     <area xml:id="response.xml.dfltregion" units="linecolumn" coords="16 40"/>
+                     <area xml:id="response.xml.role" units="linecolumn" coords="17 13"/>
+                     <area xml:id="response.xml.catalog" units="linecolumn" coords="22 9"/>
+                     <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 22"/>
+                     <area xml:id="response.xml.servicename" units="linecolumn" coords="51 42"/>
+                     <area xml:id="response.xml.region" units="linecolumn" coords="52 27"/>
+                     <area xml:id="response.xml.tenant" units="linecolumn" coords="53 21"/>
+                     <area xml:id="response.xml.url" units="linecolumn" coords="54 21"/>
+                  </areaspec>
+                  <programlisting language="xml">&lt;HTTP/1.1 200 OK
+    Content-Type: application/xml; charset=UTF-8
+    Content-Length: 477
+    Date: Thu, 12 Apr 2012 18:50:20 GMT
+    
+    &lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;
+    &lt;access xmlns:os-ksadm="http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0"
+        xmlns="http://docs.openstack.org/identity/api/v2.0"
+        xmlns:rax-kskey="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0"
+        xmlns:rax-ksqa="http://docs.rackspace.com/identity/api/ext/RAX-KSQA/v1.0"
+        xmlns:common="http://docs.openstack.org/common/api/v1.0"
+        xmlns:ksgrp="http://docs.rackspace.com/identity/api/ext/RAX-KSGRP/v1.0"
+        xmlns:rax-kscatalog="http://docs.openstack.org/identity/api/ext/OS-KSCATALOG/v1.0"
+        xmlns:atom="http://www.w3.org/2005/Atom"&gt;
+        &lt;token id="vvvvvvvv-wwww-xxxx-yyyy-zzzzzzzzzzzz" expires="2011-12-08T22:51:02.000-06:00"/&gt;
+        &lt;user id="123456" name="jsmith" rax-auth:defaultRegion="DFW"&gt;
+            &lt;roles&gt;
+                &lt;role id="identity:admin" name="identity:admin" description="Admin Role."/&gt;
+                &lt;role id="identity:default" name="identity:default" description="Default Role."/&gt;
+            &lt;/roles&gt;
+        &lt;/user&gt;
+        &lt;serviceCatalog&gt;
+            &lt;service type="rax:database" name="cloudDatabases"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111" publicURL="https://dfw.databases.api.rackspacecloud.com/v1.0/1100111"/&gt;
+                &lt;endpoint region="ORD" tenantId="1100111" publicURL="https://ord.databases.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:load-balancer" name="cloudLoadBalancers"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111" publicURL="https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/1100111"/&gt;
+                &lt;endpoint region="ORD" tenantId="1100111" publicURL="https://ord.loadbalancers.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+            &lt;service type="compute" name="cloudServersOpenStack"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111"
+                    publicURL="https://dfw.servers.api.rackspacecloud.com/v2/1100111"&gt;
+                    &lt;version id="2" info="https://dfw.servers.api.rackspacecloud.com/v2/"
+                        list="https://dfw.servers.api.rackspacecloud.com/" /&gt;
+                &lt;/endpoint&gt;
+                &lt;endpoint region="ORD" tenantId="1100111"
+                    publicURL="https://ord.servers.api.rackspacecloud.com/v2/1100111"&gt;
+                    &lt;version id="2" info="https://ord.servers.api.rackspacecloud.com/v2/"
+                        list="https://ord.servers.api.rackspacecloud.com/" /&gt;
+                &lt;/endpoint&gt;
+            &lt;/service&gt;
+            &lt;service type="compute" name="cloudServers"&gt;
+                &lt;endpoint tenantId="1100111"
+                    publicURL="https://servers.api.rackspacecloud.com/v1.0/1100111"&gt;
+                    &lt;version id="1.0"
+                        info="https://servers.api.rackspacecloud.com/v1.0/"
+                        list="https://servers.api.rackspacecloud.com/"/&gt;
+                &lt;/endpoint&gt;
+            &lt;/service&gt;
+            &lt;service type="object-store" name="cloudFiles"&gt;
+                &lt;endpoint region="DFW"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    internalURL="https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+                &lt;endpoint region="ORD"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    internalURL="https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:object-cdn" name="cloudFilesCDN"&gt;
+                &lt;endpoint region="DFW"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+                &lt;endpoint region="ORD"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:dns" name="cloudDNS"&gt;
+                &lt;endpoint tenantId="1100111"
+                    publicURL="https://dns.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+        &lt;/serviceCatalog&gt;
+    &lt;/access&gt;
+</programlisting>
+               </programlistingco>
+            </example>
         
         
-        <example xml:id="auth-response-example-json">
-          <title>Auth Response for US Endpoint: JSON</title>
+            <example xml:id="auth-response-example-json">
+               <title>Auth Response for US Endpoint: JSON</title>
           
-          <programlistingco>
-            <areaspec>
-              <area xml:id="response.json.namespaces" units="linecolumn" coords="200 1"/>
-              <area xml:id="response.json.token" units="linecolumn" coords="9 8"/>
-              <area xml:id="response.json.dfltregion" units="linecolumn" coords="16 45"/>
-              <area xml:id="response.json.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.json.catalog" units="linecolumn" coords="30 8"/>
-              <area xml:id="response.json.servicetype" units="linecolumn" coords="114 16"/>
-              <area xml:id="response.json.servicename" units="linecolumn" coords="113 16"/>
-              <area xml:id="response.json.region" units="linecolumn" coords="104 24"/>
-              <area xml:id="response.json.tenant" units="linecolumn" coords="101 24"/>
-              <area xml:id="response.json.url" units="linecolumn" coords="102 24"/>
-            </areaspec>	
-            <programlisting language="json"><xi:include href="samples/auth-20.json" parse="text"/>
+               <programlistingco>
+                  <areaspec>
+                     <area xml:id="response.json.namespaces" units="linecolumn" coords="200 1"/>
+                     <area xml:id="response.json.token" units="linecolumn" coords="9 8"/>
+                     <area xml:id="response.json.dfltregion" units="linecolumn" coords="16 45"/>
+                     <area xml:id="response.json.role" units="linecolumn" coords="17 12"/>
+                     <area xml:id="response.json.catalog" units="linecolumn" coords="30 8"/>
+                     <area xml:id="response.json.servicetype" units="linecolumn" coords="114 16"/>
+                     <area xml:id="response.json.servicename" units="linecolumn" coords="113 16"/>
+                     <area xml:id="response.json.region" units="linecolumn" coords="104 24"/>
+                     <area xml:id="response.json.tenant" units="linecolumn" coords="101 24"/>
+                     <area xml:id="response.json.url" units="linecolumn" coords="102 24"/>
+                  </areaspec>	
+                  <programlisting language="json">HTTP/1.1 200 OK
+Content-Type: application/json; charset=UTF-8
+Content-Length: 477
+Date: Thu, 12 Apr 2012 18:45:13 GMT
+
+{
+    "access": {
+     
+        "token": {
+            "expires": "2011-12-08T22:51:02.000-06:00",
+            "id": "vvvvvvvv-wwww-xxxx-yyyy-zzzzzzzzzzzz"
+        },
+        "user": {
+            "id": "123456",
+            "name": "jsmith",
+            "RAX-AUTH:defaultRegion": "DFW",
+            "roles": [
+                {
+                    "description": "Admin Role.",
+                    "id": "identity:admin",
+                    "name": "identity:admin"
+                },
+                {
+                    "description": "Default Role.",
+                    "id": "identity:default",
+                    "name": "identity:default"
+                }
+            ]
+        },
+        "serviceCatalog": [
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://dfw.databases.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "DFW",
+                        "tenantId": "1100111"
+                    },
+                    {
+                        "publicURL": "https://ord.databases.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "ORD",
+                        "tenantId": "1100111"
+                    }
+                ],
+                "name": "cloudDatabases",
+                "type": "rax:database"
+            },
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "DFW",
+                        "tenantId": "1100111"
+                    },
+                    {
+                        "publicURL": "https://ord.loadbalancers.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "ORD",
+                        "tenantId": "1100111"
+                    }
+                ],
+                "name": "cloudLoadBalancers",
+                "type": "rax:load-balancer"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "region": "DFW",
+                        "publicURL": "https://dfw.servers.api.rackspacecloud.com/v2/1100111",
+                        "versionId": "2",
+                        "versionInfo": "https://dfw.servers.api.rackspacecloud.com/v2/",
+                        "versionList": "https://dfw.servers.api.rackspacecloud.com/"
+                    },
+                    {
+                        "tenantId": "1100111",
+                        "region": "ORD",
+                        "publicURL": "https://ord.servers.api.rackspacecloud.com/v2/1100111",
+                        "versionId": "2",
+                        "versionInfo": "https://ord.servers.api.rackspacecloud.com/v2/",
+                        "versionList": "https://ord.servers.api.rackspacecloud.com/"
+                    }
+                ],
+                "name": "cloudServersOpenStack",
+                "type": "compute"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "publicURL": "https://servers.api.rackspacecloud.com/v1.0/1100111",
+                        "versionId": "1.0",
+                        "versionInfo": "https://servers.api.rackspacecloud.com/v1.0/",
+                        "versionList": "https://servers.api.rackspacecloud.com/"
+                    }
+                ],
+                "name": "cloudServers",
+                "type": "compute"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "internalURL": "https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "DFW"
+                    },
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "internalURL": "https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "ORD"
+                    }
+                ],
+                "name": "cloudFiles",
+                "type": "object-store"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "DFW"
+                    },
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "ORD"
+                    }
+                ],
+                "name": "cloudFilesCDN",
+                "type": "rax:object-cdn"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "publicURL": "https://dns.api.rackspacecloud.com/v1.0/1100111"
+                    }
+                ],
+                "name": "cloudDNS",
+                "type": "rax:dns"
+            }
+        ]
+    }
+}
+
                     </programlisting>
-          </programlistingco>
-        </example>
-        <note>
-          <para>The information shown in the Auth Response
+               </programlistingco>
+            </example>
+            <note>
+               <para>The information shown in the Auth Response
             examples is for US-based accounts. If you
             authenticate against the UK-endpoint for auth,
             you will see the service catalog information
             for UK-based accounts.</para>
-        </note>
-        <calloutlist>
-          <callout arearefs="response.xml.namespaces">
-            <para>
+            </note>
+            <calloutlist>
+               <callout arearefs="response.xml.namespaces">
+                  <para>
               In XML responses only,
               a list of namespaces identifies API extensions that add functionality to the core API.
             </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.token">
-            <para> This token can be presented to a service as evidence of authentication.
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.token">
+                  <para> This token can be presented to a service as evidence of authentication.
               Tokens are valid for a finite duration; a token's default lifespan is twenty-four hours.
             </para>
-            <para> The token's <code>expires</code> attribute denotes the time
+                  <para> The token's <code>expires</code> attribute denotes the time
               after which the token will automatically become
               invalid. A token may be manually revoked before
               the time identified by the <code>expires</code>
@@ -399,19 +637,17 @@
               maximum possible lifespan but does not guarantee
               that it will reach that lifespan. Clients are
               encouraged to cache a token until it expires. </para>
-            <note>
-              <para>The token's expiration time is
+                  <note>
+                     <para>The token's expiration time is
                 formatted differently in the US and
                 UK. These response examples show the
                 US format. For examples of the UK
-                format please refer to <link
-                  xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html"
-                  >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html</link>.</para>
-            </note>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.dfltregion">
-            <para> Users can be assigned a default region so that, when there is a 
+                format please refer to <link xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html">http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html</link>.</para>
+                  </note>
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.dfltregion">
+                  <para> Users can be assigned a default region so that, when there is a 
               choice between multiple endpoints associated with a service in the 
               user's catalog, the endpoint for the user's default region will be 
               selected if it is available. In this example, the user's default 
@@ -419,10 +655,10 @@
               offer endpoints in that region and the ORD region; this user's work 
               will be directed to the DFW region whenever possible.
             </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.role">
-            <para> Users can be assigned multiple roles,
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.role">
+                  <para> Users can be assigned multiple roles,
               with each role providing specific
               privileges. In this example,
               <code>jsmith</code> is the
@@ -434,10 +670,10 @@
               associated with actual job functions such
               as Administrator, Operator, Developer,
               Tester, or Trainer. </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.catalog">
-            <para> The service catalog lists the services
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.catalog">
+                  <para> The service catalog lists the services
               this user can access. In this example, the
               user can access one database service, one
               loadbalancing service, two compute
@@ -451,29 +687,29 @@
               as regions, versions, and tenants, is
               provided if it's relevant to this user's
               access to this service. </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.servicetype">
-            <para>
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.servicetype">
+                  <para>
               The service type attribute identifies services that perform similar functions, whatever those services might be named.
               In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code>type="compute"</code>,
               identifying them as compute services even though the word "compute" does not appear in their names.
             </para>
-            <important>
-              <para>Use service type as the primary value for
+                  <important>
+                     <para>Use service type as the primary value for
                 locating a service. If multiple endpoints of the
                 same service type exist in the same region, use
                 service name as the tiebreaker.</para>
-            </important>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.servicename">
-            <para>
+                  </important>
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.servicename">
+                  <para>
               The service name attribute identifies each unique service in the catalog.
               Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
             </para>
-            <important>
-              <para> If you are programmatically parsing an authentication
+                  <important>
+                     <para> If you are programmatically parsing an authentication
                 response, use service type rather than service name as
                 the basis for determining whether a user has access to
                 a particular kind of service. Service type is stable
@@ -489,44 +725,44 @@
                 recognize them by parsing for
                 <code>type="compute"</code> in the authentication
                 response's service catalog. </para>
-            </important>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.region">
-            <para> A service may expose endpoints in different regions.
+                  </important>
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.region">
+                  <para> A service may expose endpoints in different regions.
               Regional endpoints allow clients to provision
               resources in a manner that provides high
               availability. </para>
-            <para> Some services are not region-specific. These services supply a single
+                  <para> Some services are not region-specific. These services supply a single
               non-regional endpoint and do not provide access to internal URLs. </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.tenant">
-            <para> Some services recognize specification of a tenant. If a
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.tenant">
+                  <para> Some services recognize specification of a tenant. If a
               service does recognize tenants, the format of the
               tenant specification is defined only by the
               service; for details about whether and how to
               specify a tenant, check the documentation for the
               service you are using.</para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.url">
-            <para>
+                  <para> </para>
+               </callout>
+               <callout arearefs="response.xml.url">
+                  <para>
               An endpoint can be assigned public and internal URLs. A
               public URL is accessible from anywhere. Access to a public
               URL usually incurs traffic charges. Internal URLs are only
               accessible to services within the same region. Access to
               an internal URL is free of charge.
             </para>
-            <para> </para>
-          </callout>
-        </calloutlist>
-        <para>Authentication tokens are typically valid for 24
+                  <para> </para>
+               </callout>
+            </calloutlist>
+            <para>Authentication tokens are typically valid for 24
           hours. Applications should be designed to
           re-authenticate after receiving a 401
           (Unauthorized) response from a service endpoint. </para>
-        <important>
-          <para>If you are programmatically parsing an
+            <important>
+               <para>If you are programmatically parsing an
             authentication response, please be aware that
             service names are stable for the life of the
             particular service and can be used as keys.
@@ -541,9 +777,9 @@
             attribute can be used as a key by which to
             recognize similar services; see the tip
             below.</para>
-        </important>
-        <tip>
-          <para>Beginning with Auth 2.0, the service catalog
+            </important>
+            <tip>
+               <para>Beginning with Auth 2.0, the service catalog
             includes a service type attribute to identify
             services that perform similar functions but
             have different names; for example,
@@ -555,11 +791,9 @@
             information on Auth 2.0 (also known as the
             Cloud Identity Service), refer to the
             <citetitle>Cloud Identity Client Developer
-              Guide</citetitle> at <link
-                xlink:href="http://docs.rackspace.com"
-                >http://docs.rackspace.com/</link>.</para>
-        </tip>
-        <para>Databases service endpoints are published in the
+              Guide</citetitle> at <link xlink:href="http://docs.rackspace.com">http://docs.rackspace.com/</link>.</para>
+            </tip>
+            <para>Databases service endpoints are published in the
           service catalog in the Auth response with the
           account number, which is a required element of the
           service endpoints. The examples shown here are for
@@ -567,8 +801,8 @@
           UK-based accounts will see different values in the
           service catalog. Refer to the next section for
           more information about service endpoints. </para>  
-          -->
-      </section>  
+
+         </section>  
       </section>
       <section xml:id="serviceEndpoints">
          <title>Service Access/Endpoints</title>
@@ -934,7 +1168,7 @@ Content-Type: application/json
          </thead>
          <tbody>
             <tr>
-               <th colspan="3" align="center">Group Resource</th>
+               <th colspan="3" align="center">Groups</th>
             </tr>
             <tr>
                <td>
@@ -1003,7 +1237,7 @@ of the response in JSON format.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Configuration Resource</th>
+               <th colspan="3" align="center">Configurations</th>
             </tr>
             <tr>
                <td>
@@ -1089,7 +1323,7 @@ group.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Policies Resource</th>
+               <th colspan="3" align="center">Policies</th>
             </tr>
             <tr>
                <td>
@@ -1169,7 +1403,7 @@ returned.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Execute Resource</th>
+               <th colspan="3" align="center">Executions</th>
             </tr>
             <tr>
                <td>
@@ -1183,7 +1417,7 @@ returned.</para>
                </td>
             </tr>
             <tr>
-               <th colspan="3" align="center">Webhooks Resource</th>
+               <th colspan="3" align="center">Webhooks</th>
             </tr>
             <tr>
                <td>
@@ -1252,7 +1486,7 @@ will be returned.</para>
          </tbody>
       </informaltable>
       <section xml:id="Group_Resource">
-         <title>Group Resource</title>
+         <title>Groups</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -2054,7 +2288,7 @@ of the response in JSON format.</para>
          </section>
       </section>
       <section xml:id="Config_Resource">
-         <title>Configuration Resource</title>
+         <title>Configurations</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -2717,7 +2951,7 @@ group.</para>
          </section>
       </section>
       <section xml:id="Policies_Resource">
-         <title>Policies Resource</title>
+         <title>Policies</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -3456,7 +3690,7 @@ returned.</para>
          </section>
       </section>
       <section xml:id="Execute_Resource">
-         <title>Execute Resource</title>
+         <title>Executions</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>
@@ -3566,7 +3800,7 @@ returned.</para>
          </section>
       </section>
       <section xml:id="Webhooks_Resource">
-         <title>Webhooks Resource</title>
+         <title>Webhooks</title>
          <informaltable xmlns:xs="http://www.w3.org/2001/XMLSchema" rules="all">
             <col width="10%"/>
             <col width="40%"/>

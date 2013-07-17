@@ -3,22 +3,22 @@
    <latestpdf>autoscale-getting-started-latest.pdf</latestpdf>
    <pdfoutname>autoscale-getting-started-20130702.pdf</pdfoutname>
    <docname>Rackspace Autoscale Getting Started Guide</docname>
-   <productname>Cloud Databases</productname>
+   <productname>Rackspace Autoscale</productname>
    <webappname>autoscale-getting-started</webappname>
    <pominfo>
       <groupid>com.rackspace.cloud.apidocs</groupid>
-      <artifactid>Autoscaling</artifactid>
+      <artifactid>autoscale</artifactid>
       <version>1.0.0-SNAPSHOT</version>
-      <pomname>Autoscaling Docs, 1.0.0-SNAPSHOT</pomname>
+      <pomname>Autoscale Docs, 1.0.0-SNAPSHOT</pomname>
    </pominfo>
    <product>
-      <id>cdb-v1.0</id>
+      <id>cas-v1.0</id>
       <types>
          <type>
             <id>100</id>
             <displayname>Getting Started Guide</displayname>
-            <url>/cdb/api/v1.0/autoscale-getting-started/content/Overview.html</url>
-            <sequence>1</sequence>
+            <url>/cas/api/v1.0/autoscale-getting-started/content/Overview.html</url>
+            <sequence>10</sequence>
          </type>
       </types>
    </product>

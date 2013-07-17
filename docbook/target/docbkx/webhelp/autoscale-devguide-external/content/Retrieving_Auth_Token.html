@@ -2,11 +2,14 @@
 <!DOCTYPE html
   PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:exsl="http://exslt.org/common" xmlns:ng="http://docbook.org/docbook-ng" xmlns:fb="http://ogp.me/ns/fb#"><head>
-
+<link type="text/css" rel="stylesheet" href="styles/shCoreDefault.css"/><script type="text/javascript" src="scripts/shCore.js"><!----></script><script type="text/javascript">
+               SyntaxHighlighter.config.space = ' ';
+               SyntaxHighlighter.all();
+    </script>
 <title>3.1.2. Retrieving the Authentication Token - Rackspace Autoscale Developer Guide
-   - API v1.0</title><meta name="generator" content="DocBook XSL-NS Stylesheets V1.76.1"/><meta name="mavenGroupId" content="com.rackspace.cloud.apidocs"/><meta name="mavenArtifactId" content="Autoscaling"/><meta name="mavenVersionId" content="1.0.0-SNAPSHOT"/><link rel="home" href="index.html" title="Rackspace Autoscale Developer Guide"/><link rel="up" href="Authentication-d1e647.html" title="3.1. Authentication"/><link rel="prev" href="Geographic_Endpoints.html" title="3.1.1. Geographic Endpoints"/><link rel="next" href="serviceEndpoints.html" title="3.2. Service Access/Endpoints"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><script type="text/javascript">
+   - API v1.0</title><meta name="generator" content="DocBook XSL-NS Stylesheets V1.76.1"/><meta name="mavenGroupId" content="com.rackspace.cloud.apidocs"/><meta name="mavenArtifactId" content="autoscale"/><meta name="mavenVersionId" content="1.0.0-SNAPSHOT"/><link rel="home" href="index.html" title="Rackspace Autoscale Developer Guide"/><link rel="up" href="Authentication-d1e647.html" title="3.1. Authentication"/><link rel="prev" href="Geographic_Endpoints.html" title="3.1.1. Geographic Endpoints"/><link rel="next" href="serviceEndpoints.html" title="3.2. Service Access/Endpoints"/><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><script type="text/javascript">
             //The id for tree cookie
-            var treeCookieId = "treeview-3263";
+            var treeCookieId = "treeview-3439";
             var language = "en";
             var w = new Object();
             //Localization
@@ -28,7 +31,7 @@
             background: transparent url(../common/jquery/treeview/images/folder.gif) 0 0px no-repeat;
             }
             
-        </style><link rel="shortcut icon" href="../favicon.ico" type="image/x-icon"/><link rel="stylesheet" type="text/css" href="../common/css/positioning.css"/><link rel="stylesheet" type="text/css" href="../common/css/custom.css"/><!--[if IE]>
+        </style><link rel="shortcut icon" href="../favicon.ico" type="image/x-icon"/><link rel="stylesheet" type="text/css" href="../common/css/positioning.css"/><link rel="stylesheet" type="text/css" href="../common/css/custom.css"/><link href="../atom.xml" type="application/atom+xml" rel="alternate" title="Document ATOM Feed"/><link rel="canonical" href="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content/Retrieving_Auth_Token.html"/><!--[if IE]>
 	<link rel="stylesheet" type="text/css" href="../common/css/ie.css"/>
 	<![endif]--><link rel="stylesheet" type="text/css" href="../common/jquery/theme-redmond/jquery-ui-1.8.2.custom.css"/><link rel="stylesheet" type="text/css" href="../common/jquery/treeview/jquery.treeview.css"/><script type="text/javascript" src="../common/jquery/jquery-1.4.3.min.js"><!----></script><script type="text/javascript" src="../common/jquery/jquery-ui-1.8.2.custom.min.js"><!----></script><script type="text/javascript" src="../common/jquery/jquery.cookie.js"><!----></script><script type="text/javascript" src="../common/jquery/treeview/jquery.treeview.min.js"><!----></script><script type="text/javascript" src="../common/jquery/jquery.qtip-1.0.0-rc3/jquery.qtip-1.0.0-rc3.min.js"><!--jQuery plugin for glossary popups. --></script><script type="text/javascript" src="search/htmlFileList.js"><!----></script><script type="text/javascript" src="search/htmlFileInfoList.js"><!----></script><script type="text/javascript" src="search/nwSearchFnt.js"><!----></script><script type="text/javascript" src="search/stemmers/en_stemmer.js"><!--//make this scalable to other languages as well.--></script><script type="text/javascript" src="search/index-1.js"><!----></script><script type="text/javascript" src="search/index-2.js"><!----></script><script type="text/javascript" src="search/index-3.js"><!----></script><script type="text/javascript" src="//libs.coremetrics.com/eluminate.js"><!----></script><script type="text/javascript">
 	    cmSetClientID("90378909",true,"dc.rackspace.com","docs.rackspace.com");
@@ -43,7 +46,9 @@
                                         <a accesskey="u" class="navLinkUp" onclick="_gaq.push(['_trackEvent', 'Header', 'upLink', 'click', 1]);" tabindex="5" href="Authentication-d1e647.html">Up</a>
 				  |
                                     <a accesskey="n" class="navLinkNext" onclick="_gaq.push(['_trackEvent', 'Header', 'nextLink', 'click', 1]);" tabindex="5" href="serviceEndpoints.html">Next</a></td></tr></table></div></div><div id="toolbar" class="ui-tabs-nav ui-helper-reset ui-helper-clearfix ui-widget-header ui-corner-all"><div id="toolbar-left"><p class="breadcrumbs"><a href="http://docs.rackspace.com/api/">Rackspace Manuals</a><a href="index.html">Rackspace Autoscale Developer Guide
-   - API v1.0</a></p><a onclick="_gaq.push(['_trackEvent', 'Header', 'pdfDownload', 'click', 1]);" alt="Download a pdf of this document" class="pdficon" href="../autoscale-devguide-latest.pdf"><img src="../common/images/pdf.png"/></a></div></div><div id="content"><div class="statustext">DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW - </div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="Retrieving_Auth_Token"> </a>3.1.2. Retrieving the Authentication Token</h3></div></div></div><table rules="all" id="d293e132"><tbody><tr>
+   - API v1.0</a></p><a onclick="_gaq.push(['_trackEvent', 'Header', 'pdfDownload', 'click', 1]);" alt="Download a pdf of this document" class="pdficon" href="../autoscale-devguide-latest.pdf"><img src="../common/images/pdf.png"/></a>
+       
+      <a href="../atom.xml"><img alt="Atom feed of this document" src="../common/images/feed-icon.png"/></a></div></div><div id="content"><div class="statustext">DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW -  DRAFT - PREVIEW - </div><div class="section"><div xmlns="" class="titlepage"><div><div><h3 xmlns="http://www.w3.org/1999/xhtml" class="title"><a id="Retrieving_Auth_Token"> </a>3.1.2. Retrieving the Authentication Token</h3></div></div></div><table rules="all" id="d297e132"><tbody><tr>
               <td><span class="command"><strong>POST</strong></span> </td>
               <td> v2.0/tokens </td>
               <td colspan="4"> Authenticate to receive a
@@ -65,13 +70,400 @@
           authenticate successfully, the response to your
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
-          values shown here. </p></div><script type="text/javascript" src="../common/main.js"><!----></script><hr/><div id="disqus_thread"><script type="text/javascript">
+          values shown here. </p><div class="example"><a id="d297e151"> </a><p class="title"><strong>Example 3.1. Authentication Request for US Endpoint: XML</strong></p><div class="example-contents"><div class="programlistingco"><pre class="programlisting brush: xml; ">
+POST /v2.0/tokens HTTP/1.1
+User-Agent: curl/7.21.0 (x86_64-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6
+Host: identity.api.rackspacecloud.com
+Accept: application/xml
+Content-Type: application/xml
+Content-Length: 88
+
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;auth&gt;
+   &lt;apiKeyCredentials
+       xmlns="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0"
+       username=<span xmlns="" class="co" id="13 17"><img src="../common/images/callouts/1.png" alt="(1)"/></span>"jsmith"
+       apiKey=<span xmlns="" class="co" id="14 15"><img src="../common/images/callouts/2.png" alt="(2)"/></span>"aaaaa-bbbbb-ccccc-12345678"/&gt;
+&lt;/auth&gt;
+
+                    </pre></div></div></div><br class="example-break"/><div class="example"><a id="d297e158"> </a><p class="title"><strong>Example 3.2. Authentication Request for US Endpoint: JSON</strong></p><div class="example-contents"><div class="programlistingco"><pre class="programlisting brush: json; ">
+POST /v2.0/tokens HTTP/1.1
+User-Agent: curl/7.21.0 (x86_64-pc-linux-gnu) libcurl/7.21.0 OpenSSL/0.9.8o zlib/1.2.3.4 libidn/1.15 libssh2/1.2.6
+Host: identity.api.rackspacecloud.com
+Accept: application/json
+Content-Type: application/json
+Content-Length: 54
+
+{
+   "auth":
+   {
+      "RAX-KSKEY:apiKeyCredentials":
+      {
+         "username": <span xmlns="" class="co" id="14 22"><img src="../common/images/callouts/1.png" alt="(1)"/></span>"jsmith",
+         "apiKey": <span xmlns="" class="co" id="15 20"><img src="../common/images/callouts/2.png" alt="(2)"/></span>"aaaaa-bbbbb-ccccc-12345678"
+      }
+   }
+}
+
+                    </pre></div></div></div><br class="example-break"/><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/1.png" alt="1" border="0"/></p></td><td valign="top" align="left"><p> The username supplied here is your
+              common Rackspace Cloud username. </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/2.png" alt="2" border="0"/></p></td><td valign="top" align="left"><p> The key is your API access key. The key
+              can be obtained from the Rackspace Cloud
+              Control Panel in the <span class="guimenu"><strong>&lt;Your
+                Account&gt;</strong></span>/<span class="guimenuitem"><strong>API
+                  Access</strong></span> section (login
+              here: <a class="link" href="http://mycloud.rackspace.com/" target="_top">Control Panel Login</a>). </p></td></tr></table></div><div class="example"><a id="d297e173"> </a><p class="title"><strong>Example 3.3. Auth Response for US Endpoint: XML</strong></p><div class="example-contents"><div class="programlistingco"><pre class="programlisting brush: xml; ">&lt;HTTP/1.1 200 OK
+    Content-Type: application/xml; charset=UTF-8
+    Content-Length: 477
+    Date: Thu, 12 Apr 2012 18:50:20 GMT
+    
+    &lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?&gt;
+    <span xmlns="" class="co" id="7 5"><img src="../common/images/callouts/1.png" alt="(1)"/></span>&lt;access xmlns:os-ksadm="http://docs.openstack.org/identity/api/ext/OS-KSADM/v1.0"
+        xmlns="http://docs.openstack.org/identity/api/v2.0"
+        xmlns:rax-kskey="http://docs.rackspace.com/identity/api/ext/RAX-KSKEY/v1.0"
+        xmlns:rax-ksqa="http://docs.rackspace.com/identity/api/ext/RAX-KSQA/v1.0"
+        xmlns:common="http://docs.openstack.org/common/api/v1.0"
+        xmlns:ksgrp="http://docs.rackspace.com/identity/api/ext/RAX-KSGRP/v1.0"
+        xmlns:rax-kscatalog="http://docs.openstack.org/identity/api/ext/OS-KSCATALOG/v1.0"
+        xmlns:atom="http://www.w3.org/2005/Atom"&gt;
+        <span xmlns="" class="co" id="15 9"><img src="../common/images/callouts/2.png" alt="(2)"/></span>&lt;token id="vvvvvvvv-wwww-xxxx-yyyy-zzzzzzzzzzzz" expires="2011-12-08T22:51:02.000-06:00"/&gt;
+        &lt;user id="123456" name="jsmith"<span xmlns="" class="co" id="16 40"><img src="../common/images/callouts/3.png" alt="(3)"/></span> rax-auth:defaultRegion="DFW"&gt;
+            <span xmlns="" class="co" id="17 13"><img src="../common/images/callouts/4.png" alt="(4)"/></span>&lt;roles&gt;
+                &lt;role id="identity:admin" name="identity:admin" description="Admin Role."/&gt;
+                &lt;role id="identity:default" name="identity:default" description="Default Role."/&gt;
+            &lt;/roles&gt;
+        &lt;/user&gt;
+        <span xmlns="" class="co" id="22 9"><img src="../common/images/callouts/5.png" alt="(5)"/></span>&lt;serviceCatalog&gt;
+            &lt;service type="rax:database" name="cloudDatabases"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111" publicURL="https://dfw.databases.api.rackspacecloud.com/v1.0/1100111"/&gt;
+                &lt;endpoint region="ORD" tenantId="1100111" publicURL="https://ord.databases.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:load-balancer" name="cloudLoadBalancers"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111" publicURL="https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/1100111"/&gt;
+                &lt;endpoint region="ORD" tenantId="1100111" publicURL="https://ord.loadbalancers.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+            &lt;service type="compute" name="cloudServersOpenStack"&gt;
+                &lt;endpoint region="DFW" tenantId="1100111"
+                    publicURL="https://dfw.servers.api.rackspacecloud.com/v2/1100111"&gt;
+                    &lt;version id="2" info="https://dfw.servers.api.rackspacecloud.com/v2/"
+                        list="https://dfw.servers.api.rackspacecloud.com/" /&gt;
+                &lt;/endpoint&gt;
+                &lt;endpoint region="ORD" tenantId="1100111"
+                    publicURL="https://ord.servers.api.rackspacecloud.com/v2/1100111"&gt;
+                    &lt;version id="2" info="https://ord.servers.api.rackspacecloud.com/v2/"
+                        list="https://ord.servers.api.rackspacecloud.com/" /&gt;
+                &lt;/endpoint&gt;
+            &lt;/service&gt;
+            &lt;service type="compute" name="cloudServers"&gt;
+                &lt;endpoint tenantId="1100111"
+                    publicURL="https://servers.api.rackspacecloud.com/v1.0/1100111"&gt;
+                    &lt;version id="1.0"
+                        info="https://servers.api.rackspacecloud.com/v1.0/"
+                        list="https://servers.api.rackspacecloud.com/"/&gt;
+                &lt;/endpoint&gt;
+            &lt;/service&gt;
+            &lt;service <span xmlns="" class="co" id="51 22"><img src="../common/images/callouts/6.png" alt="(6)"/></span>type="object-store" <span xmlns="" class="co" id="51 42"><img src="../common/images/callouts/7.png" alt="(7)"/></span>name="cloudFiles"&gt;
+                &lt;endpoint <span xmlns="" class="co" id="52 27"><img src="../common/images/callouts/8.png" alt="(8)"/></span>region="DFW"
+                    <span xmlns="" class="co" id="53 21"><img src="../common/images/callouts/9.png" alt="(9)"/></span>tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    <span xmlns="" class="co" id="54 21"><img src="../common/images/callouts/10.png" alt="(10)"/></span>publicURL="https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    internalURL="https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+                &lt;endpoint region="ORD"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    internalURL="https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:object-cdn" name="cloudFilesCDN"&gt;
+                &lt;endpoint region="DFW"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+                &lt;endpoint region="ORD"
+                    tenantId="MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"
+                    publicURL="https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee"/&gt;
+            &lt;/service&gt;
+            &lt;service type="rax:dns" name="cloudDNS"&gt;
+                &lt;endpoint tenantId="1100111"
+                    publicURL="https://dns.api.rackspacecloud.com/v1.0/1100111"/&gt;
+            &lt;/service&gt;
+        &lt;/serviceCatalog&gt;
+    &lt;/access&gt;
+</pre></div></div></div><br class="example-break"/><div class="example"><a id="auth-response-example-json"> </a><p class="title"><strong>Example 3.4. Auth Response for US Endpoint: JSON</strong></p><div class="example-contents"><div class="programlistingco"><pre class="programlisting brush: json; ">HTTP/1.1 200 OK
+Content-Type: application/json; charset=UTF-8
+Content-Length: 477
+Date: Thu, 12 Apr 2012 18:45:13 GMT
+
+{
+    "access": {
+     
+       <span xmlns="" class="co" id="9 8"><img src="../common/images/callouts/2.png" alt="(2)"/></span> "token": {
+            "expires": "2011-12-08T22:51:02.000-06:00",
+            "id": "vvvvvvvv-wwww-xxxx-yyyy-zzzzzzzzzzzz"
+        },
+        "user": {
+            "id": "123456",
+            "name": "jsmith",
+            "RAX-AUTH:defaultRegion": "DFW",<span xmlns="" class="co" id="16 45"><img src="../common/images/callouts/3.png" alt="(3)"/></span>
+           <span xmlns="" class="co" id="17 12"><img src="../common/images/callouts/4.png" alt="(4)"/></span> "roles": [
+                {
+                    "description": "Admin Role.",
+                    "id": "identity:admin",
+                    "name": "identity:admin"
+                },
+                {
+                    "description": "Default Role.",
+                    "id": "identity:default",
+                    "name": "identity:default"
+                }
+            ]
+        },
+       <span xmlns="" class="co" id="30 8"><img src="../common/images/callouts/5.png" alt="(5)"/></span> "serviceCatalog": [
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://dfw.databases.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "DFW",
+                        "tenantId": "1100111"
+                    },
+                    {
+                        "publicURL": "https://ord.databases.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "ORD",
+                        "tenantId": "1100111"
+                    }
+                ],
+                "name": "cloudDatabases",
+                "type": "rax:database"
+            },
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "DFW",
+                        "tenantId": "1100111"
+                    },
+                    {
+                        "publicURL": "https://ord.loadbalancers.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "ORD",
+                        "tenantId": "1100111"
+                    }
+                ],
+                "name": "cloudLoadBalancers",
+                "type": "rax:load-balancer"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "region": "DFW",
+                        "publicURL": "https://dfw.servers.api.rackspacecloud.com/v2/1100111",
+                        "versionId": "2",
+                        "versionInfo": "https://dfw.servers.api.rackspacecloud.com/v2/",
+                        "versionList": "https://dfw.servers.api.rackspacecloud.com/"
+                    },
+                    {
+                        "tenantId": "1100111",
+                        "region": "ORD",
+                        "publicURL": "https://ord.servers.api.rackspacecloud.com/v2/1100111",
+                        "versionId": "2",
+                        "versionInfo": "https://ord.servers.api.rackspacecloud.com/v2/",
+                        "versionList": "https://ord.servers.api.rackspacecloud.com/"
+                    }
+                ],
+                "name": "cloudServersOpenStack",
+                "type": "compute"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "publicURL": "https://servers.api.rackspacecloud.com/v1.0/1100111",
+                        "versionId": "1.0",
+                        "versionInfo": "https://servers.api.rackspacecloud.com/v1.0/",
+                        "versionList": "https://servers.api.rackspacecloud.com/"
+                    }
+                ],
+                "name": "cloudServers",
+                "type": "compute"
+            },
+            {
+                "endpoints": [
+                    {
+                       <span xmlns="" class="co" id="101 24"><img src="../common/images/callouts/9.png" alt="(9)"/></span> "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                       <span xmlns="" class="co" id="102 24"><img src="../common/images/callouts/10.png" alt="(10)"/></span> "publicURL": "https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "internalURL": "https://snet-storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                       <span xmlns="" class="co" id="104 24"><img src="../common/images/callouts/8.png" alt="(8)"/></span> "region": "DFW"
+                    },
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "internalURL": "https://snet-storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "ORD"
+                    }
+                ],
+               <span xmlns="" class="co" id="113 16"><img src="../common/images/callouts/7.png" alt="(7)"/></span> "name": "cloudFiles",
+               <span xmlns="" class="co" id="114 16"><img src="../common/images/callouts/6.png" alt="(6)"/></span> "type": "object-store"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "DFW"
+                    },
+                    {
+                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "publicURL": "https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
+                        "region": "ORD"
+                    }
+                ],
+                "name": "cloudFilesCDN",
+                "type": "rax:object-cdn"
+            },
+            {
+                "endpoints": [
+                    {
+                        "tenantId": "1100111",
+                        "publicURL": "https://dns.api.rackspacecloud.com/v1.0/1100111"
+                    }
+                ],
+                "name": "cloudDNS",
+                "type": "rax:dns"
+            }
+        ]
+    }
+}
+
+                    </pre></div></div></div><br class="example-break"/><div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="../common/images/admon/note.png"/></td><th align="left">Note</th></tr><tr><td align="left" valign="top"><p>The information shown in the Auth Response
+            examples is for US-based accounts. If you
+            authenticate against the UK-endpoint for auth,
+            you will see the service catalog information
+            for UK-based accounts.</p></td></tr></table></div><div class="calloutlist"><table border="0" summary="Callout list"><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/1.png" alt="1" border="0"/></p></td><td valign="top" align="left"><p>
+              In XML responses only,
+              a list of namespaces identifies API extensions that add functionality to the core API.
+            </p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/2.png" alt="2" border="0"/></p></td><td valign="top" align="left"><p> This token can be presented to a service as evidence of authentication.
+              Tokens are valid for a finite duration; a token's default lifespan is twenty-four hours.
+            </p><p> The token's <code class="code">expires</code> attribute denotes the time
+              after which the token will automatically become
+              invalid. A token may be manually revoked before
+              the time identified by the <code class="code">expires</code>
+              attribute; <code class="code">expires</code> predicts a token's
+              maximum possible lifespan but does not guarantee
+              that it will reach that lifespan. Clients are
+              encouraged to cache a token until it expires. </p><div class="note" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Note"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Note]" src="../common/images/admon/note.png"/></td><th align="left">Note</th></tr><tr><td align="left" valign="top"><p>The token's expiration time is
+                formatted differently in the US and
+                UK. These response examples show the
+                US format. For examples of the UK
+                format please refer to <a class="link" href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html" target="_top">http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html</a>.</p></td></tr></table></div><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/3.png" alt="3" border="0"/></p></td><td valign="top" align="left"><p> Users can be assigned a default region so that, when there is a 
+              choice between multiple endpoints associated with a service in the 
+              user's catalog, the endpoint for the user's default region will be 
+              selected if it is available. In this example, the user's default 
+              region is DFW and several of the services in the user's catalog 
+              offer endpoints in that region and the ORD region; this user's work 
+              will be directed to the DFW region whenever possible.
+            </p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/4.png" alt="4" border="0"/></p></td><td valign="top" align="left"><p> Users can be assigned multiple roles,
+              with each role providing specific
+              privileges. In this example,
+              <code class="code">jsmith</code> is the
+              administrative user for the account,
+              holding the fully-privileged
+              <code class="code">identity:admin</code> role.
+              Other users might hold other roles with
+              different privileges. Roles need not be
+              associated with actual job functions such
+              as Administrator, Operator, Developer,
+              Tester, or Trainer. </p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/5.png" alt="5" border="0"/></p></td><td valign="top" align="left"><p> The service catalog lists the services
+              this user can access. In this example, the
+              user can access one database service, one
+              loadbalancing service, two compute
+              services (Cloud Servers OpenStack and
+              Cloud Servers), two object storage
+              services (Cloud Files Content Distribution
+              Network (CDN), and Cloud Files),  and one
+              DNS service. The catalog listing for each
+              service provides at least one endpoint URL
+              for that service. Other information, such
+              as regions, versions, and tenants, is
+              provided if it's relevant to this user's
+              access to this service. </p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/6.png" alt="6" border="0"/></p></td><td valign="top" align="left"><p>
+              The service type attribute identifies services that perform similar functions, whatever those services might be named.
+              In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code class="code">type="compute"</code>,
+              identifying them as compute services even though the word "compute" does not appear in their names.
+            </p><div class="important" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Important"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Important]" src="../common/images/admon/important.png"/></td><th align="left">Important</th></tr><tr><td align="left" valign="top"><p>Use service type as the primary value for
+                locating a service. If multiple endpoints of the
+                same service type exist in the same region, use
+                service name as the tiebreaker.</p></td></tr></table></div><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/7.png" alt="7" border="0"/></p></td><td valign="top" align="left"><p>
+              The service name attribute identifies each unique service in the catalog.
+              Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
+            </p><div class="important" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Important"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Important]" src="../common/images/admon/important.png"/></td><th align="left">Important</th></tr><tr><td align="left" valign="top"><p> If you are programmatically parsing an authentication
+                response, use service type rather than service name as
+                the basis for determining whether a user has access to
+                a particular kind of service. Service type is stable
+                across all releases; new service types may be developed,
+                but existing service types are not renamed.
+                In this example,
+                <code class="code">type="compute"</code> identifies all the
+                available compute services, one of which is named
+                cloudServers and one of which is named
+                cloudServersOpenStack. New compute service names may be added
+                in future releases; whatever the compute services are
+                named, you can always
+                recognize them by parsing for
+                <code class="code">type="compute"</code> in the authentication
+                response's service catalog. </p></td></tr></table></div><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/8.png" alt="8" border="0"/></p></td><td valign="top" align="left"><p> A service may expose endpoints in different regions.
+              Regional endpoints allow clients to provision
+              resources in a manner that provides high
+              availability. </p><p> Some services are not region-specific. These services supply a single
+              non-regional endpoint and do not provide access to internal URLs. </p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/9.png" alt="9" border="0"/></p></td><td valign="top" align="left"><p> Some services recognize specification of a tenant. If a
+              service does recognize tenants, the format of the
+              tenant specification is defined only by the
+              service; for details about whether and how to
+              specify a tenant, check the documentation for the
+              service you are using.</p><p> </p></td></tr><tr><td width="5%" valign="top" align="left"><p><img src="../common/images/callouts/10.png" alt="10" border="0"/></p></td><td valign="top" align="left"><p>
+              An endpoint can be assigned public and internal URLs. A
+              public URL is accessible from anywhere. Access to a public
+              URL usually incurs traffic charges. Internal URLs are only
+              accessible to services within the same region. Access to
+              an internal URL is free of charge.
+            </p><p> </p></td></tr></table></div><p>Authentication tokens are typically valid for 24
+          hours. Applications should be designed to
+          re-authenticate after receiving a 401
+          (Unauthorized) response from a service endpoint. </p><div class="important" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Important"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Important]" src="../common/images/admon/important.png"/></td><th align="left">Important</th></tr><tr><td align="left" valign="top"><p>If you are programmatically parsing an
+            authentication response, please be aware that
+            service names are stable for the life of the
+            particular service and can be used as keys.
+            You should also be aware that a user's service
+            catalog can include multiple uniquely-named
+            services which perform similar functions. For
+            example, cloudServersOpenStack is the
+            OpenStack version of compute whereas
+            cloudServers is the legacy version of compute;
+            the same user can have access to both
+            services. In Auth 2.0, the service type
+            attribute can be used as a key by which to
+            recognize similar services; see the tip
+            below.</p></td></tr></table></div><div class="tip" style="margin-left: 0.5in; margin-right: 0.5in;"><table border="0" summary="Tip"><tr><td rowspan="2" align="center" valign="top" width="25"><img alt="[Tip]" src="../common/images/admon/tip.png"/></td><th align="left">Tip</th></tr><tr><td align="left" valign="top"><p>Beginning with Auth 2.0, the service catalog
+            includes a service type attribute to identify
+            services that perform similar functions but
+            have different names; for example,
+            <code class="code">type="compute"</code> identifies
+            compute services such as cloudServers and
+            cloudServersOpenStack. Some developers have
+            found the service type attribute to be useful
+            in parsing the service catalog. For additional
+            information on Auth 2.0 (also known as the
+            Cloud Identity Service), refer to the
+            <em class="citetitle">Cloud Identity Client Developer
+              Guide</em> at <a class="link" href="http://docs.rackspace.com" target="_top">http://docs.rackspace.com/</a>.</p></td></tr></table></div><p>Databases service endpoints are published in the
+          service catalog in the Auth response with the
+          account number, which is a required element of the
+          service endpoints. The examples shown here are for
+          authentication for US customers. Customers with
+          UK-based accounts will see different values in the
+          service catalog. Refer to the next section for
+          more information about service endpoints. </p></div><script type="text/javascript" src="../common/main.js"><!----></script><hr/><div id="disqus_thread"><script type="text/javascript">
 	      if(window.location.protocol.substring(0,4) == 'http'){
 	        var disqus_shortname = 'rc-api-docs';
 	      
 	        var disqus_identifier = 'autoscale-getting-startedRetrieving_Auth_Token';
 	      
 	      }
-	    </script><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript><script type="text/javascript" src="../common/comments.js"><!----></script></div><hr/><div class="legal"><a href="index.html">Legal notices</a></div></div><div><div id="leftnavigation" style="padding-top:3px; background-color:white;"><div id="tabs"><ul><li><a href="#treeDiv" tabindex="1"><span class="contentsTab">Contents</span></a></li><li><a href="#searchDiv" tabindex="1"><span class="searchTab">Search</span></a></li></ul><div id="treeDiv"><img src="../common/images/loading.gif" alt="loading table of contents..." id="tocLoading" style="display:block;"/><div id="ulTreeDiv" style="display:none" class="thisisthat"><ul id="tree" class="filetree"><li tabindex="2"><span class="file"><a href="Overview.html">1. Overview</a></span><ul><li tabindex="2"><span class="file"><a href="Intended_Audience-d1e166.html">1.1. Intended Audience</a></span></li><li tabindex="2"><span class="file"><a href="Doc_Change_History.html">1.2. Document Change History</a></span></li><li tabindex="2"><span class="file"><a href="Resources.html">1.3. Additional Resources</a></span></li><li tabindex="2"><span class="file"><a href="API_Contract_Changes-d1e363.html">1.4. API Contract Changes</a></span></li><li tabindex="2"><span class="file"><a href="Pricing_SLA-d1e1362.html">1.5. Pricing and Service Level</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Concepts-dle001.html">2. Concepts</a></span></li><li tabindex="2"><span class="file"><a href="Gen_API_Info-de01.html">3. General API Information</a></span><ul><li tabindex="2"><span class="file"><a href="Authentication-d1e647.html">3.1. Authentication</a></span><ul><li tabindex="2"><span class="file"><a href="Geographic_Endpoints.html">3.1.1. Geographic Endpoints</a></span></li><li tabindex="2" id="webhelp-currentid"><span class="file"><a href="Retrieving_Auth_Token.html">3.1.2. Retrieving the Authentication Token</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="serviceEndpoints.html">3.2. Service Access/Endpoints</a></span></li><li tabindex="2"><span class="file"><a href="contractVersion.html">3.3. Contract Versions</a></span></li><li tabindex="2"><span class="file"><a href="Request_Response_Types-d1e903.html">3.4. Request/Response Types</a></span></li><li tabindex="2"><span class="file"><a href="Limits-d1e1208.html">3.5. Limits</a></span><ul><li tabindex="2"><span class="file"><a href="Rate_Limits-d1e1222.html">3.5.1. Rate Limits</a></span></li><li tabindex="2"><span class="file"><a href="Absolute_Limits-d1e1397.html">3.5.2. Absolute Limits</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="datetimeformat.html">3.6. Date/Time Format</a></span></li><li tabindex="2"><span class="file"><a href="faults-dle101.html">3.7. Faults</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="apiref.html">4. API Reference</a></span><ul><li tabindex="2"><span class="file"><a href="Group_Resource.html">4.1. Group Resource</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups_Group_Resource.html">4.1.1. List Autoscaling Groups</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups_Group_Resource.html">4.1.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__Group_Resource.html">4.1.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__Group_Resource.html">4.1.4. DELETE</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__state_Group_Resource.html">4.1.5. GET</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Config_Resource.html">4.2. Configuration Resource</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__config_Config_Resource.html">4.2.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__config_Config_Resource.html">4.2.2. PUT</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__launch_Config_Resource.html">4.2.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__launch_Config_Resource.html">4.2.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__pause_Config_Resource.html">4.2.5. POST</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__resume_Config_Resource.html">4.2.6. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Policies_Resource.html">4.3. Policies Resource</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies_Policies_Resource.html">4.3.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies_Policies_Resource.html">4.3.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.5. DELETE</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies__policyId__execute_Policies_Resource.html">4.3.6. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Execute_Resource.html">4.4. Execute Resource</a></span><ul><li tabindex="2"><span class="file"><a href="POST__v1.0_execute__capability_version___capability_hash__Execute_Resource.html">4.4.1. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Webhooks_Resource.html">4.5. Webhooks Resource</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__webhooks_Webhooks_Resource.html">4.5.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies__policyId__webhooks_Webhooks_Resource.html">4.5.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.5. DELETE</a></span></li></ul></li></ul></li></ul></div></div><div id="searchDiv"><div id="search"><form onsubmit="Verifie(ditaSearch_Form);return false" name="ditaSearch_Form" class="searchForm"><fieldset class="searchFieldSet"><legend>Search</legend><center><input id="textToSearch" name="textToSearch" type="text" class="searchText"/> &nbsp; <input onclick="Verifie(ditaSearch_Form)" type="button" class="searchButton" value="Go" id="doSearch"/></center></fieldset></form></div><div id="searchResults"><center/></div><p class="searchHighlight"><a href="#" onclick="toggleHighlight()">Search Highlighter (On/Off)</a></p></div></div></div></div><script type="text/javascript" src="../common/jquery/jquery.qtip-1.0.0-rc3/jquery.qtip-1.0.0-rc3.min.js"><!--jQuery plugin for glossary popups. -->
+	    </script><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript><script type="text/javascript" src="../common/comments.js"><!----></script></div><hr/><div class="legal"><a href="index.html">Legal notices</a></div></div><div><div id="leftnavigation" style="padding-top:3px; background-color:white;"><div id="tabs"><ul><li><a href="#treeDiv" tabindex="1"><span class="contentsTab">Contents</span></a></li><li><a href="#searchDiv" tabindex="1"><span class="searchTab">Search</span></a></li></ul><div id="treeDiv"><img src="../common/images/loading.gif" alt="loading table of contents..." id="tocLoading" style="display:block;"/><div id="ulTreeDiv" style="display:none" class="thisisthat"><ul id="tree" class="filetree"><li tabindex="2"><span class="file"><a href="Overview.html">1. Overview</a></span><ul><li tabindex="2"><span class="file"><a href="Intended_Audience-d1e166.html">1.1. Intended Audience</a></span></li><li tabindex="2"><span class="file"><a href="Doc_Change_History.html">1.2. Document Change History</a></span></li><li tabindex="2"><span class="file"><a href="Resources.html">1.3. Additional Resources</a></span></li><li tabindex="2"><span class="file"><a href="API_Contract_Changes-d1e363.html">1.4. API Contract Changes</a></span></li><li tabindex="2"><span class="file"><a href="Pricing_SLA-d1e1362.html">1.5. Pricing and Service Level</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Concepts-dle001.html">2. Concepts</a></span></li><li tabindex="2"><span class="file"><a href="Gen_API_Info-de01.html">3. General API Information</a></span><ul><li tabindex="2"><span class="file"><a href="Authentication-d1e647.html">3.1. Authentication</a></span><ul><li tabindex="2"><span class="file"><a href="Geographic_Endpoints.html">3.1.1. Geographic Endpoints</a></span></li><li tabindex="2" id="webhelp-currentid"><span class="file"><a href="Retrieving_Auth_Token.html">3.1.2. Retrieving the Authentication Token</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="serviceEndpoints.html">3.2. Service Access/Endpoints</a></span></li><li tabindex="2"><span class="file"><a href="contractVersion.html">3.3. Contract Versions</a></span></li><li tabindex="2"><span class="file"><a href="Request_Response_Types-d1e903.html">3.4. Request/Response Types</a></span></li><li tabindex="2"><span class="file"><a href="Limits-d1e1208.html">3.5. Limits</a></span><ul><li tabindex="2"><span class="file"><a href="Rate_Limits-d1e1222.html">3.5.1. Rate Limits</a></span></li><li tabindex="2"><span class="file"><a href="Absolute_Limits-d1e1397.html">3.5.2. Absolute Limits</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="datetimeformat.html">3.6. Date/Time Format</a></span></li><li tabindex="2"><span class="file"><a href="faults-dle101.html">3.7. Faults</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="apiref.html">4. API Reference</a></span><ul><li tabindex="2"><span class="file"><a href="Group_Resource.html">4.1. Groups</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups_Group_Resource.html">4.1.1. List Autoscaling Groups</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups_Group_Resource.html">4.1.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__Group_Resource.html">4.1.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__Group_Resource.html">4.1.4. DELETE</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__state_Group_Resource.html">4.1.5. GET</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Config_Resource.html">4.2. Configurations</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__config_Config_Resource.html">4.2.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__config_Config_Resource.html">4.2.2. PUT</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__launch_Config_Resource.html">4.2.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__launch_Config_Resource.html">4.2.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__pause_Config_Resource.html">4.2.5. POST</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__resume_Config_Resource.html">4.2.6. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Policies_Resource.html">4.3. Policies</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies_Policies_Resource.html">4.3.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies_Policies_Resource.html">4.3.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__policies__policyId__Policies_Resource.html">4.3.5. DELETE</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies__policyId__execute_Policies_Resource.html">4.3.6. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Execute_Resource.html">4.4. Executions</a></span><ul><li tabindex="2"><span class="file"><a href="POST__v1.0_execute__capability_version___capability_hash__Execute_Resource.html">4.4.1. POST</a></span></li></ul></li><li tabindex="2"><span class="file"><a href="Webhooks_Resource.html">4.5. Webhooks</a></span><ul><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__webhooks_Webhooks_Resource.html">4.5.1. GET</a></span></li><li tabindex="2"><span class="file"><a href="POST__v1.0__tenantId__groups__groupId__policies__policyId__webhooks_Webhooks_Resource.html">4.5.2. POST</a></span></li><li tabindex="2"><span class="file"><a href="GET__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.3. GET</a></span></li><li tabindex="2"><span class="file"><a href="PUT__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.4. PUT</a></span></li><li tabindex="2"><span class="file"><a href="DELETE__v1.0__tenantId__groups__groupId__policies__policyId__webhooks__webhookId__Webhooks_Resource.html">4.5.5. DELETE</a></span></li></ul></li></ul></li></ul></div></div><div id="searchDiv"><div id="search"><form onsubmit="Verifie(ditaSearch_Form);return false" name="ditaSearch_Form" class="searchForm"><fieldset class="searchFieldSet"><legend>Search</legend><center><input id="textToSearch" name="textToSearch" type="text" class="searchText"/> &nbsp; <input onclick="Verifie(ditaSearch_Form)" type="button" class="searchButton" value="Go" id="doSearch"/></center></fieldset></form></div><div id="searchResults"><center/></div><p class="searchHighlight"><a href="#" onclick="toggleHighlight()">Search Highlighter (On/Off)</a></p></div></div></div></div><script type="text/javascript" src="../common/jquery/jquery.qtip-1.0.0-rc3/jquery.qtip-1.0.0-rc3.min.js"><!--jQuery plugin for glossary popups. -->
                    $('a[title]').qtip({ style: { name: 'cream', tip: true } })
                 </script></body></html>
