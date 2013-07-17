@@ -709,9 +709,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Test that you can update a scaling policy, and if successful it returns
         None
         """
-        cass_response = [{'data': '{"type": "blah"}'}]
+        cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
-        d = self.group.update_policy('12345678', {"b": "lah", "type": "yarg"})
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
         self.assert_deferred_failed(d, ValidationError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
