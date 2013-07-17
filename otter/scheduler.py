@@ -88,21 +88,19 @@ class SchedulerService(TimerService):
                 return events, set()
 
             log.msg('Processing events', num_events=len(events))
-            deferreds = [self.execute_event(log, event) for event in events]
-            d = defer.DeferredList(deferreds, consumeErrors=True)
 
-            def _check_events_execution(results):
-                deleted_policy_ids = set()
-                for event, (success, result) in zip(events, results):
-                    if not success:
-                        if result.check(NoSuchPolicyError, NoSuchScalingGroupError):
-                            deleted_policy_ids.add(event['policyId'])
-                        else:
-                            log.err(result)
-                return deleted_policy_ids
+            deleted_policy_ids = set()
 
-            d.addCallback(_check_events_execution)
-            return d.addCallback(lambda del_pol_ids: (events, del_pol_ids))
+            def eb(failure, policy_id):
+                failure.trap(NoSuchPolicyError, NoSuchScalingGroupError)
+                deleted_policy_ids.add(policy_id)
+
+            deferreds = [
+                self.execute_event(log, event).addErrback(eb, event['policyId']).addErrback(log.err)
+                for event in events
+            ]
+            d = defer.gatherResults(deferreds, consumeErrors=True)
+            return d.addCallback(lambda _: (events, deleted_policy_ids))
 
         def update_delete_events((events, deleted_policy_ids)):
             """
