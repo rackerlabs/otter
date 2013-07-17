@@ -17,7 +17,7 @@ from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 
 from otter.json_schema.group_examples import (
-    config, launch_server_config, policy)
+    config, launch_server_config)
 from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.models.cass import CassScalingGroupCollection
@@ -29,6 +29,40 @@ from otter.test.rest.request import path_only, request, RequestTestMixin
 from otter.test.utils import LockMixin, patch
 from otter.util.config import set_config_data
 
+
+def _policy():
+    return [
+        {
+            "name": "scale up by 10",
+            "change": 10,
+            "cooldown": 5,
+            "type": "webhook"
+        },
+        {
+            "name": 'scale down by 5.5 percent',
+            "changePercent": -5.5,
+            "cooldown": 6,
+            "type": "webhook"
+        },
+        {
+            "name": 'set number of servers to 10',
+            "desiredCapacity": 10,
+            "cooldown": 3,
+            "type": "webhook"
+        },
+        {
+            "name": 'scale down by 5 percent',
+            "changePercent": -5,
+            "cooldown": 6,
+            "type": "webhook"
+        },
+        {
+            "name": 'set number of servers to 20',
+            "desiredCapacity": 20,
+            "cooldown": 3,
+            "type": "webhook"
+        },
+    ]
 
 try:
     keymaster = OtterKeymaster()
@@ -46,7 +80,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
     """
 
     _launch_server_config = launch_server_config()[0]
-    _policies = policy()
+    _policies = _policy()
 
     def setUp(self):
         """
@@ -320,7 +354,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         :return: a list self links to the new scaling policies (not guaranteed
             to be in any consistent order)
         """
-        request_body = policy()[:-1]  # however many of them there are minus one
+        request_body = _policy()[:-1]  # however many of them there are minus one
 
         def _verify_create_response(wrapper):
             self.assert_response(wrapper, 201, "Create policies failed.")
@@ -359,11 +393,13 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         Updating a scaling policy returns with a 204 no content.  When viewing
         the policy again, it should contain the updated version.
         """
-        request_body = policy()[-1]  # the one that was not created
+        request_body = _policy()[-1]  # the one that was not created
+
         wrapper = yield request(root, 'PUT', path,
                                 body=json.dumps(request_body))
         self.assert_response(wrapper, 204, "Update policy failed.")
         self.assertEqual(wrapper.content, "")
+
 
         # now try to view
         wrapper = yield request(root, 'GET', path)
