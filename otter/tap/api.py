@@ -35,6 +35,7 @@ from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
+from otter.auth import CachingAuthenticator
 
 from silverberg.cluster import RoundRobinCassandraCluster
 
@@ -125,10 +126,22 @@ def makeService(config):
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
-    authenticator = ImpersonatingAuthenticator(config_value('identity.username'),
-                                               config_value('identity.password'),
-                                               config_value('identity.url'),
-                                               config_value('identity.admin_url'))
+    cache_ttl = config_value('identity.cache_ttl')
+
+    if cache_ttl is None:
+        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
+        # science.
+        cache_ttl = 300
+
+    authenticator = CachingAuthenticator(
+        reactor,
+        ImpersonatingAuthenticator(
+            config_value('identity.username'),
+            config_value('identity.password'),
+            config_value('identity.url'),
+            config_value('identity.admin_url')
+        ).authenticate_tenant,
+        cache_ttl)
 
     supervisor = Supervisor(authenticator.authenticate_tenant)
 

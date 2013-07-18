@@ -38,11 +38,69 @@ a token.)
 
 import json
 from itertools import groupby
+from collections import defaultdict
+
+from twisted.internet.defer import succeed, Deferred
 
 import treq
 
 from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
+
+
+class CachingAuthenticator(object):
+    """
+    An authenticator which cases the result of the provided auth_function
+    based on the tenant_id.
+
+    :param IReactorTime reactor: An IReactorTime provider used for enforcing
+        the cache TTL.
+    :param auth_function: A single-argument callable that returns a Deferred.
+    :param int ttl: An integer indicating the TTL of a cache entry in seconds.
+    """
+    def __init__(self, reactor, auth_function, ttl):
+        self._reactor = reactor
+        self._auth_function = auth_function
+        self._ttl = ttl
+
+        self._waiters = defaultdict(list)
+        self._cache = {}
+
+    def authenticate_tenant(self, tenant_id):
+        """
+        Get an auth-token and service catalog for a tenant_id.  Possibly
+        from a cache.
+
+        :param tenant_id: The keystone tenant_id we wish to authenticate.
+        :returns: a deferred that fires with a 2-tuple of auth-token and
+            service catalog.
+
+        """
+        if tenant_id in self._cache:
+            (created, data) = self._cache[tenant_id]
+            now = self._reactor.seconds()
+
+            if now - created <= self._ttl:
+                return succeed(data)
+
+        if tenant_id in self._waiters:
+            d = Deferred()
+            self._waiters[tenant_id].append(d)
+            return d
+
+        def when_authenticated(result):
+            self._cache[tenant_id] = (self._reactor.seconds(), result)
+
+            waiters = self._waiters.pop(tenant_id, [])
+            for waiter in waiters:
+                waiter.callback(result)
+
+            return result
+
+        d = self._auth_function(tenant_id)
+        d.addCallback(when_authenticated)
+
+        return d
 
 
 class ImpersonatingAuthenticator(object):

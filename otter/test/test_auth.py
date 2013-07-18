@@ -4,7 +4,8 @@ Test authentication functions.
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
+from twisted.internet.task import Clock
 
 from otter.test.utils import patch, SameJSON
 
@@ -16,6 +17,7 @@ from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
+from otter.auth import CachingAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -360,3 +362,96 @@ class ImpersonatingAuthenticatorTests(TestCase):
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
+
+
+class CachingAuthenticatorTests(TestCase):
+    """
+    Test the in memory cache of authentication tokens.
+    """
+    def setUp(self):
+        """
+        Configure a clock and a fake auth function.
+        """
+        self.auth_function = mock.Mock(
+            side_effect=lambda _: succeed(('auth-token', 'catalog')))
+        self.clock = Clock()
+        self.ca = CachingAuthenticator(
+            self.clock, self.auth_function, 10)
+
+    def test_calls_auth_function_with_empty_cache(self):
+        """
+        authenticate_tenant with no items in the cache returns the result
+        of the auth_function passed to the authenticator.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+        self.auth_function.assert_called_once_with(1)
+
+    def test_returns_token_from_cache(self):
+        """
+        authenticate_tenant returns tokens from the cache without calling
+        auth_function again for subsequent calls.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        self.auth_function.assert_called_once_with(1)
+
+    def test_cache_expires(self):
+        """
+        authenticate_tenant will call auth_function again after the ttl has
+        lapsed.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        self.auth_function.assert_called_once_with(1)
+
+        self.clock.advance(20)
+
+        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token2', 'catalog2'))
+
+        self.auth_function.assert_has_calls([mock.call(1), mock.call(1)])
+
+    def test_serialize_auth_requests(self):
+        """
+        authenticate_tenant will serialize requests to authenticate the same
+        tenant to prevent multiple outstanding auth requests when no
+        value is cached.
+        """
+        self.auth_function.return_value = Deferred()
+
+        d1 = self.ca.authenticate_tenant(1)
+        d2 = self.ca.authenticate_tenant(1)
+
+        self.assertNotIdentical(d1, d2)
+
+        self.auth_function.assert_called_once_with(1)
+
+        self.auth_function.return_value.callback(('auth-token', 'catalog'))
+
+        r1 = self.successResultOf(d1)
+        r2 = self.successResultOf(d2)
+
+        self.assertEqual(r1, r2)
+        self.assertEqual(r1, ('auth-token', 'catalog'))
+
+    def test_cached_value_per_tenant(self):
+        """
+        authenticate_tenant calls auth_function for each distinct tenant_id
+        not found in the cache.
+        """
+        r1 = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(r1, ('auth-token', 'catalog'))
+
+        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+
+        r2 = self.successResultOf(self.ca.authenticate_tenant(2))
+
+        self.assertEqual(r2, ('auth-token2', 'catalog2'))
