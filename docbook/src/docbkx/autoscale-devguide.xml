@@ -892,9 +892,9 @@ format="SVG" scale="60"/>
     </section>
     <section xml:id="faults-dle101">
       <title>Faults</title>
-      <para>If any &PRODNAME; request results in an error, the
-        queuing service returns an appropriate 4xx or 5xx HTTP status
-        code, as well as the following information in the body: </para>
+      <para>If any &PRODNAME; request results in an error, the service
+        returns an appropriate 4xx or 5xx HTTP status code, as well as
+        the following information in the body: </para>
       <itemizedlist>
         <listitem>
           <para>Title</para>
@@ -911,7 +911,7 @@ format="SVG" scale="60"/>
       </itemizedlist>
       <para>An example of an error message follows. </para>
       <example>
-        <title>Error Message Example</title>
+        <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
 Content-Type: application/json
 
@@ -926,8 +926,9 @@ Content-Type: application/json
   }
 }</programlisting>
       </example>
-      <para>Error information for each operation is included with the
-        description in <xref linkend="apiref"/>.</para>
+      <para>Error information for each API operation is included with
+        the description of that operation in <xref linkend="apiref"
+        />.</para>
     </section> 
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
