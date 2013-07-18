@@ -28,11 +28,10 @@ import json
 
 from twisted.internet import defer
 
-from otter import supervisor
+from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
-from otter.auth import authenticate_tenant
 
 
 class CannotExecutePolicyError(Exception):
@@ -289,7 +288,7 @@ def find_servers_to_evict(log, state, delta):
     return sorted_servers[:delta]
 
 
-def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_group,
+def delete_active_servers(log, transaction_id, scaling_group,
                           delta, state):
     """
     Start deleting active servers
@@ -306,8 +305,8 @@ def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_grou
         state.remove_active(server['id'])
 
     # then start deleting those servers
-    return [supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
-                                             scaling_group, server_info)
+    return [get_supervisor().execute_delete_server(log, transaction_id,
+                                                   scaling_group, server_info)
             for server_info in servers_to_evict]
 
 
@@ -325,7 +324,7 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     # delete active servers if pending jobs are not enough
     remaining = delta - len(jobs_to_cancel)
     if remaining > 0:
-        delete_active_servers(log, transaction_id, authenticate_tenant,
+        delete_active_servers(log, transaction_id,
                               scaling_group, remaining, state)
 
     return defer.succeed(None)
@@ -353,8 +352,8 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
                 job_log.msg('Job removed. Deleting server')
-                supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
-                                                 scaling_group, result)
+                get_supervisor().execute_delete_server(log, transaction_id,
+                                                       scaling_group, result)
             else:
                 next_round_state.remove_job(job_id)
                 next_round_state.add_active(result['id'], result)
@@ -387,9 +386,8 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     if delta > 0:
         log.msg("Launching some servers.")
         deferreds = [
-            supervisor.execute_config(log, transaction_id,
-                                      authenticate_tenant,
-                                      scaling_group, launch)
+            get_supervisor().execute_config(log, transaction_id,
+                                            scaling_group, launch)
             for i in range(delta)
         ]
 
