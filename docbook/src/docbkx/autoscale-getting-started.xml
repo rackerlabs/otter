@@ -458,8 +458,42 @@ format="SVG" scale="60"/>
                     generate cURL commands. </para>
             </tip>
         </para>
+        <para>You have several options for sending requests through an
+            API: </para>
+        <itemizedlist>
+            <listitem>
+                <para>Developers and testers may prefer to use cURL,
+                    the command-line tool from <link
+                        xlink:href="http://curl.haxx.se/"/>. </para>
+            </listitem>
+            <listitem>
+                <para>With cURL you can send HTTP requests and receive
+                    responses back from the command line. </para>
+            </listitem>
+            <listitem>
+                <para>If you like to use a more graphical interface,
+                    the ReST client for Firefox also works well for
+                    testing and trying out commands, see <link
+                        xlink:href="https://addons.mozilla.org/en-US/firefox/addon/restclient/"
+                    />. </para>
+            </listitem>
+            <listitem>
+                <para>You can also download and install rest-client, a
+                    Java application to test ReSTful web services,
+                    from <link
+                        xlink:href="http://code.google.com/p/rest-client/"
+                    />. </para>
+            </listitem>
+        </itemizedlist>
         <section xml:id="Authenticate">
             <title>Step 1: Authenticate</title>
+            <para>To use the Autoscale API, you need to generate an
+                auth token and then send it as ‘X-Auth-token’ header
+                along with all the requests to authenticate
+                yourself.</para>
+            <para>You can find the authentication endpoint at:  <link
+                    xlink:href="https://identity.api.rackspacecloud.com/v2.0/tokens"
+                /></para>
             <para> As with all Rackspace APIs, before you can use the
                 &PRODNAME; API you must authenticate with your
                 Rackspace credentials. </para>
