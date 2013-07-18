@@ -401,7 +401,8 @@ class CassScalingGroup(object):
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
+                         max_retry=1, retry_wait=10)
         return with_lock(lock, _modify_state)
 
     def update_config(self, data):
