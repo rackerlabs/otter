@@ -125,11 +125,12 @@ def makeService(config):
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
-    supervisor = Supervisor(
-        ImpersonatingAuthenticator(config_value('identity.username'),
-                                   config_value('identity.password'),
-                                   config_value('identity.url'),
-                                   config_value('identity.admin_url')))
+    authenticator = ImpersonatingAuthenticator(config_value('identity.username'),
+                                               config_value('identity.password'),
+                                               config_value('identity.url'),
+                                               config_value('identity.admin_url'))
+
+    supervisor = Supervisor(authenticator.authenticate_tenant)
 
     set_supervisor(supervisor)
 
