@@ -16,7 +16,6 @@ from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
-from otter.util.config import set_config_data
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],

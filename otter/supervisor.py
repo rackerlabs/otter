@@ -109,9 +109,15 @@ _supervisor = None
 
 
 def get_supervisor():
+    """
+    Get the current supervisor.
+    """
     return _supervisor
 
 
 def set_supervisor(supervisor):
+    """
+    Set the current supervisor.
+    """
     global _supervisor
     _supervisor = supervisor
