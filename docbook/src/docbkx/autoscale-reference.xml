@@ -93,9 +93,8 @@ format="SVG" scale="60"/>
         </revhistory>
 	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>Reference</raxm:displayname>
-            <!-- fix product code when get one; this is just so it builds -->
-            <raxm:product version="v1.0">cdb</raxm:product>
-            <raxm:priority>1</raxm:priority>
+            <raxm:product version="v1.0">cas</raxm:product>
+            <raxm:priority>30</raxm:priority>
         </raxm:metadata>
     </info>
 <chapter xml:id="Overview">

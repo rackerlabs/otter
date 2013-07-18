@@ -93,7 +93,7 @@ Scaling Policies Contain:
 Walking Through the Autoscale API
 =================================
 
-This will give you the basic steps to create an Autoscaling group. We recommend using http://docs.ord.autoscale.apiary.io/ to generate CURL commands if you want to follow along in your environment.
+This will give you the basic steps to create an Autoscaling group. We recommend using http://docs.autoscale.apiary.io/ to generate CURL commands if you want to follow along in your environment.
 
 Authentication
 --------------

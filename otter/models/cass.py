@@ -4,6 +4,7 @@ Cassandra implementation of the store for the front-end scaling groups engine
 from zope.interface import implementer
 
 from twisted.internet import defer
+from jsonschema import ValidationError
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
@@ -528,6 +529,10 @@ class CassScalingGroup(object):
         self.log.bind(updated_policy=data, policy_id=policy_id).msg("Updating policy")
 
         def _do_update_launch(lastRev):
+            if "type" in lastRev:
+                if lastRev["type"] != data["type"]:
+                    raise ValidationError("Cannot change type of a scaling policy")
+
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
