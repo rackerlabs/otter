@@ -9,7 +9,7 @@
          role="api-reference">
    <title>API Reference</title>
    <section xml:id="Group_Resource">
-      <title>Group Resource</title>
+      <title>Groups</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups"/>
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups"/>
@@ -19,7 +19,7 @@
       </resources>
    </section>
    <section xml:id="Config_Resource">
-      <title>Configuration Resource</title>
+      <title>Configurations</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fconfig"/>
          <resource href="../wadl/autoscale.wadl#put-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fconfig"/>
@@ -30,7 +30,7 @@
       </resources>
    </section>
    <section xml:id="Policies_Resource">
-      <title>Policies Resource</title>
+      <title>Policies</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies"/>
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies"/>
@@ -41,13 +41,13 @@
       </resources>
    </section>
    <section xml:id="Execute_Resource">
-      <title>Execute Resource</title>
+      <title>Executions</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02Fexecute2F7Bcapability_version7D2F7Bcapability_hash7D2F"/>
       </resources>
    </section>
    <section xml:id="Webhooks_Resource">
-      <title>Webhooks Resource</title>
+      <title>Webhooks</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks"/>
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks"/>
