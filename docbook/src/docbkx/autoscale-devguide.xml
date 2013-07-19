@@ -141,27 +141,10 @@ format="SVG" scale="60"/>
         </para>
         <?rax revhistory?>
     </section>
-        <!-- try again later
-            <xi:include href="./chapters/resources.xml"/>
-        -->
-        <section xml:id="Resources"
-            xmlns:xlink="http://www.w3.org/1999/xlink">
-            <title>Additional Resources</title>
-            <para>
-              &PRODNAME; is an open-source project. You can see and contribute to source code in our GitHub repository, 
-              <link xlink:href="https://github.com/rackerlabs/otter">https://github.com/rackerlabs/otter</link>.
-            </para>
-            <para>
-                You can see and experiment with all &PRODNAME; API calls at
-                <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
-            </para>
-            <para> To use &PRODNAME;, you must be able to set
-                cloud monitoring alarms and create cloud servers and
-                cloud load balancers. You can read API documentation
-                for those and other Rackspace services at <link
-                    xlink:href="http://docs.rackspace.com/"
-                    >http://docs.rackspace.com/</link>. </para>
-        </section>
+    <!-- Resources section, suggesting other places to go for info, 
+         is external so it's handy for Getting Started to share -->    
+            <xi:include href="chapters/resources.xml"/>
+    <!-- -->
     <section xml:id="API_Contract_Changes-d1e363">
         <title>API Contract Changes</title>
         <para>The API contract is not locked and may change during the
@@ -205,7 +188,12 @@ format="SVG" scale="60"/>
     <chapter xml:id="Concepts-dle001">
         <title>Concepts</title>
         <para> To use the &PROD; API effectively, you should
-            understand several key concepts: </para>
+            understand several key concepts: 
+        </para>
+      <!-- Glossary section, defining basic terms, 
+         is external so it's handy for Getting Started to share -->
+      <xi:include href="chapters/glossary.xml"/>
+      <!-- -->
     </chapter>
       <chapter xml:id="Gen_API_Info-de01">
     <title>General API Information</title>

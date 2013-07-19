@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE glossary [
+<!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!-- in PDF: for page headers -->
+<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!-- in body -->
+<!ENTITY PROD "Autoscale">               
+]>
+<glossary 
+    xmlns="http://docbook.org/ns/docbook"
+    xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
+    xml:id="Glossary-000">
+    <title>Glossary</title>
+    <glossentry xml:id="Authentication-d1e01">
+        <glossterm><emphasis role="bold">Authentication</emphasis></glossterm>
+        <glossdef>
+            <para>
+                Authentication is the act or process of confirming the identity of a
+                <link linkend="User-d1e15">user</link> or the truth of a claim.
+                The authentication service confirms that an incoming request is being made by the user
+                who claims to be making the request.
+                It does this by validating a set of claims that the user makes.
+                These claims are initially in the form of a set of <link linkend="Credentials-d1e03">credentials</link>.
+                After initial confirmation based on credentials,
+                the authentication service issues a <link linkend="Token-d1e13">token</link> to the user;
+                when making subsequent requests,
+                the user can provide the token
+                as evidence that the user's identity has already been authenticated.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Credentials-d1e03">
+        <glossterm><emphasis role="bold">Credentials</emphasis></glossterm>
+        <glossdef>
+            <para>
+                Credentials are data that belong to and identify a specific <link linkend="User-d1e15">user</link>.
+                Because credentials are assumed to be known by only one user, users who present valid
+                credentials are assumed to have proven that they are who they say they are.
+                Examples of credentials include:
+                <itemizedlist spacing="compact">
+                    <listitem><para>a matching username and password</para></listitem>
+                    <listitem><para>a matching username and API key</para></listitem>
+                    <listitem><para>a unique token</para></listitem>
+                </itemizedlist>
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Service_Catalog-d1e10">
+        <glossterm><emphasis role="bold">Service Catalog</emphasis></glossterm>
+        <glossdef>
+            <para>
+                Your service catalog is the list of services available to you, as returned along with your authentication
+                <link linkend="Token-d1e13">token</link> and an expiration date for that token.
+                All the services in your service catalog should recognize your token as valid until it expires.
+            </para>
+            <para>
+                The catalog listing for each service provides at least one endpoint URL for that service.
+                Other information, such as regions and versions and tenants, is provided if it's relevant to your access to this service.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Sub-User-d1e20">
+        <glossterm><emphasis role="bold">Sub-User</emphasis></glossterm>
+        <glossdef>
+            <para> A sub-user, also called a sub-account, is a
+                child of the account's fully-privileged administrative
+                user. Each account has exactly one administrative
+                user, holding the <code>identity:user-admin</code>
+                role; optionally, one or multiple sub-users can be
+                created, each holding the
+                <code>identity:default</code> role. Each sub-user
+                shares its parent's tenant information, group
+                memberships, and endpoints. </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Tenant-d1e11">
+        <glossterm><emphasis role="bold">Tenant</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A tenant is a container used to group or isolate resources and/or identity
+                objects. Depending on the service operator, a tenant may map to a customer,
+                account, organization, or project.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Token-d1e13">
+        <glossterm><emphasis role="bold">Token</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A token is an opaque string that represents an authorization to access cloud
+                resources. Tokens may be revoked at any time and are valid for a finite duration.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="User-d1e15">
+        <glossterm><emphasis role="bold">User</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A user is a digital representation of a person, system, or service who consumes cloud services.
+                Users have credentials and may be assigned tokens; based on these credentials and tokens,
+                the authentication service validates that incoming requests are being made by the user
+                who claims to be making the request, and that the user has the right to access the requested resources.
+                Users may be directly assigned to a particular tenant and
+                behave as if they are contained within that tenant.
+            </para>
+        </glossdef>
+    </glossentry>
+</glossary>
