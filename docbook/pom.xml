@@ -31,7 +31,7 @@
 	              autoscale-reference.xml
               </includes>
               -->
-                <security>external</security>
+                <security>internal</security>
             </configuration>
           </execution>
         </executions>
