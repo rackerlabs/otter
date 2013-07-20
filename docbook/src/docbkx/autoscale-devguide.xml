@@ -283,22 +283,7 @@ format="SVG" scale="60"/>
           authenticate successfully, the response to your
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
-          values shown here. </para>
-
-        <example>
-          <title>Authentication Request for US Endpoint: XML</title>
-          <programlistingco>
-            <areaspec>
-              <area xml:id="credentials.xml.user"
-                units="linecolumn" coords="13 17"/>
-              <area xml:id="credentials.xml.key"
-                units="linecolumn" coords="14 15"/>
-            </areaspec>
-            <programlisting language="xml">
-<xi:include href="samples/credentials-20.xml" parse="text"/>
-                    </programlisting>
-          </programlistingco>
-        </example>
+          values shown here. </para>  
         <example>
           <title>Authentication Request for US Endpoint: JSON</title>
           <programlistingco>
@@ -310,15 +295,15 @@ format="SVG" scale="60"/>
             </areaspec>
             <programlisting language="json">
 <xi:include href="samples/credentials-20.json" parse="text"/>
-                    </programlisting>
+            </programlisting>
           </programlistingco>
         </example>
         <calloutlist>
-          <callout arearefs="credentials.xml.user">
+          <callout arearefs="credentials.json.user">
             <para> The username supplied here is your
               common Rackspace Cloud username. </para>
           </callout>
-          <callout arearefs="credentials.xml.key">
+          <callout arearefs="credentials.json.key">
             <para> The key is your API access key. The key
               can be obtained from the Rackspace Cloud
               Control Panel in the <guimenu>&lt;Your
@@ -329,25 +314,6 @@ format="SVG" scale="60"/>
                 >Control Panel Login</link>). </para>
           </callout>
         </calloutlist>
-        <example>
-          <title>Authentication Response for US Endpoint: XML</title>
-          
-          <programlistingco>
-            <areaspec>
-              <area xml:id="response.xml.namespaces" units="linecolumn"  coords="7 5"/>
-              <area xml:id="response.xml.token" units="linecolumn"       coords="15 9"/>
-              <area xml:id="response.xml.dfltregion" units="linecolumn"  coords="16 41"/>
-              <area xml:id="response.xml.role" units="linecolumn"        coords="17 13"/>
-              <area xml:id="response.xml.catalog" units="linecolumn"     coords="22 9"/>
-              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 22"/>
-              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 42"/>
-              <area xml:id="response.xml.region" units="linecolumn"      coords="52 27"/>
-              <area xml:id="response.xml.tenant" units="linecolumn"      coords="53 21"/>
-              <area xml:id="response.xml.url" units="linecolumn"         coords="54 21"/>
-            </areaspec>
-            <programlisting language="xml"><xi:include href="samples/auth-20.xml" parse="text"/></programlisting>
-          </programlistingco>
-        </example>
         
         
         <example xml:id="auth-response-example-json">
@@ -355,37 +321,30 @@ format="SVG" scale="60"/>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.json.namespaces" units="linecolumn" coords="200 1"/>
-              <area xml:id="response.json.token" units="linecolumn" coords="9 8"/>
-              <area xml:id="response.json.dfltregion" units="linecolumn" coords="16 45"/>
-              <area xml:id="response.json.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.json.catalog" units="linecolumn" coords="30 8"/>
-              <area xml:id="response.json.servicetype" units="linecolumn" coords="114 16"/>
-              <area xml:id="response.json.servicename" units="linecolumn" coords="113 16"/>
-              <area xml:id="response.json.region" units="linecolumn" coords="104 24"/>
-              <area xml:id="response.json.tenant" units="linecolumn" coords="101 24"/>
-              <area xml:id="response.json.url" units="linecolumn" coords="102 24"/>
+              <area xml:id="response.json.token"       units="linecolumn" coords="10 8"/>
+              <area xml:id="response.json.dfltregion"  units="linecolumn" coords="17 12"/>
+              <area xml:id="response.json.role"        units="linecolumn" coords="18 12"/>
+              <area xml:id="response.json.catalog"     units="linecolumn" coords="31 8"/>
+              <area xml:id="response.json.tenant"      units="linecolumn" coords="102 24"/>
+              <area xml:id="response.json.url"         units="linecolumn" coords="103 24"/>
+              <area xml:id="response.json.region"      units="linecolumn" coords="105 24"/>
+              <area xml:id="response.json.servicename" units="linecolumn" coords="114 16"/>
+              <area xml:id="response.json.servicetype" units="linecolumn" coords="115 16"/>
             </areaspec>	
-            <programlisting language="json"><xi:include href="samples/auth-20.json" parse="text"/>
-                    </programlisting>
+            <programlisting language="json">
+<xi:include href="samples/auth-20.json" parse="text"/>
+            </programlisting>
           </programlistingco>
         </example>
         <note>
-          <para>The information shown in the Auth Response
-            examples is for US-based accounts. If you
-            authenticate against the UK-endpoint for auth,
+          <para>The information shown in the authentication response
+            example is for US-based accounts. If you
+            authenticate against the UK endpoint,
             you will see the service catalog information
             for UK-based accounts.</para>
         </note>
         <calloutlist>
-          <callout arearefs="response.xml.namespaces">
-            <para>
-              In XML responses only,
-              a list of namespaces identifies API extensions that add functionality to the core API.
-            </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.token">
+          <callout arearefs="response.json.token">
             <para> This token can be presented to a service as evidence of authentication.
               Tokens are valid for a finite duration; a token's default lifespan is twenty-four hours.
             </para>
@@ -408,18 +367,18 @@ format="SVG" scale="60"/>
             </note>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.dfltregion">
-            <para> Users can be assigned a default region so that, when there is a 
-              choice between multiple endpoints associated with a service in the 
-              user's catalog, the endpoint for the user's default region will be 
-              selected if it is available. In this example, the user's default 
-              region is DFW and several of the services in the user's catalog 
-              offer endpoints in that region and the ORD region; this user's work 
+          <callout arearefs="response.json.dfltregion">
+            <para> Users can be assigned a default region so that, when there is a
+              choice between multiple endpoints associated with a service in the
+              user's catalog, the endpoint for the user's default region will be
+              selected if it is available. In this example, the user's default
+              region is DFW and several of the services in the user's catalog
+              offer endpoints in that region and the ORD region; this user's work
               will be directed to the DFW region whenever possible.
             </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.role">
+          <callout arearefs="response.json.role">
             <para> Users can be assigned multiple roles,
               with each role providing specific
               privileges. In this example,
@@ -434,7 +393,7 @@ format="SVG" scale="60"/>
               Tester, or Trainer. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.catalog">
+          <callout arearefs="response.json.catalog">
             <para> The service catalog lists the services
               this user can access. In this example, the
               user can access one database service, one
@@ -442,7 +401,7 @@ format="SVG" scale="60"/>
               services (Cloud Servers OpenStack and
               Cloud Servers), two object storage
               services (Cloud Files Content Distribution
-              Network (CDN), and Cloud Files),  and one
+              Network (CDN), and Cloud Files), and one
               DNS service. The catalog listing for each
               service provides at least one endpoint URL
               for that service. Other information, such
@@ -451,21 +410,35 @@ format="SVG" scale="60"/>
               access to this service. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.servicetype">
-            <para>
-              The service type attribute identifies services that perform similar functions, whatever those services might be named.
-              In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code>type="compute"</code>,
-              identifying them as compute services even though the word "compute" does not appear in their names.
-            </para>
-            <important>
-              <para>Use service type as the primary value for
-                locating a service. If multiple endpoints of the
-                same service type exist in the same region, use
-                service name as the tiebreaker.</para>
-            </important>
+          <callout arearefs="response.json.tenant">
+            <para> Some services recognize specification of a tenant. If a
+              service does recognize tenants, the format of the
+              tenant specification is defined only by the
+              service; for details about whether and how to
+              specify a tenant, check the documentation for the
+              service you are using.</para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.servicename">
+          <callout arearefs="response.json.url">
+            <para>
+              An endpoint can be assigned public and internal URLs. A
+              public URL is accessible from anywhere. Access to a public
+              URL usually incurs traffic charges. Internal URLs are only
+              accessible to services within the same region. Access to
+              an internal URL is free of charge.
+            </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.region">
+            <para> A service may expose endpoints in different regions.
+              Regional endpoints allow clients to provision
+              resources in a manner that provides high
+              availability. </para>
+            <para> Some services are not region-specific. These services supply a single
+              non-regional endpoint and do not provide access to internal URLs. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.servicename">
             <para>
               The service name attribute identifies each unique service in the catalog.
               Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
@@ -490,32 +463,18 @@ format="SVG" scale="60"/>
             </important>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.region">
-            <para> A service may expose endpoints in different regions.
-              Regional endpoints allow clients to provision
-              resources in a manner that provides high
-              availability. </para>
-            <para> Some services are not region-specific. These services supply a single
-              non-regional endpoint and do not provide access to internal URLs. </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.tenant">
-            <para> Some services recognize specification of a tenant. If a
-              service does recognize tenants, the format of the
-              tenant specification is defined only by the
-              service; for details about whether and how to
-              specify a tenant, check the documentation for the
-              service you are using.</para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.url">
+          <callout arearefs="response.json.servicetype">
             <para>
-              An endpoint can be assigned public and internal URLs. A
-              public URL is accessible from anywhere. Access to a public
-              URL usually incurs traffic charges. Internal URLs are only
-              accessible to services within the same region. Access to
-              an internal URL is free of charge.
+              The service type attribute identifies services that perform similar functions, whatever those services might be named.
+              In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code>type="compute"</code>,
+              identifying them as compute services even though the word "compute" does not appear in their names.
             </para>
+            <important>
+              <para>Use service type as the primary value for
+                locating a service. If multiple endpoints of the
+                same service type exist in the same region, use
+                service name as the tiebreaker.</para>
+            </important>
             <para> </para>
           </callout>
         </calloutlist>
