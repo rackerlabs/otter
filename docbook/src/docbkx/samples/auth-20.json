@@ -85,16 +85,35 @@ Date: Thu, 12 Apr 2012 18:45:13 GMT
             {
                 "endpoints": [
                     {
-                        "tenantId": "1100111",
-                        "publicURL": "https://servers.api.rackspacecloud.com/v1.0/1100111",
-                        "versionId": "1.0",
-                        "versionInfo": "https://servers.api.rackspacecloud.com/v1.0/",
-                        "versionList": "https://servers.api.rackspacecloud.com/"
+                        "publicURL": "https://monitoring.api.rackspacecloud.com/v1.0/1100111",
+                        "tenantId": "1100111"
                     }
                 ],
-                "name": "cloudServers",
-                "type": "compute"
+                "name": "cloudMonitoring",
+                "type": "rax:monitor"
             },
+            {
+                "endpoints": [
+                    {
+                        "publicURL": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "DFW",
+                        "tenantId": "1100111",
+                        "versionId": "1.0",
+                        "versionInfo": null,
+                        "versionList": null
+                    },
+                    {
+                        "publicURL": "https://ord.autoscale.api.rackspacecloud.com/v1.0/1100111",
+                        "region": "ORD",
+                        "tenantId": "1100111",
+                        "versionId": "1.0",
+                        "versionInfo": null,
+                        "versionList": null
+                    }
+                ],
+                "name": "autoscale",
+                "type": "rax:autoscale"
+            }, 
             {
                 "endpoints": [
                     {
@@ -112,22 +131,6 @@ Date: Thu, 12 Apr 2012 18:45:13 GMT
                 ],
                 "name": "cloudFiles",
                 "type": "object-store"
-            },
-            {
-                "endpoints": [
-                    {
-                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
-                        "publicURL": "https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
-                        "region": "DFW"
-                    },
-                    {
-                        "tenantId": "MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
-                        "publicURL": "https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaaaaaa-bbbb-cccc-dddd-eeeeeeee",
-                        "region": "ORD"
-                    }
-                ],
-                "name": "cloudFilesCDN",
-                "type": "rax:object-cdn"
             },
             {
                 "endpoints": [

@@ -325,11 +325,15 @@ format="SVG" scale="60"/>
               <area xml:id="response.json.dfltregion"  units="linecolumn" coords="17 12"/>
               <area xml:id="response.json.role"        units="linecolumn" coords="18 12"/>
               <area xml:id="response.json.catalog"     units="linecolumn" coords="31 8"/>
-              <area xml:id="response.json.tenant"      units="linecolumn" coords="102 24"/>
-              <area xml:id="response.json.url"         units="linecolumn" coords="103 24"/>
-              <area xml:id="response.json.region"      units="linecolumn" coords="105 24"/>
-              <area xml:id="response.json.servicename" units="linecolumn" coords="114 16"/>
-              <area xml:id="response.json.servicetype" units="linecolumn" coords="115 16"/>
+              <area xml:id="response.json.service-lb"         units="linecolumn" coords="49 16"/>
+              <area xml:id="response.json.service-compute"    units="linecolumn" coords="65 16"/>
+              <area xml:id="response.json.service-monitor"    units="linecolumn" coords="87 16"/>
+              <area xml:id="response.json.service-autoscale"  units="linecolumn" coords="97 16"/>
+              <area xml:id="response.json.tenant"      units="linecolumn" coords="121 24"/>
+              <area xml:id="response.json.url"         units="linecolumn" coords="122 24"/>
+              <area xml:id="response.json.region"      units="linecolumn" coords="124 24"/>
+              <area xml:id="response.json.servicename" units="linecolumn" coords="133 16"/>
+              <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
             <programlisting language="json">
 <xi:include href="samples/auth-20.json" parse="text"/>
@@ -408,6 +412,23 @@ format="SVG" scale="60"/>
               as regions, versions, and tenants, is
               provided if it's relevant to this user's
               access to this service. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.service-lb">
+            <para> This service catalog entry describes a load
+              balancing service. To use &PRODNAME;, you must have access to a load balancing service. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.service-compute">
+            <para> This service catalog entry describes a compute service. To use &PRODNAME;, you must have access to a compute service. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.service-monitor">
+            <para> This service catalog entry describes a monitoring service. To use &PRODNAME;, you must have access to a monitoring service. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.service-autoscale">
+            <para> This service catalog entry describes &PRODNAME;. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.tenant">
