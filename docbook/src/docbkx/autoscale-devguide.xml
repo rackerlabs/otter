@@ -398,20 +398,16 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.catalog">
-            <para> The service catalog lists the services
-              this user can access. In this example, the
-              user can access one database service, one
-              loadbalancing service, two compute
-              services (Cloud Servers OpenStack and
-              Cloud Servers), two object storage
-              services (Cloud Files Content Distribution
-              Network (CDN), and Cloud Files), and one
-              DNS service. The catalog listing for each
-              service provides at least one endpoint URL
-              for that service. Other information, such
-              as regions, versions, and tenants, is
-              provided if it's relevant to this user's
-              access to this service. </para>
+            <para> The service catalog lists the services this user
+              can access. In this example, the user can access one
+              database service, one loadbalancing service, one compute
+              service (Cloud Servers OpenStack), one object storage
+              service (Cloud Files), one monitoring service (Cloud
+              Monitoring), one autoscale service (&PRODNAME;) and one DNS service.
+              The catalog listing for each service provides at least
+              one endpoint URL for that service. Other information,
+              such as regions, versions, and tenants, is provided if
+              it is relevant to this user's access to this service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-lb">
@@ -465,31 +461,28 @@ format="SVG" scale="60"/>
               Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
             </para>
             <important>
-              <para> If you are programmatically parsing an authentication
-                response, use service type rather than service name as
-                the basis for determining whether a user has access to
-                a particular kind of service. Service type is stable
-                across all releases; new service types may be developed,
-                but existing service types are not renamed.
-                In this example,
-                <code>type="compute"</code> identifies all the
-                available compute services, one of which is named
-                cloudServers and one of which is named
-                cloudServersOpenStack. New compute service names may be added
-                in future releases; whatever the compute services are
-                named, you can always
-                recognize them by parsing for
-                <code>type="compute"</code> in the authentication
+              <para> If you are programmatically parsing an
+                authentication response, use service type rather than
+                service name as the basis for determining whether a
+                user has access to a particular kind of service.
+                Service type is stable across all releases; new
+                service types may be developed, but existing service
+                types are not renamed. It it possible to subscribe to
+                multiple services of the same type. Whatever those
+                services are named, you can always recognize them by
+                parsing for service type in the authentication
                 response's service catalog. </para>
             </important>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicetype">
-            <para>
-              The service type attribute identifies services that perform similar functions, whatever those services might be named.
-              In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code>type="compute"</code>,
-              identifying them as compute services even though the word "compute" does not appear in their names.
-            </para>
+            <para> The service type attribute identifies services that
+              perform similar functions, whatever those services might
+              be named. In this example, the service named
+              cloudServersOpenstack is identified as
+                <code>type="compute"</code>, indicating that it is a
+              compute service even though the word "compute" does not
+              appear in its name. </para>
             <important>
               <para>Use service type as the primary value for
                 locating a service. If multiple endpoints of the
@@ -503,50 +496,8 @@ format="SVG" scale="60"/>
           hours. Applications should be designed to
           re-authenticate after receiving a 401
           (Unauthorized) response from a service endpoint. </para>
-        <important>
-          <para>If you are programmatically parsing an
-            authentication response, please be aware that
-            service names are stable for the life of the
-            particular service and can be used as keys.
-            You should also be aware that a user's service
-            catalog can include multiple uniquely-named
-            services which perform similar functions. For
-            example, cloudServersOpenStack is the
-            OpenStack version of compute whereas
-            cloudServers is the legacy version of compute;
-            the same user can have access to both
-            services. In Auth 2.0, the service type
-            attribute can be used as a key by which to
-            recognize similar services; see the tip
-            below.</para>
-        </important>
-        <tip>
-          <para>Beginning with Auth 2.0, the service catalog
-            includes a service type attribute to identify
-            services that perform similar functions but
-            have different names; for example,
-            <code>type="compute"</code> identifies
-            compute services such as cloudServers and
-            cloudServersOpenStack. Some developers have
-            found the service type attribute to be useful
-            in parsing the service catalog. For additional
-            information on Auth 2.0 (also known as the
-            Cloud Identity Service), refer to the
-            <citetitle>Cloud Identity Client Developer
-              Guide</citetitle> at <link
-                xlink:href="http://docs.rackspace.com"
-                >http://docs.rackspace.com/</link>.</para>
-        </tip>
-        <para>Databases service endpoints are published in the
-          service catalog in the Auth response with the
-          account number, which is a required element of the
-          service endpoints. The examples shown here are for
-          authentication for US customers. Customers with
-          UK-based accounts will see different values in the
-          service catalog. Refer to the next section for
-          more information about service endpoints. </para>  
-
-      </section>  </section>
+      </section>  
+    </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access/Endpoints</title>
       <para/>
@@ -554,8 +505,14 @@ format="SVG" scale="60"/>
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
         regional boundaries to other &PROD; servers.</para>
-      <para>You can find the available service access/endpoints for
-        &PROD; summarized in the table below.</para>
+      <important>
+        <para>
+          For the Early Access period, you can use &PROD; endpoints in ORD and DFW.
+          Endpoints in LON and SYD will be available soon.
+        </para>
+      </important>
+      <para>The table below lists the service access/endpoints for
+        &PROD;.</para>
       <?rax-fo keep-with-next?>
       <para>
         <table rules="all">
@@ -595,28 +552,17 @@ format="SVG" scale="60"/>
         </table>
       </para>
       <para>Replace the sample project ID number,
-          <parameter>1234</parameter>, with your actual account number
-        returned as part of the authentication service
+          <parameter>1234</parameter>, with your actual account
+        number, returned as part of the authentication service
         response.</para>
-      <para>You will find the actual account number after the final
-        '/' in the <code>publicURL</code> field returned by the
-        authentication response. 
-        For example, in <xref
+      <para>You will find your account number after the final '/' in
+        the <code>publicURL</code> field returned by the
+        authentication response. For example, in <xref
           linkend="auth-response-example-json"/> you can see from the
           <code>publicURL</code> field for <code>cloudServers</code>
           ("https://servers.api.rackspacecloud.com/v1.0/<emphasis
           role="bold">1100111</emphasis>") that the account number is
-        1100111. 
-        </para>
-      <note>
-        <para>&PRODNAME; uses the term project ID rather than
-          account ID, which is used in other Rackspace documentation.
-          Both refer to your Rackspace account number, which you can
-          find in your Cloud Control Panel at
-          <link
-            xlink:href="https://mycloud.rackspace.com/"
-            >mycloud.rackspace.com</link>.</para>
-      </note>
+        1100111. </para>
     </section>
     <section xml:id="contractVersion">
       <title>Contract Versions</title>
