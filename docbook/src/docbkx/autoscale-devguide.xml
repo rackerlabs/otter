@@ -575,7 +575,7 @@ format="SVG" scale="60"/>
         guaranteed to be compatible with one another. </para>
       <example>
         <title>Sample Request URL for Contract Version 1.0</title>
-        <programlisting>https://ord.queuing.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
+        <programlisting>https://ord.autoscale.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
       </example>
       <note>
         <para>This document pertains to contract version 1.0.</para>
