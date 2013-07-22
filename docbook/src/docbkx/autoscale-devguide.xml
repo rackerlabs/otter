@@ -100,7 +100,7 @@ format="SVG" scale="60"/>
                 </revdescription>
             </revision>           
         </revhistory>
-  <!-- plan is that raxm:product will be cas, Cloud Autoscale; still fails validation, fix it later use cdb now because it is valid -->
+  <!-- plan is that raxm:product will be cas, Cloud Autoscale; still fails validation, fix it later. use cdb now because it is valid -->
 	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cdb</raxm:product>
@@ -115,11 +115,33 @@ format="SVG" scale="60"/>
         means that you can begin with a minimal cloud configuration and grow only when the cost of that growth is 
         justified.
     </para>
+    <para>
+      Autoscale is a Web service that automatically scales resources up and down as a response to an increase or decrease in overall workload based on user-defined thresholds.
+      You can set up a schedule for launching Autoscale or define an event that is triggered by Cloud Monitoring. You can also specify a minimum and maximum number of cloud servers, the amount of resources you want to increase or decrease and the thresholds in Cloud Monitoring that will trigger the scaling activities. 
+      Autoscale requires the following services to work together:
+      <itemizedlist>
+        <listitem>
+          <para>
+            Cloud Monitoring
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Cloud Servers
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Cloud Load Balancers
+          </para>
+        </listitem>
+      </itemizedlist> 
+    </para>
     <section xml:id="Intended_Audience-d1e166">
         <title>Intended Audience</title>
         <para>This document is intended for software developers who are
             interested in developing applications that use the Rackspace
-            Cloud Cloud Autoscale API. To use this API, we assume you have the following
+            Cloud Cloud &PROD; API. To use this API, we assume you have the following
             skills:</para>
         <itemizedlist>
             <listitem>
