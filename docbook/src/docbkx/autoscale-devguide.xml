@@ -809,7 +809,13 @@ format="SVG" scale="60"/>
           <para>Link to more information</para>
         </listitem>
       </itemizedlist>
+      <para>
+        For &PROD; users, common faults are caused by invalid configurations. 
+        For example, trying to boot a server from an image that does not exist causes a fault; 
+        so does trying to attach a load balancer to a scaling group that does not exist. 
+      </para>
       <para>An example of an error message follows. </para>
+      <!-- improve this example to show something that an Autoscale user would really see -->
       <example>
         <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
