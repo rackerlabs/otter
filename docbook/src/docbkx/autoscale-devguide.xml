@@ -631,20 +631,25 @@ format="SVG" scale="60"/>
         of time passes. Absolute limits are fixed.
       </para>
       <section xml:id="Rate_Limits-d1e1222">
+        <!-- 
+        rate limits are managed by Repose rate limiting filter, 
+        config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
+        -->
         <title>Rate Limits</title>
         <para> Rate limits are specified in terms of both a
           human-readable wild-card URI and a
           machine-processable regular expression. The
           regular expression boundary matcher '^' takes
           effect after the root URI path. For example, the
-          regular expression ^/v1.0/instances would match
+          regular expression ^/v1.0/execute would match
           the bolded portion of the following URI:
-          https://ord.databases.api.rackspacecloud.com<emphasis
-            role="bold">/v1.0/instances</emphasis>. </para>
-        <para>The following table specifies the default rate
-          limits for all API operations for all &GET;,
-          &POST;, &PUT;, and &DELETE; calls for databases
-          and database instances: </para>
+          https://ord.autoscale.api.rackspacecloud.com<emphasis
+            role="bold">/v1.0/execute</emphasis>. </para>
+        <para>
+          For any user, all &PROD; operations are limited to 1,000 calls per minute.
+        </para>
+        <para>In addition, the following table specifies the default rate limits
+          for specific &PROD; API operations: </para>
         <table rules="all">
           <caption>Default Rate Limits</caption>
           <thead>
@@ -657,42 +662,18 @@ format="SVG" scale="60"/>
           </thead>
           <tbody>
             <tr>
-              <td colspan="1">&GET; changes-since</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">3/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&POST;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">10/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&POST; instances</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">50/day</td>
-            </tr>
-            <tr>
-              <td colspan="1">&PUT;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">10/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&DELETE;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">100/minute</td>
+              <td colspan="1">&POST; {capability_version}/{capability_hash}</td>
+              <td colspan="2">/v1.0/execute/*</td>
+              <td colspan="2">/v1\\.0/execute/(.*)</td>
+              <td colspan="1">1/second</td>
             </tr>
           </tbody>
         </table>
-        <para> Rate limits are applied in order relative to the
-          verb, going from least to most specific. For
-          example, although the threshold for &POST; to
-          /v1.0/* is 10 per minute, one cannot &POST; to
-          /v1.0/* more than 50 times within a single day. </para>
+        <para> Rate limits are applied in order relative to the verb,
+          going from least to most specific. For example, although the
+          general threshold for operations to /v1/0/* is 1,000 per
+          minute, one cannot &POST; to /v1.0/execute* more than 1 time
+          per second, which is 60 times per minute. </para>
         <para> If you exceed the thresholds established for
           your account, a <errorcode>413 (Rate
             Control)</errorcode> HTTP response will be
@@ -702,9 +683,10 @@ format="SVG" scale="60"/>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <para>Refer to the following table for the absolute
-          limits that are set.</para>
-        <table rules="all">
+        <para>&PRODNAME; does not use absolute limits. It does use 
+          <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
+        <!-- build this table if absolute limits are needed in addition to rate limits -->
+        <table rules="all" security="writeronly">
           <caption>Absolute Limits</caption>
           <thead>
             <tr>

@@ -8,7 +8,7 @@
          xml:id="apiref"
          role="api-reference">
    <title>API Reference</title>
-   <section xml:id="Group_Resource">
+   <section xml:id="Groups">
       <title>Groups</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups"/>
@@ -18,7 +18,7 @@
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fstate"/>
       </resources>
    </section>
-   <section xml:id="Config_Resource">
+   <section xml:id="Configurations">
       <title>Configurations</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fconfig"/>
@@ -29,7 +29,7 @@
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fresume"/>
       </resources>
    </section>
-   <section xml:id="Policies_Resource">
+   <section xml:id="Policies">
       <title>Policies</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies"/>
@@ -40,13 +40,13 @@
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fexecute"/>
       </resources>
    </section>
-   <section xml:id="Execute_Resource">
+   <section xml:id="Executions">
       <title>Executions</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#post-2Fv1.02Fexecute2F7Bcapability_version7D2F7Bcapability_hash7D2F"/>
       </resources>
    </section>
-   <section xml:id="Webhooks_Resource">
+   <section xml:id="Webhooks">
       <title>Webhooks</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks"/>
