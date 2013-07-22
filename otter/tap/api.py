@@ -97,7 +97,7 @@ def makeService(config):
         if GraylogUDPPublisher is not None:
             log.addObserver(
                 make_observer_chain(
-                    GraylogUDPPublisher(**config_value('graylog'))))
+                    GraylogUDPPublisher(**config_value('graylog')), False))
         else:
             warnings.warn("There is a configuration option for Graylog, but "
                           "txgraylog is not installed.")

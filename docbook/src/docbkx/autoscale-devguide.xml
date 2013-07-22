@@ -51,13 +51,9 @@ format="SVG" scale="60"/>
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
          xml:id="autoscale-getting-started">
-    
-    <!-- this Getting Started content comes directly from a wiki page, 
-         https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
-    <!-- some sample code displayed on that page does NOT validate via JSONlint;
-         use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
-    
-    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+     
+    <?rax title.font.size="35px" subtitle.font.size="20px"
+          canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <?rax status.bar.text="PREVIEW" ?>
     <info>
         <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
@@ -97,7 +93,7 @@ format="SVG" scale="60"/>
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Initial internal draft of API
-                                Operations section for Preview
+                                Operations chapter for Preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -151,6 +147,10 @@ format="SVG" scale="60"/>
         <section xml:id="Resources"
             xmlns:xlink="http://www.w3.org/1999/xlink">
             <title>Additional Resources</title>
+            <para>
+              &PRODNAME; is an open-source project. You can see and contribute to source code in our GitHub repository, 
+              <link xlink:href="https://github.com/rackerlabs/otter">https://github.com/rackerlabs/otter</link>.
+            </para>
             <para>
                 You can see and experiment with all &PRODNAME; API calls at
                 <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
@@ -296,9 +296,9 @@ format="SVG" scale="60"/>
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
           values shown here. </para>
-          <!-- fix the auth code samples soon 
+
         <example>
-          <title>Auth Request for US Endpoint: XML</title>
+          <title>Authentication Request for US Endpoint: XML</title>
           <programlistingco>
             <areaspec>
               <area xml:id="credentials.xml.user"
@@ -312,7 +312,7 @@ format="SVG" scale="60"/>
           </programlistingco>
         </example>
         <example>
-          <title>Auth Request for US Endpoint: JSON</title>
+          <title>Authentication Request for US Endpoint: JSON</title>
           <programlistingco>
             <areaspec>
               <area xml:id="credentials.json.user"
@@ -342,20 +342,20 @@ format="SVG" scale="60"/>
           </callout>
         </calloutlist>
         <example>
-          <title>Auth Response for US Endpoint: XML</title>
+          <title>Authentication Response for US Endpoint: XML</title>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.xml.namespaces" units="linecolumn" coords="7 9"/>
-              <area xml:id="response.xml.token" units="linecolumn" coords="15 10"/>
-              <area xml:id="response.xml.dfltregion" units="linecolumn" coords="16 67"/>
-              <area xml:id="response.xml.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.xml.catalog" units="linecolumn" coords="22 21"/>
-              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 34"/>
-              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 54"/>
-              <area xml:id="response.xml.region" units="linecolumn" coords="52 30"/>
-              <area xml:id="response.xml.tenant" units="linecolumn" coords="53 66"/>
-              <area xml:id="response.xml.url" units="linecolumn" coords="54 9"/>
+              <area xml:id="response.xml.namespaces" units="linecolumn"  coords="7 5"/>
+              <area xml:id="response.xml.token" units="linecolumn"       coords="15 9"/>
+              <area xml:id="response.xml.dfltregion" units="linecolumn"  coords="16 41"/>
+              <area xml:id="response.xml.role" units="linecolumn"        coords="17 13"/>
+              <area xml:id="response.xml.catalog" units="linecolumn"     coords="22 9"/>
+              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 22"/>
+              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 42"/>
+              <area xml:id="response.xml.region" units="linecolumn"      coords="52 27"/>
+              <area xml:id="response.xml.tenant" units="linecolumn"      coords="53 21"/>
+              <area xml:id="response.xml.url" units="linecolumn"         coords="54 21"/>
             </areaspec>
             <programlisting language="xml"><xi:include href="samples/auth-20.xml" parse="text"/></programlisting>
           </programlistingco>
@@ -363,7 +363,7 @@ format="SVG" scale="60"/>
         
         
         <example xml:id="auth-response-example-json">
-          <title>Auth Response for US Endpoint: JSON</title>
+          <title>Authentication Response for US Endpoint: JSON</title>
           
           <programlistingco>
             <areaspec>
@@ -577,7 +577,7 @@ format="SVG" scale="60"/>
           UK-based accounts will see different values in the
           service catalog. Refer to the next section for
           more information about service endpoints. </para>  
-          -->
+
       </section>  </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access/Endpoints</title>
@@ -585,7 +585,7 @@ format="SVG" scale="60"/>
       <para>&PRODNAME; is a regionalized service. The user of the
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
-        regional boundaries to other Cloud Queuing servers.</para>
+        regional boundaries to other &PROD; servers.</para>
       <para>You can find the available service access/endpoints for
         &PROD; summarized in the table below.</para>
       <?rax-fo keep-with-next?>
@@ -602,25 +602,25 @@ format="SVG" scale="60"/>
             <tr align="left">
               <td colspan="2">Chicago (ORD)</td>
               <td colspan="5"
-                  ><code>https://ord.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                  ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">Dallas/Ft. Worth (DFW)</td>
               <td colspan="5"
-                  ><code>https://dfw.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">London (LON)</td>
               <td colspan="5">
-                <code>https://lon.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">Sydney (SYD)</td>
               <td colspan="5">
-                <code>https://syd.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
           </tbody>
@@ -633,14 +633,12 @@ format="SVG" scale="60"/>
       <para>You will find the actual account number after the final
         '/' in the <code>publicURL</code> field returned by the
         authentication response. 
-        <!-- fix auth sample soon
         For example, in <xref
           linkend="auth-response-example-json"/> you can see from the
           <code>publicURL</code> field for <code>cloudServers</code>
           ("https://servers.api.rackspacecloud.com/v1.0/<emphasis
           role="bold">1100111</emphasis>") that the account number is
         1100111. 
-        -->
         </para>
       <note>
         <para>&PRODNAME; uses the term project ID rather than
@@ -662,8 +660,7 @@ format="SVG" scale="60"/>
         the API may be available at any given time and are not
         guaranteed to be compatible with one another. </para>
       <example>
-        <title>Sample Request URL (contract version in <emphasis
-            role="strong">bold</emphasis>)</title>
+        <title>Sample Request URL for Contract Version 1.0</title>
         <programlisting>https://ord.queuing.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
       </example>
       <note>
@@ -710,9 +707,6 @@ format="SVG" scale="60"/>
     <?hard-pagebreak?>
     <section xml:id="Limits-d1e1208">
       <title>Limits</title>
-      <remark>Reviewer: Do you need both Rate Limits and Absolute
-        Limits for Autoscale? ... the section below was pulled from
-        Cloud Databases.</remark>
       <para>
         All accounts, by default, have a preconfigured set of
         thresholds (or limits) to manage capacity and prevent
@@ -794,8 +788,6 @@ format="SVG" scale="60"/>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <remark>Reviewer: Need to update this entire section.
-          Please give me your updates.</remark>
         <para>Refer to the following table for the absolute
           limits that are set.</para>
         <table rules="all">
@@ -828,16 +820,13 @@ format="SVG" scale="60"/>
       <title>Date/Time Format</title>
       <para> The &PROD; service uses an ISO-8601 compliant date
         format for the display and consumption of date/time values. </para>
-      <example>
-        <title>Service Date/Time Format</title>
-        <programlisting>yyyy-MM-dd'T'HH:mm:ss.SSSZ</programlisting>
-        <para>See the table below for a description of the date/time format codes.</para>
-        <para>May 19th, 2011 at 8:07:08 AM, GMT-5 would have the following
-          format:</para>
-        <programlisting>2011-05-19T08:07:08-05:00</programlisting>
-      </example>
+      <para>
+        The two tables below show how this works. The first table identifies the elements of the
+        ISO-8601 standard. The second table shows how a sample time appears when formatted 
+        in compliance with the ISO-8601 standard.
+      </para>
       <table rules="all">
-        <caption>Explanation of Date/Time Format Codes</caption>
+        <caption>Explanation of ISO-8601 Date/Time Format Codes</caption>
         <thead>
           <tr>
             <td>Code</td>
@@ -883,13 +872,29 @@ format="SVG" scale="60"/>
           </tr>
         </tbody>
       </table>
-      
+      <table rules="all">
+        <caption>Example of Formatted Time</caption>
+        <thead>
+          <tr>
+            <td>Format</td>
+            <td>Formatted Time</td>
+            <td>Unformatted Time</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>yyyy-MM-dd'T'HH:mm:ss.SSSZ</code></td>
+            <td><code>2013-05-19T08:07:08-05:00</code></td>
+            <td>May 19th, 2013 at 8:07:08 AM, GMT-5</td>
+          </tr>
+        </tbody>
+      </table>   
     </section>
     <section xml:id="faults-dle101">
       <title>Faults</title>
-      <para>If any &PRODNAME; request results in an error, the
-        queuing service returns an appropriate 4xx or 5xx HTTP status
-        code, as well as the following information in the body: </para>
+      <para>If any &PRODNAME; request results in an error, the service
+        returns an appropriate 4xx or 5xx HTTP status code, as well as
+        the following information in the body: </para>
       <itemizedlist>
         <listitem>
           <para>Title</para>
@@ -906,7 +911,7 @@ format="SVG" scale="60"/>
       </itemizedlist>
       <para>An example of an error message follows. </para>
       <example>
-        <title>Error Message Example</title>
+        <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
 Content-Type: application/json
 
@@ -921,8 +926,9 @@ Content-Type: application/json
   }
 }</programlisting>
       </example>
-      <para>Error information for each operation is included with the
-        description in <xref linkend="apiref"/>.</para>
+      <para>Error information for each API operation is included with
+        the description of that operation in <xref linkend="apiref"
+        />.</para>
     </section> 
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
