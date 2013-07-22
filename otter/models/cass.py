@@ -532,6 +532,7 @@ class CassScalingGroup(object):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
+                # TODO: Fix in https://issues.rax.io/browse/AUTO-467
                 if lastRev["type"] == 'schedule':
                     if lastRev["args"] != data["args"]:
                         raise ValidationError("Cannot change scheduled args")
