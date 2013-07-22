@@ -49,7 +49,7 @@ class CassandraAuditLogTests(TestCase):
 
         self.client.execute.assert_called_once_with(
             ('INSERT INTO audit_log ("tenantId", "logTime", "logEvent") '
-             'VALUES (:tenantId, :logTime, :logEvent)'),
+             'VALUES (:tenantId, :logTime, :logEvent);'),
             {'tenantId': '111111', 'logTime': ts1,
              'logEvent': '{}'},
             ConsistencyLevel.ONE)
@@ -66,3 +66,9 @@ class CassandraAuditLogTests(TestCase):
         d = self.audit_log.entries_for_tenant('111111')
         result = self.successResultOf(d)
         self.assertEqual(result, [{'stuff': 1}, {'stuff': 2}])
+
+        self.client.execute.assert_called_once_with(
+            ('SELECT "logEvent" FROM audit_log WHERE "tenantId" = :tenantId '
+             'ORDER BY "logTime";'),
+            {'tenantId': '111111'},
+            ConsistencyLevel.ONE)

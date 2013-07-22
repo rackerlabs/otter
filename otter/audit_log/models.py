@@ -54,7 +54,7 @@ class CassandraAuditLog(object):
         see :meth:`otter.audit_log.models.IAuditLog.add_log_entry`
         """
         query = ('INSERT INTO audit_log ("tenantId", "logTime", "logEvent") '
-                 'VALUES (:tenantId, :logTime, :logEvent)')
+                 'VALUES (:tenantId, :logTime, :logEvent);')
 
         return self._client.execute(query,
                                     {"logTime": uuid.uuid1(),
@@ -69,7 +69,7 @@ class CassandraAuditLog(object):
         query = ('SELECT "logEvent" '
                  'FROM audit_log '
                  'WHERE "tenantId" = :tenantId '
-                 'ORDER BY "logTime"')
+                 'ORDER BY "logTime";')
 
         def decode_results(rows):
             return [json.loads(row['logEvent']) for row in rows]
