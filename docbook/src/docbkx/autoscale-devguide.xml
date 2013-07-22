@@ -100,9 +100,10 @@ format="SVG" scale="60"/>
                 </revdescription>
             </revision>           
         </revhistory>
+  <!-- plan is that raxm:product will be cas, Cloud Autoscale; still fails validation, fix it later use cdb now because it is valid -->
 	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
-            <raxm:product version="v1.0">cas</raxm:product>
+            <raxm:product version="v1.0">cdb</raxm:product>
             <raxm:priority>20</raxm:priority>
         </raxm:metadata>
     </info>
@@ -714,11 +715,14 @@ format="SVG" scale="60"/>
     </section>
     <section xml:id="datetimeformat">
       <title>Date/Time Format</title>
-      <para> The &PROD; service uses an ISO-8601 compliant date
-        format for the display and consumption of date/time values. </para>
+      <para> 
+        The &PROD; service uses an ISO-8601 compliant date
+        format for the display and consumption of date/time values. 
+        While the standard allows specification of time zones &PROD; does not use time zones. All times are expressed as GMT
+      </para>
       <para>
         The two tables below show how this works. The first table identifies the elements of the
-        ISO-8601 standard. The second table shows how a sample time appears when formatted 
+        ISO-8601 standard. The second table shows how a sample time appears when formatted for use by &PROD;
         in compliance with the ISO-8601 standard.
       </para>
       <table rules="all">
@@ -779,9 +783,9 @@ format="SVG" scale="60"/>
         </thead>
         <tbody>
           <tr>
-            <td><code>yyyy-MM-dd'T'HH:mm:ss.SSSZ</code></td>
-            <td><code>2013-05-19T08:07:08-05:00</code></td>
-            <td>May 19th, 2013 at 8:07:08 AM, GMT-5</td>
+            <td><code>yyyy-MM-dd'T'HH:mm:ss.SSS</code></td>
+            <td><code>2013-05-19T08:07:08</code></td>
+            <td>May 19th, 2013 at 8:07:08 AM, GMT</td>
           </tr>
         </tbody>
       </table>   
