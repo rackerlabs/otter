@@ -704,6 +704,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
+    def test_update_scaling_policy_schedule_no_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}',
+                        "groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
     def test_update_scaling_policy_type_change(self):
         """
         Test that you can update a scaling policy, and if successful it returns
@@ -712,6 +731,23 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
+        self.assert_deferred_failed(d, ValidationError)
+        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expectedData = {"groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    def test_update_scaling_policy_schedule_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
         self.assert_deferred_failed(d, ValidationError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
