@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE glossary [
+<!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!-- in PDF: for page headers -->
+<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!-- in body -->
+<!ENTITY PROD "Autoscale">               
+]>
+<glossary 
+    xmlns="http://docbook.org/ns/docbook"
+    xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
+    xml:id="Glossary-000">
+    <title>Glossary</title>
+    <glossentry xml:id="Alarm-d1e02">
+        <glossterm><emphasis role="bold">Alarm</emphasis></glossterm>
+        <glossdef>
+            <para>
+                An alarm contains a set of rules that determine when a notification is triggered.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Authentication-d1e01">
+        <glossterm><emphasis role="bold">Authentication</emphasis></glossterm>
+        <glossdef>
+            <para>
+                Authentication is the act or process of confirming the identity of a
+                user or the truth of a claim.
+                The authentication service confirms that an incoming request is being made by the user
+                who claims to be making the request.
+                It does this by validating a set of claims that the user makes.
+                These claims are initially in the form of a set of credentials.
+                After initial confirmation based on credentials,
+                the authentication service issues a token to the user;
+                when making subsequent requests,
+                the user can provide the token
+                as evidence that the user's identity has already been authenticated.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Cooldown-d1e10">
+        <glossterm><emphasis role="bold">Cooldown</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A cooldown period is the length of time that a scaling group must wait
+                after scaling before beginning to scale again.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Flavor-d1e20">
+        <glossterm><emphasis role="bold">Flavor</emphasis></glossterm>
+        <glossdef>
+            <para> A flavor is a resource configuration for a server. 
+                Each flavor is a unique combination of disk, memory, vCPUs, and network bandwidth.</para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Scaling-d1e11">
+        <glossterm><emphasis role="bold">Scaling</emphasis></glossterm>
+        <glossdef>
+            <para>
+                Scaling is the process of adjusting a server configuration in response to variations in workload.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="ScalingGroup-d1e13">
+        <glossterm><emphasis role="bold">Scaling Group</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A scaling group identifies servers and load balancers to be managed by a scaling policy.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="ScalingPolicy-d1e14">
+        <glossterm><emphasis role="bold">Scaling Policy</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A scaling policy manages a scaling group.
+            </para>
+        </glossdef>
+    </glossentry>
+    <glossentry xml:id="Webhook-d1e15">
+        <glossterm><emphasis role="bold">Webhook</emphasis></glossterm>
+        <glossdef>
+            <para>
+                A webhook is a URL that can activate a policy without authentication. 
+            </para>
+        </glossdef>
+    </glossentry>
+</glossary>
