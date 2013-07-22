@@ -41,26 +41,11 @@ from itertools import groupby
 
 import treq
 
-from otter.util.config import config_value
 from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
 
 
-def authenticate_tenant(tenant_id):
-    """
-    Authenticate as the desired tenant.
-
-    :params tenant_id: id of the tenant to authenticate as
-    :returns: Deferred that fires with a 2-tuple of auth token and service catalog.
-    """
-    ia = _ImpersonatingAuthenticator(config_value('identity.username'),
-                                     config_value('identity.password'),
-                                     config_value('identity.url'),
-                                     config_value('identity.admin_url'))
-    return ia.authenticate_tenant(tenant_id)
-
-
-class _ImpersonatingAuthenticator(object):
+class ImpersonatingAuthenticator(object):
     """
     An authentication handler that first uses a identity admin account to authenticate
     and then impersonates the desired tenant_id.

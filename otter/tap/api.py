@@ -33,6 +33,9 @@ from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
+from otter.supervisor import Supervisor, set_supervisor
+from otter.auth import ImpersonatingAuthenticator
+
 from silverberg.cluster import RoundRobinCassandraCluster
 
 
@@ -121,6 +124,15 @@ def makeService(config):
             config_value('cassandra.keyspace'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
+
+    authenticator = ImpersonatingAuthenticator(config_value('identity.username'),
+                                               config_value('identity.password'),
+                                               config_value('identity.url'),
+                                               config_value('identity.admin_url'))
+
+    supervisor = Supervisor(authenticator.authenticate_tenant)
+
+    set_supervisor(supervisor)
 
     s = MultiService()
 
