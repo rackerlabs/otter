@@ -38,7 +38,6 @@ a token.)
 
 import json
 from itertools import groupby
-from collections import defaultdict
 
 from twisted.internet.defer import succeed, Deferred
 
