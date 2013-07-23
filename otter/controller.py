@@ -348,6 +348,7 @@ class _Job(object):
         self.transaction_id = transaction_id
         self.scaling_group = scaling_group
         self.supervisor = supervisor
+        self.job_id = None
 
     def start(self, launch_config):
         deferred = self.supervisor.execute_config(
@@ -365,14 +366,12 @@ class _Job(object):
             state.remove_job(self.job_id)
             return state
 
-        self.scaling_group.modify_state(handle_failure)
+        return self.scaling_group.modify_state(handle_failure)
 
     def job_succeeded(self, result):
         """
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
-
-        This function is intended to be called by `IScalingGroup.modify_state`.
         """
         def handle_success(group, state):
             if self.job_id not in state.pending:
@@ -388,12 +387,12 @@ class _Job(object):
                     "Job completed, resulting in an active server.")
             return state
 
-        self.scaling_group.modify_state(handle_success)
+        return self.scaling_group.modify_state(handle_success)
 
     def job_started(self, result):
         """
-        Takes a completion deferred, which will fire when a job has been completed,
-        and marks said job as completed by removing it from pending.
+        Takes a completion deferred, which will fire when a job has been
+        completed, and marks said job as completed by removing it from pending.
         """
         self.job_id, completion_deferred = result
         self.log = self.log.bind(job_id=self.job_id)
