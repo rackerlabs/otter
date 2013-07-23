@@ -350,6 +350,9 @@ class _Job(object):
         self.job_id = None
 
     def start(self, launch_config):
+        """
+        Kick off a job by calling the supervisor with a launch config.
+        """
         deferred = self.supervisor.execute_config(
             self.log, self.transaction_id, self.scaling_group, launch_config)
         deferred.addCallback(self.job_started)
