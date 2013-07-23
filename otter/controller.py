@@ -28,7 +28,6 @@ import json
 
 from twisted.internet import defer
 
-from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
