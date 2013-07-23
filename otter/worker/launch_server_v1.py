@@ -32,6 +32,9 @@ from otter.util.hashkey import generate_server_name
 
 
 class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
     def __init__(self, server_id, status, expected_status):
         super(UnexpectedServerStatus, self).__init__(
             'Expected {server_id} to have {expected_status}, '
