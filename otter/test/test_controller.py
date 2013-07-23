@@ -1110,7 +1110,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
                          [mock.call(self.log, '1',
                                     self.group, 'launch')] * 5)
 
-    def test_positive_delta_excute_config_failures_propagated(self):
+    def test_positive_delta_execute_config_failures_propagated(self):
         """
         ``execute_launch_config`` fails if ``execute_config`` fails for any one
         case, and propagates the first ``execute_config`` error.
@@ -1124,7 +1124,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
             d = defer.Deferred()
             self.execute_config_deferreds.append(d)
             return defer.succeed((
-                str(len(self.execute_config_deferreds)), d, {}))
+                str(len(self.execute_config_deferreds)), d))
 
         self.supervisor.execute_config.side_effect = fake_execute
         d = controller.execute_launch_config(self.log, '1', self.fake_state,
@@ -1166,10 +1166,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
         self.execute_config_deferreds[2].callback(None)              # job id 3
 
-        self.assertEqual(self.group.modify_state.mock_calls,
-                         [mock.call(mock.ANY, None),
-                          mock.call(mock.ANY, mock.ANY),
-                          mock.call(mock.ANY, None)])
+        self.assertEqual(self.group.modify_state.call_count, 3)
 
     def test_job_sucess(self):
         """
@@ -1217,7 +1214,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
         self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log, '1',
+            self.log.bind.return_value, '1',
             self.group, {'id': 's1'})
 
     def test_job_failure(self):
