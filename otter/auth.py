@@ -44,6 +44,7 @@ from twisted.internet.defer import succeed, Deferred
 
 import treq
 
+from otter.log import log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
 
@@ -63,8 +64,11 @@ class CachingAuthenticator(object):
         self._auth_function = auth_function
         self._ttl = ttl
 
-        self._waiters = defaultdict(list)
+        self._waiters = {}
         self._cache = {}
+        self._log = log.bind(system='otter.auth.cache',
+                             auth_function=auth_function,
+                             cache_ttl=ttl)
 
     def authenticate_tenant(self, tenant_id):
         """
@@ -76,19 +80,27 @@ class CachingAuthenticator(object):
             service catalog.
 
         """
+        log = self._log.bind(tenant_id=tenant_id)
+
         if tenant_id in self._cache:
             (created, data) = self._cache[tenant_id]
             now = self._reactor.seconds()
 
             if now - created <= self._ttl:
+                log.msg('otter.auth.cache.hit', age=now - created)
                 return succeed(data)
+
+            log.msg('otter.auth.cache.expired', age=now - created)
 
         if tenant_id in self._waiters:
             d = Deferred()
             self._waiters[tenant_id].append(d)
+            log.msg('otter.auth.cache.waiting',
+                    waiters=len(self._waiters[tenant_id]))
             return d
 
         def when_authenticated(result):
+            log.msg('otter.auth.cache.populate')
             self._cache[tenant_id] = (self._reactor.seconds(), result)
 
             waiters = self._waiters.pop(tenant_id, [])
@@ -97,8 +109,18 @@ class CachingAuthenticator(object):
 
             return result
 
+        def when_auth_fails(failure):
+            waiters = self._waiters.pop(tenant_id, [])
+            for waiter in waiters:
+                waiter.errback(failure)
+
+            return failure
+
+        log.msg('otter.auth.cache.miss')
+        self._waiters[tenant_id] = []
         d = self._auth_function(tenant_id)
         d.addCallback(when_authenticated)
+        d.addErrback(when_auth_fails)
 
         return d
 

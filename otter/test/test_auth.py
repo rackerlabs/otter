@@ -425,7 +425,8 @@ class CachingAuthenticatorTests(TestCase):
         tenant to prevent multiple outstanding auth requests when no
         value is cached.
         """
-        self.auth_function.return_value = Deferred()
+        auth_d = Deferred()
+        self.auth_function.side_effect = lambda _: auth_d
 
         d1 = self.ca.authenticate_tenant(1)
         d2 = self.ca.authenticate_tenant(1)
@@ -434,7 +435,7 @@ class CachingAuthenticatorTests(TestCase):
 
         self.auth_function.assert_called_once_with(1)
 
-        self.auth_function.return_value.callback(('auth-token', 'catalog'))
+        auth_d.callback(('auth-token', 'catalog'))
 
         r1 = self.successResultOf(d1)
         r2 = self.successResultOf(d2)
@@ -455,3 +456,33 @@ class CachingAuthenticatorTests(TestCase):
         r2 = self.successResultOf(self.ca.authenticate_tenant(2))
 
         self.assertEqual(r2, ('auth-token2', 'catalog2'))
+
+    def test_auth_failure_propagated_to_waiters(self):
+        """
+        authenticate_tenant propagates auth failures to all waiters
+        """
+        auth_d = Deferred()
+        self.auth_function.side_effect = lambda _: auth_d
+
+        d1 = self.ca.authenticate_tenant(1)
+        d2 = self.ca.authenticate_tenant(1)
+
+        self.assertNotIdentical(d1, d2)
+
+        auth_d.errback(APIError(500, '500'))
+
+        f1 = self.failureResultOf(d1)
+        self.assertTrue(f1.check(APIError))
+
+        f2 = self.failureResultOf(d2)
+        self.assertTrue(f2.check(APIError))
+
+    def test_auth_failure_propagated_to_caller(self):
+        """
+        authenticate_tenant propagates auth failures to the caller.
+        """
+        self.auth_function.side_effect = lambda _: fail(APIError(500, '500'))
+
+        d = self.ca.authenticate_tenant(1)
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(APIError))
