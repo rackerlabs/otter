@@ -15,7 +15,7 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
         Create 2 scheduler policies, one at-style and another cron-style
         on the scaling group with 0 minentities
         """
-        super(ScalingGroupFixture, self).setUp()
+        super(GetSchedulerScalingPolicy, self).setUp()
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'
         self.at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(

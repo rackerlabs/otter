@@ -45,9 +45,6 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertEqual(200, group_info_response.status_code,
                          msg='The get scaling group call failed with {0}'
                          .format(group_info_response.status_code))
-        self.assertTrue(group_info_response.headers,
-                        msg='The headers are not as expected, {0}'
-                        .format(group_info_response.headers))
         self.validate_headers(group_info_response.headers)
         self.assertEqual(group_info.id, self.first_scaling_group.id,
                          msg='Group id did not match')

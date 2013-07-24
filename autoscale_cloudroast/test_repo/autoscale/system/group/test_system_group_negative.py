@@ -20,13 +20,6 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         super(NegativeGroupFixture, cls).setUpClass()
         cls.invalid_lbaas = [{'loadBalancerId': 0000, 'port': 0000}]
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group
-        """
-        super(NegativeGroupFixture, cls).tearDownClass()
-
     def test_system_create_delete_scaling_group_invalid_imageid(self):
         """
         Verify scaling group fails server creation gracefully when launch config
