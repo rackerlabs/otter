@@ -16,16 +16,8 @@ from otter.supervisor import Supervisor
 
 from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
 from otter.util.timestamp import MIN
-from otter.test.utils import DeferredTestMixin, iMock, matches, patch
-
-
-class _CheckFailure(object):
-    def __init__(self, exception_type):
-        self.exception_type = exception_type
-
-    def __eq__(self, other):
-        return isinstance(other, Failure) and other.check(
-            self.exception_type)
+from otter.test.utils import (
+    CheckFailure, DeferredTestMixin, iMock, matches, patch)
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -1270,7 +1262,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.log.bind.assert_called_once_with(job_id='1')
 
         self.log.bind.return_value.err.assert_called_once_with(
-            _CheckFailure(AssertionError))
+            CheckFailure(AssertionError))
 
 
 class DummyException(Exception):
@@ -1420,7 +1412,7 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.active, {})
 
         self.log.bind.return_value.err.assert_called_once_with(
-            _CheckFailure(DummyException))
+            CheckFailure(DummyException))
 
     def test_modify_state_failure_logged(self):
         """
@@ -1433,4 +1425,4 @@ class PrivateJobHelperTestCase(TestCase):
         self.completion_deferred.callback({'id': 'active'})
 
         self.log.bind.return_value.err.assert_called_once_with(
-            _CheckFailure(DummyException))
+            CheckFailure(DummyException))
