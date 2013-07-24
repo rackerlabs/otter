@@ -1,9 +1,8 @@
-
 {
     "webhooks": [
         {
             "id":"{webhookId1}",
-            "alice",
+            "name": "alice",
             "metadata": {
                 "notes": "this is for Alice"
             },
@@ -20,8 +19,10 @@
         },
         {
             "id":"{webhookId2}",
-            "name": "bob",
-            "metadata": {},
+            "name": "alice",
+            "metadata": {
+                "notes": "this is for Bob"
+            },
             "links": [
                 {
                     "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
@@ -33,7 +34,6 @@
                 }
             ]
         }
-    ]
+    ],
+    "webhooks_links": []
 }
- 
- 
