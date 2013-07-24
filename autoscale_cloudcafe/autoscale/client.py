@@ -6,6 +6,7 @@ from autoscale.models.response.autoscale_response import Group,\
 from autoscale.models.request.autoscale_requests import \
     Group_Request, Policy_Request, Webhook_Request, Config_Request, \
     ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request
+from autoscale.models.lbaas import NodeList
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
 
@@ -79,7 +80,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups'
         """
         url = '%s/groups' % (self.url)
-        # Option "core" - Creates rack user only. See servermill build config option
+        # Option "core" - Creates rack user only. See servermill build config
+        # option
         if lc_metadata:
             lc_metadata['build_config'] = 'core'
         else:
@@ -581,4 +583,44 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         """
         url = webhook_url
         return self.request('POST', url,
+                            requestslib_kwargs=requestslib_kwargs)
+
+
+class LbaasAPIClient(AutoMarshallingRestClient):
+
+    """
+    Client object for the list node lbaas api call
+    """
+    def __init__(self, url, auth_token, serialize_format=None,
+                 deserialize_format=None):
+        super(LbaasAPIClient, self).__init__(serialize_format,
+                                             deserialize_format)
+        self.url = ''.join([url, '/loadbalancers'])
+        self.auth_token = auth_token
+        self.default_headers['X-Auth-Token'] = auth_token
+        self.default_headers['Content-Type'] = 'application/%s' % \
+                                               self.serialize_format
+        self.default_headers['Accept'] = 'application/%s' % \
+                                         self.deserialize_format
+
+    def list_nodes(self, load_balancer_id, limit=None, marker=None,
+                   offset=None, requestslib_kwargs=None):
+        """
+        :summary: Get the list of nodes for the given load balancer id
+        :param load_balancer_id: The id of an existing load balancer
+        :type load_balancer_id: Integer
+        :return: Response Object containing response code 202
+        on success and list of nodes
+        :rtype: Response Object
+        """
+        params = {}
+        if limit is not None:
+            params['limit'] = str(limit)
+        if marker is not None:
+            params['marker'] = str(marker)
+        if offset is not None:
+            params['offset'] = str(offset)
+        full_url = '/'.join([self.url, str(load_balancer_id), 'nodes'])
+        return self.request('GET', full_url, params=params,
+                            response_entity_type=NodeList,
                             requestslib_kwargs=requestslib_kwargs)

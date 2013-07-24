@@ -7,7 +7,7 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
-from autoscale.client import AutoscalingAPIClient
+from autoscale.client import AutoscalingAPIClient, LbaasAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
@@ -36,7 +36,11 @@ class AutoscaleFixture(BaseTestFixture):
                                                    user_config)
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
+        load_balancer_service = access_data.get_service(
+            cls.autoscale_config.load_balancer_endpoint_name)
         server_url = server_service.get_endpoint(
+            cls.autoscale_config.region).public_url
+        lbaas_url = load_balancer_service.get_endpoint(
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
@@ -56,6 +60,9 @@ class AutoscaleFixture(BaseTestFixture):
             'json', 'json')
         cls.server_client = ServersClient(
             server_url, access_data.token.id_,
+            'json', 'json')
+        cls.lbaas_client = LbaasAPIClient(
+            lbaas_url, access_data.token.id_,
             'json', 'json')
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
@@ -78,6 +85,10 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
+        cls.load_balancer_1 = int(cls.autoscale_config.load_balancer_1)
+        cls.load_balancer_2 = int(cls.autoscale_config.load_balancer_2)
+        cls.load_balancer_3 = int(cls.autoscale_config.load_balancer_3)
+        cls.lb_other_region = int(cls.autoscale_config.lb_other_region)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
@@ -191,6 +202,24 @@ class AutoscaleFixture(BaseTestFixture):
             sp_change=change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         sleep(self.scheduler_interval + delay)
+
+    def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
+        """
+        The group_id or the server_name should be provided.
+        Given the group id, the server name is got from the group's launch
+        config and returns server ID list of servers containing that server name
+        on the tenant, from nova.
+        """
+        if group_id:
+            launch_config_response = self.autoscale_client.view_launch_config(
+                group_id)
+            launch_config = launch_config_response.entity
+            params = launch_config.server.name
+        elif server_name:
+            params = server_name
+        list_server_resp = self.server_client.list_servers(name=params)
+        filtered_servers = list_server_resp.entity
+        return [server.id for server in filtered_servers]
 
     @classmethod
     def tearDownClass(cls):

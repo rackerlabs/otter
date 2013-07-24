@@ -3,6 +3,7 @@ System Integration tests autoscaling with lbaas
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import random
+import unittest
 
 
 class AutoscaleLbaasFixture(AutoscaleFixture):
@@ -11,109 +12,147 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     System tests to verify lbaas integration with autoscale
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(AutoscaleLbaasFixture, cls).setUpClass()
-        # create 3 lbaas in the given region and one in a different region
-        cls.lbaas1_id = '142427'
-        cls.lbaas2_id = '155337'
-        cls.lbaas3_id = '155465'
-        cls.lbaas_other_region = '155467'
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group
-        """
-        super(AutoscaleLbaasFixture, cls).tearDownClass()
-        # delete all lbaas
-
     def test_add_multiple_lbaas_to_group(self):
         """
-        Adding multiple lbaas within the launch config when creating the group,
-        cause the servers to be added as nodes to all the lbaas
+        Adding multiple load balancers within the launch config when creating the group,
+        cause the servers to be added as nodes to all the load balancers
         """
-        group = self._create_group_given_lbaas_id(self, self.lbaas1_id,
-                                                  self.lbaas2_id, self.lbaas3_id)
+        group = self._create_group_given_lbaas_id(self.load_balancer_1,
+                                                  self.load_balancer_2, self.load_balancer_3)
         active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
-        self._verify_lbs_on_group_have_servers_as_nodes(active_server_list,
-                                                        self.lbaas1_id, self.lbaas2_id,
-                                                        self.lbaas3_id)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        self.load_balancer_1,
+                                                        self.load_balancer_2,
+                                                        self.load_balancer_3)
+        self.empty_scaling_group(group)
 
     def test_update_launch_config_to_include_multiple_lbaas(self):
         """
-        Updating the launch config to add multiple lbaas to a group that had only one lbaas,
-        results in the new servers of that group to be added as nodes to all the lbaas'
+        Updating the launch config to add multiple load balancer to a group that had
+        only one load balancer, results in the new servers of that group to be added
+        as nodes to all the load balancers'
         """
-        pass
+        policy_data = {'change': self.sp_change}
+        group = self._create_group_given_lbaas_id(self.load_balancer_1)
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        self.load_balancer_1)
+        self._update_launch_config(group, self.load_balancer_1, self.load_balancer_2,
+                                   self.load_balancer_3)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_data, execute_policy=True)
+        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt + self.sp_change)
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+                                                        self.load_balancer_1,
+                                                        self.load_balancer_2,
+                                                        self.load_balancer_3)
+        self.empty_scaling_group(group)
 
     def test_update_launch_config_to_include_lbaas(self):
         """
-        Update the launch config to add a lbaas to a group that did not have an lbaas,
-        results in the new servers of that group to be added as nodes to the lbaas
+        Update the launch config to add a load balancer to a group that did not
+        have a load balancer, results in the new servers of that group to be added
+        as nodes to the load balancers
         """
-        pass
+        policy_data = {'change': self.sp_change}
+        group = (self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=self.gc_min_entities_alt)).entity
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._update_launch_config(group, self.load_balancer_1, self.load_balancer_2,
+                                   self.load_balancer_3)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_data, execute_policy=True)
+        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt + self.sp_change)
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+                                                        self.load_balancer_1,
+                                                        self.load_balancer_2,
+                                                        self.load_balancer_3)
+        self.empty_scaling_group(group)
 
     def test_update_existing_lbaas_in_launch_config(self):
         """
-        Update the lbaas id in the launch config and verify a scale up after the update,
-        resulted in servers added as nodes to the newly added lbaas
+        Update the load balancer id in the launch config and verify a scale up after the update,
+        resulted in servers added as nodes to the newly added load balancer
+        ** to be tested**
         """
-        pass
+        policy_up_data = {'change': self.gc_min_entities_alt}
+        policy_down_data = {'change': -self.gc_min_entities_alt}
+        group = self._create_group_given_lbaas_id(self.load_balancer_1)
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        self.load_balancer_1)
+        self._update_launch_config(group, self.load_balancer_2)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt * 2)
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+                                                        self.load_balancer_2)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
+        activeservers_scaledown = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
+                                                        self.load_balancer_2)
+        self.empty_scaling_group(group)
 
     def test_remove_existing_lbaas_in_launch_config(self):
         """
         Remove lbaas id in the launch config and verify a scale up after the update,
         resulted in servers not added to the older lbaas id
         """
-        pass
+        policy_up_data = {'change': self.sp_change}
+        group = self._create_group_given_lbaas_id(self.load_balancer_1)
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        self.load_balancer_1)
+        self._update_launch_config(group)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt + self.sp_change)
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        get_nodes_on_lb = (self.lbaas_client.list_nodes(self.load_balancer_1).entity)
+        nodes_list_on_lb = []
+        for each_node in get_nodes_on_lb:
+                nodes_list_on_lb.append(each_node.address)
+        for each_server in active_servers_from_scale:
+            self.assertTrue(each_server not in nodes_list_on_lb)
+        self.empty_scaling_group(group)
 
-    def test_add_nodes_to_existing_lbaas(self):
+    @unittest.skip('AUTO-378')
+    def test_negative_create_group_with_invalid_load_balancer(self):
         """
-        Add an existing lbaas to a scaling group with minentities > 0. The servers
-        on the scaling group are added as nodes to the loadbalancer
+        Create group with a random number/lb from a differnt region as the load balancer id
+        and verify the scaling group deletes the servers after trying to add loadbalancer.
         """
-        pass
-
-    def test_negative_add_nodes_to_different_accounts_lbaas(self):
-        """
-        Create an lbaas on diffrent account and add it in the launch config and
-        verify scaling group
-        """
-        pass
-
-    def test_negative_add_nodes_to_deleted_lbaas(self):
-        """
-        Delete an lbaas that is added to a scaling group's launch config
-        and execute policy and verify
-        """
-        pass
-
-    def test_negative_create_group_with_lbaas_in_different_region(self):
-        """
-        Create a group with minentities > 0 and lbaas on different region.
-        No active servers remain on the group.
-        """
-        pass
-
-    def test_update_server_and_lbaas_config_scale_up_down(self):
-        """
-        Create a group and then update group launch config for server and lbaas,
-        verify all updates reflect on servers created from the scale up after the update
-        """
-        pass
-
-    def test_update_server_and_lbaas_config_scale_up_down_scheduler(self):
-        """
-        Create a group and then update group launch config for server and lbaas,
-        verify all updates reflect on servers created from the scale up after the update
-        """
-        pass
+        load_balancer_list = [00000, self.lb_other_region]
+        for each_load_balancer in load_balancer_list:
+            group = self._create_group_given_lbaas_id(each_load_balancer)
+            try:
+                self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+                    group.id,
+                    self.gc_min_entities_alt)
+            except ValueError:
+                pass
+            self.assertTrue((self.get_servers_containing_given_name_on_tenant(group.id))
+                            is None, msg='Servers created on the group before trying to add the'
+                            'invalid load balancer were not deleted on group {0}'.format(group.id))
 
     def _create_group_given_lbaas_id(self, *lbaas_ids):
         """
@@ -123,12 +162,12 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             lc_load_balancers=self._create_lbaas_list(*lbaas_ids))
-        group = create_group_response
+        group = create_group_response.entity
         self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
         return group
 
-    def _verify_lbs_on_group_have_servers_as_nodes(self, server_ids_list, *lbaas_id):
+    def _verify_lbs_on_group_have_servers_as_nodes(self, group_id, server_ids_list, *lbaas_ids):
         """
         Given the list of active server ids on the group, create a list of the
         ip address of the servers on the group,
@@ -138,16 +177,36 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         port on the lbaas id.
         """
         # call nova list server, filter by ID and create ip address list
-        # call list node for each lbaas, create list of Ips and ports
+        servers_address_list = self._get_ipv4_address_list_on_servers(
+            server_ids_list)
         # call otter, list launch config, create list of ports
-        # compare ip address lists and port lists
-        pass
+        port_list_from_group = self._get_ports_from_otter_launch_configs(
+            group_id)
+        # call list node for each lbaas, create list of Ips and ports
+        ports_list = []
+        for each_loadbalancer in lbaas_ids:
+            get_nodes_on_lb = (self.lbaas_client.list_nodes(
+                each_loadbalancer).entity)
+            nodes_list_on_lb = []
+            for each_node in get_nodes_on_lb:
+                nodes_list_on_lb.append(each_node.address)
+                ports_list.append(each_node.port)
+            # compare ip address lists and port lists
+            for each_address in servers_address_list:
+                self.assertTrue(each_address in nodes_list_on_lb)
+        for each_port in port_list_from_group:
+            self.assertTrue(each_port in ports_list)
 
     def _update_launch_config(self, group, *lbaas_ids):
         """
-        Update the launch config to update to the given lbaas id
+        Update the launch config to update to the given load balancer ids
         """
+        if lbaas_ids:
+            lbaas_list = self._create_lbaas_list(*lbaas_ids)
+        else:
+            lbaas_list = []
         update_lc_response = self.autoscale_client.update_launch_config(
+            group_id=group.id,
             name=group.launchConfiguration.server.name,
             image_ref=group.launchConfiguration.server.imageRef,
             flavor_ref=group.launchConfiguration.server.flavorRef,
@@ -155,7 +214,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             metadata=None,
             disk_config=None,
             networks=None,
-            load_balancers=self._create_lbaas_list(*lbaas_ids))
+            load_balancers=lbaas_list)
         self.assertEquals(update_lc_response.status_code, 204,
                           msg='Update launch config with load balancer failed for group '
                           '{0} with {1}'.format(group.id, update_lc_response.status_code))
@@ -171,3 +230,27 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                          'port': random.randint(1000, 9999)}
                 lbaas_list.append(lbaas)
         return lbaas_list
+
+    def _get_ipv4_address_list_on_servers(self, server_ids_list):
+        """
+        Returns the list of ipv4 addresses for the given list of servers
+        """
+        network_list = []
+        for each_server in server_ids_list:
+            network = (self.server_client.list_addresses(each_server).entity)
+            for each_network in network.private.addresses:
+                if str(each_network.version) is '4':
+                    network_list.append(
+                        each_network.addr)
+        return network_list
+
+    def _get_ports_from_otter_launch_configs(self, group_id):
+        """
+        Returns the list of ports in the luanch configs of the group_id
+        """
+        port_list = []
+        launch_config = (
+            self.autoscale_client.view_launch_config(group_id)).entity
+        for each_lb in launch_config.loadBalancers:
+            port_list.append(each_lb.port)
+        return port_list

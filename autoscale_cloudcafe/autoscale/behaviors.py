@@ -123,14 +123,14 @@ class AutoscaleBehaviors(BaseBehavior):
             active_list = group_state.active
 
             if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
-                raise BuildErrorException(
+                raise ValueError(
                     'Group Id %s failed to attempt server creation. Group has no servers'
                     % group_id)
 
             if len(active_list) == expected_servers:
                 return [server.id for server in active_list]
             time.sleep(interval_time)
-            print "waiting for servers to be active..."
+            #print "waiting for servers to be active..."
 
             if group_state.desiredCapacity != expected_servers:
                 raise BuildErrorException(
