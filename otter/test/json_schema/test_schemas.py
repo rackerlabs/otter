@@ -583,6 +583,16 @@ class ScalingPolicyTestCase(TestCase):
             invalid['args']['cron'] = invalid_cron
             self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
+    def test_cron_with_seconds(self):
+        """
+        policy with cron having 6 entries representing seconds is not allowed
+        """
+        # This is tested for validation in above test.
+        # Here it is checked for correct exception rased
+        invalid_cron = '* * * * * *'
+        self.assertRaisesRegexp(ValueError, 'Seconds not allowed',
+                                group_schemas.validate_cron, invalid_cron)
+
 
 class CreateScalingGroupTestCase(TestCase):
     """

@@ -203,18 +203,21 @@ zero = {
 
 
 # Datetime validator. Allow only zulu-based UTC timestamp
-# It is checking for any exception by catching Exception instance since from_timestamp throws
-# TypeError instead of ParseError with certain invalid inputs like only date or time.
-# This issue has been raised and tracked http://code.google.com/p/pyiso8601/issues/detail?id=8
-# and http://code.google.com/p/pyiso8601/issues/detail?id=24
-@format_checker.checks('date-time', raises=Exception)
+@format_checker.checks('date-time', raises=ValueError)
 def validate_datetime(dt_str):
     """
-    Validate date-time string in json. Return True if valid and raise exceptions if invalid
+    Validate date-time string in json. Return True if valid and raise ValueError if invalid
     """
     if dt_str[-1] != 'Z':
         raise ValueError('Expecting Zulu-format UTC time')
-    dt = from_timestamp(dt_str)
+    try:
+        dt = from_timestamp(dt_str)
+    except:
+        # It is checking for any exception since from_timestamp throws
+        # TypeError instead of ParseError with certain invalid inputs like only date or time.
+        # This issue has been raised and tracked http://code.google.com/p/pyiso8601/issues/detail?id=8
+        # and http://code.google.com/p/pyiso8601/issues/detail?id=24
+        raise ValueError('Error parsing datetime str')
     # Ensure time is in future
     if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
         raise ValueError('time must be in future')
@@ -222,11 +225,23 @@ def validate_datetime(dt_str):
 
 
 # Register cron format checker with the global checker. Also, ensure it does not have seconds arg
-# It is checking for any exception by catching Exception instance since croniter throws
-# KeyError with some invalid inputs. This issue has been raised in
-# https://github.com/taichino/croniter/issues/25. Following 2 issues are filed w.r.t AUTO-407
-# https://github.com/taichino/croniter/issues/24 and https://github.com/taichino/croniter/issues/23
-format_checker.checks('cron', raises=Exception)(lambda c: croniter(c) and len(c.split()) <= 5)
+@format_checker.checks('cron', raises=ValueError)
+def validate_cron(cron):
+    """
+    Validate cron string in json. Return True if valid and raise ValueError if invalid
+    """
+    try:
+        croniter(cron)
+    except:
+        # It is checking for any exception since croniter throws KeyError with some invalid inputs.
+        # This issue has been raised in https://github.com/taichino/croniter/issues/25.
+        # Following 2 issues are filed w.r.t AUTO-407:
+        # https://github.com/taichino/croniter/issues/24 and
+        # https://github.com/taichino/croniter/issues/23
+        raise ValueError('Error parsing cron')
+    if len(cron.split()) == 6:
+        raise ValueError('Seconds not allowed')
+    return True
 
 _policy_base_type = {
     "type": "object",
