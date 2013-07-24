@@ -15,7 +15,7 @@ class ListSchedulerScalingPolicy(ScalingGroupPolicyFixture):
         Create 2 scheduler policies, one at-style and another cron-style
         on a scaling group with an existing webhook type policy
         """
-        super(ScalingGroupPolicyFixture, self).setUp()
+        super(ListSchedulerScalingPolicy, self).setUp()
         self.at_value = self.autoscale_behaviors.get_time_in_utc(600)
         self.cron_value = '0 */10 * * *'
         self.at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
