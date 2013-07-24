@@ -1287,15 +1287,13 @@ class PrivateJobHelperTestCase(TestCase):
         self.state = None
         self.supervisor = mock.MagicMock(Supervisor)
         self.completion_deferred = defer.Deferred()
-        self.modify_results = []
 
         self.supervisor.execute_config.return_value = defer.succeed(
             (self.job_id, self.completion_deferred))
 
         def fake_modify_state(f, *args, **kwargs):
-            return_val = f(self.group, self.state, *args, **kwargs)
-            self.modify_results.append(return_val)
-            return return_val
+            return defer.maybeDeferred(
+                f, self.group, self.state, *args, **kwargs)
 
         self.group.modify_state.side_effect = fake_modify_state
 
@@ -1365,8 +1363,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertEqual(len(self.modify_results), 1)
-        self.assertIs(self.modify_results[0], self.state)
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(
@@ -1383,8 +1381,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.assertEqual(len(self.modify_results), 1)
-        self.assertIs(self.modify_results[0], self.state)
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
@@ -1405,8 +1403,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.job.start('launch')
         self.completion_deferred.errback(DummyException('e'))
 
-        self.assertEqual(len(self.modify_results), 1)
-        self.assertIs(self.modify_results[0], self.state)
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
 
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
