@@ -1331,10 +1331,12 @@ class PrivateJobHelperTestCase(TestCase):
     def test_start_callbacks_with_job_id(self):
         """
         The deferred returned by start callbacks immediately with just the job
-        ID, without waiting for the `completion_deferred` to fire
+        ID, without waiting for the `completion_deferred` to fire, and the log
+        is bound
         """
         d = self.job.start('launch')
         self.assertEqual(self.successResultOf(d), self.job_id)
+        self.assertEqual(self.job.log, self.log.bind.return_value)
 
     def test_modify_state_called_on_job_completion_success(self):
         """
@@ -1428,6 +1430,19 @@ class PrivateJobHelperTestCase(TestCase):
         self.supervisor.execute_delete_server.assert_called_once_with(
             self.log.bind.return_value, self.transaction_id, self.group,
             {'id': 'active'})
+
+    def test_job_completion_failure_NoSuchScalingGroupError(self):
+        """
+        If a job fails, but `modify_state` fails with a
+        `NoSuchScalingGroupError`, then the group has been deleted and the
+        failure can be ignored (not logged)
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+        self.assertEqual(self.log.bind.return_value.err.call_count, 0)
 
     def test_modify_state_failure_logged(self):
         """

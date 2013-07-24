@@ -369,7 +369,13 @@ class _Job(object):
             state.remove_job(self.job_id)
             return state
 
-        return self.scaling_group.modify_state(handle_failure)
+        d = self.scaling_group.modify_state(handle_failure)
+
+        def ignore_error_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+
+        d.addErrback(ignore_error_if_group_deleted)
+        return d
 
     def _job_succeeded(self, result):
         """
