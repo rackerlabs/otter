@@ -152,7 +152,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
               return_value=ConsistencyLevel.TWO)
 
         self.lock = self.mock_lock()
-        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
+        self.basic_lock_mock = patch(self, 'otter.models.cass.BasicLock',
+                                     return_value=self.lock)
 
     def test_view_config(self):
         """
@@ -272,6 +273,35 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(self.connection.execute.call_count, 0)
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
+
+    def test_modify_state_lock_with_retry(self):
+        """
+        `modify_state` gets lock by retrying with different wait intervals each time
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.returns = [None, None]
+
+        d = self.group.modify_state(modifier)
+        self.assertEqual(self.successResultOf(d), None)
+        self.assertEqual(self.basic_lock_mock.call_count, 1)
+        args, kwargs = self.basic_lock_mock.call_args_list[0]
+        self.assertEqual(args, (self.connection, 'locks', self.group.uuid))
+        self.assertEqual(kwargs['max_retry'], 5)
+        first_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= first_retry_wait <= 5)
+
+        d = self.group.modify_state(modifier)
+        self.assertEqual(self.successResultOf(d), None)
+        self.assertEqual(self.basic_lock_mock.call_count, 2)
+        args, kwargs = self.basic_lock_mock.call_args_list[1]
+        self.assertEqual(args, (self.connection, 'locks', self.group.uuid))
+        self.assertEqual(kwargs['max_retry'], 5)
+        second_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= second_retry_wait <= 5)
+        self.assertNotEqual(first_retry_wait, second_retry_wait)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
