@@ -51,13 +51,9 @@ format="SVG" scale="60"/>
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
          xml:id="autoscale-getting-started">
-    
-    <!-- this Getting Started content comes directly from a wiki page, 
-         https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
-    <!-- some sample code displayed on that page does NOT validate via JSONlint;
-         use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
-    
-    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+     
+    <?rax title.font.size="35px" subtitle.font.size="20px"
+          canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <?rax status.bar.text="PREVIEW" ?>
     <info>
         <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
@@ -97,16 +93,17 @@ format="SVG" scale="60"/>
                     <itemizedlist spacing="compact">
                         <listitem>
                             <para>Initial internal draft of API
-                                Operations section for Preview
+                                Operations chapter for Preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
             </revision>           
         </revhistory>
+  <!-- plan is that raxm:product will be cas, Cloud Autoscale; still fails validation, fix it later. use cdb now because it is valid -->
 	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
-            <raxm:product version="v1.0">cas</raxm:product>
+            <raxm:product version="v1.0">cdb</raxm:product>
             <raxm:priority>20</raxm:priority>
         </raxm:metadata>
     </info>
@@ -118,11 +115,33 @@ format="SVG" scale="60"/>
         means that you can begin with a minimal cloud configuration and grow only when the cost of that growth is 
         justified.
     </para>
+    <para>
+      Autoscale is a Web service that automatically scales resources up and down as a response to an increase or decrease in overall workload based on user-defined thresholds.
+      You can set up a schedule for launching Autoscale or define an event that is triggered by Cloud Monitoring. You can also specify a minimum and maximum number of cloud servers, the amount of resources you want to increase or decrease and the thresholds in Cloud Monitoring that will trigger the scaling activities. 
+      Autoscale requires the following services to work together:
+      <itemizedlist>
+        <listitem>
+          <para>
+            Cloud Monitoring
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Cloud Servers
+          </para>
+        </listitem>
+        <listitem>
+          <para>
+            Cloud Load Balancers
+          </para>
+        </listitem>
+      </itemizedlist> 
+    </para>
     <section xml:id="Intended_Audience-d1e166">
         <title>Intended Audience</title>
         <para>This document is intended for software developers who are
             interested in developing applications that use the Rackspace
-            Cloud Cloud Autoscale API. To use this API, we assume you have the following
+            Cloud Cloud &PROD; API. To use this API, we assume you have the following
             skills:</para>
         <itemizedlist>
             <listitem>
@@ -145,23 +164,10 @@ format="SVG" scale="60"/>
         </para>
         <?rax revhistory?>
     </section>
-        <!-- try again later
-            <xi:include href="./chapters/resources.xml"/>
-        -->
-        <section xml:id="Resources"
-            xmlns:xlink="http://www.w3.org/1999/xlink">
-            <title>Additional Resources</title>
-            <para>
-                You can see and experiment with all &PRODNAME; API calls at
-                <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
-            </para>
-            <para> To use &PRODNAME;, you must be able to set
-                cloud monitoring alarms and create cloud servers and
-                cloud load balancers. You can read API documentation
-                for those and other Rackspace services at <link
-                    xlink:href="http://docs.rackspace.com/"
-                    >http://docs.rackspace.com/</link>. </para>
-        </section>
+    <!-- Resources section, suggesting other places to go for info, 
+         is external so it's handy for Getting Started to share -->    
+            <xi:include href="chapters/resources.xml"/>
+    <!-- -->
     <section xml:id="API_Contract_Changes-d1e363">
         <title>API Contract Changes</title>
         <para>The API contract is not locked and may change during the
@@ -205,7 +211,12 @@ format="SVG" scale="60"/>
     <chapter xml:id="Concepts-dle001">
         <title>Concepts</title>
         <para> To use the &PROD; API effectively, you should
-            understand several key concepts: </para>
+            understand several key concepts: 
+        </para>
+      <!-- Glossary section, defining basic terms, 
+         is external so it's handy for Getting Started to share -->
+      <xi:include href="chapters/glossary.xml"/>
+      <!-- -->
     </chapter>
       <chapter xml:id="Gen_API_Info-de01">
     <title>General API Information</title>
@@ -295,24 +306,9 @@ format="SVG" scale="60"/>
           authenticate successfully, the response to your
           authentication request will include a catalog of the
           services to which you have subscribed rather than the sample
-          values shown here. </para>
-          <!-- fix the auth code samples soon 
+          values shown here. </para>  
         <example>
-          <title>Auth Request for US Endpoint: XML</title>
-          <programlistingco>
-            <areaspec>
-              <area xml:id="credentials.xml.user"
-                units="linecolumn" coords="13 17"/>
-              <area xml:id="credentials.xml.key"
-                units="linecolumn" coords="14 15"/>
-            </areaspec>
-            <programlisting language="xml">
-<xi:include href="samples/credentials-20.xml" parse="text"/>
-                    </programlisting>
-          </programlistingco>
-        </example>
-        <example>
-          <title>Auth Request for US Endpoint: JSON</title>
+          <title>Authentication Request for US Endpoint: JSON</title>
           <programlistingco>
             <areaspec>
               <area xml:id="credentials.json.user"
@@ -322,15 +318,15 @@ format="SVG" scale="60"/>
             </areaspec>
             <programlisting language="json">
 <xi:include href="samples/credentials-20.json" parse="text"/>
-                    </programlisting>
+            </programlisting>
           </programlistingco>
         </example>
         <calloutlist>
-          <callout arearefs="credentials.xml.user">
+          <callout arearefs="credentials.json.user">
             <para> The username supplied here is your
               common Rackspace Cloud username. </para>
           </callout>
-          <callout arearefs="credentials.xml.key">
+          <callout arearefs="credentials.json.key">
             <para> The key is your API access key. The key
               can be obtained from the Rackspace Cloud
               Control Panel in the <guimenu>&lt;Your
@@ -341,63 +337,41 @@ format="SVG" scale="60"/>
                 >Control Panel Login</link>). </para>
           </callout>
         </calloutlist>
-        <example>
-          <title>Auth Response for US Endpoint: XML</title>
-          
-          <programlistingco>
-            <areaspec>
-              <area xml:id="response.xml.namespaces" units="linecolumn" coords="7 9"/>
-              <area xml:id="response.xml.token" units="linecolumn" coords="15 10"/>
-              <area xml:id="response.xml.dfltregion" units="linecolumn" coords="16 67"/>
-              <area xml:id="response.xml.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.xml.catalog" units="linecolumn" coords="22 21"/>
-              <area xml:id="response.xml.servicetype" units="linecolumn" coords="51 34"/>
-              <area xml:id="response.xml.servicename" units="linecolumn" coords="51 54"/>
-              <area xml:id="response.xml.region" units="linecolumn" coords="52 30"/>
-              <area xml:id="response.xml.tenant" units="linecolumn" coords="53 66"/>
-              <area xml:id="response.xml.url" units="linecolumn" coords="54 9"/>
-            </areaspec>
-            <programlisting language="xml"><xi:include href="samples/auth-20.xml" parse="text"/></programlisting>
-          </programlistingco>
-        </example>
         
         
         <example xml:id="auth-response-example-json">
-          <title>Auth Response for US Endpoint: JSON</title>
+          <title>Authentication Response for US Endpoint: JSON</title>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.json.namespaces" units="linecolumn" coords="200 1"/>
-              <area xml:id="response.json.token" units="linecolumn" coords="9 8"/>
-              <area xml:id="response.json.dfltregion" units="linecolumn" coords="16 45"/>
-              <area xml:id="response.json.role" units="linecolumn" coords="17 12"/>
-              <area xml:id="response.json.catalog" units="linecolumn" coords="30 8"/>
-              <area xml:id="response.json.servicetype" units="linecolumn" coords="114 16"/>
-              <area xml:id="response.json.servicename" units="linecolumn" coords="113 16"/>
-              <area xml:id="response.json.region" units="linecolumn" coords="104 24"/>
-              <area xml:id="response.json.tenant" units="linecolumn" coords="101 24"/>
-              <area xml:id="response.json.url" units="linecolumn" coords="102 24"/>
+              <area xml:id="response.json.token"       units="linecolumn" coords="10 8"/>
+              <area xml:id="response.json.dfltregion"  units="linecolumn" coords="17 12"/>
+              <area xml:id="response.json.role"        units="linecolumn" coords="18 12"/>
+              <area xml:id="response.json.catalog"     units="linecolumn" coords="31 8"/>
+              <area xml:id="response.json.service-lb"         units="linecolumn" coords="49 16"/>
+              <area xml:id="response.json.service-compute"    units="linecolumn" coords="65 16"/>
+              <area xml:id="response.json.service-monitor"    units="linecolumn" coords="87 16"/>
+              <area xml:id="response.json.service-autoscale"  units="linecolumn" coords="97 16"/>
+              <area xml:id="response.json.tenant"      units="linecolumn" coords="121 24"/>
+              <area xml:id="response.json.url"         units="linecolumn" coords="122 24"/>
+              <area xml:id="response.json.region"      units="linecolumn" coords="124 24"/>
+              <area xml:id="response.json.servicename" units="linecolumn" coords="133 16"/>
+              <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
-            <programlisting language="json"><xi:include href="samples/auth-20.json" parse="text"/>
-                    </programlisting>
+            <programlisting language="json">
+<xi:include href="samples/auth-20.json" parse="text"/>
+            </programlisting>
           </programlistingco>
         </example>
         <note>
-          <para>The information shown in the Auth Response
-            examples is for US-based accounts. If you
-            authenticate against the UK-endpoint for auth,
+          <para>The information shown in the authentication response
+            example is for US-based accounts. If you
+            authenticate against the UK endpoint,
             you will see the service catalog information
             for UK-based accounts.</para>
         </note>
         <calloutlist>
-          <callout arearefs="response.xml.namespaces">
-            <para>
-              In XML responses only,
-              a list of namespaces identifies API extensions that add functionality to the core API.
-            </para>
-            <para> </para>
-          </callout>
-          <callout arearefs="response.xml.token">
+          <callout arearefs="response.json.token">
             <para> This token can be presented to a service as evidence of authentication.
               Tokens are valid for a finite duration; a token's default lifespan is twenty-four hours.
             </para>
@@ -420,18 +394,18 @@ format="SVG" scale="60"/>
             </note>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.dfltregion">
-            <para> Users can be assigned a default region so that, when there is a 
-              choice between multiple endpoints associated with a service in the 
-              user's catalog, the endpoint for the user's default region will be 
-              selected if it is available. In this example, the user's default 
-              region is DFW and several of the services in the user's catalog 
-              offer endpoints in that region and the ORD region; this user's work 
+          <callout arearefs="response.json.dfltregion">
+            <para> Users can be assigned a default region so that, when there is a
+              choice between multiple endpoints associated with a service in the
+              user's catalog, the endpoint for the user's default region will be
+              selected if it is available. In this example, the user's default
+              region is DFW and several of the services in the user's catalog
+              offer endpoints in that region and the ORD region; this user's work
               will be directed to the DFW region whenever possible.
             </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.role">
+          <callout arearefs="response.json.role">
             <para> Users can be assigned multiple roles,
               with each role providing specific
               privileges. In this example,
@@ -446,72 +420,37 @@ format="SVG" scale="60"/>
               Tester, or Trainer. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.catalog">
-            <para> The service catalog lists the services
-              this user can access. In this example, the
-              user can access one database service, one
-              loadbalancing service, two compute
-              services (Cloud Servers OpenStack and
-              Cloud Servers), two object storage
-              services (Cloud Files Content Distribution
-              Network (CDN), and Cloud Files),  and one
-              DNS service. The catalog listing for each
-              service provides at least one endpoint URL
-              for that service. Other information, such
-              as regions, versions, and tenants, is
-              provided if it's relevant to this user's
-              access to this service. </para>
+          <callout arearefs="response.json.catalog">
+            <para> The service catalog lists the services this user
+              can access. In this example, the user can access one
+              database service, one loadbalancing service, one compute
+              service (Cloud Servers OpenStack), one object storage
+              service (Cloud Files), one monitoring service (Cloud
+              Monitoring), one autoscale service (&PRODNAME;) and one DNS service.
+              The catalog listing for each service provides at least
+              one endpoint URL for that service. Other information,
+              such as regions, versions, and tenants, is provided if
+              it is relevant to this user's access to this service. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.servicetype">
-            <para>
-              The service type attribute identifies services that perform similar functions, whatever those services might be named.
-              In this example, the services named cloudServers and cloudServersOpenstack are both identified as <code>type="compute"</code>,
-              identifying them as compute services even though the word "compute" does not appear in their names.
-            </para>
-            <important>
-              <para>Use service type as the primary value for
-                locating a service. If multiple endpoints of the
-                same service type exist in the same region, use
-                service name as the tiebreaker.</para>
-            </important>
+          <callout arearefs="response.json.service-lb">
+            <para> This service catalog entry describes a load
+              balancing service. To use &PRODNAME;, you must have access to a load balancing service. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.servicename">
-            <para>
-              The service name attribute identifies each unique service in the catalog.
-              Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
-            </para>
-            <important>
-              <para> If you are programmatically parsing an authentication
-                response, use service type rather than service name as
-                the basis for determining whether a user has access to
-                a particular kind of service. Service type is stable
-                across all releases; new service types may be developed,
-                but existing service types are not renamed.
-                In this example,
-                <code>type="compute"</code> identifies all the
-                available compute services, one of which is named
-                cloudServers and one of which is named
-                cloudServersOpenStack. New compute service names may be added
-                in future releases; whatever the compute services are
-                named, you can always
-                recognize them by parsing for
-                <code>type="compute"</code> in the authentication
-                response's service catalog. </para>
-            </important>
+          <callout arearefs="response.json.service-compute">
+            <para> This service catalog entry describes a compute service. To use &PRODNAME;, you must have access to a compute service. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.region">
-            <para> A service may expose endpoints in different regions.
-              Regional endpoints allow clients to provision
-              resources in a manner that provides high
-              availability. </para>
-            <para> Some services are not region-specific. These services supply a single
-              non-regional endpoint and do not provide access to internal URLs. </para>
+          <callout arearefs="response.json.service-monitor">
+            <para> This service catalog entry describes a monitoring service. To use &PRODNAME;, you must have access to a monitoring service. </para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.tenant">
+          <callout arearefs="response.json.service-autoscale">
+            <para> This service catalog entry describes &PRODNAME;. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.tenant">
             <para> Some services recognize specification of a tenant. If a
               service does recognize tenants, the format of the
               tenant specification is defined only by the
@@ -520,7 +459,7 @@ format="SVG" scale="60"/>
               service you are using.</para>
             <para> </para>
           </callout>
-          <callout arearefs="response.xml.url">
+          <callout arearefs="response.json.url">
             <para>
               An endpoint can be assigned public and internal URLs. A
               public URL is accessible from anywhere. Access to a public
@@ -530,64 +469,73 @@ format="SVG" scale="60"/>
             </para>
             <para> </para>
           </callout>
+          <callout arearefs="response.json.region">
+            <para> A service may expose endpoints in different regions.
+              Regional endpoints allow clients to provision
+              resources in a manner that provides high
+              availability. </para>
+            <para> Some services are not region-specific. These services supply a single
+              non-regional endpoint and do not provide access to internal URLs. </para>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.servicename">
+            <para>
+              The service name attribute identifies each unique service in the catalog.
+              Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
+            </para>
+            <important>
+              <para> If you are programmatically parsing an
+                authentication response, use service type rather than
+                service name as the basis for determining whether a
+                user has access to a particular kind of service.
+                Service type is stable across all releases; new
+                service types may be developed, but existing service
+                types are not renamed. It it possible to subscribe to
+                multiple services of the same type. Whatever those
+                services are named, you can always recognize them by
+                parsing for service type in the authentication
+                response's service catalog. </para>
+            </important>
+            <para> </para>
+          </callout>
+          <callout arearefs="response.json.servicetype">
+            <para> The service type attribute identifies services that
+              perform similar functions, whatever those services might
+              be named. In this example, the service named
+              cloudServersOpenstack is identified as
+                <code>type="compute"</code>, indicating that it is a
+              compute service even though the word "compute" does not
+              appear in its name. </para>
+            <important>
+              <para>Use service type as the primary value for
+                locating a service. If multiple endpoints of the
+                same service type exist in the same region, use
+                service name as the tiebreaker.</para>
+            </important>
+            <para> </para>
+          </callout>
         </calloutlist>
         <para>Authentication tokens are typically valid for 24
           hours. Applications should be designed to
           re-authenticate after receiving a 401
           (Unauthorized) response from a service endpoint. </para>
-        <important>
-          <para>If you are programmatically parsing an
-            authentication response, please be aware that
-            service names are stable for the life of the
-            particular service and can be used as keys.
-            You should also be aware that a user's service
-            catalog can include multiple uniquely-named
-            services which perform similar functions. For
-            example, cloudServersOpenStack is the
-            OpenStack version of compute whereas
-            cloudServers is the legacy version of compute;
-            the same user can have access to both
-            services. In Auth 2.0, the service type
-            attribute can be used as a key by which to
-            recognize similar services; see the tip
-            below.</para>
-        </important>
-        <tip>
-          <para>Beginning with Auth 2.0, the service catalog
-            includes a service type attribute to identify
-            services that perform similar functions but
-            have different names; for example,
-            <code>type="compute"</code> identifies
-            compute services such as cloudServers and
-            cloudServersOpenStack. Some developers have
-            found the service type attribute to be useful
-            in parsing the service catalog. For additional
-            information on Auth 2.0 (also known as the
-            Cloud Identity Service), refer to the
-            <citetitle>Cloud Identity Client Developer
-              Guide</citetitle> at <link
-                xlink:href="http://docs.rackspace.com"
-                >http://docs.rackspace.com/</link>.</para>
-        </tip>
-        <para>Databases service endpoints are published in the
-          service catalog in the Auth response with the
-          account number, which is a required element of the
-          service endpoints. The examples shown here are for
-          authentication for US customers. Customers with
-          UK-based accounts will see different values in the
-          service catalog. Refer to the next section for
-          more information about service endpoints. </para>  
-          -->
-      </section>  </section>
+      </section>  
+    </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access/Endpoints</title>
       <para/>
       <para>&PRODNAME; is a regionalized service. The user of the
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
-        regional boundaries to other Cloud Queuing servers.</para>
-      <para>You can find the available service access/endpoints for
-        &PROD; summarized in the table below.</para>
+        regional boundaries to other &PROD; servers.</para>
+      <important>
+        <para>
+          For the Early Access period, you can use &PROD; endpoints in ORD and DFW.
+          Endpoints in LON and SYD will be available soon.
+        </para>
+      </important>
+      <para>The table below lists the service access/endpoints for
+        &PROD;.</para>
       <?rax-fo keep-with-next?>
       <para>
         <table rules="all">
@@ -602,55 +550,42 @@ format="SVG" scale="60"/>
             <tr align="left">
               <td colspan="2">Chicago (ORD)</td>
               <td colspan="5"
-                  ><code>https://ord.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                  ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">Dallas/Ft. Worth (DFW)</td>
               <td colspan="5"
-                  ><code>https://dfw.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">London (LON)</td>
               <td colspan="5">
-                <code>https://lon.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
             <tr align="left">
               <td colspan="2">Sydney (SYD)</td>
               <td colspan="5">
-                <code>https://syd.queuing.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
           </tbody>
         </table>
       </para>
       <para>Replace the sample project ID number,
-          <parameter>1234</parameter>, with your actual account number
-        returned as part of the authentication service
+          <parameter>1234</parameter>, with your actual account
+        number, returned as part of the authentication service
         response.</para>
-      <para>You will find the actual account number after the final
-        '/' in the <code>publicURL</code> field returned by the
-        authentication response. 
-        <!-- fix auth sample soon
-        For example, in <xref
+      <para>You will find your account number after the final '/' in
+        the <code>publicURL</code> field returned by the
+        authentication response. For example, in <xref
           linkend="auth-response-example-json"/> you can see from the
           <code>publicURL</code> field for <code>cloudServers</code>
           ("https://servers.api.rackspacecloud.com/v1.0/<emphasis
           role="bold">1100111</emphasis>") that the account number is
-        1100111. 
-        -->
-        </para>
-      <note>
-        <para>&PRODNAME; uses the term project ID rather than
-          account ID, which is used in other Rackspace documentation.
-          Both refer to your Rackspace account number, which you can
-          find in your Cloud Control Panel at
-          <link
-            xlink:href="https://mycloud.rackspace.com/"
-            >mycloud.rackspace.com</link>.</para>
-      </note>
+        1100111. </para>
     </section>
     <section xml:id="contractVersion">
       <title>Contract Versions</title>
@@ -662,9 +597,8 @@ format="SVG" scale="60"/>
         the API may be available at any given time and are not
         guaranteed to be compatible with one another. </para>
       <example>
-        <title>Sample Request URL (contract version in <emphasis
-            role="strong">bold</emphasis>)</title>
-        <programlisting>https://ord.queuing.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
+        <title>Sample Request URL for Contract Version 1.0</title>
+        <programlisting>https://ord.autoscale.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
       </example>
       <note>
         <para>This document pertains to contract version 1.0.</para>
@@ -710,9 +644,6 @@ format="SVG" scale="60"/>
     <?hard-pagebreak?>
     <section xml:id="Limits-d1e1208">
       <title>Limits</title>
-      <remark>Reviewer: Do you need both Rate Limits and Absolute
-        Limits for Autoscale? ... the section below was pulled from
-        Cloud Databases.</remark>
       <para>
         All accounts, by default, have a preconfigured set of
         thresholds (or limits) to manage capacity and prevent
@@ -723,20 +654,25 @@ format="SVG" scale="60"/>
         of time passes. Absolute limits are fixed.
       </para>
       <section xml:id="Rate_Limits-d1e1222">
+        <!-- 
+        rate limits are managed by Repose rate limiting filter, 
+        config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
+        -->
         <title>Rate Limits</title>
         <para> Rate limits are specified in terms of both a
           human-readable wild-card URI and a
           machine-processable regular expression. The
           regular expression boundary matcher '^' takes
           effect after the root URI path. For example, the
-          regular expression ^/v1.0/instances would match
+          regular expression ^/v1.0/execute would match
           the bolded portion of the following URI:
-          https://ord.databases.api.rackspacecloud.com<emphasis
-            role="bold">/v1.0/instances</emphasis>. </para>
-        <para>The following table specifies the default rate
-          limits for all API operations for all &GET;,
-          &POST;, &PUT;, and &DELETE; calls for databases
-          and database instances: </para>
+          https://ord.autoscale.api.rackspacecloud.com<emphasis
+            role="bold">/v1.0/execute</emphasis>. </para>
+        <para>
+          For any user, all &PROD; operations are limited to 1,000 calls per minute.
+        </para>
+        <para>In addition, the following table specifies the default rate limits
+          for specific &PROD; API operations: </para>
         <table rules="all">
           <caption>Default Rate Limits</caption>
           <thead>
@@ -749,42 +685,18 @@ format="SVG" scale="60"/>
           </thead>
           <tbody>
             <tr>
-              <td colspan="1">&GET; changes-since</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">3/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&POST;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">10/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&POST; instances</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">50/day</td>
-            </tr>
-            <tr>
-              <td colspan="1">&PUT;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">10/minute</td>
-            </tr>
-            <tr>
-              <td colspan="1">&DELETE;</td>
-              <td colspan="2">*/instances/*</td>
-              <td colspan="2">^/vd+.d+/instances.*</td>
-              <td colspan="1">100/minute</td>
+              <td colspan="1">&POST; {capability_version}/{capability_hash}</td>
+              <td colspan="2">/v1.0/execute/*</td>
+              <td colspan="2">/v1\\.0/execute/(.*)</td>
+              <td colspan="1">1/second</td>
             </tr>
           </tbody>
         </table>
-        <para> Rate limits are applied in order relative to the
-          verb, going from least to most specific. For
-          example, although the threshold for &POST; to
-          /v1.0/* is 10 per minute, one cannot &POST; to
-          /v1.0/* more than 50 times within a single day. </para>
+        <para> Rate limits are applied in order relative to the verb,
+          going from least to most specific. For example, although the
+          general threshold for operations to /v1/0/* is 1,000 per
+          minute, one cannot &POST; to /v1.0/execute* more than 1 time
+          per second, which is 60 times per minute. </para>
         <para> If you exceed the thresholds established for
           your account, a <errorcode>413 (Rate
             Control)</errorcode> HTTP response will be
@@ -794,11 +706,10 @@ format="SVG" scale="60"/>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <remark>Reviewer: Need to update this entire section.
-          Please give me your updates.</remark>
-        <para>Refer to the following table for the absolute
-          limits that are set.</para>
-        <table rules="all">
+        <para>&PRODNAME; does not use absolute limits. It does use 
+          <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
+        <!-- build this table if absolute limits are needed in addition to rate limits -->
+        <table rules="all" security="writeronly">
           <caption>Absolute Limits</caption>
           <thead>
             <tr>
@@ -826,18 +737,18 @@ format="SVG" scale="60"/>
     </section>
     <section xml:id="datetimeformat">
       <title>Date/Time Format</title>
-      <para> The &PROD; service uses an ISO-8601 compliant date
-        format for the display and consumption of date/time values. </para>
-      <example>
-        <title>Service Date/Time Format</title>
-        <programlisting>yyyy-MM-dd'T'HH:mm:ss.SSSZ</programlisting>
-        <para>See the table below for a description of the date/time format codes.</para>
-        <para>May 19th, 2011 at 8:07:08 AM, GMT-5 would have the following
-          format:</para>
-        <programlisting>2011-05-19T08:07:08-05:00</programlisting>
-      </example>
+      <para> 
+        The &PROD; service uses an ISO-8601 compliant date
+        format for the display and consumption of date/time values. 
+        While the standard allows specification of time zones &PROD; does not use time zones. All times are expressed as GMT
+      </para>
+      <para>
+        The two tables below show how this works. The first table identifies the elements of the
+        ISO-8601 standard. The second table shows how a sample time appears when formatted for use by &PROD;
+        in compliance with the ISO-8601 standard.
+      </para>
       <table rules="all">
-        <caption>Explanation of Date/Time Format Codes</caption>
+        <caption>Explanation of ISO-8601 Date/Time Format Codes</caption>
         <thead>
           <tr>
             <td>Code</td>
@@ -883,13 +794,29 @@ format="SVG" scale="60"/>
           </tr>
         </tbody>
       </table>
-      
+      <table rules="all">
+        <caption>Example of Formatted Time</caption>
+        <thead>
+          <tr>
+            <td>Format</td>
+            <td>Formatted Time</td>
+            <td>Unformatted Time</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>yyyy-MM-dd'T'HH:mm:ss.SSS</code></td>
+            <td><code>2013-05-19T08:07:08</code></td>
+            <td>May 19th, 2013 at 8:07:08 AM, GMT</td>
+          </tr>
+        </tbody>
+      </table>   
     </section>
     <section xml:id="faults-dle101">
       <title>Faults</title>
-      <para>If any &PRODNAME; request results in an error, the
-        queuing service returns an appropriate 4xx or 5xx HTTP status
-        code, as well as the following information in the body: </para>
+      <para>If any &PRODNAME; request results in an error, the service
+        returns an appropriate 4xx or 5xx HTTP status code, as well as
+        the following information in the body: </para>
       <itemizedlist>
         <listitem>
           <para>Title</para>
@@ -904,9 +831,15 @@ format="SVG" scale="60"/>
           <para>Link to more information</para>
         </listitem>
       </itemizedlist>
+      <para>
+        For &PROD; users, common faults are caused by invalid configurations. 
+        For example, trying to boot a server from an image that does not exist causes a fault; 
+        so does trying to attach a load balancer to a scaling group that does not exist. 
+      </para>
       <para>An example of an error message follows. </para>
+      <!-- improve this example to show something that an Autoscale user would really see -->
       <example>
-        <title>Error Message Example</title>
+        <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
 Content-Type: application/json
 
@@ -921,8 +854,9 @@ Content-Type: application/json
   }
 }</programlisting>
       </example>
-      <para>Error information for each operation is included with the
-        description in <xref linkend="apiref"/>.</para>
+      <para>Error information for each API operation is included with
+        the description of that operation in <xref linkend="apiref"
+        />.</para>
     </section> 
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
