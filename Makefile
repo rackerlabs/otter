@@ -21,8 +21,8 @@ run:
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
 
-#env:
-#	./scripts/bootstrap-virtualenv.sh
+env:
+	./scripts/bootstrap-virtualenv.sh
 
 lint:
 	tox -e pep8
