@@ -2,7 +2,6 @@
 Test to verify the links on the autoscaling api responses.
 """
 import re
-import os
 from urlparse import urlparse
 from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 
@@ -13,24 +12,6 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
     Verify links on the autoscaling api response calls
     """
     # Issue AUTO-209 - no bookmark link
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Creates a scaling group with webhook
-        """
-        super(AutoscalingLinksTest, cls).setUpClass()
-        if 'dev' in os.environ['OSTNG_CONFIG_FILE']:
-            cls.url = 'http://127.0.0.1:9000/v1.0/' + str(cls.tenant_id)
-        if 'preprod' in os.environ['OSTNG_CONFIG_FILE']:
-            cls.url = 'http://api0.preprod.ord.as.rax.io:9000/v1.0/' + str(cls.tenant_id)
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Deletes the scaling group
-        """
-        super(AutoscalingLinksTest, cls).tearDownClass()
 
     def test_scaling_group_links(self):
         """
