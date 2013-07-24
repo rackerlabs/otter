@@ -5,9 +5,7 @@ Enforces Python coding standards via pep8, pyflakes and pylint
 
 
 Installation:
-pip install pep8       - style guide
 pip install pep257     - for docstrings
-pip install pyflakes   - unused imports and variable declarations
 pip install plumbum    - used for executing shell commands
 
 This script can be called from the git pre-commit hook with a
@@ -20,34 +18,18 @@ import re
 import sys
 from plumbum import local, cli, commands
 
-pep8_options = [
-    '--max-line-length=105'
-]
-
-
 def lint(to_lint):
     """
-    Run all linters against a list of files.
+    Run linter against a list of files.
 
     :param to_lint: a list of files to lint.
 
     """
     exit_code = 0
-    for linter, options in (('pyflakes', []), ('pep8', pep8_options)):
-        try:
-            output = local[linter](*(options + to_lint))
-        except commands.ProcessExecutionError as e:
-            output = e.stdout
-
-        if output:
-            exit_code = 1
-            print "{0} Errors:".format(linter)
-            print output
-
     output = hacked_pep257(to_lint)
     if output:
         exit_code = 1
-        print "Docstring Errors:".format(linter.upper())
+        print "{0} Docstring Errors:".format("pep257".upper())
         print output
 
     sys.exit(exit_code)

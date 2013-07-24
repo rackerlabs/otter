@@ -21,19 +21,14 @@ run:
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
 
-env:
-	./scripts/bootstrap-virtualenv.sh
+#env:
+#	./scripts/bootstrap-virtualenv.sh
 
 lint:
-	${PYTHONLINT} ${PYDIRS}
+	tox -e pep8
 
 unit:
-ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
-else
-	trial --random 0 ${UNITTESTS}
-endif
+	tox -e py27
 
 integration:
 ifneq ($(and $(CLOUDCAFE),$(JENKINS_URL)), )
@@ -46,7 +41,7 @@ else
 endif
 
 coverage:
-	coverage run --source=${CODEDIR} --branch `which trial` ${UNITTESTS} && coverage html -d _trial_coverage --omit="*/test/*"
+	tox -e cover
 
 cleandocs:
 	rm -rf _builddoc
