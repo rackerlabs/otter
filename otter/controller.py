@@ -28,6 +28,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
@@ -389,7 +390,16 @@ class _Job(object):
                     "Job completed, resulting in an active server.")
             return state
 
-        return self.scaling_group.modify_state(handle_success)
+        d = self.scaling_group.modify_state(handle_success)
+
+        def delete_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+            self.log.msg('Group removed. Deleting server')
+            self.supervisor.execute_delete_server(
+                self.log, self.transaction_id, self.scaling_group, result)
+
+        d.addErrback(delete_if_group_deleted)
+        return d
 
     def job_started(self, result):
         """

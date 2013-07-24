@@ -14,7 +14,8 @@ from twisted.trial.unittest import TestCase
 from otter import controller
 from otter.supervisor import Supervisor
 
-from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
+from otter.models.interface import (
+    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
 from otter.test.utils import (
     CheckFailure, DeferredTestMixin, iMock, matches, patch)
@@ -1412,9 +1413,26 @@ class PrivateJobHelperTestCase(TestCase):
         self.log.bind.return_value.err.assert_called_once_with(
             CheckFailure(DummyException))
 
+    def test_job_completion_success_NoSuchScalingGroupError(self):
+        """
+        If a job is completed successfully, but `modify_state` fails with a
+        `NoSuchScalingGroupError`, then the group has been deleted and so the
+        server is deleted
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+
+        self.supervisor.execute_delete_server.assert_called_once_with(
+            self.log.bind.return_value, self.transaction_id, self.group,
+            {'id': 'active'})
+
     def test_modify_state_failure_logged(self):
         """
-        If modify state fails, the error is logged
+        If `modify_state` fails with a non-`NoSuchScalingGroupError`, the error
+        is logged
         """
         self.group.modify_state.side_effect = (
             lambda *args: defer.fail(DummyException('e')))
