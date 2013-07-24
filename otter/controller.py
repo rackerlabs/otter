@@ -358,7 +358,7 @@ class _Job(object):
         deferred.addCallback(self.job_started)
         return deferred
 
-    def job_failed(self, f):
+    def _job_failed(self, f):
         """
         Job has failed.  Remove the job, if it exists, and log the error.
         """
@@ -370,7 +370,7 @@ class _Job(object):
 
         return self.scaling_group.modify_state(handle_failure)
 
-    def job_succeeded(self, result):
+    def _job_succeeded(self, result):
         """
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
@@ -400,7 +400,7 @@ class _Job(object):
         self.log = self.log.bind(job_id=self.job_id)
 
         completion_deferred.addCallbacks(
-            self.job_succeeded, self.job_failed)
+            self._job_succeeded, self._job_failed)
         completion_deferred.addErrback(self.log.err)
 
         return self.job_id
