@@ -1144,7 +1144,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
             [mock.call(str(i)) for i in (1, 2, 3)])
         self.assertEqual(self.fake_state.add_job.call_count, 3)
 
-    def test_propagates_add_job_faileds(self):
+    def test_propagates_add_job_failures(self):
         """
         ``execute_launch_config`` fails if ``add_job`` raises an error
         """
@@ -1218,7 +1218,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
             self.log.bind.return_value, '1',
             self.group, {'id': 's1'})
 
-    def test_job_failed(self):
+    def test_job_failure(self):
         """
         ``execute_launch_config`` sets it up so that when a job fails, it is
         removed from pending.  It is also lgoged.

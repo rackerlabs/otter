@@ -393,8 +393,9 @@ class _Job(object):
 
     def job_started(self, result):
         """
-        Takes a completion deferred, which will fire when a job has been
-        completed, and marks said job as completed by removing it from pending.
+        Takes a tuple of (job_id, completion deferred), which will fire when a
+        job has been completed, and marks said job as completed by removing it
+        from pending.
         """
         self.job_id, completion_deferred = result
         self.log = self.log.bind(job_id=self.job_id)
