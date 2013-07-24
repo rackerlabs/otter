@@ -16,7 +16,8 @@ import os
 import pep257
 import re
 import sys
-from plumbum import local, cli, commands
+from plumbum import local, cli
+
 
 def lint(to_lint):
     """
@@ -103,7 +104,9 @@ class Lint(cli.Application):
             root = local['git']('rev-parse', '--show-toplevel').strip()
 
             # get all modified or added python files
-            modified = re.findall(r"^\s[AM]\s+(\S+\.py)$", status, re.MULTILINE)
+            modified = re.findall(r"^\s[AM]\s+(\S+\.py)$",
+                                  status,
+                                  re.MULTILINE)
 
             # now just get the path part, which all should be relative to the
             # root

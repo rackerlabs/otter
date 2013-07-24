@@ -330,9 +330,11 @@ class GroupFixture(AutoscaleFixture):
             min_entities=minentities,
             max_entities=maxentities,
             metadata={})
-        self.assertEqual(update_group.status_code, 204,
-                         msg='Update group failed with {0} for group {1}'.format(
-                         update_group.status_code, group.id))
+        self.assertEqual(
+            update_group.status_code,
+            204,
+            msg='Update group failed with {0} for group {1}'.format(
+                update_group.status_code, group.id))
 
     def _execute_policy(self, group):
         """
