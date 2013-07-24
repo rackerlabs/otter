@@ -503,13 +503,15 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         """
         cap_log = log.bind.return_value.bind.return_value
 
-        exc = CannotExecutePolicyError('tenant', 'group', 'policy', 'test')
-        self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
-            ('tenant', 'group', 'policy'))
-        self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
-        self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
+        for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
+                    NoSuchPolicyError('tenant', 'group', 'policy'),
+                    NoSuchScalingGroupError('tenant', 'group')]:
+            self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
+                ('tenant', 'group', 'policy'))
+            self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
+            self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
 
-        cap_log.msg.assert_any_call(
-            'Non-fatal error during webhook execution: {exc!r}', exc=exc)
+            cap_log.msg.assert_any_call(
+                'Non-fatal error during webhook execution: {exc!r}', exc=exc)
 
-        self.assertEqual(0, cap_log.err.call_count)
+            self.assertEqual(0, cap_log.err.call_count)

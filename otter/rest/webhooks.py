@@ -15,7 +15,12 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links, transaction_id
-from otter.models.interface import UnrecognizedCapabilityError
+
+from otter.models.interface import (
+    UnrecognizedCapabilityError,
+    NoSuchPolicyError,
+    NoSuchScalingGroupError
+)
 
 from otter.controller import CannotExecutePolicyError
 from otter import controller
@@ -308,7 +313,10 @@ def execute_webhook(request, log, capability_version, capability_hash):
     d = store.webhook_info_by_hash(log, capability_hash)
 
     def log_informational_webhook_failure(failure):
-        failure.trap(UnrecognizedCapabilityError, CannotExecutePolicyError)
+        failure.trap(UnrecognizedCapabilityError,
+                     CannotExecutePolicyError,
+                     NoSuchPolicyError,
+                     NoSuchScalingGroupError)
         cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
                     exc=failure.value)
 
