@@ -162,13 +162,13 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
             your servers in response to variation in load. &PROD;
             functions by linking three services: <itemizedlist>
                 <listitem>
-                    <para> a Cloud Monitoring Service, such as <link
+                    <para> Cloud Monitoring Service, such as <link
                             xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/Introduction.html"
                             >Rackspace Cloud Monitoring</link>
                     </para>
                 </listitem>
                 <listitem>
-                    <para> the &PROD; API </para>
+                    <para> &PROD; API </para>
                 </listitem>
                 <listitem>
                     <para> Load-balanced Cloud Servers, such as <link
@@ -206,19 +206,14 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                             has been defined in accordance with the
                             webhook. This policy determines the amount
                             of cloud servers that need to be added or
-                            removed in case the alarm is triggered.
-                             </para>
+                            removed in case the alarm is triggered. </para>
                     </listitem>
                 </orderedlist>
             </para>
             <para> Scale down events remove the oldest server in the
                 group. </para>
-            <note>
-                <para> For the Preview release, scaling down is not
-                    implemented. </para>
-            </note>
-            <para> Rackspace Autoscaling supports a cooldown feature.
-                A cooldown is a period during which no other scaling
+            <para>Rackspace Autoscaling supports a cooldown feature. A
+                cooldown is a period during which no other scaling
                 activity occurs. &#8232;By configuring cooldown
                 periods between triggers, you can control how quickly
                 Autoscale scales up toward the scaling group's maximum
@@ -260,7 +255,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                     >Chef</link> or a similar tool. </para>
             <para>
                 <note>
-                    <para> Autoscale can create servers, but you must
+                    <para>Autoscale can create servers, but you must
                         manually remove those servers when you no
                         longer want them to be active.</para>
                 </note>
@@ -304,12 +299,6 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                 </itemizedlist>Autoscaling can also work in the
                 opposite direction. A policy can say "When this
                 webhook is triggered, scale down by five servers." </para>
-            <note>
-                <para> For the Preview release, scaling down is not
-                    implemented. &PROD; can create servers, but you
-                    must manually remove those servers when you no
-                    longer want them to be active. </para>
-            </note>
         </section>
     </chapter>
     <chapter xml:id="Autoscale_Components">
@@ -335,7 +324,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
             </itemizedlist></para>
         <section xml:id="Group_Configuration">
             <title>Scaling Group Configuration</title>
-            <para> The scaling group configuration specifies the basic
+            <para>The scaling group configuration specifies the basic
                 elements of the autoscale configuration. It manages
                 how many servers can participate in the scaling group. </para>
             <para> The group configuration specifies the following
@@ -355,7 +344,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                             the scaling group </para>
                     </listitem>
                 </itemizedlist></para>
-            <para> Within the group configuration, group cooldown
+            <para>Within the group configuration, group cooldown
                 describes, in seconds, how long the group must wait
                 after a scaling policy is triggered before another
                 request for scaling is accepted. </para>
@@ -467,8 +456,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
         </section>
         <section xml:id="Scaling_Policies">
             <title>Scaling Group Policies</title>
-            <para> Scaling group policies specify how to modify the
-                scaling group and its behavior. You an specify
+            <para>Scaling group policies specify how to modify the
+                scaling group and its behavior. You can specify
                 multiple policies to manage a scaling group. </para>
             <para>Scaling policies specify the following:</para>
             <para>
@@ -500,13 +489,13 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
     </chapter>
     <chapter xml:id="Autoscale_API">
         <title>Using the &PROD; API</title>
-        <para> You can create a autoscaling group by following the
+        <para>You can create a autoscaling group by following the
             steps described in this chapter. </para>
         <para>There are several options for sending requests through
             an API: </para>
         <itemizedlist>
             <listitem>
-                <para>Developers and testers can useo cURL, the
+                <para>Developers and testers can use cURL, the
                     command-line tool from <link
                         xlink:href="http://curl.haxx.se/"
                         >http://curl.haxx.se/</link>. With cURL you
@@ -541,7 +530,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
         </para>
         <section xml:id="Authenticate">
             <title>Step 1: Authenticate</title>
-            <para> As with all Rackspace APIs, before you can use the
+            <para>As with all Rackspace APIs, before you can use the
                 &PRODNAME; API you must authenticate with your
                 Rackspace credentials. </para>
       <itemizedlist>
@@ -602,11 +591,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
             <para> With the Cloud Servers API, you can use a <link
                     xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
                     >List Images</link> request to retrieve a list of
-                options available for configuring your server.  The
-                following example shows how to request a list cloud
-                server images.<example>
+                options available for configuring your server. <example>
                     <title>Requesting a List of Cloud Server
                         Images</title>
+                    <para>The following example shows how to request a list cloud server images.</para>
                     <screen>
 curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool
                     </screen>
@@ -622,15 +610,20 @@ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" h
                     >imageID</emphasis>. </para>
         </section>
         <section xml:id="Create_Group">
-            <title>Step 3: Create a Scaling Group</title>
-            <para>To create a scaling group, submit a &POST; request
-                with the <emphasis role="italic">tenantID</emphasis>
-                that you obtained during the <link
-                    linkend="Authenticate">Authentication</link> step.
-                The following examples hows how to create a scaling
-                group</para>
+            <title>Step 3: Create and Manage a Scaling Group</title>
+            <para>You can use the Autoscale API to create and manage
+                your scaling group.</para>
             <example>
                 <title>Creating a Scaling Group</title>
+                <para>To create a scaling group, submit a &POST;
+                    request with the <emphasis role="italic"
+                        >tenantID</emphasis> that you obtained during
+                    the <link linkend="Authenticate"
+                        >Authentication</link> step.The following
+                    example shows how to create a scaling group. The
+                    POST action creates a scaling group, starts the
+                    minimum number of servers, and attaches those
+                    servers to the specified load balancer. </para>
                 <screen>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
                 </screen>
@@ -638,20 +631,123 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
 <xi:include href="./samples/groupConfiguration.json" parse="text"/>
 </programlisting>
             </example>
-            <para> This action creates your scaling group, starts the
-                minimum number of servers, and attaches those servers
-                to the specified load balancer. </para>
+            <example>
+                <title>List all Scaling Groups</title>
+                <para>The following example shows how to list all the
+                    scaling groups for a specific <emphasis
+                        role="italic">tenantID</emphasis>. </para>
+                <screen>
+GET /{tenantId}/groups
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/ViewScalingGroup.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>View Manifested View of a Scaling Group Configuration</title>
+                <para>The following example shows how to obtain the
+                    view of the scaling group configuration, including
+                    the launch configuration, and the scaling
+                    policies.  </para>
+                <screen>
+GET /{tenantId}/groups/{groupId}
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/ManifestedViewScalingGroup.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Get the Current State of a Scaling Group</title>
+                <para>The following example shows how to obtain the
+                    current date of a scaling group, including the
+                    current set of active entities, the number of
+                    pending entities, and the desired number of
+                    entities. </para>
+                <screen>
+GET /{tenantId}/groups/{groupId}
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/GetScalingGroupState.json" parse="text"/>
+</programlisting>
+            </example>
+        </section>
+        <section xml:id="Manage_Launch_Configuration">
+            <title>Step 4: Manage the Launch Configuration for your
+                Scaling Group</title>
+            <para>You can use the Autoscale API to view and update the
+                launch configuration for your scaling group.</para>
+            <example>
+                <title>Get the Current Configuration for your Scaling Group</title>
+                <para>The following example shows how to obtain the configuration for a scaling group, which includes the minimum
+                    number of entities, the maximum number of entities, global cooldown, and
+                    other metadata.</para>
+                <screen>GET /{tenantId}/groups/{groupId}/config</screen>
+                <programlisting language="json">
+<xi:include href="./samples/GetLaunchConfiguration.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Edit the Current Configuration for your Scaling
+                    Group</title>
+                <para>The following example shows how to edit the
+                    configuration for a scaling group, which includes
+                    the minimum number of entities, the maximum number
+                    of entities, global cooldown, and other metadata.
+                    If successful, no response body will be returned. </para>
+                <programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
+                <programlisting language="json">
+<xi:include href="./samples/EditGroupConfiguration.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Get the Launch Configuration for your Scaling Group</title>
+                <para>The following example shows how to obtain the launch configuration for a scaling group, which includes the
+                    details of how to create a server, from what image, which load balancers to
+                    join it to, and what networks to add it to, and other metadata. </para>
+                <screen> GET /{tenantId}/groups/{groupId}/launch</screen>
+                <programlisting language="json">
+<xi:include href="./samples/GetLaunchConfiguration.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Edit the Launch Configuration for your Scaling Group</title>
+                <para>The following example shows how to edit the
+                    launch configuration for a scaling group,
+                    inlucding how to create a server, from what image,
+                    which load balancers to join it to, and what
+                    networks to add it to, and other metadata. If
+                    successful, no response body will be returned. </para>
+                <screen> PUT /{tenantId}/groups/{groupId}/launch </screen>
+                <programlisting language="json">
+<xi:include href="./samples/EditLaunchConfiguration.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Pause Execution of all Policies for a Scaling Group</title>
+                <para>The following example shows how to pause execution of all policies for a specific scaling group. </para>
+                <screen> POST /{tenantId}/groups/{groupId}/pause</screen>
+           
+            </example>
+            <example>
+                <title>Resume Execution of all Policies for a Scaling Group</title>
+                <para>The following example shows how to resume execution of all policies for a specific scaling group. </para>
+                <screen> POST /{tenantId}/groups/{groupId}/resume</screen>
+                
+            </example>
+  
         </section>
         <section xml:id="Create_Policy">
-            <title>Step 4: Create Scaling Policies</title>
-            <para> Create a scaling policy by submitting a &POST;
-                request that contains the <emphasis role="italic"
+            <title>Step 5: Create Scaling Policies</title>
+            <para>You can use the Autoscale API to create and manage
+                the scaling policies for your scaling group. Create a
+                scaling policy by submitting a &POST; request that
+                contains the <emphasis role="italic"
                     >tenantID</emphasis> that you obtained during the
                     <link linkend="Authenticate">Authentication</link>
                 step and the <emphasis role="italic"
                     >groupID</emphasis> that you obtained during the
-                    <link linkend="Create_Group">Create a Scaling
-                    Group</link> step. </para>
+                    <link linkend="Create_Group">Create and Manage a
+                    Scaling Group</link> step. </para>
             <para> You can specify multiple policies to manage your
                     <link linkend="Create_Group">scaling group</link>. </para>
             <para>
@@ -664,16 +760,15 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
                         scale. If some element of the configuration is
                         invalid, scaling can fail even if the scaling
                         policy is executed. </para>
-              
                 </note>
             </para>
-            <para>The following example demonstrate how to create a
-                scaling policy that scales the group up by one server
-                with a cooldown phase of 150 seconds and a scaling
-                policy that scales the group down y 5.5 percent with a
-                cooldown phase of 6 seconds.</para>
             <example>
                 <title>Creating a Scaling Policy</title>
+                <para>The following example demonstrates how to create
+                    a scaling policy that scales the group up by one
+                    server with a cooldown phase of 150 seconds and a
+                    scaling policy that scales the group down y 5.5
+                    percent with a cooldown phase of 6 seconds.</para>
                 <screen>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
                 </screen>
@@ -681,15 +776,50 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
 <xi:include href="./samples/scalingPolicy.json" parse="text"/>
 </programlisting>
             </example>
-            <note>
-                <para> For the Preview release, scaling down is not
-                    implemented. &PROD; can create servers, but you
-                    must manually remove those servers when you no
-                    longer want them to be active. </para>
-            </note>
+            <example>
+                <title>Obtaining a List of Scaling Policies</title>
+                <para>The following example demonstrates how to obtain a list of scaling policies in the group. Each policy describes an id,
+                    name, type, adjustment, cooldown, and links. </para>
+                <screen>
+GET /{tenantId}/groups/{groupId}/policies
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/ViewScalingPolicies.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Getting an Individual Scaling Policy</title>
+                <para>The following example demonstrates how to get a scaling policy which describes an id, name, type, adjustment, and
+                    cooldown, and links. </para>
+                <screen>
+GET /{tenantId}/groups/{groupId}/policies/{policyId}
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/GetScalingPolicy.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Updating a Scaling Policy</title>
+                <para>The following example demonstrates how to get a scaling policy which describes an id, name, type, adjustment, and
+                    cooldown, and links. </para>
+                <screen>
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}
+                </screen>
+                <programlisting language="json">
+<xi:include href="./samples/UpdateScalingPolicy.json" parse="text"/>
+</programlisting>
+            </example>
+            <example>
+                <title>Deleting a Scaling Policy</title>
+                <para>The following example shows how to delete a scaling policy. If successful, no response body will be returned. </para>
+                <screen>
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
+                </screen>
+           
+            </example>
         </section>
         <section xml:id="Create_Webhooks">
-            <title>Step 5: Create and Manage Webhooks</title>
+            <title>Step 6: Create and Manage Webhooks</title>
             <para> After creating your policy, you need to specify a
                 webhook to you tie your <link linkend="Create_Policy"
                     >scaling policy</link> to events. Webhooks are
@@ -699,7 +829,7 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
                 sent to a configured URI. </para>
             <example>
                 <title>Creating a Scaling Webhook: Request</title>
-                <para>The following example shows how to create 2
+                <para>The following example shows how to create two
                     webhooks for a scaling policy.</para>
                 <screen>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
@@ -710,6 +840,7 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
             </example>
             <example>
                 <title>Creating a Scaling Webhook: Response</title>
+                <para>The following example shows the response that is received for a request to create a webhook for a scaling policy.</para>
                 <programlisting language="json">
 <xi:include href="./samples/webhook-response.json" parse="text"/>
 </programlisting>
@@ -758,14 +889,14 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
             </example>
         </section>
         <section xml:id="Execute_Policy">
-            <title>Step 6: Execute a Scaling Policy</title>
+            <title>Step 7: Execute a Scaling Policy</title>
             <para> After you define a <link linkend="Create_Policy"
                     >policy</link>, you can activate that policy by
                 issuing a &POST; request against its URL. </para>
             <example>
-                <title>Activating a Scaling Policy: cURL</title>
+                <title>Activating a Scaling Policy</title>
                 <screen>
-curl -X POST https://autoscale.api.rackspacecloud.com/v1.0/execute/1/{capability_hash}/ -v
+ POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute 
                 </screen>
                 <programlisting language="json">
 <xi:include href="./samples/scalingPolicy.json" parse="text"/>
@@ -785,7 +916,7 @@ curl -X POST https://autoscale.api.rackspacecloud.com/v1.0/execute/1/{capability
                 the scaling policy is executed. </para>
         </section>
         <section xml:id="Delete_Group">
-            <title>Step 7: Deactivate and Delete a Scaling
+            <title>Step 8: Deactivate and Delete a Scaling
                 Group</title>
             <para> You can stop a <link linkend="Create_Group">scaling
                     group</link> from scaling by configuring both its
@@ -802,10 +933,9 @@ PUT /{tenantId}/groups/{groupID}/config
             <para> Setting <code>maxEntities</code> to <code>0</code>
                 prevents the scaling group from expanding. </para>
             <note>
-                <para> For the Preview release, scaling down is not
-                    implemented. &PROD; can create servers, but you
-                    must manually remove those servers when you no
-                    longer want them to be active. </para>
+                <para>&PROD; can create servers, but you must manually
+                    remove those servers when you no longer want them
+                    to be active. </para>
             </note>
             <para> You cannot delete a scaling group until all the
                 servers within the group are removed. </para>
