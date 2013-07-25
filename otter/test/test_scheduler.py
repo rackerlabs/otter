@@ -87,9 +87,10 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
                          [mock.call(mock.ANY, tid, gid) for tid, gid, pid, t in events])
         self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.mock_calls,
-                         [mock.call(mock.ANY, 'transaction-id', self.mock_group,
-                          self.mock_state, policy_id=policy_id)
-                         for tid, gid, policy_id, t in events])
+                         [mock.call(mock.ANY, 'transaction-id',
+                                    self.mock_group, self.mock_state,
+                                    policy_id=policy_id)
+                             for tid, gid, policy_id, t in events])
 
     def test_empty(self):
         """
