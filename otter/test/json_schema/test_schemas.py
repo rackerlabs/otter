@@ -510,8 +510,10 @@ class ScalingPolicyTestCase(TestCase):
         policy with invalid timestamp raises ``ValidationError``
         """
         invalid = self.at_policy
-        invalid['args']['at'] = 'junk'
-        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+        invalid_dates = ['', 'junk']
+        for invalid_date in invalid_dates:
+            invalid['args']['at'] = invalid_date
+            self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
     def test_only_date_timestamp(self):
         """
@@ -575,7 +577,7 @@ class ScalingPolicyTestCase(TestCase):
         """
         policy with invalid cron entry raises ``ValidationError``
         """
-        invalid_crons = ['junk', '* * -32 * *', '-90 * * *', '* 0 * *',
+        invalid_crons = ['', 'junk', '* * -32 * *', '-90 * * *', '* 0 * *',
                          '* * * * * *', '0 * * 0 * *', '* * * *', '* * * * * * * *',
                          '*12345', 'dfsdfdf', '- - - - -', '-090 * * * *', '* -089 * * *']
         invalid = self.cron_policy

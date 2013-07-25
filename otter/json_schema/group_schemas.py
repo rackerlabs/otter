@@ -208,7 +208,7 @@ def validate_datetime(dt_str):
     """
     Validate date-time string in json. Return True if valid and raise ValueError if invalid
     """
-    if dt_str[-1] != 'Z':
+    if dt_str and dt_str[-1] != 'Z':
         raise ValueError('Expecting Zulu-format UTC time')
     try:
         dt = from_timestamp(dt_str)
