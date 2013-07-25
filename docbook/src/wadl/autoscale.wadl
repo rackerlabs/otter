@@ -46,7 +46,7 @@
                         <param name="tenantId" required="true" style="template"/>
                         <param name="groupId" required="true" style="template"/>
                         <method href="#getGroupConfig"/>
-                        <method href="#putConfig"/>
+                        <method href="#putGroupConfig"/>
                     </resource>
                     <resource id="launch_configuration" path="/launch">
                         <param name="tenantId" required="true" style="template"/>
