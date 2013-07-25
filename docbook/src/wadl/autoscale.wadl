@@ -150,14 +150,14 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/createGroup.json"/>
+                    <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resCreateGroup.json"/>
                 </doc>
             </representation>
         </response>
@@ -174,7 +174,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetGroupManifest.json"/>
                 </doc>
             </representation>
         </response>
@@ -203,7 +203,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetGroupState.json"/>
                 </doc>
             </representation>
         </response>
@@ -221,7 +221,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetGroupConfig.json"/>
                 </doc>
             </representation>
         </response>
@@ -240,7 +240,7 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqPutGroupConfig.json"/>
                 </doc>
             </representation>
         </request>
@@ -260,7 +260,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetLaunchConfig.json"/>
                 </doc>
             </representation>
         </response>
@@ -279,7 +279,7 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqPutLaunchConfig.json"/>
                 </doc>
             </representation>
         </request>
@@ -305,7 +305,7 @@
         <doc title="Resume Group Policy Execution">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Resume all execution of scaling policies for this scaling
-            group.
+                group.
             </p>
         </doc>
         <request>
@@ -327,7 +327,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetPolicies.json"/>
                 </doc>
             </representation>
         </response>
@@ -345,14 +345,14 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
                 </doc>
             </representation>
         </response>
@@ -369,7 +369,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetPolicy.json"/>
                 </doc>
             </representation>
         </response>
@@ -386,7 +386,7 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqPutPolicy.json"/>
                 </doc>
             </representation>
         </request>
@@ -415,13 +415,7 @@
                 <doc xml:lang="en"/>
             </representation>
         </request>
-        <response status="202">
-            <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
-                </doc>
-            </representation>
-        </response>
+        <response status="202"/>
     </method>
 
     <method name="GET" id="getWebhooks">
@@ -434,7 +428,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetWebhooks.json"/>
                 </doc>
             </representation>
         </response>
@@ -452,14 +446,14 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqCreateWebhook.json"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resCreateWebhook.json"/>
                 </doc>
             </representation>
         </response>
@@ -475,7 +469,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/resGetWebhook.json"/>
                 </doc>
             </representation>
         </response>
@@ -493,7 +487,7 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/"/>
+                    <xsdxt:code href="../docbkx/samples/reqPutWebhook.json"/>
                 </doc>
             </representation>
         </request>
@@ -504,7 +498,7 @@
         <doc title="Delete a webhook">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Delete a scaling policy webhook. If successful, no response body
-            will be returned.
+                will be returned.
             </p>
         </doc>
         <response status="204"/>
@@ -519,12 +513,6 @@
                 <doc xml:lang="en"/>
             </representation>
         </request>
-        <response status="202">
-            <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
-                </doc>
-            </representation>
-        </response>
+        <response status="202"/>
     </method>
 </application>
