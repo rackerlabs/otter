@@ -67,8 +67,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
     @unittest.skip('cron not implemented yet')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
-        Create groups with scheduler and webhook policies and verify the
-        servers after their executions are as exepected
+        Create 2 groups each with the same type of scheduler and webhook policies and
+        verify the servers after each of their executions
         """
         group1 = self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy)
