@@ -248,6 +248,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
+                                                     self.group.uuid, max_retry=5,
+                                                     retry_wait=mock.ANY)
+        args, kwargs = self.basic_lock_mock.call_args_list[0]
+        self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
+
         self.lock.acquire.assert_called_once_with()
         self.lock.release.assert_called_once_with()
 
@@ -274,7 +280,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
 
-    def test_modify_state_lock_with_retry(self):
+    def test_modify_state_lock_with_different_retry(self):
         """
         `modify_state` gets lock by retrying with different wait intervals each time
         """
@@ -284,21 +290,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
 
-        d = self.group.modify_state(modifier)
-        self.assertEqual(self.successResultOf(d), None)
-        self.assertEqual(self.basic_lock_mock.call_count, 1)
-        args, kwargs = self.basic_lock_mock.call_args_list[0]
-        self.assertEqual(args, (self.connection, 'locks', self.group.uuid))
-        self.assertEqual(kwargs['max_retry'], 5)
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
         first_retry_wait = kwargs['retry_wait']
         self.assertTrue(3 <= first_retry_wait <= 5)
 
-        d = self.group.modify_state(modifier)
-        self.assertEqual(self.successResultOf(d), None)
-        self.assertEqual(self.basic_lock_mock.call_count, 2)
-        args, kwargs = self.basic_lock_mock.call_args_list[1]
-        self.assertEqual(args, (self.connection, 'locks', self.group.uuid))
-        self.assertEqual(kwargs['max_retry'], 5)
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
         second_retry_wait = kwargs['retry_wait']
         self.assertTrue(3 <= second_retry_wait <= 5)
         self.assertNotEqual(first_retry_wait, second_retry_wait)
