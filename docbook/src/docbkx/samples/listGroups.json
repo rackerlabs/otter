@@ -1,0 +1,41 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 24 Jul 2013 18:50:33 GMT
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.0)
+x-response-id: ab787f47-05a5-457a-8591-ba107d4866b5
+
+{
+    "groups": [
+        {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "id": "a41380ae-173c-4b40-848a-25c16d7fa83d",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/000000/groups/a41380ae-173c-4b40-848a-25c16d7fa83d/",
+                    "rel": "self"
+                }
+            ],
+            "paused": false,
+            "pendingCapacity": 0
+        },
+        {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "id": "a82bb000-f451-40c8-9dc3-6919097d2f7e",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/00000/groups/a82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                    "rel": "self"
+                }
+            ],
+            "paused": false,
+            "pendingCapacity": 0
+        }
+    ],
+    "groups_links": []
+}

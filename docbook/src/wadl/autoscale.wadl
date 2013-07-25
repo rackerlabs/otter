@@ -1,0 +1,1194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--*******************************************************-->
+<!-- Import Common XML Entities -->
+<!-- -->
+<!-- You can resolve the entites with xmllint -->
+<!-- -->
+<!-- xmllint -noent RAX-AUTH.wadl -->
+<!--*******************************************************-->
+<!DOCTYPE application [
+<!ENTITY % common SYSTEM "../common/common.ent">
+%common;
+]>
+<application xmlns="http://wadl.dev.java.net/2009/02"
+    xmlns:db="http://docbook.org/ns/docbook"
+    xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
+    xmlns:wadl="http://wadl.dev.java.net/2009/02"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
+    <!-- ======================================================================================= -->
+    <!-- Resources -->
+    <!-- ======================================================================================= -->
+    <resources base="https:///{region}.autoscale.api.rackspacecloud.com/">
+        <resource id="version" path="v1.0/">
+
+            <!-- GROUPS resource -->
+            <resource id="groups" path="/{tenantId}/groups">
+                <param name="tenantId" required="true" style="template"/>
+                <method href="#getGroups"/>
+                <method href="#createAutoscaleGroup"/>
+
+                <resource id="group" path="{groupId}">
+                    <param name="tenantId" required="true" style="template"/>
+                    <param name="groupId" required="true" style="template"/>
+                    <method href="#getGroupManifest"/>
+                    <method href="#deleteGroup"/>
+
+                    <resource id="group_state" path="/state">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#getGroupState"/>
+                    </resource>
+                    <resource id="group_config" path="/config">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#getGroupConfig"/>
+                        <method href="#putConfig"/>
+                    </resource>
+                    <resource id="launch_configuration" path="/launch">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#getLaunchConfig"/>
+                        <method href="#putLaunchConfig"/>
+                    </resource>
+                    <resource id="pause" path="/pause">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#pauseGroup"/>
+                    </resource>
+                    <resource id="resume" path="/resume">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#resumeGroup"/>
+                    </resource>
+
+                    <!-- POLICIES resource -->
+                    <resource id="policies" path="/policies">
+                        <param name="tenantId" required="true" style="template"/>
+                        <param name="groupId" required="true" style="template"/>
+                        <method href="#getPolicies"/>
+                        <method href="#createPolicies"/>
+
+                        <resource id="policy" path="{policyId}">
+                            <param name="tenantId" required="true" style="template"/>
+                            <param name="groupId" required="true" style="template"/>
+                            <param name="policyId" required="true" style="template"/>
+                            <method href="#getPolicy"/>
+                            <method href="#putPolicy"/>
+                            <method href="#deletePolicy"/>
+
+                            <resource id="execute" path="execute">
+                                <param name="tenantId" required="true" style="template"/>
+                                <param name="groupId" required="true" style="template"/>
+                                <param name="policyId" required="true" style="template"/>
+                                <method href="executePolicy"/>
+
+                            </resource>
+                            <resource id="webhooks" path="webhooks">
+                                <param name="tenantId" required="true" style="template"/>
+                                <param name="groupId" required="true" style="template"/>
+                                <param name="policyId" required="true" style="template"/>
+                                <method href="#getWebhooks"/>
+                                <method href="#createWebhook"/>
+
+                                <resource id="webhook" path="{webhookId}">
+                                    <param name="tenantId" required="true" style="template"/>
+                                    <param name="groupId" required="true" style="template"/>
+                                    <param name="policyId" required="true" style="template"/>
+                                    <param name="webhookId" required="true" style="template"/>
+                                    <method href="#getWebhook"/>
+                                    <method href="#putWebhook"/>
+                                    <method href="#deleteWebhook"/>
+                                </resource>
+                            </resource>
+                        </resource>
+                    </resource>
+                </resource>
+            </resource>
+            <resource id="anonymous_execute_webhook" path="/execute/{capability_version}/{capability_hash}/">
+                <param name="capability_version" required="true" style="template"/>
+                <param name="capability_hash" required="true" style="template"/>
+                <method href="#anonymousExecute"/>
+            </resource>
+        </resource>
+    </resources>
+    <!-- ======================================================================================= -->
+    <!-- Methods -->
+    <!-- ======================================================================================= -->
+    <method id="getGroups" name="GET">
+        <doc title="List Autoscaling Groups" xml:lang="EN">
+            <db:para role="shortdesc">
+                Lists all the autoscaling groups for the specified tenant ID.
+            </db:para>
+            <db:para>
+                For the tenant specified by
+                <code>tenantID</code>
+                ,
+         this operation returns a list of autoscaling groups.
+            </db:para>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../samples/listGroups.json"/>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="createAutoscaleGroup" name="POST">
+        <doc title="Create Autoscale Group">
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Create a new scaling group, given the general scaling group
+                        configuration, launch configuration, and optional scaling policies.
+                        This data provided in the request body in JSON format. If
+                        successful, the created group in JSON format containing id and
+                        links is returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;groupConfiguration&quot;: {
+                &quot;name&quot; : &quot;workers&quot;
+                &quot;cooldown&quot;: 60,
+                &quot;minEntities&quot;: 5,
+                &quot;maxEntities&quot;: 100,
+                &quot;metadata&quot;: {
+                &quot;firstkey&quot; : &quot;this is a string&quot;
+                &quot;secondkey&quot; : &quot;1&quot;
+                }
+                },
+                &quot;launchConfiguration&quot;: {
+                &quot;type&quot; : &quot;launch_server&quot;
+                &quot;args&quot;: {
+                &quot;server&quot;: {
+                &quot;flavorRef&quot;: 3,
+                &quot;name&quot; : &quot;webhead&quot;
+                &quot;imageRef&quot; : &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;
+                &quot;OS-DCF:diskConfig&quot; : &quot;AUTO&quot;
+                &quot;metadata&quot;: {
+                &quot;mykey&quot; : &quot;myvalue&quot;
+                },
+                &quot;personality&quot;: [
+                {
+                &quot;path&quot;: '/root/.ssh/authorized_keys',
+                &quot;contents&quot; : &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
+                }
+                ],
+                &quot;networks&quot;: [
+                {
+                &quot;uuid&quot; : &quot;11111111-1111-1111-1111-111111111111&quot;
+                }
+                ],
+                },
+                &quot;loadBalancers&quot;: [
+                {
+                &quot;loadBalancerId&quot;: 2200,
+                &quot;port&quot;: 8081
+                }
+                ]
+                }
+                },
+                &quot;scalingPolicies&quot;: [
+                {
+                &quot;name&quot; : &quot;scale up by 10&quot;
+                &quot;change&quot;: 10,
+                &quot;cooldown&quot;: 5,
+                &quot;type&quot; : &quot;webhook&quot;
+                },
+                {
+                &quot;name&quot; : &quot;scale down by 5.5 percent&quot;
+                &quot;changePercent&quot;: -5.5,
+                &quot;cooldown&quot;: 6,
+                &quot;type&quot; : &quot;webhook&quot;
+                },
+                {
+                &quot;name&quot; : &quot;set number of servers to 10&quot;
+                &quot;desiredCapacity&quot;: 10,
+                &quot;cooldown&quot;: 3,
+                &quot;type&quot; : &quot;webhook&quot;
+                }
+                ]
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="201">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;group&quot;: {
+                &quot;id&quot;: &quot;{groupId}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;groupConfiguration&quot;: {
+                &quot;name&quot;: &quot;workers&quot;,
+                &quot;cooldown&quot;: 60,
+                &quot;minEntities&quot;: 5,
+                &quot;maxEntities&quot;: 100,
+                &quot;metadata&quot;: {
+                &quot;firstkey&quot;: &quot;this is a string&quot;,
+                &quot;secondkey&quot;: &quot;1&quot;,
+                }
+                },
+                &quot;launchConfiguration&quot;: {
+                &quot;type&quot;: &quot;launch_server&quot;,
+                &quot;args&quot;: {
+                &quot;server&quot;: {
+                &quot;flavorRef&quot;: 3,
+                &quot;name&quot;: &quot;webhead&quot;,
+                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
+                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
+                &quot;metadata&quot;: {
+                &quot;mykey&quot;: &quot;myvalue&quot;
+                },
+                &quot;personality&quot;: [
+                {
+                &quot;path&quot;: '/root/.ssh/authorized_keys',
+                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
+                }
+                ],
+                &quot;networks&quot;: [
+                {
+                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
+                }
+                ],
+                },
+                &quot;loadBalancers&quot;: [
+                {
+                &quot;loadBalancerId&quot;: 2200,
+                &quot;port&quot;: 8081
+                }
+                ]
+                }
+                },
+                &quot;scalingPolicies&quot;: [
+                {
+                &quot;id&quot;: &quot;{policyId1}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;scale up by 10&quot;,
+                &quot;change&quot;: 10,
+                &quot;cooldown&quot;: 5,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                {
+                &quot;id&quot;: &quot;{policyId2}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
+                &quot;changePercent&quot;: -5.5,
+                &quot;cooldown&quot;: 6,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                {
+                &quot;id&quot;: &quot;{policyId3}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;Set number of servers to 10&quot;,
+                &quot;desiredCapacity&quot;: 10,
+                &quot;cooldown&quot;: 6,
+                &quot;type&quot;: &quot;webhook&quot;
+                }
+                ]
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="getGroupManifest" name="GET">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                View manifested view of the scaling group configuration,
+                        including the launch configuration, and the scaling policies. This
+                        data is returned in the body of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;group&quot;: {
+                &quot;id&quot;: &quot;{groupId}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;groupConfiguration&quot;: {
+                &quot;name&quot;: &quot;workers&quot;,
+                &quot;cooldown&quot;: 60,
+                &quot;minEntities&quot;: 5,
+                &quot;maxEntities&quot;: 100,
+                &quot;metadata&quot;: {
+                &quot;firstkey&quot;: &quot;this is a string&quot;,
+                &quot;secondkey&quot;: &quot;1&quot;,
+                }
+                },
+                &quot;launchConfiguration&quot;: {
+                &quot;type&quot;: &quot;launch_server&quot;,
+                &quot;args&quot;: {
+                &quot;server&quot;: {
+                &quot;flavorRef&quot;: 3,
+                &quot;name&quot;: &quot;webhead&quot;,
+                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
+                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
+                &quot;metadata&quot;: {
+                &quot;mykey&quot;: &quot;myvalue&quot;
+                },
+                &quot;personality&quot;: [
+                {
+                &quot;path&quot;: '/root/.ssh/authorized_keys',
+                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
+                }
+                ],
+                &quot;networks&quot;: [
+                {
+                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
+                }
+                ],
+                },
+                &quot;loadBalancers&quot;: [
+                {
+                &quot;loadBalancerId&quot;: 2200,
+                &quot;port&quot;: 8081
+                }
+                ]
+                }
+                },
+                &quot;scalingPolicies&quot;: [
+                {
+                &quot;id&quot;: &quot;{policyId1}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;scale up by 10&quot;,
+                &quot;change&quot;: 10,
+                &quot;cooldown&quot;: 5,
+                &quot;type&quot;: &quot;webhook&quot;
+                }
+                {
+                &quot;id&quot;: &quot;{policyId2}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
+                &quot;changePercent&quot;: -5.5,
+                &quot;cooldown&quot;: 6,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                {
+                &quot;id&quot;: &quot;{policyId3}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;set number of servers to 10&quot;,
+                &quot;desiredCapacity&quot;: 10,
+                &quot;cooldown&quot;: 3,
+                &quot;type&quot;: &quot;webhook&quot;
+                }
+                ]
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="deleteGroup" name="DELETE">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Delete a scaling group if there are no entities belonging to the
+            scaling group. If successful, no response body will be returned. If
+            there are pending or active entities, a 409 will be returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="getGroupState" name="GET">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get the current state of the scaling group, including the
+            current set of active entities, the number of pending entities, and
+            the desired number of entities. This data is returned in the body
+            of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;group&quot;: {
+                &quot;id&quot;: &quot;{groupId}&quot;,
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId},
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;active&quot;: [
+                {
+                &quot;id&quot;: &quot;{instanceId1}&quot;
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}&quot;,
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                },
+                {
+                &quot;id&quot;: &quot;{instanceId2}&quot;
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}&quot;,
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                }
+                ],
+                &quot;activeCapacity&quot;: 2,
+                &quot;pendingCapacity&quot;: 2,
+                &quot;desiredCapacity&quot;: 4,
+                &quot;paused&quot;: false
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="getGroupConfig" name="GET">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get the configuration for a scaling group, which includes the
+            minimum number of entities, the maximum number of entities, global
+            cooldown, and other metadata. This data is returned in the body of
+            the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;groupConfiguration&quot;: {
+                &quot;name&quot;: &quot;workers&quot;,
+                &quot;cooldown&quot;: 60,
+                &quot;minEntities&quot;: 5,
+                &quot;maxEntities&quot;: 100,
+                &quot;metadata&quot;: {
+                &quot;firstkey&quot;: &quot;this is a string&quot;,
+                &quot;secondkey&quot;: &quot;1&quot;,
+                }
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="putGroupConfig" name="PUT">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Edit the configuration for a scaling group, which includes the
+            minimum number of entities, the maximum number of entities, global
+            cooldown, and other metadata. This data provided in the request
+            body in JSON format. If successful, no response body will be
+            returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;name&quot; : &quot;workers&quot;
+                    &quot;cooldown&quot;: 60,
+                    &quot;minEntities&quot;: 5,
+                    &quot;maxEntities&quot;: 100,
+                    &quot;metadata&quot;: {
+                    &quot;firstkey&quot; : &quot;this is a string&quot;
+                    &quot;secondkey&quot; : &quot;1&quot;
+                    }
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="getLaunchConfig" name="GET">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get the launch configuration for a scaling group, which includes
+                the details of how to create a server, from what image, which load
+                balancers to join it to, and what networks to add it to, and other
+                metadata. This data is returned in the body of the response in JSON
+                format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;launchConfiguration&quot;: {
+                &quot;type&quot;: &quot;launch_server&quot;,
+                &quot;args&quot;: {
+                &quot;server&quot;: {
+                &quot;flavorRef&quot;: 3,
+                &quot;name&quot;: &quot;webhead&quot;,
+                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
+                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
+                &quot;metadata&quot;: {
+                &quot;mykey&quot;: &quot;myvalue&quot;
+                },
+                &quot;personality&quot;: [
+                {
+                &quot;path&quot;: '/root/.ssh/authorized_keys',
+                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
+                }
+                ],
+                &quot;networks&quot;: [
+                {
+                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
+                }
+                ],
+                },
+                &quot;loadBalancers&quot;: [
+                {
+                &quot;loadBalancerId&quot;: 2200,
+                &quot;port&quot;: 8081
+                }
+                ]
+                }
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="putLaunchConfig" name="PUT">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Edit the launch configuration for a scaling group, which
+            includes the details of how to create a server, from what image,
+            which load balancers to join it to, and what networks to add it to,
+            and other metadata. This data provided in the request body in JSON
+            format. If successful, no response body will be returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;type&quot; : &quot;launch_server&quot;
+                    &quot;args&quot;: {
+                    &quot;server&quot;: {
+                    &quot;flavorRef&quot;: 3,
+                    &quot;name&quot; : &quot;webhead&quot;
+                    &quot;imageRef&quot; : &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;
+                    &quot;OS-DCF:diskConfig&quot; : &quot;AUTO&quot;
+                    &quot;metadata&quot;: {
+                    &quot;mykey&quot; : &quot;myvalue&quot;
+                    },
+                    &quot;personality&quot;: [
+                    {
+                    &quot;path&quot;: '/root/.ssh/authorized_keys',
+                    &quot;contents&quot; : &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
+                    }
+                    ],
+                    &quot;networks&quot;: [
+                    {
+                    &quot;uuid&quot; : &quot;11111111-1111-1111-1111-111111111111&quot;
+                    }
+                    ],
+                    },
+                    &quot;loadBalancers&quot;: [
+                    {
+                    &quot;loadBalancerId&quot;: 2200,
+                    &quot;port&quot;: 8081
+                    }
+                    ]
+                    }
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="pauseGroup" name="POST">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Pause all execution of scaling policies for this scaling
+            group.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="resumeGroup" name="POST">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Resume all execution of scaling policies for this scaling
+            group.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method name="GET" id="getPolicies">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get a list of scaling policies in the group. Each policy
+            describes an id, name, type, adjustment, cooldown, and links. This
+            data is returned in the body of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;policies&quot;: [
+                {
+                &quot;id&quot;:&quot;{policyId1}&quot;,
+                &quot;data&quot;: {
+                &quot;name&quot;: &quot;scale up by one server&quot;,
+                &quot;change&quot;: 1,
+                &quot;cooldown&quot;: 150,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                },
+                {
+                &quot;id&quot;: &quot;{policyId2}&quot;,
+                &quot;data&quot;: {
+                &quot;name&quot;: &quot;scale up ten percent&quot;,
+                &quot;changePercent&quot;: 10,
+                &quot;cooldown&quot;: 150,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                },
+                {
+                &quot;id&quot;:&quot;{policyId3}&quot;,
+                &quot;data&quot;: {
+                &quot;name&quot;: &quot;scale down one server&quot;,
+                &quot;change&quot;: -1,
+                &quot;cooldown&quot;: 150,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                },
+                {
+                &quot;id&quot;: &quot;{policyId4}&quot;,
+                &quot;data&quot;: {
+                &quot;name&quot;: &quot;scale down ten percent&quot;,
+                &quot;changePercent&quot;: -10,
+                &quot;cooldown&quot;: 150,
+                &quot;type&quot;: &quot;webhook&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ]
+                }
+                ]
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method name="POST" id="createPolicies">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Create one or many new scaling policies. Scaling policies must
+            include a name, type, adjustment, and cooldown. The response header
+            will point to the list policies endpoint. An array of scaling
+            policies is provided in the request body in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        [
+                    {
+                    &quot;name&quot; : &quot;scale up by one server&quot;
+                    &quot;change&quot;: 1,
+                    &quot;cooldown&quot;: 150,
+                    &quot;type&quot; : &quot;webhook&quot;
+                    },
+                    {
+                    &quot;name&quot; : &quot;scale down by 5.5 percent&quot;
+                    &quot;changePercent&quot;: -5.5,
+                    &quot;cooldown&quot;: 6,
+                    &quot;type&quot; : &quot;webhook&quot;
+                    }
+                    ]
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="201">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;policies&quot;: [
+                    {
+                    &quot;id&quot;: {policyId1},
+                    &quot;links&quot;: [
+                    {
+                    &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}&quot;
+                    &quot;rel&quot;: &quot;self&quot;
+                    }
+                    ],
+                    &quot;name&quot;: &quot;scale up by one server&quot;,
+                    &quot;change&quot;: 1,
+                    &quot;cooldown&quot;: 150,
+                    &quot;type&quot;: &quot;webhook&quot;
+                    },
+                    {
+                    &quot;id&quot;: {policyId2},
+                    &quot;links&quot;: [
+                    {
+                    &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}&quot;
+                    &quot;rel&quot;: &quot;self&quot;
+                    }
+                    ],
+                    &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
+                    &quot;changePercent&quot;: -5.5,
+                    &quot;cooldown&quot;: 6,
+                    &quot;type&quot;: &quot;webhook&quot;
+                    }
+                    ]
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method name="GET" id="getPolicy">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get a scaling policy which describes an id, name, type,
+            adjustment, and cooldown, and links. This data is returned in the
+            body of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;policy&quot;: {
+                &quot;id&quot;: {policyId},
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}&quot;
+                &quot;rel&quot;: &quot;self&quot;
+                }
+                ],
+                &quot;name&quot;: &quot;scale up by one server&quot;,
+                &quot;change&quot;: 1,
+                &quot;cooldown&quot;: 150,
+                &quot;type&quot;: &quot;webhook&quot;
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="putPolicy" name="PUT">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Updates a scaling policy. Scaling policies must include a name,
+            type, adjustment, and cooldown. If successful, no response body
+            will be returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;name&quot;: 'scale down by 5.5 percent',
+                    &quot;changePercent&quot;: -5.5,
+                    &quot;cooldown&quot;: 6,
+                    &quot;type&quot; : &quot;webhook&quot;
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+
+    <method id="deletePolicy" name="DELETE">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Delete a scaling policy. If successful, no response body will be
+            returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="executePolicy" name="POST">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Execute a scaling policy. If successful, a response body will be
+            returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="202">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">{}</xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method name="GET" id="getWebhooks">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get a list of webhooks and their IDs. This data is returned in
+            the body of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;webhooks&quot;: [
+                {
+                &quot;id&quot;:&quot;{webhookId1}&quot;,
+                &quot;name&quot;: &quot;alice&quot;,
+                &quot;metadata&quot;: {
+                &quot;notes&quot;: &quot;this is for Alice&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/&quot;,
+                &quot;rel&quot;: &quot;self&quot;
+                },
+                {
+                &quot;href&quot;: &quot;.../execute/1/{capability_hash1}/,
+                &quot;rel&quot;: &quot;capability&quot;
+                }
+                ]
+                },
+                {
+                &quot;id&quot;:&quot;{webhookId2}&quot;,
+                &quot;name&quot;: &quot;alice&quot;,
+                &quot;metadata&quot;: {
+                &quot;notes&quot;: &quot;this is for Bob&quot;
+                },
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/&quot;,
+                &quot;rel&quot;: &quot;self&quot;
+                },
+                {
+                &quot;href&quot;: &quot;.../execute/1/{capability_hash2}/,
+                &quot;rel&quot;: &quot;capability&quot;
+                }
+                ]
+                }
+                ],
+                &quot;webhooks_links&quot;: []
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="createWebhook" name="POST">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Create one or more new scaling policy webhooks. Webhooks must
+            have a name. If successful, the created response body will contain
+            the IDs and links to the newly created webhooks. This data provided
+            in the request body in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        [
+                    {
+                    &quot;name&quot; : &quot;alice&quot;
+                    &quot;metadata&quot;: {
+                    &quot;notes&quot; : &quot;this is for Alice&quot;
+                    }
+                    },
+                    {
+                    &quot;name&quot; : &quot;bob&quot;
+                    }
+                    ]
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="201">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;webhooks&quot;: [
+                    {
+                    &quot;id&quot;:&quot;{webhookId1}&quot;,
+                    &quot;alice&quot;,
+                    &quot;metadata&quot;: {
+                    &quot;notes&quot;: &quot;this is for Alice&quot;
+                    },
+                    &quot;links&quot;: [
+                    {
+                    &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/&quot;,
+                    &quot;rel&quot;: &quot;self&quot;
+                    },
+                    {
+                    &quot;href&quot;: &quot;.../execute/1/{capability_hash1}/,
+                    &quot;rel&quot;: &quot;capability&quot;
+                    }
+                    ]
+                    },
+                    {
+                    &quot;id&quot;:&quot;{webhookId2}&quot;,
+                    &quot;name&quot;: &quot;bob&quot;,
+                    &quot;metadata&quot;: {},
+                    &quot;links&quot;: [
+                    {
+                    &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/&quot;,
+                    &quot;rel&quot;: &quot;self&quot;
+                    },
+                    {
+                    &quot;href&quot;: &quot;.../execute/1/{capability_hash2}/,
+                    &quot;rel&quot;: &quot;capability&quot;
+                    }
+                    ]
+                    }
+                    ]
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="getWebhook" name="GET">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Get information about a specific scaling policy webhook. This
+            data is returned in the body of the response in JSON format.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="200">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                &quot;webhook&quot;: {
+                &quot;id&quot;:&quot;{webhookId}&quot;,
+                &quot;name&quot;: &quot;webhook name&quot;,
+                &quot;metadata&quot;: {},
+                &quot;links&quot;: [
+                {
+                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/&quot;,
+                &quot;rel&quot;: &quot;self&quot;
+                },
+                {
+                &quot;href&quot;: &quot;.../execute/1/{capability_hash2},
+                &quot;rel&quot;: &quot;capability&quot;
+                }
+                ]
+                }
+                }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+    <method id="putWebhook" name="PUT">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Update an existing webhook. WebhookIds not recognized will be
+            ignored with accompanying data. URLs will be ignored if submitted,
+            but that will not invalidate the request. If successful, no
+            response body will be returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">
+                        {
+                    &quot;name&quot; : &quot;alice&quot;
+                    &quot;metadata&quot;: {
+                    &quot;notes&quot; : &quot;this is for Alice&quot;
+                    }
+                    }
+                    </xsdxt:code>
+                </doc>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="deleteWebhook" name="DELETE">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+                Delete a scaling policy webhook. If successful, no response body
+            will be returned.
+            </p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="204"/>
+    </method>
+    <method id="anonymousExecute" name="POST">
+        <doc>
+            <p xmlns="http://www.w3.org/1999/xhtml">Execute a webhook</p>
+        </doc>
+        <request>
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en"/>
+            </representation>
+        </request>
+        <response status="202">
+            <representation element="noop" mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../code/samples/">{}</xsdxt:code>
+                </doc>
+            </representation>
+        </response>
+    </method>
+</application>
