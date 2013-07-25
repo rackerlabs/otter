@@ -139,8 +139,7 @@ def makeService(config):
             config_value('identity.username'),
             config_value('identity.password'),
             config_value('identity.url'),
-            config_value('identity.admin_url')
-        ).authenticate_tenant,
+            config_value('identity.admin_url')),
         cache_ttl)
 
     supervisor = Supervisor(authenticator.authenticate_tenant)

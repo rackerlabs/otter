@@ -7,7 +7,9 @@ from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Clock
 
-from otter.test.utils import patch, SameJSON
+from zope.interface.verify import verifyObject
+
+from otter.test.utils import patch, SameJSON, iMock
 
 from otter.util.http import APIError, RequestError
 
@@ -18,6 +20,7 @@ from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
+from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -273,6 +276,12 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.ia = ImpersonatingAuthenticator(self.user, self.password,
                                              self.url, self.admin_url)
 
+    def test_verifyObject(self):
+        """
+        ImpersonatingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.ia)
+
     def test_authenticate_tenant_auth_as_service_user(self):
         """
         authenticate_tenant authenticates as the service user.
@@ -372,11 +381,22 @@ class CachingAuthenticatorTests(TestCase):
         """
         Configure a clock and a fake auth function.
         """
-        self.auth_function = mock.Mock(
-            side_effect=lambda _: succeed(('auth-token', 'catalog')))
+        self.authenticator = iMock(IAuthenticator)
+
+        def authenticate_tenant(tenant_id):
+            return succeed(('auth-token', 'catalog'))
+
+        self.authenticator.authenticate_tenant.side_effect = authenticate_tenant
+        self.auth_function = self.authenticator.authenticate_tenant
+
         self.clock = Clock()
-        self.ca = CachingAuthenticator(
-            self.clock, self.auth_function, 10)
+        self.ca = CachingAuthenticator(self.clock, self.authenticator, 10)
+
+    def test_verifyObject(self):
+        """
+        CachingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.ca)
 
     def test_calls_auth_function_with_empty_cache(self):
         """

@@ -41,6 +41,8 @@ from itertools import groupby
 
 from twisted.internet.defer import succeed, Deferred
 
+from zope.interface import Interface, implementer
+
 import treq
 
 from otter.log import log
@@ -48,6 +50,19 @@ from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
 
 
+class IAuthenticator(Interface):
+    """
+    Authenticators know how to authenticate tenants.
+    """
+    def authenticate_tenant(tenant_id):
+        """
+        :param tenant_id: A keystone tenant ID to authenticate as.
+
+        :returns: 2-tuple of auth token and service catalog.
+        """
+
+
+@implementer(IAuthenticator)
 class CachingAuthenticator(object):
     """
     An authenticator which cases the result of the provided auth_function
@@ -55,29 +70,23 @@ class CachingAuthenticator(object):
 
     :param IReactorTime reactor: An IReactorTime provider used for enforcing
         the cache TTL.
-    :param auth_function: A single-argument callable that returns a Deferred.
+    :param IAuthenticator authenticator:
     :param int ttl: An integer indicating the TTL of a cache entry in seconds.
     """
-    def __init__(self, reactor, auth_function, ttl):
+    def __init__(self, reactor, authenticator, ttl):
         self._reactor = reactor
-        self._auth_function = auth_function
+        self._authenticator = authenticator
         self._ttl = ttl
 
         self._waiters = {}
         self._cache = {}
         self._log = log.bind(system='otter.auth.cache',
-                             auth_function=auth_function,
+                             authenticator=authenticator,
                              cache_ttl=ttl)
 
     def authenticate_tenant(self, tenant_id):
         """
-        Get an auth-token and service catalog for a tenant_id.  Possibly
-        from a cache.
-
-        :param tenant_id: The keystone tenant_id we wish to authenticate.
-        :returns: a deferred that fires with a 2-tuple of auth-token and
-            service catalog.
-
+        see :meth:`IAuthenticator.authenticate_tenant`
         """
         log = self._log.bind(tenant_id=tenant_id)
 
@@ -117,13 +126,14 @@ class CachingAuthenticator(object):
 
         log.msg('otter.auth.cache.miss')
         self._waiters[tenant_id] = []
-        d = self._auth_function(tenant_id)
+        d = self._authenticator.authenticate_tenant(tenant_id)
         d.addCallback(when_authenticated)
         d.addErrback(when_auth_fails)
 
         return d
 
 
+@implementer(IAuthenticator)
 class ImpersonatingAuthenticator(object):
     """
     An authentication handler that first uses a identity admin account to authenticate
@@ -137,9 +147,7 @@ class ImpersonatingAuthenticator(object):
 
     def authenticate_tenant(self, tenant_id):
         """
-        :param tenant_id: The keystone tenant_id we wish to impersonate.
-        :returns: a deferred that fires with a 2-tuple of auth-token and
-            service catalog.
+        see :meth:`IAuthenticator.authenticate_tenant`
         """
         d = authenticate_user(self._url,
                               self._identity_admin_user,
