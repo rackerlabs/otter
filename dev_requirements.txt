@@ -1,3 +1,4 @@
+tox
 pep257
 pep8
 flake8
