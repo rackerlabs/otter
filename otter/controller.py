@@ -373,6 +373,8 @@ class _Job(object):
 
         def ignore_error_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
+            self.log.msg("Relevant scaling group has already been deleted. "
+                         "Job failure logged and ignored.")
 
         d.addErrback(ignore_error_if_group_deleted)
         return d
@@ -400,7 +402,8 @@ class _Job(object):
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
-            self.log.msg('Group removed. Deleting server')
+            self.log.msg('Relevant scaling group has been removed. '
+                         'Deleting server.')
             self.supervisor.execute_delete_server(
                 self.log, self.transaction_id, self.scaling_group, result)
 
