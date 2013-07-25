@@ -24,6 +24,9 @@
 
             <!-- GROUPS resource -->
             <resource id="groups" path="/{tenantId}/groups">
+                <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
+                    <doc>A valid authentication token</doc>
+                </param>
                 <param name="tenantId" required="true" style="template"/>
                 <method href="#getGroups"/>
                 <method href="#createAutoscaleGroup"/>
@@ -121,22 +124,19 @@
                 Lists all the autoscaling groups for the specified tenant ID.
             </db:para>
             <db:para>
-                For the tenant specified by<code>tenantID</code>,this operation returns a list of autoscaling groups.
+                For the tenant specified by<code>tenantID</code>, 
+                this operation returns a list of autoscaling groups.
             </db:para>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/listGroups.json"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="createAutoscaleGroup" name="POST">
         <doc title="Create Autoscale Group">
             <p xmlns="http://www.w3.org/1999/xhtml">
@@ -148,102 +148,87 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/createGroup.json"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="getGroupManifest" name="GET">
-        <doc>
+        <doc title="View all group details">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 View manifested view of the scaling group configuration,
-                        including the launch configuration, and the scaling policies. This
-                        data is returned in the body of the response in JSON format.
+                including the launch configuration, and the scaling policies. This
+                data is returned in the body of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="deleteGroup" name="DELETE">
-        <doc>
+        <doc title="Delete a group.">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Delete a scaling group if there are no entities belonging to the
-            scaling group. If successful, no response body will be returned. If
-            there are pending or active entities, a 409 will be returned.
+                scaling group. If successful, no response body will be returned. If
+                there are pending or active entities, a 409 will be returned.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="204"/>
     </method>
+
     <method id="getGroupState" name="GET">
-        <doc>
+        <doc title="Get Group State">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get the current state of the scaling group, including the
-            current set of active entities, the number of pending entities, and
-            the desired number of entities. This data is returned in the body
-            of the response in JSON format.
+                current set of active entities, the number of pending entities, and
+                the desired number of entities. This data is returned in the body
+                of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="getGroupConfig" name="GET">
-        <doc>
+        <doc title="Get a Group's Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get the configuration for a scaling group, which includes the
-            minimum number of entities, the maximum number of entities, global
-            cooldown, and other metadata. This data is returned in the body of
-            the response in JSON format.
+                minimum number of entities, the maximum number of entities, global
+                cooldown, and other metadata. This data is returned in the body of
+                the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="putGroupConfig" name="PUT">
-        <doc>
+        <doc title="Replace a Group's Gonfiguration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Edit the configuration for a scaling group, which includes the
             minimum number of entities, the maximum number of entities, global
@@ -253,7 +238,7 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
@@ -261,8 +246,9 @@
         </request>
         <response status="204"/>
     </method>
+
     <method id="getLaunchConfig" name="GET">
-        <doc>
+        <doc title="Get a Group's Launch Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get the launch configuration for a scaling group, which includes
                 the details of how to create a server, from what image, which load
@@ -271,21 +257,17 @@
                 format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="putLaunchConfig" name="PUT">
-        <doc>
+        <doc title="Replace a Group's Launch Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Edit the launch configuration for a scaling group, which
             includes the details of how to create a server, from what image,
@@ -295,7 +277,7 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
@@ -303,57 +285,56 @@
         </request>
         <response status="204"/>
     </method>
+
     <method id="pauseGroup" name="POST">
-        <doc>
+        <doc title="Pause Group Policy Execution">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Pause all execution of scaling policies for this scaling
             group.
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en"/>
             </representation>
         </request>
         <response status="204"/>
     </method>
+
     <method id="resumeGroup" name="POST">
-        <doc>
+        <doc title="Resume Group Policy Execution">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Resume all execution of scaling policies for this scaling
             group.
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en"/>
             </representation>
         </request>
         <response status="204"/>
     </method>
+
     <method name="GET" id="getPolicies">
-        <doc>
+        <doc title="Get a list of policies">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get a list of scaling policies in the group. Each policy
             describes an id, name, type, adjustment, cooldown, and links. This
             data is returned in the body of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method name="POST" id="createPolicies">
-        <doc>
+        <doc title="Create a new policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create one or many new scaling policies. Scaling policies must
             include a name, type, adjustment, and cooldown. The response header
@@ -362,43 +343,40 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method name="GET" id="getPolicy">
-        <doc>
+        <doc title="Get details of a policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get a scaling policy which describes an id, name, type,
             adjustment, and cooldown, and links. This data is returned in the
             body of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="putPolicy" name="PUT">
-        <doc>
+        <doc title="Replace a policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Updates a scaling policy. Scaling policies must include a name,
             type, adjustment, and cooldown. If successful, no response body
@@ -406,7 +384,7 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
@@ -416,61 +394,54 @@
     </method>
 
     <method id="deletePolicy" name="DELETE">
-        <doc>
+        <doc title="Delete a policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Delete a scaling policy. If successful, no response body will be
             returned.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="204"/>
     </method>
+
     <method id="executePolicy" name="POST">
-        <doc>
+        <doc title="Execute a policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Execute a scaling policy. If successful, a response body will be
             returned.
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en"/>
             </representation>
         </request>
         <response status="202">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method name="GET" id="getWebhooks">
-        <doc>
+        <doc title="Get a list of webhooks for the policy">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get a list of webhooks and their IDs. This data is returned in
-            the body of the response in JSON format.
+                the body of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="createWebhook" name="POST">
-        <doc>
+        <doc title="Create a webhook">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create one or more new scaling policy webhooks. Webhooks must
             have a name. If successful, the created response body will contain
@@ -479,42 +450,39 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="getWebhook" name="GET">
-        <doc>
+        <doc title="View Webhook Info">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get information about a specific scaling policy webhook. This
             data is returned in the body of the response in JSON format.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="200">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
     </method>
+
     <method id="putWebhook" name="PUT">
-        <doc>
+        <doc title="Replace a Webhook">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Update an existing webhook. WebhookIds not recognized will be
             ignored with accompanying data. URLs will be ignored if submitted,
@@ -523,7 +491,7 @@
             </p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
@@ -531,31 +499,28 @@
         </request>
         <response status="204"/>
     </method>
+
     <method id="deleteWebhook" name="DELETE">
-        <doc>
+        <doc title="Delete a webhook">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Delete a scaling policy webhook. If successful, no response body
             will be returned.
             </p>
         </doc>
-        <request>
-            <representation element="noop" mediaType="application/json">
-                <doc xml:lang="en"/>
-            </representation>
-        </request>
         <response status="204"/>
     </method>
+
     <method id="anonymousExecute" name="POST">
-        <doc>
-            <p xmlns="http://www.w3.org/1999/xhtml">Execute a webhook</p>
+        <doc title="Execute an anonymous webhook">
+            <p xmlns="http://www.w3.org/1999/xhtml">Execute an anonymous webhook</p>
         </doc>
         <request>
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en"/>
             </representation>
         </request>
         <response status="202">
-            <representation element="noop" mediaType="application/json">
+            <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
                 </doc>
