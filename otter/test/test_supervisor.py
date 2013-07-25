@@ -7,11 +7,9 @@ from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail
 
 from otter.models.interface import IScalingGroup
-from otter.supervisor import execute_config
+from otter.supervisor import Supervisor
 from otter.test.utils import iMock, patch
 from otter.util.config import set_config_data
-
-from otter.supervisor import execute_delete_server
 
 
 class SupervisorTests(TestCase):
@@ -41,6 +39,8 @@ class SupervisorTests(TestCase):
         set_config_data({'region': 'ORD'})
         self.addCleanup(set_config_data, {})
 
+        self.supervisor = Supervisor(self.auth_function)
+
 
 class LaunchConfigTests(SupervisorTests):
     """
@@ -67,7 +67,7 @@ class LaunchConfigTests(SupervisorTests):
         """
         self.assertRaises(
             AssertionError,
-            execute_config, self.log, 'transaction-id', self.auth_function,
+            self.supervisor.execute_config, self.log, 'transaction-id',
             self.group, {'type': 'not-launch_server'})
 
     def test_execute_config_auths(self):
@@ -75,8 +75,8 @@ class LaunchConfigTests(SupervisorTests):
         execute_config asks the provided authentication function for
         credentials for the tenant_id that owns the group.
         """
-        execute_config(self.log, 'transaction-id', self.auth_function,
-                       self.group, self.launch_config)
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
 
         self.auth_function.assert_called_once_with(11111)
 
@@ -88,8 +88,8 @@ class LaunchConfigTests(SupervisorTests):
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
 
-        d = execute_config(self.log, 'transaction-id', self.auth_function,
-                           self.group, self.launch_config)
+        d = self.supervisor.execute_config(self.log, 'transaction-id',
+                                           self.group, self.launch_config)
 
         (job_id, completed_d) = self.successResultOf(d)
 
@@ -102,8 +102,8 @@ class LaunchConfigTests(SupervisorTests):
         execute_config runs the launch_server_v1 worker with the credentials
         for the group owner.
         """
-        d = execute_config(self.log, 'transaction-id', self.auth_function,
-                           self.group, self.launch_config)
+        d = self.supervisor.execute_config(self.log, 'transaction-id',
+                                           self.group, self.launch_config)
 
         (job_id, completed_d) = self.successResultOf(d)
 
@@ -142,8 +142,8 @@ class DeleteServerTests(SupervisorTests):
         ``launch_server_v1.delete_server`` is called with correct args. It is
         also logged
         """
-        execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                              self.group, self.fake_server)
+        self.supervisor.execute_delete_server(self.log, 'transaction-id',
+                                              self.group, self.fake_server)
         self.delete_server.assert_called_once_with(
             self.log.bind.return_value,
             'ORD',
@@ -160,8 +160,8 @@ class DeleteServerTests(SupervisorTests):
         expected = KeyError('some')
         self.delete_server.return_value = fail(expected)
 
-        execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                              self.group, self.fake_server)
+        self.supervisor.execute_delete_server(self.log, 'transaction-id',
+                                              self.group, self.fake_server)
 
         args, kwargs = self.log.bind.return_value.err.call_args
         self.assertEqual(args[0].value, expected)
@@ -172,8 +172,8 @@ class DeleteServerTests(SupervisorTests):
         ``execute_delete_server`` asks the provided authentication function for
         credentials for the tenant_id that owns the group.
         """
-        execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                              self.group, self.fake_server)
+        self.supervisor.execute_delete_server(self.log, 'transaction-id',
+                                              self.group, self.fake_server)
 
         self.auth_function.assert_called_once_with(11111)
 
@@ -185,8 +185,8 @@ class DeleteServerTests(SupervisorTests):
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
 
-        execute_delete_server(self.log, 'transaction-id', self.auth_function,
-                              self.group, self.fake_server)
+        self.supervisor.execute_delete_server(self.log, 'transaction-id',
+                                              self.group, self.fake_server)
 
         args, kwargs = self.log.bind.return_value.err.call_args
         self.assertEqual(args[0].value, expected)

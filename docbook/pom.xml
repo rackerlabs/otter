@@ -3,10 +3,10 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.rackspace.cloud.apidocs</groupId>
-  <artifactId>Autoscaling</artifactId>
+  <artifactId>autoscale</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>Autoscaling Docs</name>
+  <name>Autoscale Docs</name>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
@@ -31,18 +31,16 @@
 	              autoscale-reference.xml
               </includes>
               -->
-                <security>external</security>
+                <security>internal</security>
             </configuration>
           </execution>
         </executions>
         <configuration>
-	  <enableDisqus>1</enableDisqus>
-    <!-- delete sectionLabelIncludesComponentLabel after plugin 1.7.1      -->
-    <sectionLabelIncludesComponentLabel>1</sectionLabelIncludesComponentLabel>
-	  <feedbackEmail>rose.coste@rackspace.com</feedbackEmail>
-    <branding>rackspace</branding>
+	  <enableDisqus>intranet</enableDisqus>
+	  <feedbackEmail>rose.coste@rackspace.com,michael.mcgrail@rackspace.com</feedbackEmail>
+	  <branding>rackspace</branding>
           <failOnValidationerror>no</failOnValidationerror>
-    <showXslMessages>true</showXslMessages>
+	  <showXslMessages>true</showXslMessages>
 	  <highlightSource>false</highlightSource>
         </configuration>
       </plugin>
@@ -92,20 +90,4 @@
       </pluginRepositories>                                                                           
     </profile> 
   </profiles>
-  <!-- source repo: at https://github.rackspace.com/IX/autoscaling, click SSH -->
-  <scm>
-    <connection>scm:git:ssh://git@github.rackspace.com:IX/autoscaling.git</connection>
-  </scm>
-
-  <distributionManagement>
-    <site>
-      <id>docs-stagging</id>
-      <url>http://10.14.208.16:8081/nexus/content/repositories/docs-stagging/</url>
-    </site>
-    <repository>
-      <id>docs-stagging</id>
-      <name>docs-stagging</name>
-      <url>http://10.14.208.16:8081/nexus/content/repositories/docs-stagging/</url>
-    </repository>
-  </distributionManagement>
 </project>

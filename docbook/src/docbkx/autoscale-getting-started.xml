@@ -57,7 +57,8 @@ format="SVG" scale="60"/>
     <!-- some sample code displayed on that page does NOT validate via JSONlint;
          use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
     
-    <?rax title.font.size="35px" subtitle.font.size="20px"?>
+    <?rax title.font.size="35px" subtitle.font.size="20px"?
+        canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-started/content"?>
     <?rax status.bar.text="PREVIEW" ?>
     <info>
         <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
@@ -91,9 +92,8 @@ format="SVG" scale="60"/>
 	<raxm:metadata
 	    xmlns:raxm="http://docs.rackspace.com/api/metadata">
 	  <raxm:displayname>Getting Started Guide</raxm:displayname>
-	  <!-- fix product code when get one; this is just so it builds -->
-	  <raxm:product version="v1.0">cdb</raxm:product>
-	  <raxm:priority>1</raxm:priority>
+	  <raxm:product version="v1.0">cas</raxm:product>
+	  <raxm:priority>10</raxm:priority>
 	</raxm:metadata>
     </info>
     <chapter xml:id="Overview">
