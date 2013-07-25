@@ -91,6 +91,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         """
         The policy cooldown times are not enforced when executing different policies,
         and executing such polcies result in active servers as expected
+        ** Busy lock error sometimes **
         """
         execute_change_percent_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
@@ -143,8 +144,10 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         Creating multiple webhook policies with the same payload, using multiple
         create policy requests is successful.
         """
-        group = (self.autoscale_behaviors.create_group_min()).entity
-        for each in range(3):
+        policy_count = 3
+        group = (self.autoscale_behaviors.create_scaling_group_min()).entity
+        policy_id_list = []
+        for _ in range(policy_count):
             create_policy_response = self.autoscale_behaviors.create_policy_given(
                 group_id=group.id,
                 sp_name='multi_web_policy',
@@ -152,6 +155,8 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.assertEquals(create_policy_response['status_code'], 201,
                               msg='Created multiple scaling policies with same policy data'
                               ', response code: {0}'.format(create_policy_response['status_code']))
+            policy_id_list.append(create_policy_response['id'])
+        self.assertEqual(len(set(policy_id_list)), policy_count)
 
     def _execute_policy_after_cooldown(self, group_id, policy_id):
         """

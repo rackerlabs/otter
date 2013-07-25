@@ -113,10 +113,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         Creates a group with the given list of policies and asserts the
         group creation was successful
         """
-        policy_list = []
-        for each in range(multi_num):
-            for each_policy in args:
-                policy_list.append(each_policy)
+        for each_policy in args:
+            policy_list = [each_policy for _ in range(multi_num)]
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling',
             sp_list=policy_list,
