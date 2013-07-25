@@ -121,10 +121,7 @@
                 Lists all the autoscaling groups for the specified tenant ID.
             </db:para>
             <db:para>
-                For the tenant specified by
-                <code>tenantID</code>
-                ,
-         this operation returns a list of autoscaling groups.
+                For the tenant specified by<code>tenantID</code>,this operation returns a list of autoscaling groups.
             </db:para>
         </doc>
         <request>
@@ -135,7 +132,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../samples/listGroups.json"/>
+                    <xsdxt:code href="../docbkx/samples/listGroups.json"/>
                 </doc>
             </representation>
         </response>
@@ -144,181 +141,23 @@
         <doc title="Create Autoscale Group">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create a new scaling group, given the general scaling group
-                        configuration, launch configuration, and optional scaling policies.
-                        This data provided in the request body in JSON format. If
-                        successful, the created group in JSON format containing id and
-                        links is returned.
+                configuration, launch configuration, and optional scaling policies.
+                This data provided in the request body in JSON format. If
+                successful, the created group in JSON format containing id and
+                links is returned.
             </p>
         </doc>
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;groupConfiguration&quot;: {
-                &quot;name&quot; : &quot;workers&quot;
-                &quot;cooldown&quot;: 60,
-                &quot;minEntities&quot;: 5,
-                &quot;maxEntities&quot;: 100,
-                &quot;metadata&quot;: {
-                &quot;firstkey&quot; : &quot;this is a string&quot;
-                &quot;secondkey&quot; : &quot;1&quot;
-                }
-                },
-                &quot;launchConfiguration&quot;: {
-                &quot;type&quot; : &quot;launch_server&quot;
-                &quot;args&quot;: {
-                &quot;server&quot;: {
-                &quot;flavorRef&quot;: 3,
-                &quot;name&quot; : &quot;webhead&quot;
-                &quot;imageRef&quot; : &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;
-                &quot;OS-DCF:diskConfig&quot; : &quot;AUTO&quot;
-                &quot;metadata&quot;: {
-                &quot;mykey&quot; : &quot;myvalue&quot;
-                },
-                &quot;personality&quot;: [
-                {
-                &quot;path&quot;: '/root/.ssh/authorized_keys',
-                &quot;contents&quot; : &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
-                }
-                ],
-                &quot;networks&quot;: [
-                {
-                &quot;uuid&quot; : &quot;11111111-1111-1111-1111-111111111111&quot;
-                }
-                ],
-                },
-                &quot;loadBalancers&quot;: [
-                {
-                &quot;loadBalancerId&quot;: 2200,
-                &quot;port&quot;: 8081
-                }
-                ]
-                }
-                },
-                &quot;scalingPolicies&quot;: [
-                {
-                &quot;name&quot; : &quot;scale up by 10&quot;
-                &quot;change&quot;: 10,
-                &quot;cooldown&quot;: 5,
-                &quot;type&quot; : &quot;webhook&quot;
-                },
-                {
-                &quot;name&quot; : &quot;scale down by 5.5 percent&quot;
-                &quot;changePercent&quot;: -5.5,
-                &quot;cooldown&quot;: 6,
-                &quot;type&quot; : &quot;webhook&quot;
-                },
-                {
-                &quot;name&quot; : &quot;set number of servers to 10&quot;
-                &quot;desiredCapacity&quot;: 10,
-                &quot;cooldown&quot;: 3,
-                &quot;type&quot; : &quot;webhook&quot;
-                }
-                ]
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/createGroup.json"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;group&quot;: {
-                &quot;id&quot;: &quot;{groupId}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;groupConfiguration&quot;: {
-                &quot;name&quot;: &quot;workers&quot;,
-                &quot;cooldown&quot;: 60,
-                &quot;minEntities&quot;: 5,
-                &quot;maxEntities&quot;: 100,
-                &quot;metadata&quot;: {
-                &quot;firstkey&quot;: &quot;this is a string&quot;,
-                &quot;secondkey&quot;: &quot;1&quot;,
-                }
-                },
-                &quot;launchConfiguration&quot;: {
-                &quot;type&quot;: &quot;launch_server&quot;,
-                &quot;args&quot;: {
-                &quot;server&quot;: {
-                &quot;flavorRef&quot;: 3,
-                &quot;name&quot;: &quot;webhead&quot;,
-                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
-                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
-                &quot;metadata&quot;: {
-                &quot;mykey&quot;: &quot;myvalue&quot;
-                },
-                &quot;personality&quot;: [
-                {
-                &quot;path&quot;: '/root/.ssh/authorized_keys',
-                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
-                }
-                ],
-                &quot;networks&quot;: [
-                {
-                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
-                }
-                ],
-                },
-                &quot;loadBalancers&quot;: [
-                {
-                &quot;loadBalancerId&quot;: 2200,
-                &quot;port&quot;: 8081
-                }
-                ]
-                }
-                },
-                &quot;scalingPolicies&quot;: [
-                {
-                &quot;id&quot;: &quot;{policyId1}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;scale up by 10&quot;,
-                &quot;change&quot;: 10,
-                &quot;cooldown&quot;: 5,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                {
-                &quot;id&quot;: &quot;{policyId2}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
-                &quot;changePercent&quot;: -5.5,
-                &quot;cooldown&quot;: 6,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                {
-                &quot;id&quot;: &quot;{policyId3}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;Set number of servers to 10&quot;,
-                &quot;desiredCapacity&quot;: 10,
-                &quot;cooldown&quot;: 6,
-                &quot;type&quot;: &quot;webhook&quot;
-                }
-                ]
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -339,101 +178,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;group&quot;: {
-                &quot;id&quot;: &quot;{groupId}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;groupConfiguration&quot;: {
-                &quot;name&quot;: &quot;workers&quot;,
-                &quot;cooldown&quot;: 60,
-                &quot;minEntities&quot;: 5,
-                &quot;maxEntities&quot;: 100,
-                &quot;metadata&quot;: {
-                &quot;firstkey&quot;: &quot;this is a string&quot;,
-                &quot;secondkey&quot;: &quot;1&quot;,
-                }
-                },
-                &quot;launchConfiguration&quot;: {
-                &quot;type&quot;: &quot;launch_server&quot;,
-                &quot;args&quot;: {
-                &quot;server&quot;: {
-                &quot;flavorRef&quot;: 3,
-                &quot;name&quot;: &quot;webhead&quot;,
-                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
-                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
-                &quot;metadata&quot;: {
-                &quot;mykey&quot;: &quot;myvalue&quot;
-                },
-                &quot;personality&quot;: [
-                {
-                &quot;path&quot;: '/root/.ssh/authorized_keys',
-                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
-                }
-                ],
-                &quot;networks&quot;: [
-                {
-                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
-                }
-                ],
-                },
-                &quot;loadBalancers&quot;: [
-                {
-                &quot;loadBalancerId&quot;: 2200,
-                &quot;port&quot;: 8081
-                }
-                ]
-                }
-                },
-                &quot;scalingPolicies&quot;: [
-                {
-                &quot;id&quot;: &quot;{policyId1}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;scale up by 10&quot;,
-                &quot;change&quot;: 10,
-                &quot;cooldown&quot;: 5,
-                &quot;type&quot;: &quot;webhook&quot;
-                }
-                {
-                &quot;id&quot;: &quot;{policyId2}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
-                &quot;changePercent&quot;: -5.5,
-                &quot;cooldown&quot;: 6,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                {
-                &quot;id&quot;: &quot;{policyId3}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;set number of servers to 10&quot;,
-                &quot;desiredCapacity&quot;: 10,
-                &quot;cooldown&quot;: 3,
-                &quot;type&quot;: &quot;webhook&quot;
-                }
-                ]
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -470,43 +215,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;group&quot;: {
-                &quot;id&quot;: &quot;{groupId}&quot;,
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId},
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;active&quot;: [
-                {
-                &quot;id&quot;: &quot;{instanceId1}&quot;
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}&quot;,
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                },
-                {
-                &quot;id&quot;: &quot;{instanceId2}&quot;
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}&quot;,
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                }
-                ],
-                &quot;activeCapacity&quot;: 2,
-                &quot;pendingCapacity&quot;: 2,
-                &quot;desiredCapacity&quot;: 4,
-                &quot;paused&quot;: false
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -528,20 +237,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;groupConfiguration&quot;: {
-                &quot;name&quot;: &quot;workers&quot;,
-                &quot;cooldown&quot;: 60,
-                &quot;minEntities&quot;: 5,
-                &quot;maxEntities&quot;: 100,
-                &quot;metadata&quot;: {
-                &quot;firstkey&quot;: &quot;this is a string&quot;,
-                &quot;secondkey&quot;: &quot;1&quot;,
-                }
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -559,18 +255,7 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;name&quot; : &quot;workers&quot;
-                    &quot;cooldown&quot;: 60,
-                    &quot;minEntities&quot;: 5,
-                    &quot;maxEntities&quot;: 100,
-                    &quot;metadata&quot;: {
-                    &quot;firstkey&quot; : &quot;this is a string&quot;
-                    &quot;secondkey&quot; : &quot;1&quot;
-                    }
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
@@ -594,41 +279,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;launchConfiguration&quot;: {
-                &quot;type&quot;: &quot;launch_server&quot;,
-                &quot;args&quot;: {
-                &quot;server&quot;: {
-                &quot;flavorRef&quot;: 3,
-                &quot;name&quot;: &quot;webhead&quot;,
-                &quot;imageRef&quot;: &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;,
-                &quot;OS-DCF:diskConfig&quot;: &quot;AUTO&quot;,
-                &quot;metadata&quot;: {
-                &quot;mykey&quot;: &quot;myvalue&quot;
-                },
-                &quot;personality&quot;: [
-                {
-                &quot;path&quot;: '/root/.ssh/authorized_keys',
-                &quot;contents&quot;: &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
-                }
-                ],
-                &quot;networks&quot;: [
-                {
-                &quot;uuid&quot;: &quot;11111111-1111-1111-1111-111111111111&quot;
-                }
-                ],
-                },
-                &quot;loadBalancers&quot;: [
-                {
-                &quot;loadBalancerId&quot;: 2200,
-                &quot;port&quot;: 8081
-                }
-                ]
-                }
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -646,39 +297,7 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;type&quot; : &quot;launch_server&quot;
-                    &quot;args&quot;: {
-                    &quot;server&quot;: {
-                    &quot;flavorRef&quot;: 3,
-                    &quot;name&quot; : &quot;webhead&quot;
-                    &quot;imageRef&quot; : &quot;0d589460-f177-4b0f-81c1-8ab8903ac7d8&quot;
-                    &quot;OS-DCF:diskConfig&quot; : &quot;AUTO&quot;
-                    &quot;metadata&quot;: {
-                    &quot;mykey&quot; : &quot;myvalue&quot;
-                    },
-                    &quot;personality&quot;: [
-                    {
-                    &quot;path&quot;: '/root/.ssh/authorized_keys',
-                    &quot;contents&quot; : &quot;ssh-rsa AAAAB3Nza...LiPk== user@example.net&quot;
-                    }
-                    ],
-                    &quot;networks&quot;: [
-                    {
-                    &quot;uuid&quot; : &quot;11111111-1111-1111-1111-111111111111&quot;
-                    }
-                    ],
-                    },
-                    &quot;loadBalancers&quot;: [
-                    {
-                    &quot;loadBalancerId&quot;: 2200,
-                    &quot;port&quot;: 8081
-                    }
-                    ]
-                    }
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
@@ -728,72 +347,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;policies&quot;: [
-                {
-                &quot;id&quot;:&quot;{policyId1}&quot;,
-                &quot;data&quot;: {
-                &quot;name&quot;: &quot;scale up by one server&quot;,
-                &quot;change&quot;: 1,
-                &quot;cooldown&quot;: 150,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                },
-                {
-                &quot;id&quot;: &quot;{policyId2}&quot;,
-                &quot;data&quot;: {
-                &quot;name&quot;: &quot;scale up ten percent&quot;,
-                &quot;changePercent&quot;: 10,
-                &quot;cooldown&quot;: 150,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                },
-                {
-                &quot;id&quot;:&quot;{policyId3}&quot;,
-                &quot;data&quot;: {
-                &quot;name&quot;: &quot;scale down one server&quot;,
-                &quot;change&quot;: -1,
-                &quot;cooldown&quot;: 150,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                },
-                {
-                &quot;id&quot;: &quot;{policyId4}&quot;,
-                &quot;data&quot;: {
-                &quot;name&quot;: &quot;scale down ten percent&quot;,
-                &quot;changePercent&quot;: -10,
-                &quot;cooldown&quot;: 150,
-                &quot;type&quot;: &quot;webhook&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ]
-                }
-                ]
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -810,60 +364,14 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        [
-                    {
-                    &quot;name&quot; : &quot;scale up by one server&quot;
-                    &quot;change&quot;: 1,
-                    &quot;cooldown&quot;: 150,
-                    &quot;type&quot; : &quot;webhook&quot;
-                    },
-                    {
-                    &quot;name&quot; : &quot;scale down by 5.5 percent&quot;
-                    &quot;changePercent&quot;: -5.5,
-                    &quot;cooldown&quot;: 6,
-                    &quot;type&quot; : &quot;webhook&quot;
-                    }
-                    ]
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;policies&quot;: [
-                    {
-                    &quot;id&quot;: {policyId1},
-                    &quot;links&quot;: [
-                    {
-                    &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}&quot;
-                    &quot;rel&quot;: &quot;self&quot;
-                    }
-                    ],
-                    &quot;name&quot;: &quot;scale up by one server&quot;,
-                    &quot;change&quot;: 1,
-                    &quot;cooldown&quot;: 150,
-                    &quot;type&quot;: &quot;webhook&quot;
-                    },
-                    {
-                    &quot;id&quot;: {policyId2},
-                    &quot;links&quot;: [
-                    {
-                    &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}&quot;
-                    &quot;rel&quot;: &quot;self&quot;
-                    }
-                    ],
-                    &quot;name&quot;: &quot;scale down by 5.5 percent&quot;,
-                    &quot;changePercent&quot;: -5.5,
-                    &quot;cooldown&quot;: 6,
-                    &quot;type&quot;: &quot;webhook&quot;
-                    }
-                    ]
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -884,23 +392,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;policy&quot;: {
-                &quot;id&quot;: {policyId},
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}&quot;
-                &quot;rel&quot;: &quot;self&quot;
-                }
-                ],
-                &quot;name&quot;: &quot;scale up by one server&quot;,
-                &quot;change&quot;: 1,
-                &quot;cooldown&quot;: 150,
-                &quot;type&quot;: &quot;webhook&quot;
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -916,14 +408,7 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;name&quot;: 'scale down by 5.5 percent',
-                    &quot;changePercent&quot;: -5.5,
-                    &quot;cooldown&quot;: 6,
-                    &quot;type&quot; : &quot;webhook&quot;
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
@@ -959,7 +444,7 @@
         <response status="202">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">{}</xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
                 </doc>
             </representation>
         </response>
@@ -979,47 +464,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;webhooks&quot;: [
-                {
-                &quot;id&quot;:&quot;{webhookId1}&quot;,
-                &quot;name&quot;: &quot;alice&quot;,
-                &quot;metadata&quot;: {
-                &quot;notes&quot;: &quot;this is for Alice&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/&quot;,
-                &quot;rel&quot;: &quot;self&quot;
-                },
-                {
-                &quot;href&quot;: &quot;.../execute/1/{capability_hash1}/,
-                &quot;rel&quot;: &quot;capability&quot;
-                }
-                ]
-                },
-                {
-                &quot;id&quot;:&quot;{webhookId2}&quot;,
-                &quot;name&quot;: &quot;alice&quot;,
-                &quot;metadata&quot;: {
-                &quot;notes&quot;: &quot;this is for Bob&quot;
-                },
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/&quot;,
-                &quot;rel&quot;: &quot;self&quot;
-                },
-                {
-                &quot;href&quot;: &quot;.../execute/1/{capability_hash2}/,
-                &quot;rel&quot;: &quot;capability&quot;
-                }
-                ]
-                }
-                ],
-                &quot;webhooks_links&quot;: []
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -1036,63 +481,14 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        [
-                    {
-                    &quot;name&quot; : &quot;alice&quot;
-                    &quot;metadata&quot;: {
-                    &quot;notes&quot; : &quot;this is for Alice&quot;
-                    }
-                    },
-                    {
-                    &quot;name&quot; : &quot;bob&quot;
-                    }
-                    ]
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;webhooks&quot;: [
-                    {
-                    &quot;id&quot;:&quot;{webhookId1}&quot;,
-                    &quot;alice&quot;,
-                    &quot;metadata&quot;: {
-                    &quot;notes&quot;: &quot;this is for Alice&quot;
-                    },
-                    &quot;links&quot;: [
-                    {
-                    &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/&quot;,
-                    &quot;rel&quot;: &quot;self&quot;
-                    },
-                    {
-                    &quot;href&quot;: &quot;.../execute/1/{capability_hash1}/,
-                    &quot;rel&quot;: &quot;capability&quot;
-                    }
-                    ]
-                    },
-                    {
-                    &quot;id&quot;:&quot;{webhookId2}&quot;,
-                    &quot;name&quot;: &quot;bob&quot;,
-                    &quot;metadata&quot;: {},
-                    &quot;links&quot;: [
-                    {
-                    &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/&quot;,
-                    &quot;rel&quot;: &quot;self&quot;
-                    },
-                    {
-                    &quot;href&quot;: &quot;.../execute/1/{capability_hash2}/,
-                    &quot;rel&quot;: &quot;capability&quot;
-                    }
-                    ]
-                    }
-                    ]
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -1112,25 +508,7 @@
         <response status="200">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                &quot;webhook&quot;: {
-                &quot;id&quot;:&quot;{webhookId}&quot;,
-                &quot;name&quot;: &quot;webhook name&quot;,
-                &quot;metadata&quot;: {},
-                &quot;links&quot;: [
-                {
-                &quot;href&quot;: &quot;.../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/&quot;,
-                &quot;rel&quot;: &quot;self&quot;
-                },
-                {
-                &quot;href&quot;: &quot;.../execute/1/{capability_hash2},
-                &quot;rel&quot;: &quot;capability&quot;
-                }
-                ]
-                }
-                }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </response>
@@ -1147,14 +525,7 @@
         <request>
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">
-                        {
-                    &quot;name&quot; : &quot;alice&quot;
-                    &quot;metadata&quot;: {
-                    &quot;notes&quot; : &quot;this is for Alice&quot;
-                    }
-                    }
-                    </xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/"/>
                 </doc>
             </representation>
         </request>
@@ -1186,7 +557,7 @@
         <response status="202">
             <representation element="noop" mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../code/samples/">{}</xsdxt:code>
+                    <xsdxt:code href="../docbkx/samples/">{}</xsdxt:code>
                 </doc>
             </representation>
         </response>
