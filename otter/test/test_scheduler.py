@@ -24,13 +24,15 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
     def setUp(self):
         """
-        mock all the dependencies of SchedulingService that includes cass store,
-        store's fetch and delete events methods, scaling group on which controller
-        will execute scaling policy. Hence, controller.maybe_execute_scaling_policy.
-        twisted.internet.task.Clock is used to simulate time
+        mock all the dependencies of SchedulingService that includes cass
+        store, store's fetch and delete events methods, scaling group on which
+        controller will execute scaling policy. Hence,
+        controller.maybe_execute_scaling_policy. twisted.internet.task.Clock
+        is used to simulate time
         """
 
-        self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
+        self.mock_store = iMock(IScalingGroupCollection,
+                                IScalingScheduleCollection)
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
 
@@ -74,7 +76,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         self.slv_client = mock.MagicMock()
 
         self.clock = Clock()
-        self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
+        self.scheduler_service = SchedulerService(100, 1, self.slv_client,
+                                                  self.clock)
 
     def validate_calls(self, d, fetch_call_count, events):
         """
@@ -82,19 +85,22 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         """
         num_events = len(events)
         self.assertIsNone(self.successResultOf(d))
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, fetch_call_count)
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count,
+                         fetch_call_count)
         self.assertEqual(self.mock_group.modify_state.call_count, num_events)
         self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
-                         [mock.call(mock.ANY, tid, gid) for tid, gid, pid, t in events])
-        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.mock_calls,
-                         [mock.call(mock.ANY, 'transaction-id', self.mock_group,
-                          self.mock_state, policy_id=policy_id)
-                         for tid, gid, policy_id, t in events])
+                         [mock.call(mock.ANY, tid, gid)
+                             for tid, gid, pid, t in events])
+        self.assertEqual(
+            self.mock_controller.maybe_execute_scaling_policy.mock_calls,
+            [mock.call(mock.ANY, 'transaction-id', self.mock_group,
+                       self.mock_state, policy_id=policy_id)
+                for tid, gid, policy_id, t in events])
 
     def test_empty(self):
         """
-        No policies are executed when ``fetch_batch_of_events`` return empty list
-        i.e. no events are there before now
+        No policies are executed when ``fetch_batch_of_events`` return empty
+        list i.e. no events are there before now
         """
         self.returns = [[]]
         d = self.scheduler_service.check_for_events(100)
@@ -113,8 +119,8 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
     def test_many(self):
         """
-        Events are fetched and processed as batches of 100. Its corresponding policies
-        are executed.
+        Events are fetched and processed as batches of 100. Its corresponding
+        policies are executed.
         """
         events1 = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
         events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(100)]
@@ -151,7 +157,9 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME,
+                                               'schedule',
                                                max_retry=0)
 
         d = self.scheduler_service.check_for_events(100)
@@ -161,40 +169,49 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.call_count, 2)
         self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
+                         [mock.call(
+                             lock,
+                             self.scheduler_service.fetch_and_process,
+                             100)] * 2)
 
     def test_does_nothing_on_no_lock(self):
         """
-        ``check_for_events`` gracefully does nothing when it does not get a lock. It
-        does not call ``fetch_and_process``
+        ``check_for_events`` gracefully does nothing when it does not get a
+        lock. It does not call ``fetch_and_process``
         """
         events1 = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
         events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME,
+                                               'schedule',
                                                max_retry=0)
 
-        with_lock_impl = lambda *args: defer.fail(BusyLockError(LOCK_TABLE_NAME, 'schedule'))
+        with_lock_impl = lambda *args: defer.fail(BusyLockError(
+            LOCK_TABLE_NAME, 'schedule'))
         self.mock_with_lock.side_effect = with_lock_impl
 
         d = self.scheduler_service.check_for_events(100)
 
         self.validate_calls(d, 0, [])
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
+        self.assertEqual(
+            self.mock_with_lock.mock_calls,
+            [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
-        ``check_for_events`` gracefully does nothing when it does not get a lock after
-        finishing first batch of 100 events. It does not call ``fetch_and_process`` second time
+        ``check_for_events`` gracefully does nothing when it does not get a
+        lock after finishing first batch of 100 events. It does not call
+        ``fetch_and_process`` second time
         """
         events1 = [('1234', 'scal44', 'pol44', 'now') for i in range(100)]
         events2 = [('1234', 'scal44', 'pol45', 'now') for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME, 'schedule',
                                                max_retry=0)
 
         _with_lock_first_time = [True]
@@ -211,5 +228,7 @@ class SchedulerTestCase(DeferredTestMixin, TestCase):
 
         self.validate_calls(d, 1, events1)
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
+        self.assertEqual(
+            self.mock_with_lock.mock_calls,
+            [mock.call(lock, self.scheduler_service.fetch_and_process,
+                       100)] * 2)
