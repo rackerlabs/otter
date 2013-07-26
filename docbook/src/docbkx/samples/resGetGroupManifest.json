@@ -30,7 +30,7 @@
                     },
                     "personality": [
                         {
-                            "path": '/root/.ssh/authorized_keys',
+                            "path": "/root/.ssh/authorized_keys",
                             "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
