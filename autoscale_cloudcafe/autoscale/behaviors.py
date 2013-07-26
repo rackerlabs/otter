@@ -196,7 +196,8 @@ class AutoscaleBehaviors(BaseBehavior):
                 name=sp_name, cooldown=sp_cooldown,
                 desired_capacity=sp_desired_capacity, policy_type=sp_policy_type)
         policy = AutoscaleBehaviors.get_policy_properties(
-            self, create_response.entity)
+            self, policy_list=create_response.entity, status_code=create_response.status_code,
+            headers=create_response.headers)
         return policy
 
     def create_schedule_policy_given(
