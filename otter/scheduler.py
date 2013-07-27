@@ -1,7 +1,7 @@
 """
-The OtterClock.  Because, while a broken clock is right twice a day, an OtterClock
-is right all the time and is probably what caused your regular clock to get broken
-in the first place.
+The OtterClock.  Because, while a broken clock is right twice a day, an
+OtterClock is right all the time and is probably what caused your regular
+clock to get broken in the first place.
 """
 
 from datetime import datetime
@@ -24,7 +24,8 @@ def next_cron_occurrence(cron):
     """
     Return next occurence of given cron entry
     """
-    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
+    return croniter(cron,
+                    start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 class SchedulerService(TimerService):
@@ -39,11 +40,14 @@ class SchedulerService(TimerService):
         :param int batchsize: number of events to fetch on each iteration
         :param int interval: time between each iteration
         :param slv_client: a :class:`silverberg.client.CQLClient` or
-                    :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
-        :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
+            :class:`silverberg.cluster.RoundRobinCassandraCluster` instance
+            used to get lock
+        :param clock: An instance of IReactorTime provider that defaults to
+            reactor if not provided
         """
         from otter.models.cass import LOCK_TABLE_NAME
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
+        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME,
+                              'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
@@ -60,7 +64,8 @@ class SchedulerService(TimerService):
             return None
 
         def check_fetch_error(failure):
-            # Return if we do not get lock as other process might be processing current events
+            # Return if we do not get lock as other process might be
+            # processing current events
             failure.trap(BusyLockError)
             otter_log.msg('No lock in scheduler')
 
