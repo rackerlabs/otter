@@ -1,7 +1,7 @@
 """
-The OtterClock.  Because, while a broken clock is right twice a day, an OtterClock
-is right all the time and is probably what caused your regular clock to get broken
-in the first place.
+The OtterClock.  Because, while a broken clock is right twice a day, an
+OtterClock is right all the time and is probably what caused your regular
+clock to get broken in the first place.
 """
 
 from datetime import datetime
@@ -31,10 +31,13 @@ class SchedulerService(TimerService):
         :param int batchsize: number of events to fetch on each iteration
         :param int interval: time between each iteration
         :param slv_client: a :class:`silverberg.client.CQLClient` or
-                    :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
-        :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
+            :class:`silverberg.cluster.RoundRobinCassandraCluster` instance
+            used to get lock
+        :param clock: An instance of IReactorTime provider that defaults to
+            reactor if not provided
         """
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
+        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule',
+                              max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
@@ -53,7 +56,8 @@ class SchedulerService(TimerService):
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            # Return if we do not get lock as other process might be processing current events
+            # Return if we do not get lock as other process might be
+            # processing current events
             d.addErrback(lambda f: f.trap(BusyLockError) and None)
             return d
 

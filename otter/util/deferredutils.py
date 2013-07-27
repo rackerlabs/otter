@@ -18,7 +18,8 @@ def unwrap_first_error(possible_first_error):
         :class:`defer.FirstError`
     :type possible_first_error: :class:`Failure`
 
-    :return: :class:`Failure` that is under any/all the :class:`defer.FirstError`
+    :return: :class:`Failure` that is under any/all the
+        :class:`defer.FirstError`
     """
     if possible_first_error.check(defer.FirstError):
         return unwrap_first_error(possible_first_error.value.subFailure)

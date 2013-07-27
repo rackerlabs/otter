@@ -16,20 +16,21 @@ class Supervisor(object):
     def __init__(self, auth_function):
         self.auth_function = auth_function
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(self, log, transaction_id, scaling_group,
+                       launch_config):
         """
         Executes a single launch config.
 
         :param log: Bound logger.
         :param str transaction_id: Transaction ID.
-        :param callable auth_function: A 1-argument callable that takes a tenant_id,
-            and returns a Deferred that fires with a 2-tuple of auth_token and
-            service_catalog.
+        :param callable auth_function: A 1-argument callable that takes a
+            tenant_id, and returns a Deferred that fires with a 2-tuple of
+            auth_token and service_catalog.
         :param IScalingGroup scaling_group: Scaling Group.
         :param dict launch_config: The launch config for the scaling group.
 
-        :returns: A deferred that fires with a 3-tuple of job_id, completion deferred,
-            and job_info (a dict)
+        :returns: A deferred that fires with a 3-tuple of job_id, completion
+            deferred, and job_info (a dict)
         :rtype: ``Deferred``
         """
         job_id = generate_job_id(scaling_group.uuid)
@@ -58,8 +59,9 @@ class Supervisor(object):
         d.addCallback(when_authenticated)
 
         def when_launch_server_completed(result):
-            # XXX: Something should be done with this data. Currently only enough
-            # to pass to the controller to store in the active state is returned
+            # XXX: Something should be done with this data. Currently only
+            # enough to pass to the controller to store in the active state
+            # is returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
                     instance_id=server_details['server']['id'])
@@ -75,16 +77,18 @@ class Supervisor(object):
 
         return succeed((job_id, completion_d))
 
-    def execute_delete_server(self, log, transaction_id, scaling_group, server):
+    def execute_delete_server(self, log, transaction_id, scaling_group,
+                              server):
         """
         Executes a single delete server
 
-        Return a Deferred that callbacks with None after the server deleted successfully.
-        None is also callback(ed) when server deletion fails in which case the error is logged
-        before callback(ing).
+        Return a Deferred that callbacks with None after the server deleted
+        successfully. None is also callback(ed) when server deletion fails in
+        which case the error is logged before callback(ing).
         """
 
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server['id'],
+                       tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):

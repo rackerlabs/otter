@@ -27,13 +27,13 @@ The current workflow for impersonating a customer is as follows:
 
 The implemented workflow uses only v2.0 APIs and so it makes some assumptions
 about the featureset of the world.  It currently chooses the first (and only)
-user for a tenant and impersonates them.  There is a mosso API in Identity Admin
-v1.1 that can give you a single (probably default) user for a given tenant but
-it is not currently being used.
+user for a tenant and impersonates them.  There is a mosso API in Identity
+Admin v1.1 that can give you a single (probably default) user for a given
+tenant but it is not currently being used.
 
 This API also currently makes use of features of the Identity Admin v2.0 API
-that are only availabe in staging (listing users for a tenant, and endpoints for
-a token.)
+that are only availabe in staging (listing users for a tenant, and endpoints
+for a token.)
 """
 
 import json
@@ -47,10 +47,11 @@ from otter.util.http import (
 
 class ImpersonatingAuthenticator(object):
     """
-    An authentication handler that first uses a identity admin account to authenticate
-    and then impersonates the desired tenant_id.
+    An authentication handler that first uses a identity admin account to
+    authenticate and then impersonates the desired tenant_id.
     """
-    def __init__(self, identity_admin_user, identity_admin_password, url, admin_url):
+    def __init__(self, identity_admin_user, identity_admin_password, url,
+                 admin_url):
         self._identity_admin_user = identity_admin_user
         self._identity_admin_password = identity_admin_password
         self._url = url
@@ -88,8 +89,10 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(impersonate)
 
         def endpoints((identity_admin_token, token)):
-            scd = endpoints_for_token(self._admin_url, identity_admin_token, token)
-            scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
+            scd = endpoints_for_token(self._admin_url, identity_admin_token,
+                                      token)
+            scd.addCallback(lambda endpoints: (
+                token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
         d.addCallback(endpoints)
@@ -119,7 +122,8 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
 
     :return: decoded JSON response as dict.
     """
-    d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
+    d = treq.get(append_segments(auth_endpoint, 'tokens',
+                                 user_token, 'endpoints'),
                  headers=headers(identity_admin_token))
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, auth_endpoint, data='token_endpoints')
@@ -139,7 +143,9 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id):
     :return: Username of the magical identity:user-admin user for the tenantid.
     """
     d = treq.get(
-        append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
+        append_segments(auth_endpoint.replace('v2.0', 'v1.1'),
+                        'mosso',
+                        str(tenant_id)),
         auth=(username, password),
         allow_redirects=False)
     d.addCallback(check_success, [301])
@@ -178,7 +184,8 @@ def authenticate_user(auth_endpoint, username, password):
     return d
 
 
-def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10800):
+def impersonate_user(auth_endpoint, identity_admin_token, username,
+                     expire_in=10800):
     """
     Acquire an auth-token for a user via impersonation.
 
@@ -207,8 +214,9 @@ def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10
 
 def _endpoints_to_service_catalog(endpoints):
     """
-    Convert the endpoint list from the endpoints API to the service catalog format
-    from the authentication API.
+    Convert the endpoint list from the endpoints API to the service catalog
+    format from the authentication API.
     """
     return [{'endpoints': list(e), 'name': n, 'type': t}
-            for (n, t), e in groupby(endpoints['endpoints'], lambda i: (i['name'], i['type']))]
+            for (n, t), e in groupby(endpoints['endpoints'], lambda i: (
+                i['name'], i['type']))]

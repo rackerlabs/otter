@@ -125,10 +125,9 @@ def makeService(config):
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
-    authenticator = ImpersonatingAuthenticator(config_value('identity.username'),
-                                               config_value('identity.password'),
-                                               config_value('identity.url'),
-                                               config_value('identity.admin_url'))
+    authenticator = ImpersonatingAuthenticator(
+        config_value('identity.username'), config_value('identity.password'),
+        config_value('identity.url'), config_value('identity.admin_url'))
 
     supervisor = Supervisor(authenticator.authenticate_tenant)
 
@@ -143,9 +142,9 @@ def makeService(config):
     api_service.setServiceParent(s)
 
     if config_value('scheduler'):
-        scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
-                                             int(config_value('scheduler.interval')),
-                                             cassandra_cluster)
+        scheduler_service = SchedulerService(
+            int(config_value('scheduler.batchsize')),
+            int(config_value('scheduler.interval')), cassandra_cluster)
         scheduler_service.setServiceParent(s)
 
     return s
