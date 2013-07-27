@@ -4,14 +4,16 @@
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from autoscale.behaviors import AutoscaleBehaviors
 from cloudcafe.common.resources import ResourcePool
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
 from autoscale.client import AutoscalingAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
+from autoscale.otter_constants import OtterConstants
 
 import os
+from time import sleep
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -32,28 +34,25 @@ class AutoscaleFixture(BaseTestFixture):
         user_config = UserConfig()
         access_data = AuthProvider.get_access_data(cls.endpoint_config,
                                                    user_config)
-
-        autoscale_service = access_data.get_service(
-            cls.autoscale_config.autoscale_endpoint_name)
-
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
         server_url = server_service.get_endpoint(
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
+        cls.otter_endpoint = cls.autoscale_config.server_endpoint
+
         env = os.environ['OSTNG_CONFIG_FILE']
-        if 'dev' in env.lower():
-            url = 'http://localhost:9000/v1.0/{0}'.format(cls.tenant_id)
-        elif 'prod' in env.lower():
-            url = 'https://autoscale.api.rackspacecloud.com/v1.0/{0}'.format(
-                cls.tenant_id)
-        else:
-            url = autoscale_service.get_endpoint(
+        if ('prod.ord' in env.lower()) or ('prod.dfw' in env.lower()):
+            autoscale_service = access_data.get_service(
+                cls.autoscale_config.autoscale_endpoint_name)
+            cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
+        else:
+            cls.url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
 
         cls.autoscale_client = AutoscalingAPIClient(
-            url, access_data.token.id_,
+            cls.url, access_data.token.id_,
             'json', 'json')
         cls.server_client = ServersClient(
             server_url, access_data.token.id_,
@@ -81,6 +80,10 @@ class AutoscaleFixture(BaseTestFixture):
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
+        cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
+        cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
+        cls.max_maxentities = OtterConstants.MAX_MAXENTITIES
+        cls.max_cooldown = OtterConstants.MAX_COOLDOWN
 
     def validate_headers(self, headers):
         """
@@ -170,6 +173,24 @@ class AutoscaleFixture(BaseTestFixture):
         if args is 'cron_style':
             self.assertEquals(get_policy.args.cron, created_policy['schedule_value'],
                               msg='Cron style schedule policy value not as expected')
+
+    def create_default_at_style_policy_wait_for_execution(self, group_id, delay=3,
+                                                          change=None,
+                                                          scale_down=None):
+        """
+        Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
+        the scheduler config seconds + delay, so that the policy is picked
+        """
+        if change is None:
+            change = self.sp_change
+        if scale_down is True:
+            change = -change
+        self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=group_id,
+            sp_cooldown=0,
+            sp_change=change,
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
+        sleep(self.scheduler_interval + delay)
 
     @classmethod
     def tearDownClass(cls):

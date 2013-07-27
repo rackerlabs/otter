@@ -11,18 +11,12 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
     System tests to verify execute multiple scaling policies' scenarios
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ExecuteMultiplePoliciesTest, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities > 0, with multiple scaling policies
         and execute one scale up policy to create 2 servers
         """
+        super(ExecuteMultiplePoliciesTest, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             gc_cooldown=0)
@@ -58,6 +52,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
+        super(ExecuteMultiplePoliciesTest, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_policy_up_cooldown(self):
@@ -96,6 +91,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         """
         The policy cooldown times are not enforced when executing different policies,
         and executing such polcies result in active servers as expected
+        ** Busy lock error sometimes **
         """
         execute_change_percent_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
@@ -142,6 +138,25 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
+
+    def test_system_multiple_webhook_policies_in_group_in_different_requests(self):
+        """
+        Creating multiple webhook policies with the same payload, using multiple
+        create policy requests is successful.
+        """
+        policy_count = 3
+        group = (self.autoscale_behaviors.create_scaling_group_min()).entity
+        policy_id_list = []
+        for _ in range(policy_count):
+            create_policy_response = self.autoscale_behaviors.create_policy_given(
+                group_id=group.id,
+                sp_name='multi_web_policy',
+                sp_change=1)
+            self.assertEquals(create_policy_response['status_code'], 201,
+                              msg='Created multiple scaling policies with same policy data'
+                              ', response code: {0}'.format(create_policy_response['status_code']))
+            policy_id_list.append(create_policy_response['id'])
+        self.assertEqual(len(set(policy_id_list)), policy_count)
 
     def _execute_policy_after_cooldown(self, group_id, policy_id):
         """

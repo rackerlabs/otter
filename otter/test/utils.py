@@ -7,6 +7,7 @@ import os
 
 from silverberg.lock import BasicLock
 from twisted.internet import defer
+from twisted.python.failure import Failure
 from zope.interface import directlyProvides
 
 
@@ -49,6 +50,20 @@ class matches(object):
 
     def __repr__(self):
         return 'matches({0!s}'.format(self._matcher)
+
+
+class CheckFailure(object):
+    """
+    Class that can be passed to an `assertEquals` or `assert_called_with` -
+    shortens checking whether a `twisted.python.failure.Failure` wraps an
+    Exception of a particular type.
+    """
+    def __init__(self, exception_type):
+        self.exception_type = exception_type
+
+    def __eq__(self, other):
+        return isinstance(other, Failure) and other.check(
+            self.exception_type)
 
 
 class DeferredTestMixin(object):

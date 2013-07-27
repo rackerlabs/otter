@@ -28,11 +28,11 @@ import json
 
 from twisted.internet import defer
 
-from otter import supervisor
+from otter.models.interface import NoSuchScalingGroupError
+from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
-from otter.auth import authenticate_tenant
 
 
 class CannotExecutePolicyError(Exception):
@@ -289,7 +289,7 @@ def find_servers_to_evict(log, state, delta):
     return sorted_servers[:delta]
 
 
-def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_group,
+def delete_active_servers(log, transaction_id, scaling_group,
                           delta, state):
     """
     Start deleting active servers
@@ -306,8 +306,8 @@ def delete_active_servers(log, transaction_id, authenticate_tenant, scaling_grou
         state.remove_active(server['id'])
 
     # then start deleting those servers
-    return [supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
-                                             scaling_group, server_info)
+    return [get_supervisor().execute_delete_server(log, transaction_id,
+                                                   scaling_group, server_info)
             for server_info in servers_to_evict]
 
 
@@ -325,10 +325,108 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     # delete active servers if pending jobs are not enough
     remaining = delta - len(jobs_to_cancel)
     if remaining > 0:
-        delete_active_servers(log, transaction_id, authenticate_tenant,
+        delete_active_servers(log, transaction_id,
                               scaling_group, remaining, state)
 
     return defer.succeed(None)
+
+
+class _Job(object):
+    """
+    Private class representing a server creation job.  This calls the supervisor
+    to create one server, and also handles job completion.
+    """
+    def __init__(self, log, transaction_id, scaling_group, supervisor):
+        """
+        :param log: a bound logger instance that can be used for logging
+        :param str transaction_id: a transaction id
+        :param IScalingGroup scaling_group: the scaling group for which a job
+            should be created
+        :param dict launch_config: the launch config to scale up a server
+        """
+        self.log = log
+        self.transaction_id = transaction_id
+        self.scaling_group = scaling_group
+        self.supervisor = supervisor
+        self.job_id = None
+
+    def start(self, launch_config):
+        """
+        Kick off a job by calling the supervisor with a launch config.
+        """
+        deferred = self.supervisor.execute_config(
+            self.log, self.transaction_id, self.scaling_group, launch_config)
+        deferred.addCallback(self.job_started)
+        return deferred
+
+    def _job_failed(self, f):
+        """
+        Job has failed.  Remove the job, if it exists, and log the error.
+        """
+        self.log.err(f)
+
+        def handle_failure(group, state):
+            # if it is not in pending, then the job was probably deleted before
+            # it got a chance to fail.
+            if self.job_id in state.pending:
+                state.remove_job(self.job_id)
+            return state
+
+        d = self.scaling_group.modify_state(handle_failure)
+
+        def ignore_error_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+            self.log.msg("Relevant scaling group has already been deleted. "
+                         "Job failure logged and ignored.")
+
+        d.addErrback(ignore_error_if_group_deleted)
+        return d
+
+    def _job_succeeded(self, result):
+        """
+        Job succeeded. If the job exists, move the server from pending to active
+        and log.  If not, then the job has been canceled, so delete the server.
+        """
+        def handle_success(group, state):
+            if self.job_id not in state.pending:
+                # server was slated to be deleted when it completed building.
+                # So, deleting it now
+                self.log.msg('Job removed. Deleting server')
+                self.supervisor.execute_delete_server(
+                    self.log, self.transaction_id, self.scaling_group, result)
+            else:
+                state.remove_job(self.job_id)
+                state.add_active(result['id'], result)
+                self.log.bind(server_id=result['id']).msg(
+                    "Job completed, resulting in an active server.")
+            return state
+
+        d = self.scaling_group.modify_state(handle_success)
+
+        def delete_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+            self.log.msg('Relevant scaling group has been removed. '
+                         'Deleting server.')
+            self.supervisor.execute_delete_server(
+                self.log, self.transaction_id, self.scaling_group, result)
+
+        d.addErrback(delete_if_group_deleted)
+        return d
+
+    def job_started(self, result):
+        """
+        Takes a tuple of (job_id, completion deferred), which will fire when a
+        job has been completed, and marks said job as completed by removing it
+        from pending.
+        """
+        self.job_id, completion_deferred = result
+        self.log = self.log.bind(job_id=self.job_id)
+
+        completion_deferred.addCallbacks(
+            self._job_succeeded, self._job_failed)
+        completion_deferred.addErrback(self.log.err)
+
+        return self.job_id
 
 
 def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
@@ -338,41 +436,6 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     :return: Deferred
     """
 
-    def _handle_completion(completion_deferred, job_id):
-        """
-        Marks a job as completed by removing it from pending.
-        If successful, adds the server info to the active servers, log, and save
-        If unsuccessful, TBD other stuff, log, and save.
-        """
-        job_log = log.bind(job_id=job_id)
-
-        # next_round_state is a new state blob passed to these functions by
-        # modify_state.  By the time these are called, state may have changed.
-        def _on_success(group, next_round_state, result):
-            if job_id not in next_round_state.pending:
-                # server was slated to be deleted when it completed building.
-                # So, deleting it now
-                job_log.msg('Job removed. Deleting server')
-                supervisor.execute_delete_server(log, transaction_id, authenticate_tenant,
-                                                 scaling_group, result)
-            else:
-                next_round_state.remove_job(job_id)
-                next_round_state.add_active(result['id'], result)
-                job_log.bind(server_id=result['id']).msg(
-                    "Job completed, resulting in an active server.")
-            return next_round_state
-
-        def _on_failure(group, next_round_state, f):
-            next_round_state.remove_job(job_id)
-            job_log.err(f)
-            return next_round_state
-
-        completion_deferred.addCallbacks(
-            partial(scaling_group.modify_state, _on_success),
-            partial(scaling_group.modify_state, _on_failure))
-
-        completion_deferred.addErrback(job_log.err)
-
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
@@ -380,16 +443,14 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
         """
         log.msg('updating state')
 
-        for job_id, completion_deferred in pending_results:
+        for job_id in pending_results:
             state.add_job(job_id)
-            _handle_completion(completion_deferred, job_id)
 
     if delta > 0:
         log.msg("Launching some servers.")
+        supervisor = get_supervisor()
         deferreds = [
-            supervisor.execute_config(log, transaction_id,
-                                      authenticate_tenant,
-                                      scaling_group, launch)
+            _Job(log, transaction_id, scaling_group, supervisor).start(launch)
             for i in range(delta)
         ]
 
