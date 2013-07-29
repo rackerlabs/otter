@@ -28,6 +28,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
@@ -365,10 +366,21 @@ class _Job(object):
         self.log.err(f)
 
         def handle_failure(group, state):
-            state.remove_job(self.job_id)
+            # if it is not in pending, then the job was probably deleted before
+            # it got a chance to fail.
+            if self.job_id in state.pending:
+                state.remove_job(self.job_id)
             return state
 
-        return self.scaling_group.modify_state(handle_failure)
+        d = self.scaling_group.modify_state(handle_failure)
+
+        def ignore_error_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+            self.log.msg("Relevant scaling group has already been deleted. "
+                         "Job failure logged and ignored.")
+
+        d.addErrback(ignore_error_if_group_deleted)
+        return d
 
     def _job_succeeded(self, result):
         """
@@ -389,7 +401,17 @@ class _Job(object):
                     "Job completed, resulting in an active server.")
             return state
 
-        return self.scaling_group.modify_state(handle_success)
+        d = self.scaling_group.modify_state(handle_success)
+
+        def delete_if_group_deleted(f):
+            f.trap(NoSuchScalingGroupError)
+            self.log.msg('Relevant scaling group has been removed. '
+                         'Deleting server.')
+            self.supervisor.execute_delete_server(
+                self.log, self.transaction_id, self.scaling_group, result)
+
+        d.addErrback(delete_if_group_deleted)
+        return d
 
     def job_started(self, result):
         """
