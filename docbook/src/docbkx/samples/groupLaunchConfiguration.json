@@ -1,14 +1,4 @@
 {
-    "groupConfiguration": {
-        "name": "workers",
-        "cooldown": 60,
-        "minEntities": 5,
-        "maxEntities": 100,
-        "metadata": {
-            "firstkey": "this is a string",
-            "secondkey": "1"
-        }
-    },
     "launchConfiguration": {
         "type": "launch_server",
         "args": {
@@ -39,19 +29,5 @@
                 }
             ]
         }
-    },
-    "scalingPolicies": [
-        {
-            "name": "scale up by 10",
-            "change": 10,
-            "cooldown": 5,
-            "type": "webhook"
-        },
-        {
-            "name": 'scale down 5.5 percent',
-            "changePercent": -5.5,
-            "cooldown": 6,
-            "type": "webhook"
-        }
-    ]
+    }
 }
