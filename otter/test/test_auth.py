@@ -15,9 +15,7 @@ from otter.auth import extract_token
 from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
-from otter.auth import _ImpersonatingAuthenticator
-from otter.auth import authenticate_tenant
-from otter.util.config import set_config_data
+from otter.auth import ImpersonatingAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -270,8 +268,8 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.admin_url = 'http://identity_admin/v2.0'
         self.user = 'service_user'
         self.password = 'service_password'
-        self.ia = _ImpersonatingAuthenticator(self.user, self.password,
-                                              self.url, self.admin_url)
+        self.ia = ImpersonatingAuthenticator(self.user, self.password,
+                                             self.url, self.admin_url)
 
     def test_authenticate_tenant_auth_as_service_user(self):
         """
@@ -362,65 +360,3 @@ class ImpersonatingAuthenticatorTests(TestCase):
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
-
-
-class AuthenticateTenantTests(TestCase):
-    """
-    Test the public authenticate_tenant API.
-    """
-    def setUp(self):
-        """
-        Set up a mock Authenticator for authenticate_tenant.
-        """
-        set_config_data({'identity': {
-            'username': 'service_user',
-            'password': 'service_password',
-            'url': 'http://identity/v2.0',
-            'admin_url': 'http://identity_admin'
-        }})
-
-        self.ia = patch(self, 'otter.auth._ImpersonatingAuthenticator')
-
-    def test_authenticate_tenant_creates_authenticator_with_config_values(self):
-        """
-        authenticate_tenant configures the authenticator with the global config
-        values.
-        """
-        authenticate_tenant(111111)
-
-        self.ia.assert_called_once_with('service_user', 'service_password',
-                                        'http://identity/v2.0',
-                                        'http://identity_admin')
-
-    def test_authenticate_tenant_calls_authenticators_authenticate_tenant(self):
-        """
-        authenticate_tenant delegates to the configured authenticators,
-        authenticate_tenant method.
-        """
-        authenticate_tenant(111111)
-        self.ia.return_value.authenticate_tenant.assert_called_once_with(111111)
-
-    def test_authenticate_tenant_propagates_auth_errors(self):
-        """
-        authenticate_tenant propagates errors from the authenticator's method.
-        """
-        self.ia.return_value.authenticate_tenant.return_value = fail(
-            APIError(500, '500'))
-
-        failure = self.failureResultOf(authenticate_tenant(111111))
-        self.assertTrue(failure.check(APIError))
-
-    def test_authenticate_tenant_returns_token_and_endpoints(self):
-        """
-        authenticate_tenant returns tokens and endpoints from the
-        authenticator's method.
-        """
-        self.ia.return_value.authenticate_tenant.return_value = succeed(
-            ('impersonation_token', [{'endpoints': [], 'name': 'anEndpoint',
-                                      'type': 'anType'}]))
-
-        result = self.successResultOf(authenticate_tenant(111111))
-        self.assertEqual(result,
-                         ('impersonation_token',
-                          [{'endpoints': [], 'name': 'anEndpoint',
-                            'type': 'anType'}]))

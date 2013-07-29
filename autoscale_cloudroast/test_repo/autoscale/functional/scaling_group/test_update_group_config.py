@@ -2,7 +2,7 @@
 Test to create and update the created group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class UpdateGroupConfigTest(AutoscaleFixture):
@@ -183,8 +183,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         self.assertEquals(update_group_response.status_code, 204,
                           msg='Update group config failed with {0}'
                           .format(update_group_response.status_code))
-        self.assertTrue(update_group_response.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(update_group_response.headers)
         self.assertEquals(updated_config.minEntities, self.gc_min_entities,
                           msg='Min entities in the Group config did not update')

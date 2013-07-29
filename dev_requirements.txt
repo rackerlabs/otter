@@ -15,5 +15,5 @@ requests==1.2.0
 decorator==3.4.0
 unittest2==0.5.1
 git+https://github.com/stackforge/opencafe.git@b971070b28d07c0b19f8809e18950f2d6cf0e466#egg=opencafe
-git+https://github.com/stackforge/cloudcafe.git@f1a0dee8eec6e60aeb5493ef6884a5f22c9ae219#egg=cloudcafe
+git+https://github.com/stackforge/cloudcafe.git@4dc2227b4b0140158ceab286dfa127384886f5b7#egg=cloudcafe
 IPy==0.81
