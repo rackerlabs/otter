@@ -51,7 +51,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             2, self.at_style_policy, self.cron_style_policy)
         self.empty_scaling_group(group)
 
-    @unittest.skip('cron not implemented yet')
     def test_system_webhook_and_scheduler_policies_same_group(self):
         """
         Create a group with scheduler and webhook policies and verify the
@@ -60,11 +59,10 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group = self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy)
         self._execute_webhook_policies_within_group(group)
-        sleep(self.delta + self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, 3 * self.change)
         self.empty_scaling_group(group)
 
-    @unittest.skip('cron not implemented yet')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
         Create 2 groups each with the same type of scheduler and webhook policies and
@@ -75,7 +73,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group2 = self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy)
         self._execute_webhook_policies_within_group(group1, group2)
-        sleep(self.delta + self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
         self.empty_scaling_group(group1)
@@ -113,8 +111,9 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         Creates a group with the given list of policies and asserts the
         group creation was successful
         """
+        policy_list = []
         for each_policy in args:
-            policy_list = [each_policy for _ in range(multi_num)]
+            policy_list.extend([each_policy] * multi_num)
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling',
             sp_list=policy_list,
