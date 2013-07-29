@@ -1036,8 +1036,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.mock_state,
                                                     'pol1')
         f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
-        self.assertIn("Policy execution would violate min/max constraints",
-                      str(f.value))
+        self.assertIn("No change in servers", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
