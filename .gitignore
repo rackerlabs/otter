@@ -20,3 +20,6 @@ subunit-output.txt
 *.pydev*
 .DS_Store
 docbook/target
+.tox
+_coverage_html
+coverage.xml
