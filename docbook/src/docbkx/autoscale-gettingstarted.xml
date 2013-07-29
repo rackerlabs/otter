@@ -596,7 +596,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                         Images</title>
                     <para>The following example shows how to request a list cloud server images.</para>
                     <screen>
-curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool
+$ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool
                     </screen>
                 </example>
             </para>
@@ -628,7 +628,7 @@ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" h
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/groupConfiguration.json" parse="text"/>
+<xi:include href="./samples/reqCreateGroup.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -640,7 +640,7 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
 GET /{tenantId}/groups
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/ViewScalingGroup.json" parse="text"/>
+<xi:include href="./samples/resGetGroups.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -653,7 +653,7 @@ GET /{tenantId}/groups
 GET /{tenantId}/groups/{groupId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/ManifestedViewScalingGroup.json" parse="text"/>
+<xi:include href="./samples/resGetGroupManifest.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -667,7 +667,7 @@ GET /{tenantId}/groups/{groupId}
 GET /{tenantId}/groups/{groupId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/GetScalingGroupState.json" parse="text"/>
+<xi:include href="./samples/resGetGroupState.json" parse="text"/>
 </programlisting>
             </example>
         </section>
@@ -683,7 +683,7 @@ GET /{tenantId}/groups/{groupId}
                     other metadata.</para>
                 <screen>GET /{tenantId}/groups/{groupId}/config</screen>
                 <programlisting language="json">
-<xi:include href="./samples/GetLaunchConfiguration.json" parse="text"/>
+<xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -696,7 +696,6 @@ GET /{tenantId}/groups/{groupId}
                     If successful, no response body will be returned. </para>
                 <programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
                 <programlisting language="json">
-<xi:include href="./samples/EditGroupConfiguration.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -706,7 +705,7 @@ GET /{tenantId}/groups/{groupId}
                     join it to, and what networks to add it to, and other metadata. </para>
                 <screen> GET /{tenantId}/groups/{groupId}/launch</screen>
                 <programlisting language="json">
-<xi:include href="./samples/GetLaunchConfiguration.json" parse="text"/>
+<xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -719,7 +718,6 @@ GET /{tenantId}/groups/{groupId}
                     successful, no response body will be returned. </para>
                 <screen> PUT /{tenantId}/groups/{groupId}/launch </screen>
                 <programlisting language="json">
-<xi:include href="./samples/EditLaunchConfiguration.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -784,7 +782,7 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
 GET /{tenantId}/groups/{groupId}/policies
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/ViewScalingPolicies.json" parse="text"/>
+<xi:include href="./samples/resGetPolicies.json" parse="text"/>
 </programlisting>
             </example>
             <example>
