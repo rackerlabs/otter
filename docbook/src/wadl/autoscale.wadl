@@ -14,95 +14,75 @@
     xmlns:db="http://docbook.org/ns/docbook"
     xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
     xmlns:wadl="http://wadl.dev.java.net/2009/02"
+    xmlns:osapi="http://docs.openstack.org/compute/api/v1.1"
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
     xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
     <!-- ======================================================================================= -->
     <!-- Resources -->
     <!-- ======================================================================================= -->
-    <resources base="https:///{region}.autoscale.api.rackspacecloud.com/">
+    <resources base="https://{region}.autoscale.api.rackspacecloud.com/">
         <resource id="version" path="v1.0/">
 
             <!-- GROUPS resource -->
-            <resource id="groups" path="/{tenantId}/groups">
-                <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
-                    <doc>A valid authentication token</doc>
-                </param>
-                <param name="tenantId" required="true" style="template"/>
-                <method href="#getGroups"/>
-                <method href="#createAutoscaleGroup"/>
+            <resource id="tenantid" path="/{tenantId}">
+                <param name="tenantId" type="xsd:string" required="true" style="template"/>
+                <resource id="groups" path="/groups">
+                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true"/>
 
-                <resource id="group" path="{groupId}">
-                    <param name="tenantId" required="true" style="template"/>
-                    <param name="groupId" required="true" style="template"/>
-                    <method href="#getGroupManifest"/>
-                    <method href="#deleteGroup"/>
+                    <method href="#getGroups"/>
+                    <method href="#createGroup"/>
 
-                    <resource id="group_state" path="/state">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#getGroupState"/>
-                    </resource>
-                    <resource id="group_config" path="/config">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#getGroupConfig"/>
-                        <method href="#putGroupConfig"/>
-                    </resource>
-                    <resource id="launch_configuration" path="/launch">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#getLaunchConfig"/>
-                        <method href="#putLaunchConfig"/>
-                    </resource>
-                    <resource id="pause" path="/pause">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#pauseGroup"/>
-                    </resource>
-                    <resource id="resume" path="/resume">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#resumeGroup"/>
-                    </resource>
+                    <resource id="group" path="/{groupId}">
 
-                    <!-- POLICIES resource -->
-                    <resource id="policies" path="/policies">
-                        <param name="tenantId" required="true" style="template"/>
-                        <param name="groupId" required="true" style="template"/>
-                        <method href="#getPolicies"/>
-                        <method href="#createPolicies"/>
+                        <param name="groupId" type="osapi:UUID" required="true" style="template"/>
+                        <method href="#getGroupManifest"/>
+                        <method href="#deleteGroup"/>
 
-                        <resource id="policy" path="{policyId}">
-                            <param name="tenantId" required="true" style="template"/>
-                            <param name="groupId" required="true" style="template"/>
-                            <param name="policyId" required="true" style="template"/>
-                            <method href="#getPolicy"/>
-                            <method href="#putPolicy"/>
-                            <method href="#deletePolicy"/>
+                        <resource id="group_state" path="/state">
+                            <method href="#getGroupState"/>
+                        </resource>
 
-                            <resource id="execute" path="execute">
-                                <param name="tenantId" required="true" style="template"/>
-                                <param name="groupId" required="true" style="template"/>
-                                <param name="policyId" required="true" style="template"/>
-                                <method href="#executePolicy"/>
+                        <resource id="group_config" path="/config">
+                            <method href="#getGroupConfig"/>
+                            <method href="#putGroupConfig"/>
+                        </resource>
+                        <resource id="launch_configuration" path="/launch">
+                            <method href="#getLaunchConfig"/>
+                            <method href="#putLaunchConfig"/>
+                        </resource>
 
-                            </resource>
-                            <resource id="webhooks" path="webhooks">
-                                <param name="tenantId" required="true" style="template"/>
-                                <param name="groupId" required="true" style="template"/>
-                                <param name="policyId" required="true" style="template"/>
-                                <method href="#getWebhooks"/>
-                                <method href="#createWebhook"/>
+                        <resource id="pause" path="/pause">
+                            <method href="#pauseGroup"/>
+                        </resource>
+                        <resource id="resume" path="/resume">
+                            <method href="#resumeGroup"/>
+                        </resource>
 
-                                <resource id="webhook" path="{webhookId}">
-                                    <param name="tenantId" required="true" style="template"/>
-                                    <param name="groupId" required="true" style="template"/>
-                                    <param name="policyId" required="true" style="template"/>
-                                    <param name="webhookId" required="true" style="template"/>
-                                    <method href="#getWebhook"/>
-                                    <method href="#putWebhook"/>
-                                    <method href="#deleteWebhook"/>
+                        <!-- POLICIES resource -->
+                        <resource id="policies" path="/policies">
+                            <method href="#getPolicies"/>
+                            <method href="#createPolicies"/>
+
+                            <resource id="policy" path="/{policyId}">
+                                <param name="policyId" type="osapi:UUID" required="true" style="template"/>
+                                <method href="#getPolicy"/>
+                                <method href="#putPolicy"/>
+                                <method href="#deletePolicy"/>
+
+                                <resource id="execute" path="/execute">
+                                    <method href="#executePolicy"/>
+                                </resource>
+
+                                <resource id="webhooks" path="/webhooks">
+                                    <method href="#getWebhooks"/>
+                                    <method href="#createWebhook"/>
+                                    <resource id="webhook" path="/{webhookId}">
+                                        <param name="webhookId" type="osapi:UUID" required="true" style="template"/>
+                                        <method href="#getWebhook"/>
+                                        <method href="#putWebhook"/>
+                                        <method href="#deleteWebhook"/>
+                                    </resource>
                                 </resource>
                             </resource>
                         </resource>
@@ -110,8 +90,8 @@
                 </resource>
             </resource>
             <resource id="anonymous_execute_webhook" path="/execute/{capability_version}/{capability_hash}/">
-                <param name="capability_version" required="true" style="template"/>
-                <param name="capability_hash" required="true" style="template"/>
+                <param name="capability_version" required="true" style="template" type="xsd:string"/>
+                <param name="capability_hash" required="true" style="template" type="xsd:string"/>
                 <method href="#anonymousExecute"/>
             </resource>
         </resource>
@@ -119,27 +99,8 @@
     <!-- ======================================================================================= -->
     <!-- Methods -->
     <!-- ======================================================================================= -->
-    <method id="getGroups" name="GET">
-        <doc title="List Autoscaling Groups" xml:lang="EN">
-            <db:para role="shortdesc">
-                Lists all the autoscaling groups for the specified tenant ID.
-            </db:para>
-            <db:para>
-                For the tenant specified by<code>tenantID</code>, 
-                this operation returns a list of autoscaling groups.
-            </db:para>
-        </doc>
-        <response status="200">
-            <representation mediaType="application/json">
-                <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/listGroups.json"/>
-                </doc>
-            </representation>
-        </response>
-    </method>
-
-    <method id="createAutoscaleGroup" name="POST">
-        <doc title="Create Autoscale Group">
+      <method id="createGroup" name="POST">
+        <doc title="Create Group">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create a new scaling group, given the general scaling group
                 configuration, launch configuration, and optional scaling policies.
@@ -153,9 +114,12 @@
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
                 </doc>
+                
             </representation>
         </request>
         <response status="201">
+            <param name="Location" style="header"
+                   required="true" type="xsd:anyURI"/>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/resCreateGroup.json"/>
@@ -164,8 +128,29 @@
         </response>
     </method>
 
+    <method id="getGroups" name="GET">
+        <doc title="List Scaling Groups" xml:lang="EN">
+            <db:para role="shortdesc">
+                Lists all the autoscaling groups for the specified tenant ID.
+            </db:para>
+            <db:para>
+                For the tenant specified by
+                <code>tenantID</code>
+                , 
+                this operation returns a list of autoscaling groups.
+            </db:para>
+        </doc>
+        <response status="200">
+            <representation mediaType="application/json">
+                <doc xml:lang="en">
+                    <xsdxt:code href="../docbkx/samples/listGroups.json"/>
+                </doc>
+            </representation>
+        </response>
+    </method>
+
     <method id="getGroupManifest" name="GET">
-        <doc title="View all group details">
+        <doc title="List All Group Details">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 View manifested view of the scaling group configuration,
                 including the launch configuration, and the scaling policies. This
@@ -182,7 +167,7 @@
     </method>
 
     <method id="deleteGroup" name="DELETE">
-        <doc title="Delete a group.">
+        <doc title="Delete Group">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Delete a scaling group if there are no entities belonging to the
                 scaling group. If successful, no response body will be returned. If
@@ -211,7 +196,7 @@
     </method>
 
     <method id="getGroupConfig" name="GET">
-        <doc title="Get a Group's Configuration">
+        <doc title="Get Group Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get the configuration for a scaling group, which includes the
                 minimum number of entities, the maximum number of entities, global
@@ -229,7 +214,7 @@
     </method>
 
     <method id="putGroupConfig" name="PUT">
-        <doc title="Replace a Group's Gonfiguration">
+        <doc title="Replace Group Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Edit the configuration for a scaling group, which includes the
             minimum number of entities, the maximum number of entities, global
@@ -249,7 +234,7 @@
     </method>
 
     <method id="getLaunchConfig" name="GET">
-        <doc title="Get a Group's Launch Configuration">
+        <doc title="Get Group Launch Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get the launch configuration for a scaling group, which includes
                 the details of how to create a server, from what image, which load
@@ -268,7 +253,7 @@
     </method>
 
     <method id="putLaunchConfig" name="PUT">
-        <doc title="Replace a Group's Launch Configuration">
+        <doc title="Replace Group Launch Configuration">
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Edit the launch configuration for a scaling group, which
             includes the details of how to create a server, from what image,
