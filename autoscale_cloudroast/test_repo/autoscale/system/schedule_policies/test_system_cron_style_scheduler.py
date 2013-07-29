@@ -34,14 +34,12 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         super(CronStyleSchedulerTests, self).tearDown()
         self.empty_scaling_group(self.group)
 
-    @unittest.skip('AUTO-442')
     def test_system_cron_style_change_policy_up_down(self):
         """
         Create a cron style schedule policy via change to scale up by 2, followed by
         a cron style schedule policy to scale down by -2, each policy with 0 cooldown.
         The total servers after execution of both policies is the minentities with
         which the group was created.
-        ** fails cause of lock error AUTO-442 **
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -58,14 +56,12 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
-    @unittest.skip('AUTO-442')
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
         Create a cron style schedule policy via desired capacity to scale up by 1,
         followed by a cron style schedule policy to scale down to 0,
         each policy with 0 cooldown. The total servers after execution of both
         policies is 0.
-        ** fails cause of lock error AUTO-442 **
         """
         self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,

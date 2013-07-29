@@ -27,7 +27,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
         self.empty_scaling_group(group)
 
-    @unittest.skip('AUTO-442')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, a cron style
@@ -123,18 +122,16 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    @unittest.skip('AUTO-442')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
         of them are executed in the batch size specified.
-        (currently blocked by AUTO-442)
         """
         at_style_policies_list = []
         size = 5
         for policy in (range(self.scheduler_batch * size)):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(0)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
@@ -148,18 +145,16 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             create_group_reponse.entity.id, self.scheduler_batch + size)
         self.empty_scaling_group(create_group_reponse.entity)
 
-    @unittest.skip('AUTO-442')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):
         """
         Create multiple scheduler policies within the same group such that all of them are
         triggered by the scheduler, at the same time, and ensure all the policies
         are executed successfully.
-        ** fails due to the locks presumably, see gist**
         """
         at_style_policies_list = []
         for policy in (1, 2, 3):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(0)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
