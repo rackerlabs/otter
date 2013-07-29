@@ -1,4 +1,3 @@
-
 {
     "webhooks": [
         {
@@ -13,7 +12,7 @@
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash1}/,
+                    "href": ".../execute/1/{capabilityHash1}/",
                     "rel": "capability"
                 }
             ]
@@ -28,12 +27,10 @@
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capability_hash2}/,
+                    "href": ".../execute/1/{capabilityHash2}/",
                     "rel": "capability"
                 }
             ]
         }
     ]
 }
- 
- 
