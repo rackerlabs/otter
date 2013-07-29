@@ -414,6 +414,70 @@ class ServerTests(TestCase):
         self.assertEqual(failure.value.status, 'ERROR')
         self.assertEqual(failure.value.expected_status, 'ACTIVE')
 
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_error(self, server_details):
+        """
+        wait_for_active stops looping when it encounters an error.
+        """
+        clock = Clock()
+        server_status = ['BUILDING', 'ERROR']
+
+        def _server_status(*args, **kwargs):
+            return succeed({'server': {'status': server_status.pop(0)}})
+
+        server_details.side_effect = _server_status
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+
+        clock.advance(5)
+
+        self.assertEqual(server_details.call_count, 2)
+
+        clock.advance(5)
+
+        # This has not been called a 3rd time because we encountered an error,
+        # and the looping call stopped.
+        self.assertEqual(server_details.call_count, 2)
+
+        self.failureResultOf(d)
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_success(self, server_details):
+        """
+        wait_for_active stops looping when it encounters the active state.
+        """
+        clock = Clock()
+        server_status = ['BUILDING', 'ACTIVE']
+
+        def _server_status(*args, **kwargs):
+            return succeed({'server': {'status': server_status.pop(0)}})
+
+        server_details.side_effect = _server_status
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+
+        clock.advance(5)
+
+        self.assertEqual(server_details.call_count, 2)
+
+        clock.advance(5)
+
+        # This has not been called a 3rd time because we encountered the active
+        # state and the looping call stopped.
+        self.assertEqual(server_details.call_count, 2)
+
+        self.successResultOf(d)
+
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
