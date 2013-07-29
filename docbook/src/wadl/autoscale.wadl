@@ -15,6 +15,7 @@
     xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
     xmlns:wadl="http://wadl.dev.java.net/2009/02"
     xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
     xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
     <!-- ======================================================================================= -->
     <!-- Resources -->
@@ -84,7 +85,7 @@
                                 <param name="tenantId" required="true" style="template"/>
                                 <param name="groupId" required="true" style="template"/>
                                 <param name="policyId" required="true" style="template"/>
-                                <method href="executePolicy"/>
+                                <method href="#executePolicy"/>
 
                             </resource>
                             <resource id="webhooks" path="webhooks">

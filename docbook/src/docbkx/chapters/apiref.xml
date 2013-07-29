@@ -11,49 +11,37 @@
    <section xml:id="Groups">
       <title>Groups</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../../wadl/autoscale.wadl#getGroups"/>
-         <resource href="../../wadl/autoscale.wadl#createAutoscaleGroup"/>
-         <resource href="../../wadl/autoscale.wadl#getGroupManifest"/>
-         <resource href="../../wadl/autoscale.wadl#deleteGroup"/>
-         <resource href="../../wadl/autoscale.wadl#getGroupState"/>
+         <resource href="../../wadl/autoscale.wadl#group"/>
+         <resource href="../../wadl/autoscale.wadl#group_state"/>
       </resources>
    </section>
    <section xml:id="Configurations">
       <title>Configurations</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../../wadl/autoscale.wadl#getGroupConfig"/>
-         <resource href="../../wadl/autoscale.wadl#putConfig"/>
-         <resource href="../../wadl/autoscale.wadl#getLaunchConfig"/>
-         <resource href="../../wadl/autoscale.wadl#putLaunchConfig"/>
-         <resource href="../../wadl/autoscale.wadl#pauseGroup"/>
-         <resource href="../../wadl/autoscale.wadl#resumeGroup"/>
+         <resource href="../../wadl/autoscale.wadl#group_config"/>
+         <resource href="../../wadl/autoscale.wadl#launch_configuration"/>
+         <resource href="../../wadl/autoscale.wadl#pause"/>
+         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
    <section xml:id="Policies">
       <title>Policies</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../../wadl/autoscale.wadl#getPolicies"/>
-         <resource href="../../wadl/autoscale.wadl#createPolicies"/>
-         <resource href="../../wadl/autoscale.wadl#getPolicy"/>
-         <resource href="../../wadl/autoscale.wadl#putPolicy"/>
-         <resource href="../../wadl/autoscale.wadl#deletePolicy"/>
-         <resource href="../../wadl/autoscale.wadl#executePolicy"/>
+         <resource href="../../wadl/autoscale.wadl#policies"/>
+         <resource href="../../wadl/autoscale.wadl#policy"/>
+         <resource href="../../wadl/autoscale.wadl#execute"/>
       </resources>
    </section>
    <section xml:id="Executions">
       <title>Executions</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../../wadl/autoscale.wadl#anonymousExecute"/>
+         <resource href="../../wadl/autoscale.wadl#anonymous_execute_webhook"/>
       </resources>
    </section>
    <section xml:id="Webhooks">
       <title>Webhooks</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../../wadl/autoscale.wadl#getWebhooks"/>
-         <resource href="../../wadl/autoscale.wadl#createWebhook"/>
-         <resource href="../../wadl/autoscale.wadl#getWebhook"/>
-         <resource href="../../wadl/autoscale.wadl#putWebhook"/>
-         <resource href="../../wadl/autoscale.wadl#deleteWebhook"/>
+         <resource href="../../wadl/autoscale.wadl#webhook"/>
       </resources>
    </section>
 </chapter>
