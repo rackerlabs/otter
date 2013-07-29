@@ -3,7 +3,6 @@ Test execution of at and cron style scheduler policies when group has updates
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-import unittest
 
 
 class UpdateSchedulerScalingPolicy(AutoscaleFixture):
@@ -42,7 +41,6 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         self.empty_scaling_group(group)
 
-    @unittest.skip('AUTO-442')
     def test_system_min_max_entities_cron_style(self):
         """
         Create a scaling group with minentities between 0 and maxentities and maxentities=change,
@@ -118,7 +116,6 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self._verify_server_list_for_launch_config(active_list_on_scale_down)
         self.empty_scaling_group(group)
 
-    @unittest.skip('AUTO-442')
     def test_system_upd_launch_config_cron_style_scheduler(self):
         """
         Create a scaling group with minentities>0, update launch config, schedule cron style

@@ -366,7 +366,10 @@ class _Job(object):
         self.log.err(f)
 
         def handle_failure(group, state):
-            state.remove_job(self.job_id)
+            # if it is not in pending, then the job was probably deleted before
+            # it got a chance to fail.
+            if self.job_id in state.pending:
+                state.remove_job(self.job_id)
             return state
 
         d = self.scaling_group.modify_state(handle_failure)

@@ -1415,6 +1415,26 @@ class PrivateJobHelperTestCase(TestCase):
         self.log.bind.return_value.err.assert_called_once_with(
             CheckFailure(DummyException))
 
+    def test_job_completion_failure_job_deleted_pending(self):
+        """
+        If the job failed, but the job ID is no longer in pending, the job id
+        is not removed (and hence no error occurs).  The only error logged is
+        the failure.  Nothing else in the state changes.
+        """
+        self.state = GroupState('tenant', 'group', {}, {}, None,
+                                {}, False)
+        self.job.start('launch')
+        self.completion_deferred.errback(DummyException('e'))
+
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
+
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(self.state.active, {})
+
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException))
+
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
         If a job is completed successfully, but `modify_state` fails with a
