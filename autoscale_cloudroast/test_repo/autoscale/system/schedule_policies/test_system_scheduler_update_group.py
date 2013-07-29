@@ -3,7 +3,6 @@ Test execution of at and cron style scheduler policies when group has updates
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-import unittest
 
 
 class UpdateSchedulerScalingPolicy(AutoscaleFixture):
