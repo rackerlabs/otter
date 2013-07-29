@@ -4,7 +4,6 @@ and desired caapacity
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-import unittest
 
 
 class CronStyleSchedulerTests(AutoscaleFixture):
