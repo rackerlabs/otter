@@ -457,12 +457,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         If the policy execution fails, the webhook should still return 202 and
         does not wait for the response
         """
-        self.mock_group.modify_state.side_effect = None
-        # no callback
-        self.mock_group.modify_state.return_value = defer.Deferred()
-
-        self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
-            (self.tenant_id, self.group_id, self.policy_id))
+        self.mock_store.webhook_info_by_hash.return_value = defer.Deferred()
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
@@ -505,7 +500,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
 
         for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
                     NoSuchPolicyError('tenant', 'group', 'policy'),
-                    NoSuchScalingGroupError('tenant', 'group')]:
+                    NoSuchScalingGroupError('tenant', 'group'),
+                    UnrecognizedCapabilityError("11111", 1)]:
             self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
                 ('tenant', 'group', 'policy'))
             self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
