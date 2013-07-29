@@ -131,7 +131,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         size = 5
         for policy in (range(self.scheduler_batch * size)):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(0)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
@@ -150,12 +150,11 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         Create multiple scheduler policies within the same group such that all of them are
         triggered by the scheduler, at the same time, and ensure all the policies
         are executed successfully.
-        ** fails due to the locks presumably, see gist**
         """
         at_style_policies_list = []
         for policy in (1, 2, 3):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(0)},
+                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
