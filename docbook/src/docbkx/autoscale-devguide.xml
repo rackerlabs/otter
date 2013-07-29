@@ -812,8 +812,20 @@ format="SVG" scale="60"/>
         </tbody>
       </table>   
     </section>
-    <section xml:id="faults-dle101">
-      <title>Faults</title>
+    <section xml:id="removing-servers">
+      <title>Removing Servers</title>
+      <para>Servers are removed in reverse order of creation, with an
+        exception for when currently building.</para>
+        </section> 
+      <section xml:id="audit-log">
+        <title>Audit Log</title>
+      <para>Because of the deferred nature of Autoscale, most errors
+        occur outside of the user's session. Errors are logged to a
+        user's Cloud Feed as an Audit Log. The Audit log contains all
+        the events that have occurred within a user's Autoscale Group. </para>
+        </section> 
+      <section xml:id="faults-dle101">
+        <title>Faults</title>
       <para>If any &PRODNAME; request results in an error, the service
         returns an appropriate 4xx or 5xx HTTP status code, as well as
         the following information in the body: </para>
