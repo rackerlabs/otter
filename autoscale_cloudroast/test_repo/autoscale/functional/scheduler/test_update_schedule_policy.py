@@ -35,59 +35,19 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                           msg='Create schedule policy (cron style) failed with {0} for group {1}'
                           .format(self.cron_style_policy['status_code'], self.group.id))
 
-    def test_update_at_style_scaling_policy(self):
+    def test_disallow_cron_style_policy_update(self):
         """
-        Verify the update at style schedule policy by updating date
-        and verify the response code 204, headers and data
-        """
-        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
-        self._update_policy(self.group.id, self.at_style_policy, upd_args)
-        # self.assertEquals(
-        #     updated_at_style_policy.id, self.at_style_policy['id'],
-        #     msg='Policy Id is not as expected after update')
-        # self.assertEquals(
-        #     updated_at_style_policy.links, self.at_style_policy['links'],
-        #     msg='Links for the scaling policy is none after the update')
-        # self.assertEquals(
-        #     updated_at_style_policy.name, self.at_style_policy['name'],
-        #     msg='Name of the policy is None after update')
-        # self.assertEquals(
-        #     updated_at_style_policy.cooldown, self.at_style_policy['cooldown'],
-        #     msg='Cooldown of the policy in null after an update')
-        # self.assertEquals(
-        #     updated_at_style_policy.change, self.at_style_policy['change'],
-        #     msg='Change in the policy is not as expected')
-        # self.assertEquals(updated_at_style_policy.args.at, upd_args['at'],
-        #                   msg='At style schedule policy did not update for group {0}'
-        #                   .format(self.group.id))
-
-    def test_update_cron_style_scaling_policy(self):
-        """
-        Verify the update cron style schedule policy by updating date
-        and verify the response code 204, headers and data
+        Updating an at style policy results in a 400.
         """
         upd_args = {'cron': '0 0 * * 1'}
         self._update_policy(self.group.id, self.cron_style_policy, upd_args)
-        # self.assertEquals(
-        #     updated_cron_style_policy.id, self.cron_style_policy['id'],
-        #     msg='Policy Id is not as expected after update')
-        # self.assertEquals(
-        #     updated_cron_style_policy.links, self.cron_style_policy['links'],
-        #     msg='Links for the scaling policy is none after the update')
-        # self.assertEquals(
-        #     updated_cron_style_policy.name, self.cron_style_policy['name'],
-        #     msg='Name of the policy is None after update')
-        # self.assertEquals(
-        #     updated_cron_style_policy.cooldown, self.cron_style_policy[
-        #         'cooldown'],
-        #     msg='Cooldown of the policy in null after an update')
-        # self.assertEquals(
-        #     updated_cron_style_policy.change, self.cron_style_policy['change'],
-        #     msg='Change in the policy is not as expected')
-        # self.assertEquals(
-        #     updated_cron_style_policy.args.cron, upd_args['cron'],
-        #     msg='Cron style schedule policy did not update for group {0}'
-        #     .format(self.group.id))
+
+    def test_disallow_at_style_policy_update(self):
+        """
+        Updating an at style policy results in a 400.
+        """
+        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
+        self._update_policy(self.group.id, self.cron_style_policy, upd_args)
 
     def test_update_scheduler_at_style_policy_after_deletion(self):
         """
