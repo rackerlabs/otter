@@ -50,6 +50,7 @@ format="SVG" scale="60"/>
     xmlns:m="http://www.w3.org/1998/Math/MathML"
     xmlns:html="http://www.w3.org/1999/xhtml"
     xml:id="autoscale-getting-started"
+    xmlns:raxm="http://docs.rackspace.com/api/metadata"
     xlink:href="http:// docs.autoscale.apiary.io/ ">
     <!-- this Getting Started content comes directly from a wiki page,
 https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
@@ -89,8 +90,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                 </revdescription>
             </revision>
         </revhistory>
-        <raxm:metadata
-            xmlns:raxm="http://docs.rackspace.com/api/metadata">
+        <raxm:metadata>
             <raxm:displayname>Getting Started Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>10</raxm:priority>
@@ -117,8 +117,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
             xmlns:xlink="http://www.w3.org/1999/xlink">
             <title>Additional Resources</title>
             <para> You can see and experiment with all &PRODNAME; API
-                calls at <link
-                    xlink:href="http://docs.autoscale.apiary.io/"
+                calls at <link xlink:href="http://docs.autoscale.apiary.io/"
                     >http://docs.autoscale.apiary.io/</link>. </para>
             <para>In order to run the examples in this guide, the
                 following prerequisites are required:</para>
@@ -771,7 +770,7 @@ GET /{tenantId}/groups/{groupId}
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/scalingPolicy.json" parse="text"/>
+<xi:include href="./samples/resCreatePolicies.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -793,7 +792,7 @@ GET /{tenantId}/groups/{groupId}/policies
 GET /{tenantId}/groups/{groupId}/policies/{policyId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/GetScalingPolicy.json" parse="text"/>
+<xi:include href="./samples/resGetPolicy.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -804,7 +803,6 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/UpdateScalingPolicy.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -833,14 +831,14 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/webhook-request.json" parse="text"/>
+<xi:include href="./samples/reqPutWebhook.json" parse="text"/>
 </programlisting>
             </example>
             <example>
                 <title>Creating a Scaling Webhook: Response</title>
                 <para>The following example shows the response that is received for a request to create a webhook for a scaling policy.</para>
                 <programlisting language="json">
-<xi:include href="./samples/webhook-response.json" parse="text"/>
+<xi:include href="./samples/resCreateWebhook.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -852,7 +850,7 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/ListWebhooks.json" parse="text"/>
+<xi:include href="./samples/resGetWebhooks.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -862,7 +860,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/UpdateWebhook.json" parse="text"/>
+<xi:include href="./samples/reqPutWebhook.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -873,7 +871,7 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </screen>
                 <programlisting language="json">
-<xi:include href="./samples/GetWebhookInfo.json" parse="text"/>
+<xi:include href="./samples/resGetWebhook.json" parse="text"/>
 </programlisting>
             </example>
             <example>
@@ -896,9 +894,6 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 <screen>
  POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute 
                 </screen>
-                <programlisting language="json">
-<xi:include href="./samples/scalingPolicy.json" parse="text"/>
-</programlisting>
             </example>
             <para> The &POST; request causes the <link
                     linkend="Create_Policy">scaling policy</link> to
@@ -922,7 +917,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
             <example>
                 <title>Deactivating a Scaling Group</title>
                 <screen>
-PUT /{tenantId}/groups/{groupID}/config
+PUT /{tenantId}/groups/{groupId}/config
                 </screen>
                 <programlisting language="json">
 <xi:include href="./samples/groupConfiguration-size0.json" parse="text"/>
@@ -941,7 +936,7 @@ PUT /{tenantId}/groups/{groupID}/config
                 the group by sending a &DELETE; request to its group
                 ID. </para>
             <screen>
-DELETE /[tenantId]/groups/[groupId[
+DELETE /{tenantId}/groups/{groupId}
             </screen>
         </section>
     </chapter>
