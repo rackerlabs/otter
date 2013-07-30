@@ -186,13 +186,16 @@ def _build_schedule_policy(policy, event_table, queries, data, polname):
         data[polname + 'cron'] = cron
 
 
-def _update_schedule_policy(connection, policy, policy_id, event_table):
+def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_id, group_id):
     # Delete existing entry in event table
     d = connection.execute(_cql_delete_policy_events.format(cf=self.event_table),
                            {'policyId': policy_id}, get_consistency_level('delete', 'event'))
 
     def _insert_event():
         queries, data = [], {}
+        data['tenantId'] = tenant_id
+        data['groupId'] = group_id
+        data['policyId'] = policy_id
         _build_schedule_policy(policy, event_table, queries, data, 'policy')
         return Batch(queries, data, get_consistency_level('update', 'event')).execute(connection)
 
@@ -557,7 +560,8 @@ class CassScalingGroup(object):
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
                 if lastRev["type"] == 'schedule':
-                    return _update_schedule_policy(self.connection, data, self.event_table)
+                    return _update_schedule_policy(self.connection, data, policy_id,
+                                                   self.event_table, self.tenant_id, self.uuid)
 
         def _do_update_policy():
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
