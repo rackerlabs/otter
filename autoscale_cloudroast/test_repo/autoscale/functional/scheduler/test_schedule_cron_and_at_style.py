@@ -74,3 +74,89 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
                 schedule_policy_at_style[
                     'schedule_value'], each_schedule_value,
                 msg="Scaling policy's schedule value does not match")
+
+    def test_schedule_at_style_policy_with_webhook(self):
+        """
+        Creating a webhook on a scaling policy of type schedule with (at style)
+        results in a 201
+        """
+        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change)
+        self.assertEquals(schedule_policy_at_style['status_code'], 201,
+                          msg='Create scheduler at style policy with failed'
+                          ' with {0} for group {1}'
+                          .format(schedule_policy_at_style['status_code'], self.group.id))
+        create_webhook_response = self.autoscale_client.create_webhook(
+            group_id=self.group.id,
+            policy_id=schedule_policy_at_style['id'],
+            name=self.wb_name)
+        self.assertEquals(create_webhook_response.status_code, 201,
+                          msg='Create webhook on a scheduler at style policy failed'
+                          ' with {0} for group {1}'
+                          .format(create_webhook_response.status_code, self.group.id))
+
+    def test_schedule_at_style_policy_execute(self):
+        """
+        Create scaling policy of type schedule with (at style) and execute it,
+        results in a 202.
+        """
+        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change)
+        self.assertEquals(schedule_policy_at_style['status_code'], 201,
+                          msg='Create scheduler at style policy with failed'
+                          ' with {0} for group {1}'
+                          .format(schedule_policy_at_style['status_code'], self.group.id))
+        execute_policy_response = self.autoscale_client.execute_policy(
+            group_id=self.group.id,
+            policy_id=schedule_policy_at_style['id'])
+        self.assertEquals(execute_policy_response.status_code, 202,
+                          msg='Able to execute scheduler policy via at style policy'
+                          ' with {0} for group {1}'
+                          .format(execute_policy_response.status_code, self.group.id))
+
+    def test_schedule_cron_style_policy_with_webhook(self):
+        """
+        Creating a webhook on a scaling policy of type schedule with (at style)
+        results in a 201.
+        """
+        schedule_value = '* * * * *'
+        schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_cron=schedule_value)
+        self.assertEquals(schedule_policy_cron_style['status_code'], 201,
+                          msg='Create scheduler at style policy with failed'
+                          ' with {0} for group {1}'
+                          .format(schedule_policy_cron_style['status_code'], self.group.id))
+        create_webhook_response = self.autoscale_client.create_webhook(
+            group_id=self.group.id,
+            policy_id=schedule_policy_cron_style['id'],
+            name=self.wb_name)
+        self.assertEquals(create_webhook_response.status_code, 201,
+                          msg='Create webhook on a scheduler cron style policy failed'
+                          ' with {0} for group {1}'
+                          .format(create_webhook_response.status_code, self.group.id))
+
+    def test_schedule_cron_style_policy_execute(self):
+        """
+        Create scaling policy of type schedule via cron style and execute it,
+        results in a 202.
+        """
+        schedule_value = '* * * * *'
+        schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_change=self.sp_change,
+            schedule_cron=schedule_value)
+        self.assertEquals(schedule_policy_cron_style['status_code'], 201,
+                          msg='Create scheduler at style policy with failed'
+                          ' with {0} for group {1}'
+                          .format(schedule_policy_cron_style['status_code'], self.group.id))
+        execute_policy_response = self.autoscale_client.execute_policy(
+            group_id=self.group.id,
+            policy_id=schedule_policy_cron_style['id'])
+        self.assertEquals(execute_policy_response.status_code, 202,
+                          msg='Able to execute scheduler policy via cron style policy'
+                          ' with {0} for group {1}'
+                          .format(execute_policy_response.status_code, self.group.id))
