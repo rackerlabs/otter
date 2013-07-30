@@ -10,10 +10,6 @@ from itertools import cycle
 
 from otter.json_schema.group_schemas import (
     policy, config, launch_config, webhook)
-from otter.json_schema.group_examples import (
-    launch_server_config as launch_server_config_examples,
-    config as config_examples,
-    policy as policy_examples)
 
 
 #------------- subschemas and other utilities -----------------
