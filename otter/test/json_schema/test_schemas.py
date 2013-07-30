@@ -596,6 +596,39 @@ class ScalingPolicyTestCase(TestCase):
                                 group_schemas.validate_cron, invalid_cron)
 
 
+class CreateScalingPoliciesTestCase(TestCase):
+    """
+    Verification that the JSON schema for creating scaling policies is correct
+    """
+    one_policy = group_examples.policy()[0]
+
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(rest_schemas.create_policies_request)
+
+    def test_empty_array_valid(self):
+        """
+        Seems pointless to disallow empty arrays, so empty arrays validate.
+        """
+        validate([], rest_schemas.create_policies_request)
+
+    def test_duplicate_policies_valid(self):
+        """
+        Duplicate policies are valid
+        """
+        validate([self.one_policy] * 5,
+                 rest_schemas.create_policies_request)
+
+    def test_non_array_policy_fails(self):
+        """
+        A single policy, not in an array, fails to validate.
+        """
+        self.assertRaises(ValidationError, validate, self.one_policy,
+                          rest_schemas.create_policies_request)
+
+
 class CreateScalingGroupTestCase(TestCase):
     """
     Simple verification that the JSON schema for creating a scaling group is
