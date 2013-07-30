@@ -96,7 +96,7 @@ class RunningCassandraCluster(object):
     existing cassandra processes what ports they are listening on and what data
     dir they are using?
     """
-    def __init__(self, host="localhost", port=9160, cql_version="3",
+    def __init__(self, host="localhost", port=9160, cql_version="3.0.4",
                  setup_cql=None, teardown_cql=None, overwrite_keyspaces=True):
         self.host = host
         self.port = port
