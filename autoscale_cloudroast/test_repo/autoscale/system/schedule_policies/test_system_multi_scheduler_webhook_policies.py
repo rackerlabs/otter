@@ -32,7 +32,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
             change=self.change)
 
-    @unittest.skip('AUTO-441')
     def test_system_create_group_with_multiple_webhook_policies_with_same_attributes(self):
         """
         Creating a group with a list of multiple webhook policies, with the same
@@ -41,7 +40,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group = self._create_multi_policy_group(2, self.wb_policy)
         self.empty_scaling_group(group)
 
-    @unittest.skip('AUTO-441')
     def test_system_create_multiple_scheduler_policies_same_payload(self):
         """
         Creating a group with a list of multiple scheduler policies, (at style and
