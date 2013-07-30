@@ -15,13 +15,14 @@ from otter.worker.launch_server_v1 import (
     add_to_load_balancer,
     add_to_load_balancers,
     server_details,
-    wait_for_status,
+    wait_for_active,
     create_server,
     launch_server,
     prepare_launch_config,
     delete_server,
     remove_from_load_balancer,
-    public_endpoint_url
+    public_endpoint_url,
+    UnexpectedServerStatus
 )
 
 
@@ -350,9 +351,9 @@ class ServerTests(TestCase):
         self.assertEqual(real_failure.value.code, 500)
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
-    def test_wait_for_status(self, server_details):
+    def test_wait_for_active(self, server_details):
         """
-        wait_for_status will poll server_details until the status transitions
+        wait_for_active will poll server_details until the status transitions
         to our expected status at which point it will return the complete
         server_details.
         """
@@ -365,9 +366,9 @@ class ServerTests(TestCase):
 
         server_details.side_effect = _server_status
 
-        d = wait_for_status(self.log,
+        d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            'ACTIVE', clock=clock)
+                            clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId')
@@ -385,10 +386,102 @@ class ServerTests(TestCase):
 
         self.assertEqual(result['server']['status'], server_status[0])
 
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_errors(self, server_details):
+        """
+        wait_for_active will errback it's Deferred if it encounters a non-active
+        state transition.
+        """
+        clock = Clock()
+
+        server_status = ['BUILDING', 'ERROR']
+
+        def _server_status(*args, **kwargs):
+            return succeed({'server': {'status': server_status.pop(0)}})
+
+        server_details.side_effect = _server_status
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            clock=clock)
+
+        clock.advance(5)
+
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(UnexpectedServerStatus))
+
+        self.assertEqual(failure.value.server_id, 'serverId')
+        self.assertEqual(failure.value.status, 'ERROR')
+        self.assertEqual(failure.value.expected_status, 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_error(self, server_details):
+        """
+        wait_for_active stops looping when it encounters an error.
+        """
+        clock = Clock()
+        server_status = ['BUILDING', 'ERROR']
+
+        def _server_status(*args, **kwargs):
+            return succeed({'server': {'status': server_status.pop(0)}})
+
+        server_details.side_effect = _server_status
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+
+        clock.advance(5)
+
+        self.assertEqual(server_details.call_count, 2)
+
+        clock.advance(5)
+
+        # This has not been called a 3rd time because we encountered an error,
+        # and the looping call stopped.
+        self.assertEqual(server_details.call_count, 2)
+
+        self.failureResultOf(d)
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_success(self, server_details):
+        """
+        wait_for_active stops looping when it encounters the active state.
+        """
+        clock = Clock()
+        server_status = ['BUILDING', 'ACTIVE']
+
+        def _server_status(*args, **kwargs):
+            return succeed({'server': {'status': server_status.pop(0)}})
+
+        server_details.side_effect = _server_status
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+
+        clock.advance(5)
+
+        self.assertEqual(server_details.call_count, 2)
+
+        clock.advance(5)
+
+        # This has not been called a 3rd time because we encountered the active
+        # state and the looping call stopped.
+        self.assertEqual(server_details.call_count, 2)
+
+        self.successResultOf(d)
+
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server(self, wait_for_status, create_server,
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server(self, wait_for_active, create_server,
                            add_to_load_balancers):
         """
         launch_server creates a server, waits until the server is active then
@@ -424,7 +517,7 @@ class ServerTests(TestCase):
 
         create_server.return_value = succeed(server_details)
 
-        wait_for_status.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
 
         add_to_load_balancers.return_value = succeed([
             (12345, ('10.0.0.1', 80)),
@@ -449,7 +542,7 @@ class ServerTests(TestCase):
                                               'my-auth-token',
                                               expected_server_config)
 
-        wait_for_status.assert_called_once_with(mock.ANY,
+        wait_for_active.assert_called_once_with(mock.ANY,
                                                 'http://dfw.openstack/',
                                                 'my-auth-token',
                                                 '1',
@@ -461,9 +554,9 @@ class ServerTests(TestCase):
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
     def test_launch_server_propagates_create_server_errors(
-            self, wait_for_status, create_server, add_to_load_balancers):
+            self, wait_for_active, create_server, add_to_load_balancers):
         """
         launch_server will propagate any errors from create_server.
         """
@@ -487,11 +580,11 @@ class ServerTests(TestCase):
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
-    def test_launch_server_propagates_wait_for_status_errors(
-            self, wait_for_status, create_server, add_to_load_balancers):
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_propagates_wait_for_active_errors(
+            self, wait_for_active, create_server, add_to_load_balancers):
         """
-        launch_server will propagate any errors from wait_for_status.
+        launch_server will propagate any errors from wait_for_active.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
@@ -504,7 +597,7 @@ class ServerTests(TestCase):
 
         create_server.return_value = succeed(server_details)
 
-        wait_for_status.return_value = fail(
+        wait_for_active.return_value = fail(
             APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
         d = launch_server(self.log,
@@ -524,9 +617,9 @@ class ServerTests(TestCase):
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_status')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
     def test_launch_server_propagates_add_to_load_balancers_errors(
-            self, wait_for_status, create_server, add_to_load_balancers):
+            self, wait_for_active, create_server, add_to_load_balancers):
         """
         launch_server will propagate any errors from add_to_load_balancers.
         """
@@ -541,7 +634,7 @@ class ServerTests(TestCase):
 
         create_server.return_value = succeed(server_details)
 
-        wait_for_status.return_value = succeed(server_details)
+        wait_for_active.return_value = succeed(server_details)
 
         add_to_load_balancers.return_value = fail(
             APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
