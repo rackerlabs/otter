@@ -195,22 +195,6 @@ create_group_request = {
     "additionalProperties": False
 }
 
-create_group_request_examples = [
-    {
-        "groupConfiguration": config_examples()[0],
-        "launchConfiguration": launch_server_config_examples()[0]
-    },
-    {
-        "groupConfiguration": config_examples()[0],
-        "launchConfiguration": launch_server_config_examples()[0],
-        "scalingPolicies": [policy_examples()[0]]
-    },
-    {
-        "groupConfiguration": config_examples()[1],
-        "launchConfiguration": launch_server_config_examples()[1],
-        "scalingPolicies": policy_examples()[1:3]
-    }
-]
 
 # the response from creating a group and the response for viewing the manifest
 # is exactly the same.
