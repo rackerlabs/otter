@@ -2,6 +2,7 @@
 Test to update and verify the updated scheduler policy.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
+import unittest
 
 
 class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
@@ -48,6 +49,37 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         """
         upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
         self._update_policy(self.group.id, self.cron_style_policy, upd_args)
+
+    @unittest.skip('AUTO-467')
+    def test_update_at_style_scaling_policy(self):
+        """
+        Verify the update at style schedule policy by updating date
+        and verify the response code 204, headers and data
+        """
+        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
+        updated_at_style_policy = self._update_policy(
+            self.group.id, self.at_style_policy, upd_args)
+        self._assert_updated_policy(updated_at_style_policy,
+                                    self.at_style_policy)
+        self.assertEquals(updated_at_style_policy.args.at, upd_args['at'],
+                          msg='At style schedule policy did not update for group {0}'
+                          .format(self.group.id))
+
+    @unittest.skip('AUTO-467')
+    def test_update_cron_style_scaling_policy(self):
+        """
+        Verify the update cron style schedule policy by updating date
+        and verify the response code 204, headers and data
+        """
+        upd_args = {'cron': '0 0 * * 1'}
+        updated_cron_style_policy = self._update_policy(self.group.id,
+                                                        self.cron_style_policy, upd_args)
+        self._assert_updated_policy(updated_cron_style_policy,
+                                    self.cron_style_policy)
+        self.assertEquals(
+            updated_cron_style_policy.args.cron, upd_args['cron'],
+            msg='Cron style schedule policy did not update for group {0}'
+            .format(self.group.id))
 
     def test_update_scheduler_at_style_policy_after_deletion(self):
         """
@@ -122,3 +154,24 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                         msg='The headers are not as expected')
         self.validate_headers(update_policy_response.headers)
         return updated_policy
+
+    def _assert_updated_policy(self, updated_policy, policy):
+        """
+        Verify the updated policy
+        """
+        self.assertEquals(
+            updated_policy.id, policy['id'],
+            msg='Policy Id is not as expected after update')
+        self.assertEquals(
+            updated_policy.links, policy['links'],
+            msg='Links for the scaling policy is none after the update')
+        self.assertEquals(
+            updated_policy.name, policy['name'],
+            msg='Name of the policy is None after update')
+        self.assertEquals(
+            updated_policy.cooldown, policy[
+                'cooldown'],
+            msg='Cooldown of the policy in null after an update')
+        self.assertEquals(
+            updated_policy.change, policy['change'],
+            msg='Change in the policy is not as expected')
