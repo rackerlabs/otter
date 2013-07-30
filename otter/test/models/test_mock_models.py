@@ -293,8 +293,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         a :class:`GroupNotEmptyError`
         """
         self.group.state.active = {'1': {}}
-        self.failureResultOf(self.group.delete_group(),
-                                    GroupNotEmptyError)
+        self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
         self.assertEqual(len(self.collection.data[self.group.tenant_id]), 1)
 
     def test_list_empty_policies(self):

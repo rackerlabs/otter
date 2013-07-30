@@ -596,7 +596,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         :class:`NoSuchScalingGroupError`
         """
         self.failureResultOf(self.group.list_policies(),
-                                    NoSuchScalingGroupError)
+                             NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_list_policy_no_version(self):
@@ -825,7 +825,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group.get_policy = mock.MagicMock(
             return_value=defer.fail(DummyException("Cassandra failure")))
         self.failureResultOf(self.group.update_policy('1', {'b': 'lah'}),
-                                    DummyException)
+                             DummyException)
 
         # view is called
         self.group.get_policy.assert_called_once_with('1')
@@ -1029,7 +1029,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         :class:`NoSuchScalingPolicy`
         """
         self.failureResultOf(self.group.list_webhooks('23456789'),
-                                    NoSuchPolicyError)
+                             NoSuchPolicyError)
         mock_naive.assert_called_with('23456789')
         mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -1205,7 +1205,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return_value=defer.succeed('policies'))
 
         self.failureResultOf(self.group.view_manifest(),
-                                    NoSuchScalingGroupError)
+                             NoSuchScalingGroupError)
         self.group.view_config.assert_called_once_with()
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
         self.assertEqual(len(self.group._naive_list_policies), 0)
