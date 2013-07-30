@@ -923,7 +923,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
@@ -1010,7 +1010,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
@@ -1035,7 +1035,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
         self.assertIn("No change in servers", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(

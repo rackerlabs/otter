@@ -365,7 +365,7 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         def handle_body(request, *args, **kwargs):
             return defer.succeed((args, kwargs))
 
-        self.assert_deferred_failed(handle_body(self.request), InvalidJsonError)
+        self.failureResultOf(handle_body(self.request), InvalidJsonError)
 
     def test_validation_error(self):
         """
@@ -382,4 +382,4 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         def handle_body(request, *args, **kwargs):
             return defer.succeed((args, kwargs))
 
-        self.assert_deferred_failed(handle_body(self.request), ValidationError)
+        self.failureResultOf(handle_body(self.request), ValidationError)

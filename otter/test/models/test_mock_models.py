@@ -293,7 +293,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         a :class:`GroupNotEmptyError`
         """
         self.group.state.active = {'1': {}}
-        self.assert_deferred_failed(self.group.delete_group(),
+        self.failureResultOf(self.group.delete_group(),
                                     GroupNotEmptyError)
         self.assertEqual(len(self.collection.data[self.group.tenant_id]), 1)
 
@@ -335,7 +335,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         uuid = "Otters are so cute!"
         deferred = self.group.get_policy(uuid)
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_delete_policy_succeeds(self):
         """
@@ -353,7 +353,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Delete a policy that doesn't exist. Should return with NoSuchPolicyError
         """
         deferred = self.group.delete_policy("puppies")
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_delete_policy_removes_webhooks(self):
         """
@@ -392,7 +392,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             "type": "webhook"
         }
         deferred = self.group.update_policy("puppies", update_data)
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_list_webhooks_nonexistant_policy_fails(self):
         """
@@ -400,7 +400,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError`
         """
         deferred = self.group.list_webhooks("otter-stacking")
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_list_empty_webhooks(self):
         """
@@ -433,7 +433,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError`
         """
         deferred = self.group.create_webhooks("otter-stacking", [{}])
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
@@ -481,7 +481,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError`.
         """
         deferred = self.group.get_webhook("puppies", "1")
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_get_nonexistant_webhook_fails(self):
         """
@@ -491,7 +491,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.group.policies = {'2': {}}
         self.group.webhooks = {'2': {}}
         deferred = self.group.get_webhook("2", "1")
-        self.assert_deferred_failed(deferred, NoSuchWebhookError)
+        self.failureResultOf(deferred, NoSuchWebhookError)
 
     def test_get_webhook_updates_existing_dictionary(self):
         """
@@ -515,7 +515,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError`.
         """
         deferred = self.group.update_webhook("puppies", "1", {'name': 'fake'})
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_update_nonexistant_webhook_fails(self):
         """
@@ -524,7 +524,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.policies = {'2': {}}
         deferred = self.group.update_webhook("2", "1", {'name': 'fake'})
-        self.assert_deferred_failed(deferred, NoSuchWebhookError)
+        self.failureResultOf(deferred, NoSuchWebhookError)
 
     def test_update_webhook_updates_existing_dictionary(self):
         """
@@ -589,7 +589,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         :class:`NoSuchPolicyError`.
         """
         deferred = self.group.delete_webhook("puppies", "1")
-        self.assert_deferred_failed(deferred, NoSuchPolicyError)
+        self.failureResultOf(deferred, NoSuchPolicyError)
 
     def test_delete_nonexistant_webhook_fails(self):
         """
@@ -598,7 +598,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         self.group.policies = {'2': {}}
         deferred = self.group.delete_webhook("2", "1")
-        self.assert_deferred_failed(deferred, NoSuchWebhookError)
+        self.failureResultOf(deferred, NoSuchWebhookError)
 
     def test_delete_webhook_succeeds(self):
         """
@@ -788,7 +788,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
         deferred = self.collection.webhook_info_by_hash(self.mock_log, 'weasel')
-        self.assert_deferred_failed(deferred, UnrecognizedCapabilityError)
+        self.failureResultOf(deferred, UnrecognizedCapabilityError)
 
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
@@ -861,4 +861,4 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         failed_deferreds = self._call_all_methods_on_group("1")
 
         for deferred in failed_deferreds:
-            self.assert_deferred_failed(deferred, NoSuchScalingGroupError)
+            self.failureResultOf(deferred, NoSuchScalingGroupError)
