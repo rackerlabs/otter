@@ -66,38 +66,6 @@ class CheckFailure(object):
             self.exception_type)
 
 
-class DeferredTestMixin(object):
-    """
-    Class that can be used for asserting whether a ``Deferred`` has fired or
-    failed
-    """
-
-    def assert_deferred_failed(self, deferred, *expected_failures):
-        """
-        Asserts that the deferred should have errbacked with the given
-        expected failures.  This is like
-        :func:`twisted.trial.unittest.TestCase.assertFailure` except that it
-        asserts that it has _already_ failed.
-
-        :param deferred: the ``Deferred`` to check
-        :type deferred: :class:`twisted.internet.defer.Deferred`
-
-        :param expected_failures: all the failures that are expected.  If None,
-            will return true so long as the deferred errbacks, with whatever
-            error.  If provided, ensures that the failure matches
-            one of the expected failures.
-        :type expected_failures: Exceptions
-
-        :return: whatever the Exception was that was expected, or None if the
-            test failed
-        """
-        failure = self.failureResultOf(deferred)
-        if expected_failures and not failure.check(*expected_failures):
-            self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
-                expected_failures, failure))
-        return failure
-
-
 def fixture(fixture_name):
     """
     :param fixture_name: The base filename of the fixture, ex: simple.atom.
