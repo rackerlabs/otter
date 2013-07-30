@@ -455,13 +455,13 @@ class CachingAuthenticatorTests(TestCase):
 
         self.auth_function.assert_called_once_with(1)
 
-        auth_d.callback(('auth-token', 'catalog'))
+        auth_d.callback(('auth-token2', 'catalog2'))
 
         r1 = self.successResultOf(d1)
         r2 = self.successResultOf(d2)
 
         self.assertEqual(r1, r2)
-        self.assertEqual(r1, ('auth-token', 'catalog'))
+        self.assertEqual(r1, ('auth-token2', 'catalog2'))
 
     def test_cached_value_per_tenant(self):
         """
