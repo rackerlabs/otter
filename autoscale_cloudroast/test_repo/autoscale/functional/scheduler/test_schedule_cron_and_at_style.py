@@ -29,7 +29,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         """
         schedule_value_list = [
             '* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
-            '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0', '* * * * * *']
+            '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0']
         for each_schedule_value in schedule_value_list:
             schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
                 group_id=self.group.id,

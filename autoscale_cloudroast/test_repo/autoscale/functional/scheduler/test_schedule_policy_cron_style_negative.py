@@ -26,7 +26,7 @@ class ScheduleScalingPolicyCronStyleNegative(AutoscaleFixture):
         Creating a scaling policy of type schedule with invalid cron results
         in a 400.
         """
-        schedule_value_list = ['* * * *', '* * * * * * * *', '*'
+        schedule_value_list = ['* * * *', '* * * * * * * *', '*', '* * * * * *',
                                '12345', 'dfsdfdf', '- - - - -']
         for each_schedule_value in schedule_value_list:
             schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
