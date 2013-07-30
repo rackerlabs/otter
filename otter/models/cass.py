@@ -188,10 +188,10 @@ def _build_schedule_policy(policy, event_table, queries, data, polname):
 
 def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_id, group_id):
     # Delete existing entry in event table
-    d = connection.execute(_cql_delete_policy_events.format(cf=self.event_table),
+    d = connection.execute(_cql_delete_policy_events.format(cf=event_table),
                            {'policyId': policy_id}, get_consistency_level('delete', 'event'))
 
-    def _insert_event():
+    def _insert_event(_):
         queries, data = [], {}
         data['tenantId'] = tenant_id
         data['groupId'] = group_id
@@ -559,19 +559,18 @@ class CassScalingGroup(object):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
-                if lastRev["type"] == 'schedule':
+                if lastRev["type"] == 'schedule' and lastRev['args'] != data['args']:
                     return _update_schedule_policy(self.connection, data, policy_id,
                                                    self.event_table, self.tenant_id, self.uuid)
 
-        def _do_update_policy():
+        def _do_update_policy(_):
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id,
                                 "policy": serialize_json_data(data, 1)},
                       consistency=get_consistency_level('update', 'policy'))
-            d = b.execute(self.connection)
-            return d
+            return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
         d.addCallback(_do_update_schedule)
