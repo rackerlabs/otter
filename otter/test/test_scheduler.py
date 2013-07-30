@@ -11,13 +11,14 @@ import mock
 from silverberg.lock import BusyLockError
 
 from otter.scheduler import SchedulerService
-from otter.test.utils import iMock, DeferredTestMixin, patch
-from otter.models.interface import IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection
+from otter.test.utils import iMock, patch
+from otter.models.interface import (
+    IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.rest.application import set_store
 from otter.models.cass import LOCK_TABLE_NAME
 
 
-class SchedulerTestCase(DeferredTestMixin, TestCase):
+class SchedulerTestCase(TestCase):
     """
     Tests for :mod:`SchedulerService`
     """

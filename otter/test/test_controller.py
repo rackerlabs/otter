@@ -17,8 +17,7 @@ from otter.supervisor import Supervisor
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
-from otter.test.utils import (
-    CheckFailure, DeferredTestMixin, iMock, matches, patch)
+from otter.test.utils import CheckFailure, iMock, matches, patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -878,7 +877,7 @@ class ExecScaleDownTests(TestCase):
         self.assertFalse(self.del_active_servers.called)
 
 
-class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
+class MaybeExecuteScalingPolicyTestCase(TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
@@ -1073,7 +1072,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_state.mark_executed.assert_called_once_with('pol1')
 
 
-class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
+class ExecuteLaunchConfigTestCase(TestCase):
     """
     Tests for :func:`otter.controller.execute_launch_config`
     """

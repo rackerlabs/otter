@@ -24,7 +24,7 @@ from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import root, set_store
 
 from otter.test.rest.request import request
-from otter.test.utils import DeferredTestMixin, patch
+from otter.test.utils import patch
 
 from otter.util.config import set_config_data
 
@@ -33,7 +33,7 @@ def _strip_base_url(url):
     return urlsplit(url)[2]
 
 
-class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
+class MockStoreRestScalingGroupTestCase(TestCase):
     """
     Test case for testing the REST API for the scaling group specific endpoints
     (not policies or webhooks) against the mock model.
@@ -201,7 +201,7 @@ class MockStoreRestScalingGroupTestCase(DeferredTestMixin, TestCase):
                          {'launchConfiguration': edited_launch})
 
 
-class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
+class MockStoreRestScalingPolicyTestCase(TestCase):
     """
     Test case for testing the REST API for the scaling policy specific endpoints
     (but not webhooks) against the mock model.
@@ -390,7 +390,7 @@ class MockStoreRestScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.flushLoggedErrors(NoSuchPolicyError)
 
 
-class MockStoreRestWebhooksTestCase(DeferredTestMixin, TestCase):
+class MockStoreRestWebhooksTestCase(TestCase):
     """
     Test case for testing the REST API for the webhook specific endpoints
     against the mock model.
