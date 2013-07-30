@@ -491,8 +491,7 @@ class CachingAuthenticatorTests(TestCase):
 
         auth_d.errback(APIError(500, '500'))
 
-        f1 = self.failureResultOf(d1)
-        self.assertTrue(f1.check(APIError))
+        self.failureResultOf(d1)
 
         f2 = self.failureResultOf(d2)
         self.assertTrue(f2.check(APIError))
