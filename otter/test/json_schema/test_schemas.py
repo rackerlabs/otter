@@ -635,6 +635,10 @@ class CreateScalingGroupTestCase(TestCase):
     correct.
     """
     def setUp(self):
+        """
+        Set up a reference to a standard, valid policy, config, and launch
+        configs.
+        """
         self.policy = group_examples.policy()[0]
         self.config = group_examples.config()[0]
         self.launch = group_examples.launch_server_config()[0]
@@ -647,7 +651,7 @@ class CreateScalingGroupTestCase(TestCase):
 
     def test_creation_with_no_scaling_policies_valid(self):
         """
-        Seems pointless to disallow empty arrays, so empty arrays validate.
+        Creation without the ``scalingPolicies`` key validates.
         """
         validate({
             'groupConfiguration': self.config,
@@ -656,7 +660,7 @@ class CreateScalingGroupTestCase(TestCase):
 
     def test_creation_with_empty_scaling_policies_valid(self):
         """
-        Seems pointless to disallow empty arrays, so empty arrays validate.
+        Creation with an empty array of scaling policies validates
         """
         validate({
             'groupConfiguration': self.config,
@@ -666,7 +670,7 @@ class CreateScalingGroupTestCase(TestCase):
 
     def test_creation_with_scaling_policies_valid(self):
         """
-        Seems pointless to disallow empty arrays, so empty arrays validate.
+        Creation with an array of scaling policies validates
         """
         validate({
             'groupConfiguration': self.config,
