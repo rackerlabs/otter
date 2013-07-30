@@ -20,11 +20,8 @@ CREATE TABLE scaling_policies (
     "groupId" ascii,
     "policyId" ascii,
     data ascii,
-    deleted boolean,
     PRIMARY KEY("tenantId", "groupId", "policyId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',
     'min_threshold' : '2'
 } AND gc_grace_seconds = 3600;
-
-CREATE INDEX deleted_scaling_policies ON scaling_policies (deleted);

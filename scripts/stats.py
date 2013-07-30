@@ -41,8 +41,6 @@ def run(args):
                  "Number of group states (should be same as above): {0}"),
                 ("SELECT COUNT(*) FROM scaling_policies WHERE deleted=false;", True,
                  "Number of scaling policies: {0}"),
-                ("SELECT COUNT(*) FROM scaling_config WHERE deleted=false;", True,
-                 "Number of scaling groups: {0}"),
                 ("SELECT COUNT(*) FROM policy_webhooks WHERE deleted=false;", True,
                  "Number of webhooks: {0}"),
                 ]
@@ -50,12 +48,8 @@ def run(args):
     # connect
     if args.verbose > 0:
         print "Attempting to connect to {0}:{1}".format(args.host, args.port)
-    try:
-        connection = connect(args.host, args.port, cql_version='3')
-    except Exception as e:
-        print "CONNECTION ERROR: {0}".format(e.message)
-        sys.exit(1)
 
+    connection = connect(args.host, args.port, cql_version='3.0.4')
     cursor = connection.cursor()
 
     for command, displayResults, label in commands:

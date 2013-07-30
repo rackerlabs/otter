@@ -11,20 +11,6 @@ class GroupFixture(AutoscaleFixture):
     System tests to verify scaling group scenarios
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(GroupFixture, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group
-        """
-        super(GroupFixture, cls).tearDownClass()
-
     def test_system_update_minentities_to_scaleup(self):
         """
         The scaling group scales up when the minentities are updated,

@@ -15,7 +15,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ScheduleScalingPolicyCronAndAtStyle, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
@@ -56,6 +56,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         ** fails with 400, AUTO-434**
         """
         schedule_value_list = [self.autoscale_behaviors.get_time_in_utc(3155760000),
+                               '2013-12-05 03:12:09Z',
                                '2013-12-05T03:12Z']
         for each_schedule_value in schedule_value_list:
             schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(

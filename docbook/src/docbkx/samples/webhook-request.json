@@ -1,0 +1,39 @@
+
+{
+    "webhooks": [
+        {
+            "id":"{webhookId1}",
+            "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            },
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash1}/,
+                    "rel": "capability"
+                }
+            ]
+        },
+        {
+            "id":"{webhookId2}",
+            "name": "bob",
+            "metadata": {},
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash2}/,
+                    "rel": "capability"
+                }
+            ]
+        }
+    ]
+}
+ 
+ 

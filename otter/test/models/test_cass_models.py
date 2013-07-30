@@ -8,13 +8,13 @@ from datetime import datetime
 import iso8601
 
 from twisted.trial.unittest import TestCase
+from jsonschema import ValidationError
 
 from otter.json_schema import group_examples
 
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
-    CassBadDataError,
     serialize_json_data)
 
 from otter.models.interface import (
@@ -92,6 +92,12 @@ class SerialJsonDataTestCase(TestCase):
                          json.dumps({'_ver': 'version'}))
 
 
+class DummyException(Exception):
+    """
+    Specific exception class, to be used in testing exception handling
+    """
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -147,27 +153,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
               return_value=ConsistencyLevel.TWO)
 
         self.lock = self.mock_lock()
-        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
-
-    def _test_view_things_errors(self, callback_to_test, *args, **kwargs):
-        """
-        Errors from cassandra in viewing one thing (not listing) or updating
-        one thing (because it must first be viewed) cause
-        :class:`CassBadDataErrors`
-        """
-        bads = (
-            # this should probably not happen
-            [{}],
-            # non json
-            [{'data': 'hi'}],
-            [{'data': '{ff}'}]
-        )
-
-        for bad in bads:
-            self.returns = [bad]
-            self.assert_deferred_failed(callback_to_test(*args, **kwargs),
-                                        CassBadDataError)
-            self.flushLoggedErrors(CassBadDataError)
+        self.basic_lock_mock = patch(self, 'otter.models.cass.BasicLock',
+                                     return_value=self.lock)
 
     def test_view_config(self):
         """
@@ -262,6 +249,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
+                                                     self.group.uuid, max_retry=5,
+                                                     retry_wait=mock.ANY)
+        args, kwargs = self.basic_lock_mock.call_args_list[0]
+        self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
+
         self.lock.acquire.assert_called_once_with()
         self.lock.release.assert_called_once_with()
 
@@ -287,6 +280,27 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(self.connection.execute.call_count, 0)
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
+
+    def test_modify_state_lock_with_different_retry(self):
+        """
+        `modify_state` gets lock by retrying with different wait intervals each time
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.returns = [None, None]
+
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
+        first_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= first_retry_wait <= 5)
+
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
+        second_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= second_retry_wait <= 5)
+        self.assertNotEqual(first_retry_wait, second_retry_wait)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -335,19 +349,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertTrue(f.check(AssertionError))
         self.assertEqual(self.connection.execute.call_count, 0)
 
-    def test_view_config_bad_db_data(self):
-        """
-        Test what happens if you retrieve bad db config data, including None, rows
-        without keys, or bad JSON data (e.g. database corruption)
-        """
-        self._test_view_things_errors(self.group.view_config)
-        expectedCql = ('SELECT data FROM scaling_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
-        expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.TWO))
-
     def test_view_config_no_such_group(self):
         """
         Tests what happens if you try to view a group that doesn't exist.
@@ -391,19 +392,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, {})
-
-    def test_view_launch_bad_db_data(self):
-        """
-        Test what happens if you retrieve bad db launch data, including None, rows
-        without keys, or bad JSON data (e.g. database corruption)
-        """
-        self._test_view_things_errors(self.group.view_launch_config)
-        expectedCql = ('SELECT data FROM launch_config WHERE '
-                       '"tenantId" = :tenantId AND "groupId" = :groupId;')
-        expectedData = {"tenantId": "11111", "groupId": "12345678g"}
-        for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.TWO))
 
     def test_view_launch_no_such_group(self):
         """
@@ -478,14 +466,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         for callback in updates:
             self.group.view_config = mock.MagicMock(
-                return_value=defer.fail(CassBadDataError("Cassandra failure")))
-            self.assert_deferred_failed(callback(), CassBadDataError)
+                return_value=defer.fail(DummyException('boo')))
+            self.assert_deferred_failed(callback(), DummyException)
 
             # view is called
             self.group.view_config.assert_called_once_with()
             # but extra executes, to update, are not called
             self.assertFalse(self.connection.execute.called)
-            self.flushLoggedErrors(CassBadDataError)
 
     def test_view_policy(self):
         """
@@ -502,19 +489,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, {})
-
-    def test_view_policy_bad_db_data(self):
-        """
-        Test what happens if you retrieve bad db policy data, including None, rows
-        without keys, or bad JSON data (e.g. database corruption)
-        """
-        self._test_view_things_errors(self.group.get_policy, "3444")
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
-        for call in self.connection.execute.call_args_list:
-            self.assertEqual(call, mock.call(expectedCql, expectedData,
-                                             ConsistencyLevel.TWO))
 
     def test_view_policy_no_such_policy(self):
         """
@@ -744,18 +718,71 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Test that you can update a scaling policy, and if successful it returns
         None
         """
-        cass_response = [{'data': '{}'}]
+        cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
-        d = self.group.update_policy('12345678', {"b": "lah"})
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "helvetica"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         expectedCql = (
             'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
             'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        expectedData = {"policy": '{"_ver": 1, "b": "lah"}',
+        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "helvetica"}',
                         "groupId": '12345678g',
                         "policyId": '12345678',
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    def test_update_scaling_policy_schedule_no_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}',
+                        "groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    def test_update_scaling_policy_type_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "helvetica"}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
+        self.assert_deferred_failed(d, ValidationError)
+        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expectedData = {"groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    def test_update_scaling_policy_schedule_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
+        self.assert_deferred_failed(d, ValidationError)
+        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expectedData = {"groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
     def test_update_scaling_policy_bad(self):
@@ -796,15 +823,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         the rest of the update does not continue
         """
         self.group.get_policy = mock.MagicMock(
-            return_value=defer.fail(CassBadDataError("Cassandra failure")))
+            return_value=defer.fail(DummyException("Cassandra failure")))
         self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
-                                    CassBadDataError)
+                                    DummyException)
 
         # view is called
         self.group.get_policy.assert_called_once_with('1')
         # but extra executes, to update, are not called
         self.assertFalse(self.connection.execute.called)
-        self.flushLoggedErrors(CassBadDataError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
@@ -1026,13 +1052,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         ConsistencyLevel.TWO)
         self.assertEqual(
             r, {'name': 'pokey', 'capability': {"version": "1", "hash": "h"}})
-
-    def test_view_webhook_bad_db_data(self):
-        """
-        Test what happens if you retrieve bad db policy data, including None, rows
-        without keys, or bad JSON data (e.g. database corruption)
-        """
-        self._test_view_things_errors(self.group.get_webhook, "3444", "4555")
 
     def test_view_webhook_no_such_webhook(self):
         """

@@ -2,7 +2,7 @@
 Test to verify list group config.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from cloudcafe.compute.common.datagen import rand_name
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class ListGroupConfigTest(AutoscaleFixture):
@@ -47,8 +47,6 @@ class ListGroupConfigTest(AutoscaleFixture):
         self.assertEquals(self.group_config_response.status_code, 200,
                           msg='List group config failed with {0}'
                           .format(self.group_config_response.status_code))
-        self.assertTrue(self.group_config_response.headers is not None,
-                        msg='The headers are not as expected')
         self.validate_headers(self.group_config_response.headers)
         self.assertEquals(self.group_config.minEntities,
                           self.gc_min_entities,

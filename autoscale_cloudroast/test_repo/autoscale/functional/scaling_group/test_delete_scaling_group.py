@@ -62,6 +62,7 @@ class DeleteScalingGroupTest(AutoscaleFixture):
                           msg='The create failed with {0}'
                               .format(create_resp.status_code))
         delete_resp = self.autoscale_client.delete_scaling_group(group.id)
+        self.validate_headers(delete_resp.headers)
         self.assertEquals(delete_resp.status_code, 204,
                           msg='The delete failed with {0}'
                               .format(delete_resp.status_code))
