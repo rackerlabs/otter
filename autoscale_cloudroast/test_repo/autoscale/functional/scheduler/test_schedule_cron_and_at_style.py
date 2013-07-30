@@ -78,8 +78,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
     def test_schedule_at_style_policy_with_webhook(self):
         """
         Creating a webhook on a scaling policy of type schedule with (at style)
-        results in a 400.
-        ** AUTO-418, fails with 201 for webhook creation **
+        results in a 201
         """
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -100,7 +99,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
     def test_schedule_at_style_policy_execute(self):
         """
         Create scaling policy of type schedule with (at style) and execute it,
-        results in a 400.
+        results in a 202.
         """
         schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
@@ -120,7 +119,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
     def test_schedule_cron_style_policy_with_webhook(self):
         """
         Creating a webhook on a scaling policy of type schedule with (at style)
-        results in a 400.
+        results in a 201.
         """
         schedule_value = '* * * * *'
         schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
@@ -143,8 +142,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
     def test_schedule_cron_style_policy_execute(self):
         """
         Create scaling policy of type schedule via cron style and execute it,
-        results in a 400.
-        ** AUTO-418 fails with 202 upon execution, and creates/deletes servers as per policy **
+        results in a 202.
         """
         schedule_value = '* * * * *'
         schedule_policy_cron_style = self.autoscale_behaviors.create_schedule_policy_given(
