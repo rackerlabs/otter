@@ -545,8 +545,7 @@ class ServerTests(TestCase):
         wait_for_active.assert_called_once_with(mock.ANY,
                                                 'http://dfw.openstack/',
                                                 'my-auth-token',
-                                                '1',
-                                                'ACTIVE')
+                                                '1')
 
         add_to_load_balancers.assert_called_once_with(
             'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
