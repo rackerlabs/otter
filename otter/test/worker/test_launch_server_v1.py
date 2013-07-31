@@ -22,11 +22,12 @@ from otter.worker.launch_server_v1 import (
     delete_server,
     remove_from_load_balancer,
     public_endpoint_url,
-    UnexpectedServerStatus
+    UnexpectedServerStatus,
+    verified_delete
 )
 
 
-from otter.test.utils import patch
+from otter.test.utils import CheckFailure, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
@@ -778,6 +779,12 @@ instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
+class DummyException(Exception):
+    """
+    Fake exception
+    """
+
+
 class DeleteServerTests(TestCase):
     """
     Test the delete server worker.
@@ -867,3 +874,52 @@ class DeleteServerTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertEqual(failure.value.reason.value.code, 500)
+
+    def test_verified_delete_returns_after_delete_but_verifies_deletion(self):
+        """
+        verified_delete returns as soon as the deletion succeeded, but also
+        attempts to verify deleting the server.  It also logs the deletion.
+        """
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.head.return_value = Deferred()
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=mock.Mock())
+        self.assertIsNone(self.successResultOf(d))
+
+        self.treq.delete.assert_called_once_with('http://url/servers/serverId',
+                                                 headers=expected_headers)
+        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+                                               headers=expected_headers)
+
+        self.assertEqual(self.log.bind.return_value.msg.call_count, 1)
+
+    def test_verified_delete_propagates_delete_server_api_failures(self):
+        """
+        verified_delete propagates deletions from server deletion
+        """
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=500))
+        self.treq.content.return_value = succeed(error_body)
+        self.treq.head.return_value = Deferred()
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=mock.Mock())
+        failure = self.failureResultOf(d, RequestError)
+        self.assertEqual(failure.value.reason.value.code, 500)
+
+    def test_verified_delete_does_not_propagate_verification_failure(self):
+        """
+        verified_delete propagates deletions from server deletion
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.head.return_value = fail(DummyException('failure'))
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=clock)
+        self.assertIsNone(self.successResultOf(d))
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException))

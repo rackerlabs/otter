@@ -81,7 +81,6 @@ def wait_for_active(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param str expected_status: Nova status string.
     :param int interval: Polling interval.  Default: 5.
 
     :return: Deferred that fires when the expected status has been seen.
@@ -390,7 +389,6 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
-
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
@@ -429,4 +427,46 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
         return d
 
     d.addCallback(when_removed_from_loadbalancers)
+    return d
+
+
+def verified_delete(log,
+                    server_endpoint,
+                    auth_token,
+                    server_id,
+                    interval=5,
+                    timeout=120,
+                    clock=None):
+    """
+    Attempt to delete a server from the server endpoint, and ensure that it is
+    deleted by trying again until getting the server results in a 404.
+
+    There is a possibility Nova sometimes fails to delete servers.  Log if this
+    happens, and if so, re-evaluate workarounds.
+
+    :param log: A bound logger.
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth token.
+    :param str server_id: Opaque nova server id.
+    :param int interval: Deletion interval - how long until a delete is retried.
+        Default: 2.
+    :param int timeout: Timeout before logging deletion failiure.
+
+    :return: Deferred that fires when the expected status has been seen.
+    """
+    del_log = log.bind(server_id=server_id)
+    del_log.msg('Deleting server')
+
+    d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
+                    headers=headers(auth_token))
+    d.addCallback(check_success, [204])
+
+    def verify_deletion(_):
+        vd = treq.head(append_segments(server_endpoint, 'servers', server_id),
+                       headers=headers(auth_token))
+        vd.addCallback(check_success, [404])
+        vd.addErrback(del_log.err)
+
+    d.addCallback(verify_deletion)
+    d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
     return d
