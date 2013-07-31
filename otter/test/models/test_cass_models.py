@@ -733,8 +733,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
     def test_update_scaling_policy_schedule_no_change(self):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        Schedule policy update with no change in args works
         """
         cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
         self.returns = [cass_response, None]
@@ -752,8 +751,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
     def test_update_scaling_policy_type_change(self):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        Policy type cannot be changed while updating it
         """
         cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
@@ -767,22 +765,40 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
-    def test_update_scaling_policy_schedule_change(self):
+    def test_update_scaling_policy_at_schedule_change(self):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        Updating at-style schedule policy updates respective entry in scaling_schedule table also
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
-        self.returns = [cass_response, None]
-        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
-        self.failureResultOf(d, ValidationError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
+        self.returns = [cass_response, None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
+        self.assertIsNone(self.successResultOf(d))
+        selectCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                     'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        selectData = {"groupId": '12345678g',
+                      "policyId": '12345678',
+                      "tenantId": '11111'}
+        delCql = 'DELETE FROM scaling_schedule WHERE "policyId" = :policyId;'
+        delData = {'policyId': '12345678'}
+        insertCql = ('BEGIN BATCH '
+                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                     'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
+                     'APPLY BATCH;')
+        insertData = selectData.copy()
+        insertData['policyTrigger'] = from_timestamp("2015-09-20T10:00:12Z")
+        insertpolCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        insertpolData = selectData.copy()
+        insertpolData["policy"] = ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                   '"type": "schedule"}')
+
+        self.assertEqual(self.connection.execute.call_args_list,
+                         [mock.call(selectCql, selectData, ConsistencyLevel.TWO),
+                          mock.call(delCql, delData, ConsistencyLevel.TWO),
+                          mock.call(insertCql, insertData, ConsistencyLevel.TWO),
+                          mock.call(insertpolCql, insertpolData, ConsistencyLevel.TWO)])
 
     def test_update_scaling_policy_bad(self):
         """
