@@ -113,6 +113,8 @@ _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} W
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
 
+_cql_count_all = ('SELECT COUNT(*) FROM {cf};')
+
 
 def get_consistency_level(operation, resource):
     """
@@ -925,6 +927,22 @@ class CassScalingGroupCollection:
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
         deferred = [self.connection.execute(_cql_count_for_tenant.format(cf=field),
                                             {'tenantId': tenant_id},
+                                            get_consistency_level('count', 'group'))
+                    for field in fields]
+
+        d = defer.gatherResults(deferred)
+        d.addCallback(lambda results: [r[0]['count'] for r in results])
+        d.addCallback(lambda results: dict(zip(
+            ('groups', 'policies', 'webhooks'), results)))
+        return d
+
+    def get_metrics(self, log):
+        """
+        Return a count of tables from cassandra.
+        """
+
+        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        deferred = [self.connection.execute(_cql_count_all.format(cf=field),
                                             get_consistency_level('count', 'group'))
                     for field in fields]
 

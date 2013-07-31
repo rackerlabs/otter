@@ -1727,3 +1727,31 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)
+
+    def test_get_metrics(self):
+        """
+        Check get_metrics returns dictionary in proper format
+        """
+        self.returns = [
+            [{'count': 190}],
+            [{'count': 191}],
+            [{'count': 192}],
+        ]
+
+        expectedResults = {
+            "groups": 190,
+            "policies": 191,
+            "webhooks": 192
+        }
+        config_query = ('SELECT COUNT(*) FROM scaling_config;')
+        policy_query = ('SELECT COUNT(*) FROM scaling_policies;')
+        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks;')
+
+        calls = [mock.call(config_query, ConsistencyLevel.TWO),
+                 mock.call(policy_query, ConsistencyLevel.TWO),
+                 mock.call(webhook_query, ConsistencyLevel.TWO)]
+
+        d = self.collection.get_metrics(self.mock_log)
+        result = self.successResultOf(d)
+        self.assertEquals(result, expectedResults)
+        self.connection.execute.assert_has_calls(calls)
