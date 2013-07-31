@@ -10,4 +10,3 @@ OtterAPI = ServiceMaker(
     "Handle API requests",
     "otter-api"
 )
-

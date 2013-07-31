@@ -26,8 +26,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_update_minentities_to_be_lesser_than_during_create_group(self):
         """
-        The scaling group does not scale down when the minenetities are updated,
-        to be lower than when created
+        The scaling group does not scale down when the minenetities are
+        updated, to be lower than when created
         """
         minentities = 4
         group = self._create_group(minentities=minentities)
@@ -40,8 +40,9 @@ class GroupFixture(AutoscaleFixture):
     def test_system_update_maxentities_less_than_desiredcapacity(self):
         """
         Create a scaling group and execute a policy to be within maxentities,
-        reduce the max entities to be less than the active servers (desiredCapacity)
-        and the scaling group scales down to match the updated maxentities
+        reduce the max entities to be less than the active servers
+        (desiredCapacity) and the scaling group scales down to match the
+        updated maxentities
         """
         minentities = 0
         maxentities = 10
@@ -117,8 +118,8 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_group_cooldown_enforced_when_executing_different_policies(self):
         """
-        The group cooldown is enforced when executing different scaling policies,
-        multiple times
+        The group cooldown is enforced when executing different scaling
+        policies, multiple times
         """
         splist = [{
             'name': 'scale up by 3',
@@ -181,9 +182,10 @@ class GroupFixture(AutoscaleFixture):
 
     def test_system_execute_policy_beyond_maxentities(self):
         """
-        Scaling policy is executed when change + minentities > maxentities, upto
-        the maxentities. Re-executing policy when maxentities are met fails with 403.
-        The scaling policy can be executed when the maxentities is updated to be higher.
+        Scaling policy is executed when change + minentities > maxentities,
+        upto the maxentities. Re-executing policy when maxentities are met
+        fails with 403. The scaling policy can be executed when the
+        maxentities is updated to be higher.
         """
         minentities = 2
         maxentities = 3
@@ -298,8 +300,8 @@ class GroupFixture(AutoscaleFixture):
     def _create_group(self, minentities=None, maxentities=None, cooldown=None,
                       splist=None):
         """
-        Create a scaling group with the given minentities, maxentities, cooldown
-        and scaling policy and Return the group.
+        Create a scaling group with the given minentities, maxentities,
+        cooldown and scaling policy and Return the group.
         """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=minentities, gc_max_entities=maxentities,
@@ -331,8 +333,9 @@ class GroupFixture(AutoscaleFixture):
             max_entities=maxentities,
             metadata={})
         self.assertEqual(update_group.status_code, 204,
-                         msg='Update group failed with {0} for group {1}'.format(
-                         update_group.status_code, group.id))
+                         msg='Update group failed with {0} for '
+                         'group {1}'.format(
+                             update_group.status_code, group.id))
 
     def _execute_policy(self, group):
         """
