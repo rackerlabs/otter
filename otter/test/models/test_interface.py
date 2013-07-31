@@ -399,7 +399,7 @@ class IScalingScheduleCollectionProviderMixin(object):
     def validate_fetch_batch_of_events(self, *args, **kwargs):
         """
         Calls ``fetch_batch_of_events()`` and validates that it returns a
-        list of (tenant_id, scaling_group_id, policy_id, trigger time) tuples
+        list of dict
 
         :return: the return value of ``fetch_batch_of_events()``
         """
@@ -408,7 +408,7 @@ class IScalingScheduleCollectionProviderMixin(object):
 
         self.assertEqual(type(result), list)
         for elem in result:
-            self.assertEqual(type(elem), tuple)
-            self.assertEqual(len(elem), 4)
+            self.assertEqual(type(elem), dict)
+            self.assertEqual(len(elem), 5)
 
         return result
