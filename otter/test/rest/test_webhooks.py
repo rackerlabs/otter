@@ -16,7 +16,10 @@ from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError)
 from otter.rest.decorators import InvalidJsonError
+
 from otter.test.rest.request import DummyException, RestAPITestMixin
+
+from otter.controller import CannotExecutePolicyError
 
 
 class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
@@ -454,12 +457,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         If the policy execution fails, the webhook should still return 202 and
         does not wait for the response
         """
-        self.mock_group.modify_state.side_effect = None
-        # no callback
-        self.mock_group.modify_state.return_value = defer.Deferred()
-
-        self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
-            (self.tenant_id, self.group_id, self.policy_id))
+        self.mock_store.webhook_info_by_hash.return_value = defer.Deferred()
 
         response_body = self.assert_status_code(
             202, '/v1.0/execute/1/11111/', 'POST')
@@ -479,14 +477,37 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
 
         self.assertEqual(response_body, '')
 
-    def test_execute_webhook_should_only_surface_500(self):
+    def test_execute_webhook_logs_unhandled_exceptions(self):
         """
-        Executing a webhook should only surface 500 in the case of
-        a synchronous exception and not specific codes.
+        Executing a webhook logs any unhandled exceptions.
         """
-        self.mock_store.webhook_info_by_hash.return_value = defer.fail(
-            ValueError('otters in pants'))
+        exc = ValueError('otters in pants')
 
-        self.assert_status_code(500, '/v1.0/execute/1/11111/', 'POST')
+        self.mock_store.webhook_info_by_hash.return_value = defer.fail(exc)
 
-        self.flushLoggedErrors(ValueError)
+        self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
+
+        excs = self.flushLoggedErrors(ValueError)
+        self.assertEqual(excs[0].value, exc)
+
+    @mock.patch('otter.rest.decorators.log')
+    def test_execute_webhook_logs_info_message_when_policy_cannot_be_executed(self, log):
+        """
+        Executing a webhook logs an information message about non-fatal, policy
+        execution failures.
+        """
+        cap_log = log.bind.return_value.bind.return_value
+
+        for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
+                    NoSuchPolicyError('tenant', 'group', 'policy'),
+                    NoSuchScalingGroupError('tenant', 'group'),
+                    UnrecognizedCapabilityError("11111", 1)]:
+            self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
+                ('tenant', 'group', 'policy'))
+            self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
+            self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
+
+            cap_log.msg.assert_any_call(
+                'Non-fatal error during webhook execution: {exc!r}', exc=exc)
+
+            self.assertEqual(0, cap_log.err.call_count)

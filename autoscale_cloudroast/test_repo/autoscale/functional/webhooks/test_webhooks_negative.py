@@ -277,3 +277,18 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
         self.assertEquals(execute_wb_resp.status_code, 202,
                           msg='Execute webhook failed with {0}'
                           .format(execute_wb_resp.status_code))
+
+    def test_verify_webhook_with_metadata_as_string(self):
+        """
+        Negative Test: Creating a webhook with metadata as a string returns 400.
+        AUTO-319
+        """
+        create_resp = self.autoscale_client.create_webhook(
+            group_id=self.group.id,
+            policy_id=self.policy[
+                'id'],
+            name=self.wb_name,
+            metadata='{}')
+        self.assertEquals(
+            create_resp.status_code, 400, msg='create webhook with metadata'
+            'results in {0}'.format(create_resp.status_code))

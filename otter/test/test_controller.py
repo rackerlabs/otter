@@ -14,9 +14,10 @@ from twisted.trial.unittest import TestCase
 from otter import controller
 from otter.supervisor import Supervisor
 
-from otter.models.interface import GroupState, IScalingGroup, NoSuchPolicyError
+from otter.models.interface import (
+    GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
-from otter.test.utils import DeferredTestMixin, iMock, matches, patch
+from otter.test.utils import CheckFailure, iMock, matches, patch
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -876,7 +877,7 @@ class ExecScaleDownTests(TestCase):
         self.assertFalse(self.del_active_servers.called)
 
 
-class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
+class MaybeExecuteScalingPolicyTestCase(TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
@@ -921,7 +922,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
@@ -1008,7 +1009,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
@@ -1033,9 +1034,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
-        self.assertIn("Policy execution would violate min/max constraints",
-                      str(f.value))
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
+        self.assertIn("No change in servers", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -1072,7 +1072,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_state.mark_executed.assert_called_once_with('pol1')
 
 
-class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
+class ExecuteLaunchConfigTestCase(TestCase):
     """
     Tests for :func:`otter.controller.execute_launch_config`
     """
@@ -1110,7 +1110,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
                          [mock.call(self.log, '1',
                                     self.group, 'launch')] * 5)
 
-    def test_positive_delta_excute_config_failures_propagated(self):
+    def test_positive_delta_execute_config_failures_propagated(self):
         """
         ``execute_launch_config`` fails if ``execute_config`` fails for any one
         case, and propagates the first ``execute_config`` error.
@@ -1124,7 +1124,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
             d = defer.Deferred()
             self.execute_config_deferreds.append(d)
             return defer.succeed((
-                str(len(self.execute_config_deferreds)), d, {}))
+                str(len(self.execute_config_deferreds)), d))
 
         self.supervisor.execute_config.side_effect = fake_execute
         d = controller.execute_launch_config(self.log, '1', self.fake_state,
@@ -1166,10 +1166,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
         self.execute_config_deferreds[2].callback(None)              # job id 3
 
-        self.assertEqual(self.group.modify_state.mock_calls,
-                         [mock.call(mock.ANY, None),
-                          mock.call(mock.ANY, mock.ANY),
-                          mock.call(mock.ANY, None)])
+        self.assertEqual(self.group.modify_state.call_count, 3)
 
     def test_job_sucess(self):
         """
@@ -1217,7 +1214,7 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
         self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log, '1',
+            self.log.bind.return_value, '1',
             self.group, {'id': 's1'})
 
     def test_job_failure(self):
@@ -1263,13 +1260,218 @@ class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
 
         self.log.bind.assert_called_once_with(job_id='1')
 
-        class _CheckFailure(object):
-            def __init__(self, exception_type):
-                self.exception_type = exception_type
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(AssertionError))
 
-            def __eq__(self, other):
-                return isinstance(other, Failure) and other.check(
-                    self.exception_type)
+
+class DummyException(Exception):
+    """
+    Dummy exception used in tests
+    """
+
+
+class PrivateJobHelperTestCase(TestCase):
+    """
+    Tests for the private helper class `_Job`
+    """
+    def setUp(self):
+        """
+        Mock a fake supervisor relevant controller methods, and also a fake
+        log and group
+        """
+        self.transaction_id = 'transaction_id'
+        self.job_id = 'job_id'
+        self.log = mock.MagicMock()
+        self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
+        self.state = None
+        self.supervisor = mock.MagicMock(Supervisor)
+        self.completion_deferred = defer.Deferred()
+
+        self.supervisor.execute_config.return_value = defer.succeed(
+            (self.job_id, self.completion_deferred))
+
+        def fake_modify_state(f, *args, **kwargs):
+            return defer.maybeDeferred(
+                f, self.group, self.state, *args, **kwargs)
+
+        self.group.modify_state.side_effect = fake_modify_state
+
+        self.job = controller._Job(self.log, self.transaction_id, self.group,
+                                   self.supervisor)
+
+    def test_start_calls_supervisor(self):
+        """
+        `start` calls the supervisor's `execute_config` method, and adds
+        `job_started` as a callback to that deferred
+        """
+        self.job.job_started = mock.MagicMock()
+
+        self.job.start('launch')
+        self.supervisor.execute_config.assert_called_once_with(
+            self.log, self.transaction_id, self.group, 'launch')
+        self.job.job_started.assert_called_once_with(
+            (self.job_id, self.completion_deferred))
+
+    def test_job_started_not_called_if_supervisor_error(self):
+        """
+        `job_started` is not called if the supervisor's `execute_config`
+        errbacks, and the failure propagates up.
+        """
+        self.job.job_started = mock.MagicMock()
+        self.supervisor.execute_config.return_value = defer.fail(
+            DummyException('e'))
+
+        d = self.job.start('launch')
+        self.assertEqual(self.job.job_started.call_count, 0)
+        f = self.failureResultOf(d)
+        self.assertTrue(f.check(DummyException))
+
+    def test_start_callbacks_with_job_id(self):
+        """
+        The deferred returned by start callbacks immediately with just the job
+        ID, without waiting for the `completion_deferred` to fire, and the log
+        is bound
+        """
+        d = self.job.start('launch')
+        self.assertEqual(self.successResultOf(d), self.job_id)
+        self.assertEqual(self.job.log, self.log.bind.return_value)
+
+    def test_modify_state_called_on_job_completion_success(self):
+        """
+        If the job succeeded, and modify_state is called
+        """
+        self.job.start('launch')
+        self.assertEqual(self.group.modify_state.call_count, 0)
+        self.completion_deferred.callback('blob')
+        self.assertEqual(self.group.modify_state.call_count, 1)
+
+    def test_modify_state_called_on_job_completion_failure(self):
+        """
+        If the job failed, modify_state is called
+        """
+        self.job.start('launch')
+        self.assertEqual(self.group.modify_state.call_count, 0)
+        self.completion_deferred.errback(Exception('e'))
+        self.assertEqual(self.group.modify_state.call_count, 1)
+
+    def test_job_completion_success_job_marked_as_active(self):
+        """
+        If the job succeeded, and the job ID is still in pending, it is removed
+        and added to active.
+        """
+        self.state = GroupState('tenant', 'group', {}, {self.job_id: {}}, None,
+                                {}, False)
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
+
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(
+            self.state.active,
+            {'active': matches(ContainsDict({'id': Equals('active')}))})
+
+    def test_job_completion_success_job_deleted_pending(self):
+        """
+        If the job succeeded, but the job ID is no longer in pending, the
+        server is deleted and the state not changed.  No error is logged.
+        """
+        self.state = GroupState('tenant', 'group', {}, {}, None,
+                                {}, False)
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
+
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(self.state.active, {})
+
+        self.supervisor.execute_delete_server.assert_called_once_with(
+            self.log.bind.return_value, self.transaction_id, self.group,
+            {'id': 'active'})
+
+        self.assertEqual(self.log.bind.return_value.err.call_count, 0)
+
+    def test_job_completion_failure_job_removed(self):
+        """
+        If the job failed, the job ID is removed from the pending state.  The
+        failure is logged.
+        """
+        self.state = GroupState('tenant', 'group', {}, {self.job_id: {}}, None,
+                                {}, False)
+        self.job.start('launch')
+        self.completion_deferred.errback(DummyException('e'))
+
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
+
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(self.state.active, {})
 
         self.log.bind.return_value.err.assert_called_once_with(
-            _CheckFailure(AssertionError))
+            CheckFailure(DummyException))
+
+    def test_job_completion_failure_job_deleted_pending(self):
+        """
+        If the job failed, but the job ID is no longer in pending, the job id
+        is not removed (and hence no error occurs).  The only error logged is
+        the failure.  Nothing else in the state changes.
+        """
+        self.state = GroupState('tenant', 'group', {}, {}, None,
+                                {}, False)
+        self.job.start('launch')
+        self.completion_deferred.errback(DummyException('e'))
+
+        self.assertIs(self.successResultOf(self.completion_deferred),
+                      self.state)
+
+        self.assertEqual(self.state.pending, {})
+        self.assertEqual(self.state.active, {})
+
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException))
+
+    def test_job_completion_success_NoSuchScalingGroupError(self):
+        """
+        If a job is completed successfully, but `modify_state` fails with a
+        `NoSuchScalingGroupError`, then the group has been deleted and so the
+        server is deleted
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+
+        self.supervisor.execute_delete_server.assert_called_once_with(
+            self.log.bind.return_value, self.transaction_id, self.group,
+            {'id': 'active'})
+
+    def test_job_completion_failure_NoSuchScalingGroupError(self):
+        """
+        If a job fails, but `modify_state` fails with a
+        `NoSuchScalingGroupError`, then the group has been deleted and the
+        failure can be ignored (not logged)
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+        self.assertEqual(self.log.bind.return_value.err.call_count, 0)
+
+    def test_modify_state_failure_logged(self):
+        """
+        If `modify_state` fails with a non-`NoSuchScalingGroupError`, the error
+        is logged
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(DummyException('e')))
+
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'active'})
+
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException))

@@ -1,8 +1,39 @@
-[
-    {
-        "name": "gus",
-        "metadata": {
-            "notes": "This is is note about a webhook. In the response, look above this line to the href to see the webhook's endpoint."
+
+{
+    "webhooks": [
+        {
+            "id":"{webhookId1}",
+            "alice",
+            "metadata": {
+                "notes": "this is for Alice"
+            },
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash1}/,
+                    "rel": "capability"
+                }
+            ]
+        },
+        {
+            "id":"{webhookId2}",
+            "name": "bob",
+            "metadata": {},
+            "links": [
+                {
+                    "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                    "rel": "self"
+                },
+                {
+                    "href": ".../execute/1/{capability_hash2}/,
+                    "rel": "capability"
+                }
+            ]
         }
-    }
-] 
+    ]
+}
+ 
+ 

@@ -31,6 +31,22 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 
 
+class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
+    def __init__(self, server_id, status, expected_status):
+        super(UnexpectedServerStatus, self).__init__(
+            'Expected {server_id} to have {expected_status}, '
+            'has {status}'.format(server_id=server_id,
+                                  status=status,
+                                  expected_status=expected_status)
+        )
+        self.server_id = server_id
+        self.status = status
+        self.expected_status = expected_status
+
+
 def server_details(server_endpoint, auth_token, server_id):
     """
     Fetch the details of a server as specified by id.
@@ -50,18 +66,16 @@ def server_details(server_endpoint, auth_token, server_id):
     return d.addCallback(treq.json_content)
 
 
-def wait_for_status(log,
+def wait_for_active(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    expected_status,
                     interval=5,
                     clock=None):
     """
-    Wait until the server specified by server_id's status is expected_status.
+    Wait until the server specified by server_id's status is 'ACTIVE'
 
     @TODO: Timeouts
-    @TODO: Errback on error statuses.
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
@@ -78,16 +92,20 @@ def wait_for_status(log,
     d = Deferred()
 
     def poll():
-        def _check_status(server):
-            log.msg("Waiting for status {expected_status} got {status}.",
-                    expected_status=expected_status,
-                    status=server['server']['status'])
+        def check_status(server):
+            status = server['server']['status']
 
-            if server['server']['status'] == expected_status:
+            log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
+            if server['server']['status'] == 'ACTIVE':
                 d.callback(server)
+            elif server['server']['status'] != 'BUILD':
+                d.errback(UnexpectedServerStatus(
+                    server_id,
+                    status,
+                    'ACTIVE'))
 
         sd = server_details(server_endpoint, auth_token, server_id)
-        sd.addCallback(_check_status)
+        sd.addCallback(check_status)
 
         return sd
 
@@ -96,11 +114,11 @@ def wait_for_status(log,
     if clock is not None:  # pragma: no cover
         lc.clock = clock
 
-    def _stop(r):
+    def stop(r):
         lc.stop()
         return r
 
-    d.addCallback(_stop)
+    d.addBoth(stop)
 
     return lc.start(interval).addCallback(lambda _: d)
 
@@ -312,11 +330,11 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     def _wait_for_server(server):
         ilog = log.bind(instance_id=server['server']['id'])
-        return wait_for_status(
+        return wait_for_active(
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'], 'ACTIVE')
+            server['server']['id'])
 
     d.addCallback(_wait_for_server)
 

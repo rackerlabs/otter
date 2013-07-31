@@ -495,25 +495,18 @@ class IScalingScheduleCollection(Interface):
         :param size: the size of the request
         :type size: ``int``
 
-        :return: an array containing a tuple of (tenant_id, scaling_group_id, policy_id, trigger time)
+        :return: list of dict representing a row
         """
 
-    def delete_events(policy_ids):
+    def update_delete_events(delete_policy_ids, update_policies):
         """
-        Delete scheduled event of given policy Ids
+        Update trigger times and Delete scheduled event of given policy Ids
 
-        :param policy_ids: list of policy IDs
+        :param delete_policy_ids: list of policy IDs to delete
         :type policy_ids: ``list``
 
-        :return: None
-        """
-
-    def update_events_trigger(policy_and_triggers):
-        """
-        Update the trigger time of given policy ids
-
-        :param policy_and_triggers: list of (policy ID, trigger time) tuples
-        :type policy_and_triggers: ``list``
+        :param update_policies: list of `dict` returned in `fetch_batch_of_events`
+        :type policy_ids: ``list``
 
         :return: None
         """

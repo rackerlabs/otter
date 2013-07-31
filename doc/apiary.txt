@@ -335,7 +335,7 @@ GET /{tenantId}/groups/{groupId}/state
         "id": "{groupId}",
         "links": [
             {
-                "href": "{urlRoot}/v1.0/010101/groups/{groupId},
+                "href": "{urlRoot}/v1.0/010101/groups/{groupId}",
                 "rel": "self"
             }
         ],
@@ -455,6 +455,7 @@ GET /{tenantId}/groups/{groupId}/launch
         }
     }
 }
+
 
 Edit the launch configuration for a scaling group, which includes the
 details of how to create a server, from what image, which load balancers to
@@ -716,6 +717,7 @@ policy.
 /tenantId/groups/groupId/policy/policyId/webhooks/webhookId)
 --
 
+
 Get a list of webhooks and their IDs.
 This data is returned in the body of the response in JSON format.
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
@@ -735,7 +737,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capabilityHash1}/,
+                    "href": ".../execute/1/{capabilityHash1}/",
                     "rel": "capability"
                 }
             ]
@@ -752,7 +754,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capabilityHash2}/,
+                    "href": ".../execute/1/{capabilityHash2}/",
                     "rel": "capability"
                 }
             ]
@@ -795,7 +797,7 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capabilityHash1}/,
+                    "href": ".../execute/1/{capabilityHash1}/",
                     "rel": "capability"
                 }
             ]
@@ -810,7 +812,7 @@ POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                     "rel": "self"
                 },
                 {
-                    "href": ".../execute/1/{capabilityHash2}/,
+                    "href": ".../execute/1/{capabilityHash2}/",
                     "rel": "capability"
                 }
             ]
@@ -836,7 +838,7 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 "rel": "self"
             },
             {
-                "href": ".../execute/1/{capabilityHash2},
+                "href": ".../execute/1/{capabilityHash2}",
                 "rel": "capability"
             }
         ]

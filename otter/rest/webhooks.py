@@ -15,8 +15,14 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, get_autoscale_links, transaction_id
-from otter.models.interface import UnrecognizedCapabilityError
 
+from otter.models.interface import (
+    UnrecognizedCapabilityError,
+    NoSuchPolicyError,
+    NoSuchScalingGroupError
+)
+
+from otter.controller import CannotExecutePolicyError
 from otter import controller
 
 
@@ -301,22 +307,25 @@ def execute_webhook(request, log, capability_version, capability_hash):
     """
     store = get_store()
 
+    cap_log = log.bind(capability_hash=capability_hash,
+                       capability_version=capability_version)
+
     d = store.webhook_info_by_hash(log, capability_hash)
+
+    def log_informational_webhook_failure(failure):
+        failure.trap(UnrecognizedCapabilityError,
+                     CannotExecutePolicyError,
+                     NoSuchPolicyError,
+                     NoSuchScalingGroupError)
+        cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
+                    exc=failure.value)
 
     def execute_policy((tenant_id, group_id, policy_id)):
         group = store.get_scaling_group(log, tenant_id, group_id)
-        # no deferred return because this doesn't wait for execution
-        group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                   log, transaction_id(request),
-                                   policy_id=policy_id))
+        return group.modify_state(partial(controller.maybe_execute_scaling_policy,
+                                          cap_log, transaction_id(request),
+                                          policy_id=policy_id))
 
     d.addCallback(execute_policy)
-
-    def log_unrecognized_cap(failure):
-        exc = failure.trap(UnrecognizedCapabilityError)
-        log.bind(capability_hash=capability_hash,
-                 capability_version=capability_version).msg(repr(exc))
-
-    d.addErrback(log_unrecognized_cap)
-
-    return d
+    d.addErrback(log_informational_webhook_failure)
+    d.addErrback(lambda f: cap_log.err(f, "Unhandled exception executing webhook."))

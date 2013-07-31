@@ -2,7 +2,6 @@
 Test for negative scenarios to a scaling policy of type schedule.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import unittest
 
 
 class ScheduleScalingPolicyNegative(AutoscaleFixture):
@@ -293,49 +292,3 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           msg='Create schedule scaling at style policy with invalid second results'
                           ' in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
-
-    @unittest.skip('AUTO-418')
-    def test_schedule_at_style_policy_with_webhook(self):
-        """
-        Creating a webhook on a scaling policy of type schedule with (at style)
-        results in a 400.
-        ** AUTO-418, fails with 201 for webhook creation **
-        """
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change)
-        self.assertEquals(schedule_policy_at_style['status_code'], 201,
-                          msg='Create scheduler at style policy with failed'
-                          ' with {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
-        create_webhook_response = self.autoscale_client.create_webhook(
-            group_id=self.group.id,
-            policy_id=schedule_policy_at_style['id'],
-            name=self.wb_name)
-        self.assertEquals(create_webhook_response.status_code, 400,
-                          msg='Create webhook on a scheduler at style policy failed'
-                          ' with {0} for group {1}'
-                          .format(create_webhook_response.status_code, self.group.id))
-
-    @unittest.skip('AUTO-418')
-    def test_schedule_at_style_policy_execute(self):
-        """
-        Create scaling policy of type schedule with (at style) and execute it,
-        results in a 400.
-        ** AUTO-418, fails with 202 upon execution, and creates/deletes servers as
-        per policy **
-        """
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change)
-        self.assertEquals(schedule_policy_at_style['status_code'], 201,
-                          msg='Create scheduler at style policy with failed'
-                          ' with {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
-        execute_policy_response = self.autoscale_client.execute_policy(
-            group_id=self.group.id,
-            policy_id=schedule_policy_at_style['id'])
-        self.assertEquals(execute_policy_response.status_code, 400,
-                          msg='Able to execute scheduler policy via at style policy'
-                          ' with {0} for group {1}'
-                          .format(execute_policy_response.status_code, self.group.id))
