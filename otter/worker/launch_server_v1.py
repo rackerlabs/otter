@@ -98,7 +98,7 @@ def wait_for_active(log,
             log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
             if server['server']['status'] == 'ACTIVE':
                 d.callback(server)
-            elif server['server']['status'] != 'BUILDING':
+            elif server['server']['status'] != 'BUILD':
                 d.errback(UnexpectedServerStatus(
                     server_id,
                     status,
