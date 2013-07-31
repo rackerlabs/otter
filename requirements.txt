@@ -1,4 +1,4 @@
-klein==0.2.0
+klein==0.2.1
 twisted==13.0
 tryfer==0.2.2
 jsonschema==2.0
