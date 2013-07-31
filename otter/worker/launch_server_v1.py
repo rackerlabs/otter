@@ -334,7 +334,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'], 'ACTIVE')
+            server['server']['id'])
 
     d.addCallback(_wait_for_server)
 
