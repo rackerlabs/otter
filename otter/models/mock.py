@@ -428,15 +428,9 @@ class MockScalingGroupCollection:
         """
         return defer.succeed([])
 
-    def delete_events(self, policy_ids):
+    def update_delete_events(self, delete_policy_ids, update_policies):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
-        """
-        return defer.succeed(None)
-
-    def update_events_trigger(self, policyids_with_trigger):
-        """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_delete_events`
         """
         return defer.succeed(None)
 

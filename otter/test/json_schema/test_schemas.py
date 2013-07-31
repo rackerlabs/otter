@@ -510,8 +510,10 @@ class ScalingPolicyTestCase(TestCase):
         policy with invalid timestamp raises ``ValidationError``
         """
         invalid = self.at_policy
-        invalid['args']['at'] = 'junk'
-        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+        invalid_dates = ['', 'junk']
+        for invalid_date in invalid_dates:
+            invalid['args']['at'] = invalid_date
+            self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
     def test_only_date_timestamp(self):
         """
@@ -560,13 +562,38 @@ class ScalingPolicyTestCase(TestCase):
         group_schemas.validate_datetime(valid['args']['at'])
         validate(valid, group_schemas.policy)
 
+    def test_valid_cron(self):
+        """
+        policy with valid cron entry validates
+        """
+        valid_crons = ['* * * * *', '0-59 0-23 1-31 1-12 0-6', '00 9,16 * * *',
+                       '00 02-11 * * *', '00 09-18 * * 1-5', '0 0 0 0 0']
+        valid = self.cron_policy
+        for valid_cron in valid_crons:
+            valid['args']['cron'] = valid_cron
+            validate(valid, group_schemas.policy)
+
     def test_invalid_cron(self):
         """
         policy with invalid cron entry raises ``ValidationError``
         """
+        invalid_crons = ['', 'junk', '* * -32 * *', '-90 * * *', '* 0 * *',
+                         '* * * * * *', '0 * * 0 * *', '* * * *', '* * * * * * * *',
+                         '*12345', 'dfsdfdf', '- - - - -', '-090 * * * *', '* -089 * * *']
         invalid = self.cron_policy
-        invalid['args']['cron'] = 'junk'
-        self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+        for invalid_cron in invalid_crons:
+            invalid['args']['cron'] = invalid_cron
+            self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
+
+    def test_cron_with_seconds(self):
+        """
+        policy with cron having 6 entries representing seconds is not allowed
+        """
+        # This is tested for validation in above test.
+        # Here it is checked for correct exception rased
+        invalid_cron = '* * * * * *'
+        self.assertRaisesRegexp(ValueError, 'Seconds not allowed',
+                                group_schemas.validate_cron, invalid_cron)
 
 
 class CreateScalingGroupTestCase(TestCase):

@@ -15,7 +15,6 @@ from twisted.python.failure import Failure
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
     with_transaction_id)
-from otter.test.utils import DeferredTestMixin
 
 
 class BlahError(Exception):
@@ -28,7 +27,7 @@ class DetailsError(Exception):
     details = 'this is a detail'
 
 
-class TransactionIdTestCase(DeferredTestMixin, TestCase):
+class TransactionIdTestCase(TestCase):
     """Test case for the transaction ID"""
     def setUp(self):
         """ Basic Setup and patch the log """
@@ -88,7 +87,7 @@ class TransactionIdTestCase(DeferredTestMixin, TestCase):
         self.assertEqual('hello', r)
 
 
-class FaultTestCase(DeferredTestMixin, TestCase):
+class FaultTestCase(TestCase):
     """Test case for the fault system"""
     def setUp(self):
         """ Basic Setup and patch the log """
@@ -304,7 +303,7 @@ class FaultTestCase(DeferredTestMixin, TestCase):
         self.flushLoggedErrors(BlahError)
 
 
-class ValidateBodyTestCase(DeferredTestMixin, TestCase):
+class ValidateBodyTestCase(TestCase):
     """
     Tests for the `validate_body` decorator
     """
@@ -365,7 +364,7 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         def handle_body(request, *args, **kwargs):
             return defer.succeed((args, kwargs))
 
-        self.assert_deferred_failed(handle_body(self.request), InvalidJsonError)
+        self.failureResultOf(handle_body(self.request), InvalidJsonError)
 
     def test_validation_error(self):
         """
@@ -382,4 +381,4 @@ class ValidateBodyTestCase(DeferredTestMixin, TestCase):
         def handle_body(request, *args, **kwargs):
             return defer.succeed((args, kwargs))
 
-        self.assert_deferred_failed(handle_body(self.request), ValidationError)
+        self.failureResultOf(handle_body(self.request), ValidationError)
