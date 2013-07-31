@@ -36,11 +36,12 @@ else
 endif
 
 integration:
-ifneq ($(and $(CLOUDCAFE),$(JENKINS_URL)), )
-	@echo "Waiting on preprod node before running tests here."
-#	cafe-runner autoscale prod -p functional --parallel
-else ifneq ($(CLOUDCAFE), )
+ifneq ($(JENKINS_URL), )
+ifneq ($(CLOUDCAFE), )
 	cafe-runner autoscale dev -p functional --parallel
+else
+	@echo "Waiting on preprod node before running tests here."
+endif
 else
 	@echo "Cloudcafe is not set up as desired, so can't run those tests."
 endif
