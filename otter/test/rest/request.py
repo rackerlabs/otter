@@ -17,7 +17,7 @@ from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.rest.application import root, set_store
-from otter.test.utils import iMock, DeferredTestMixin, patch
+from otter.test.utils import iMock, patch
 
 
 def _render(resource, request):
@@ -135,7 +135,7 @@ class DummyException(Exception):
     pass
 
 
-class RequestTestMixin(DeferredTestMixin):
+class RequestTestMixin(object):
     """
     Mixin that has utilities for asserting something about the status code,
     getting header info, etc.

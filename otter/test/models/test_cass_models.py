@@ -356,7 +356,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.view_config()
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -400,7 +400,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.view_launch_config()
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM launch_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -467,7 +467,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         for callback in updates:
             self.group.view_config = mock.MagicMock(
                 return_value=defer.fail(DummyException('boo')))
-            self.assert_deferred_failed(callback(), DummyException)
+            self.failureResultOf(callback(), DummyException)
 
             # view is called
             self.group.view_config.assert_called_once_with()
@@ -497,7 +497,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.get_policy('3444')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
@@ -595,8 +595,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingGroupError`
         """
-        self.assert_deferred_failed(self.group.list_policies(),
-                                    NoSuchScalingGroupError)
+        self.failureResultOf(self.group.list_policies(),
+                             NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_list_policy_no_version(self):
@@ -708,7 +708,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         :class:`NoSuchPolicyError` is raised
         """
         d = self.group.delete_policy('3222')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
         mock_get_policy.assert_called_once_with('3222')
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -759,7 +759,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
-        self.assert_deferred_failed(d, ValidationError)
+        self.failureResultOf(d, ValidationError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"groupId": '12345678g',
@@ -776,7 +776,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
-        self.assert_deferred_failed(d, ValidationError)
+        self.failureResultOf(d, ValidationError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"groupId": '12345678g',
@@ -791,7 +791,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.update_policy('12345678', {"b": "lah"})
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"groupId": '12345678g',
@@ -809,7 +809,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.update_config({"b": "lah"})
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -824,8 +824,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.group.get_policy = mock.MagicMock(
             return_value=defer.fail(DummyException("Cassandra failure")))
-        self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
-                                    DummyException)
+        self.failureResultOf(self.group.update_policy('1', {'b': 'lah'}),
+                             DummyException)
 
         # view is called
         self.group.get_policy.assert_called_once_with('1')
@@ -928,7 +928,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
@@ -1028,8 +1028,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingPolicy`
         """
-        self.assert_deferred_failed(self.group.list_webhooks('23456789'),
-                                    NoSuchPolicyError)
+        self.failureResultOf(self.group.list_webhooks('23456789'),
+                             NoSuchPolicyError)
         mock_naive.assert_called_with('23456789')
         mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -1059,7 +1059,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[]]
         d = self.group.get_webhook('3444', '4555')
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_webhook_no_version(self):
@@ -1132,7 +1132,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         class:`NoSuchWebhookError` failure, and no update is attempted
         """
         d = self.group.update_webhook('3444', '4555', {'name': 'aname'})
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.assertEqual(len(self.connection.execute.mock_calls), 0)
         self.flushLoggedErrors(NoSuchWebhookError)
 
@@ -1165,7 +1165,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.delete_webhook('3444', '4555')
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
         self.flushLoggedErrors(NoSuchWebhookError)
 
@@ -1204,8 +1204,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed('policies'))
 
-        self.assert_deferred_failed(self.group.view_manifest(),
-                                    NoSuchScalingGroupError)
+        self.failureResultOf(self.group.view_manifest(),
+                             NoSuchScalingGroupError)
         self.group.view_config.assert_called_once_with()
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
         self.assertEqual(len(self.group._naive_list_policies), 0)
@@ -1218,7 +1218,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, {'1': {}}, {}, None, {}, False))
-        self.assert_deferred_failed(self.group.delete_group(), GroupNotEmptyError)
+        self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
         self.assertTrue(mock_view_state.called)
@@ -1652,7 +1652,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+        self.failureResultOf(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

@@ -16,7 +16,6 @@ from otter.models.interface import (
     NoSuchScalingGroupError)
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas, validate
-from otter.test.utils import DeferredTestMixin
 
 
 class GroupStateTestCase(TestCase):
@@ -177,7 +176,7 @@ class GroupStateTestCase(TestCase):
         self.assertEqual(state.policy_touched, {'pid': '0'})
 
 
-class IScalingGroupProviderMixin(DeferredTestMixin):
+class IScalingGroupProviderMixin(object):
     """
     Mixin that tests for anything that provides
     :class:`otter.models.interface.IScalingGroup`.
@@ -326,7 +325,7 @@ class IScalingGroupProviderMixin(DeferredTestMixin):
         return result
 
 
-class IScalingGroupCollectionProviderMixin(DeferredTestMixin):
+class IScalingGroupCollectionProviderMixin(object):
     """
     Mixin that tests for anything that provides
     :class:`IScalingGroupCollection`.
