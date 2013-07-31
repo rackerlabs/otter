@@ -359,7 +359,7 @@ class ServerTests(TestCase):
         """
         clock = Clock()
 
-        server_status = ['BUILDING']
+        server_status = ['BUILD']
 
         def _server_status(*args, **kwargs):
             return succeed({'server': {'status': server_status[0]}})
@@ -394,7 +394,7 @@ class ServerTests(TestCase):
         """
         clock = Clock()
 
-        server_status = ['BUILDING', 'ERROR']
+        server_status = ['BUILD', 'ERROR']
 
         def _server_status(*args, **kwargs):
             return succeed({'server': {'status': server_status.pop(0)}})
@@ -420,7 +420,7 @@ class ServerTests(TestCase):
         wait_for_active stops looping when it encounters an error.
         """
         clock = Clock()
-        server_status = ['BUILDING', 'ERROR']
+        server_status = ['BUILD', 'ERROR']
 
         def _server_status(*args, **kwargs):
             return succeed({'server': {'status': server_status.pop(0)}})
@@ -452,7 +452,7 @@ class ServerTests(TestCase):
         wait_for_active stops looping when it encounters the active state.
         """
         clock = Clock()
-        server_status = ['BUILDING', 'ACTIVE']
+        server_status = ['BUILD', 'ACTIVE']
 
         def _server_status(*args, **kwargs):
             return succeed({'server': {'status': server_status.pop(0)}})
