@@ -41,8 +41,9 @@ class CannotExecutePolicyError(Exception):
     """
     def __init__(self, tenant_id, group_id, policy_id, why):
         super(CannotExecutePolicyError, self).__init__(
-            "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
-            .format(t=tenant_id, g=group_id, p=policy_id, w=why))
+            "Cannot execute scaling policy {p} for group {g} for "
+            "tenant {t}: {w}".format(t=tenant_id, g=group_id,
+                                     p=policy_id, w=why))
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
@@ -104,7 +105,8 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
         return deferred
     else:
         # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
+        deferred = exec_scale_down(bound_log, transaction_id, state,
+                                   scaling_group, -delta)
         deferred.addCallback(lambda _: state)
         return deferred
 
@@ -128,17 +130,21 @@ def maybe_execute_scaling_policy(
     :return: a ``Deferred`` that fires with the updated
         :class:`otter.models.interface.GroupState` if successful
 
-    :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
+    :raises: :class:`NoSuchScalingGroupError` if this scaling group does
+        not exist
     :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot
+        be executed
 
-    :raises: Some exception about why you don't want to execute the policy. This
-        Exception should also have an audit log id
+    :raises: Some exception about why you don't want to execute the policy.
+        This Exception should also have an audit log id
     """
-    bound_log = log.bind(scaling_group_id=scaling_group.uuid, policy_id=policy_id)
+    bound_log = log.bind(scaling_group_id=scaling_group.uuid,
+                         policy_id=policy_id)
     bound_log.msg("beginning to execute scaling policy")
 
-    # make sure that the policy (and the group) exists before doing anything else
+    # make sure that the policy (and the group)
+    # exists before doing anything else
     deferred = scaling_group.get_policy(policy_id)
 
     def _do_get_configs(policy):
@@ -165,15 +171,17 @@ def maybe_execute_scaling_policy(
             delta = calculate_delta(bound_log, state, config, policy)
             execute_bound_log = bound_log.bind(server_delta=delta)
             if delta == 0:
-                execute_bound_log.msg("cooldowns checked, no change in servers")
+                execute_bound_log.msg(
+                    "cooldowns checked, no change in servers")
                 error_msg = "No change in servers"
                 raise CannotExecutePolicyError(scaling_group.tenant_id,
                                                scaling_group.uuid, policy_id,
                                                error_msg)
             elif delta > 0:
-                execute_bound_log.msg("cooldowns checked, executing launch configs")
-                d = execute_launch_config(execute_bound_log, transaction_id, state,
-                                          launch, scaling_group, delta)
+                execute_bound_log.msg("cooldowns checked, executing launch "
+                                      "configs")
+                d = execute_launch_config(execute_bound_log, transaction_id,
+                                          state, launch, scaling_group, delta)
             else:
                 # delta < 0 (scale down event)
                 execute_bound_log.msg("cooldowns checked, Scaling down")
@@ -190,9 +198,9 @@ def maybe_execute_scaling_policy(
 
 def check_cooldowns(log, state, config, policy, policy_id):
     """
-    Check the global cooldowns (when was the last time any policy was executed?)
-    and the policy specific cooldown (when was the last time THIS policy was
-    executed?)
+    Check the global cooldowns (when was the last time any policy was
+    executed?) and the policy specific cooldown (when was the last time
+    THIS policy was executed?)
 
     :param log: A twiggy bound log for logging
     :param dict state: the state dictionary
@@ -238,7 +246,8 @@ def calculate_delta(log, state, config, policy):
         desired = current + policy['change']
     elif "changePercent" in policy:
         percentage = policy["changePercent"]
-        change = int((current * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
+        change = int((
+            current * (Decimal(percentage) / 100)).to_integral_value(ROUND_UP))
         desired = current + change
     elif "desiredCapacity" in policy:
         desired = policy["desiredCapacity"]
@@ -270,7 +279,8 @@ def find_pending_jobs_to_cancel(log, state, delta):
     if delta >= len(state.pending):  # don't bother sorting - return everything
         return state.pending.keys()
 
-    sorted_jobs = sorted(state.pending.items(), key=lambda (_id, s): from_timestamp(s['created']),
+    sorted_jobs = sorted(state.pending.items(),
+                         key=lambda (_id, s): from_timestamp(s['created']),
                          reverse=True)
     return [job_id for job_id, _job_info in sorted_jobs[:delta]]
 
@@ -285,7 +295,8 @@ def find_servers_to_evict(log, state, delta):
         return state.active.values()
 
     # return delta number of oldest server
-    sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
+    sorted_servers = sorted(state.active.values(),
+                            key=lambda s: from_timestamp(s['created']))
     return sorted_servers[:delta]
 
 
@@ -294,8 +305,8 @@ def delete_active_servers(log, transaction_id, scaling_group,
     """
     Start deleting active servers
 
-    Returns a list of Deferreds corresponding to deletion of a server. Each Deferred
-    in the list gets fired when that server is deleted
+    Returns a list of Deferreds corresponding to deletion of a server. Each
+    Deferred in the list gets fired when that server is deleted
     """
 
     # find servers to evict
@@ -316,8 +327,9 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     Execute a scale down policy
     """
 
-    # cancel pending jobs by removing them from the state. The servers will get
-    # deleted when they are finished building and their id is not found in pending
+    # cancel pending jobs by removing them from the state. The servers will
+    # get deleted when they are finished building and their id is not
+    # found in pending
     jobs_to_cancel = find_pending_jobs_to_cancel(log, state, delta)
     for job_id in jobs_to_cancel:
         state.remove_job(job_id)
@@ -333,8 +345,8 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
 
 class _Job(object):
     """
-    Private class representing a server creation job.  This calls the supervisor
-    to create one server, and also handles job completion.
+    Private class representing a server creation job.  This calls the
+    supervisor to create one server, and also handles job completion.
     """
     def __init__(self, log, transaction_id, scaling_group, supervisor):
         """
@@ -384,8 +396,9 @@ class _Job(object):
 
     def _job_succeeded(self, result):
         """
-        Job succeeded. If the job exists, move the server from pending to active
-        and log.  If not, then the job has been canceled, so delete the server.
+        Job succeeded. If the job exists, move the server from pending to
+        active and log.  If not, then the job has been canceled, so delete
+        the server.
         """
         def handle_success(group, state):
             if self.job_id not in state.pending:
@@ -429,7 +442,8 @@ class _Job(object):
         return self.job_id
 
 
-def execute_launch_config(log, transaction_id, state, launch, scaling_group, delta):
+def execute_launch_config(log, transaction_id, state, launch, scaling_group,
+                          delta):
     """
     Execute a launch config some number of times.
 
@@ -439,7 +453,8 @@ def execute_launch_config(log, transaction_id, state, launch, scaling_group, del
     def _update_state(pending_results):
         """
         :param pending_results: ``list`` of tuples of
-        ``(job_id, {'created': <job creation time>, 'jobType': [create/delete]})``
+        ``(job_id, {'created': <job creation time>,
+        'jobType': [create/delete]})``
         """
         log.msg('updating state')
 

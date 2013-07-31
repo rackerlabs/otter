@@ -27,13 +27,15 @@ class SchedulerTestCase(TestCase):
 
     def setUp(self):
         """
-        mock all the dependencies of SchedulingService that includes cass store,
-        store's fetch and delete events methods, scaling group on which controller
-        will execute scaling policy. Hence, controller.maybe_execute_scaling_policy.
-        twisted.internet.task.Clock is used to simulate time
+        mock all the dependencies of SchedulingService that includes cass
+        store, store's fetch and delete events methods, scaling group on which
+        controller will execute scaling policy. Hence,
+        controller.maybe_execute_scaling_policy. twisted.internet.task.Clock
+        is used to simulate time
         """
 
-        self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
+        self.mock_store = iMock(IScalingGroupCollection,
+                                IScalingScheduleCollection)
         self.mock_group = iMock(IScalingGroup)
         self.mock_store.get_scaling_group.return_value = self.mock_group
 
@@ -77,7 +79,8 @@ class SchedulerTestCase(TestCase):
         self.slv_client = mock.MagicMock()
 
         self.clock = Clock()
-        self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
+        self.scheduler_service = SchedulerService(100, 1, self.slv_client,
+                                                  self.clock)
 
         self.otter_log = patch(self, 'otter.scheduler.otter_log')
         self.otter_log.msg.return_value = None
@@ -93,22 +96,27 @@ class SchedulerTestCase(TestCase):
         events = [event for fetch_return in fetch_returns for event in fetch_return]
         num_events = len(events)
         self.assertIsNone(self.successResultOf(d))
-        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, fetch_call_count)
+        self.assertEqual(self.mock_store.fetch_batch_of_events.call_count,
+                         fetch_call_count)
         if update_delete_args:
-            self.assertEqual(self.mock_store.update_delete_events.call_args_list,
-                             [mock.call(delete_events, update_events)
-                              for delete_events, update_events in update_delete_args])
+            self.assertEqual(
+                self.mock_store.update_delete_events.call_args_list,
+                [mock.call(delete_events, update_events)
+                    for delete_events, update_events in update_delete_args])
         self.assertEqual(self.mock_group.modify_state.call_count, num_events)
         self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
-                         [mock.call(mock.ANY, e['tenantId'], e['groupId']) for e in events])
-        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.mock_calls,
-                         [mock.call(mock.ANY, 'transaction-id', self.mock_group,
-                          self.mock_state, policy_id=event['policyId']) for event in events])
+                         [mock.call(mock.ANY, e['tenantId'], e['groupId'])
+                             for e in events])
+        self.assertEqual(
+            self.mock_controller.maybe_execute_scaling_policy.mock_calls,
+            [mock.call(mock.ANY, 'transaction-id', self.mock_group,
+                       self.mock_state, policy_id=event['policyId'])
+                for event in events])
 
     def test_empty(self):
         """
-        No policies are executed when ``fetch_batch_of_events`` return empty list
-        i.e. no events are there before now
+        No policies are executed when ``fetch_batch_of_events`` return empty
+        list i.e. no events are there before now
         """
         self.returns = [[]]
         d = self.scheduler_service.check_for_events(100)
@@ -129,8 +137,8 @@ class SchedulerTestCase(TestCase):
 
     def test_many(self):
         """
-        Events are fetched and processed as batches of 100. Its corresponding policies
-        are executed.
+        Events are fetched and processed as batches of 100. Its corresponding
+        policies are executed.
         """
         events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
                     'trigger': 'now', 'cron': None} for i in range(100)]
@@ -198,7 +206,9 @@ class SchedulerTestCase(TestCase):
                     'trigger': 'now', 'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME,
+                                               'schedule',
                                                max_retry=0)
 
         d = self.scheduler_service.check_for_events(100)
@@ -209,12 +219,15 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.call_count, 2)
         self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
+                         [mock.call(
+                             lock,
+                             self.scheduler_service.fetch_and_process,
+                             100)] * 2)
 
     def test_does_nothing_on_no_lock(self):
         """
-        ``check_for_events`` gracefully does nothing when it does not get a lock. It
-        does not call ``fetch_and_process``
+        ``check_for_events`` gracefully does nothing when it does not get a
+        lock. It does not call ``fetch_and_process``
         """
         events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
                     'trigger': 'now', 'cron': None} for i in range(100)]
@@ -222,31 +235,39 @@ class SchedulerTestCase(TestCase):
                     'trigger': 'now', 'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME,
+                                               'schedule',
                                                max_retry=0)
-        with_lock_impl = lambda *args: defer.fail(BusyLockError(LOCK_TABLE_NAME, 'schedule'))
+        with_lock_impl = lambda *args: defer.fail(BusyLockError(
+            LOCK_TABLE_NAME, 'schedule'))
         self.mock_with_lock.side_effect = with_lock_impl
 
         d = self.scheduler_service.check_for_events(100)
 
         self.validate_calls(d, [], None)
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
+        self.assertEqual(
+            self.mock_with_lock.mock_calls,
+            [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
         self.otter_log.msg.assert_called_once_with('No lock in scheduler')
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
-        ``check_for_events`` gracefully does nothing when it does not get a lock after
-        finishing first batch of 100 events. It does not call ``fetch_and_process`` second time
+        ``check_for_events`` gracefully does nothing when it does not get a
+        lock after finishing first batch of 100 events. It does not call
+        ``fetch_and_process`` second time
         """
-        events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                    'trigger': 'now', 'cron': None} for i in range(100)]
-        events2 = [{'tenantId': '1234', 'groupId': 'scal45', 'policyId': 'pol45',
-                    'trigger': 'now', 'cron': None} for i in range(20)]
+        events1 = [{'tenantId': '1234', 'groupId': 'scal44',
+                    'policyId': 'pol44', 'trigger': 'now',
+                    'cron': None} for i in range(100)]
+        events2 = [{'tenantId': '1234', 'groupId': 'scal45',
+                    'policyId': 'pol45', 'trigger': 'now',
+                    'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+        self.mock_lock.assert_called_once_with(self.slv_client,
+                                               LOCK_TABLE_NAME, 'schedule',
                                                max_retry=0)
 
         _with_lock_first_time = [True]
@@ -263,16 +284,19 @@ class SchedulerTestCase(TestCase):
 
         self.validate_calls(d, [events1], [(['pol44'] * 100, [])])
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
+        self.assertEqual(
+            self.mock_with_lock.mock_calls,
+            [mock.call(
+                lock, self.scheduler_service.fetch_and_process, 100)] * 2)
         self.otter_log.msg.assert_called_once_with('No lock in scheduler')
 
     def test_cron_updates(self):
         """
         The scheduler updates cron events
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                   'trigger': 'now', 'cron': 'c1'} for i in range(30)]
+        events = [{'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol44', 'trigger': 'now',
+                   'cron': 'c1'} for i in range(30)]
         self.returns = [events]
 
         d = self.scheduler_service.check_for_events(100)
@@ -287,12 +311,15 @@ class SchedulerTestCase(TestCase):
         """
         The scheduler updates cron events and deletes at-style events
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                   'trigger': 'now', 'cron': 'c1'},
-                  {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol45',
-                   'trigger': 'now', 'cron': None},
-                  {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol46',
-                   'trigger': 'now', 'cron': 'c2'}]
+        events = [{'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol44', 'trigger': 'now',
+                   'cron': 'c1'},
+                  {'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol45', 'trigger': 'now',
+                   'cron': None},
+                  {'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol46', 'trigger': 'now',
+                   'cron': 'c2'}]
         self.returns = [events]
 
         d = self.scheduler_service.check_for_events(100)
@@ -303,21 +330,27 @@ class SchedulerTestCase(TestCase):
             event = events[i]
             event['trigger'] = 'newtrigger'
             exp_updated_events.append(event)
-        self.validate_calls(d, [events], [(exp_deleted_events, exp_updated_events)])
+        self.validate_calls(d, [events],
+                            [(exp_deleted_events, exp_updated_events)])
 
     def test_nopolicy_or_group_events_deleted(self):
         """
-        The scheduler does not update deleted policy/group's (that give NoSuchPolicyError or
-        NoSuchScalingGroupError) events (for cron-style events) and deletes them
+        The scheduler does not update deleted policy/group's (that give
+        NoSuchPolicyError or NoSuchScalingGroupError) events (for cron-style
+        events) and deletes them
         """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                   'trigger': 'now', 'cron': 'c1'},
-                  {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol45',
-                   'trigger': 'now', 'cron': 'c2'},
-                  {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol46',
-                   'trigger': 'now', 'cron': 'c3'},
-                  {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol47',
-                   'trigger': 'now', 'cron': None}]
+        events = [{'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol44', 'trigger': 'now',
+                   'cron': 'c1'},
+                  {'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol45', 'trigger': 'now',
+                   'cron': 'c2'},
+                  {'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol46', 'trigger': 'now',
+                   'cron': 'c3'},
+                  {'tenantId': '1234', 'groupId': 'scal44',
+                   'policyId': 'pol47', 'trigger': 'now',
+                   'cron': None}]
         self.returns = [events]
 
         events_indexes = range(len(events))
@@ -339,11 +372,13 @@ class SchedulerTestCase(TestCase):
         events[2]['trigger'] = 'newtrigger'
         exp_update_events = [events[2]]
 
-        # Not using validate_call since maybe_execute_scaling_policy calls do not match
+        # Not using validate_call since maybe_execute_scaling_policy
+        # calls do not match
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.mock_store.fetch_batch_of_events.call_count, 1)
-        self.mock_store.update_delete_events.assert_called_once_with(exp_delete_events,
-                                                                     exp_update_events)
+        self.mock_store.update_delete_events.assert_called_once_with(
+            exp_delete_events, exp_update_events)
         self.assertEqual(self.mock_group.modify_state.call_count, len(events))
-        self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
-                         [mock.call(mock.ANY, e['tenantId'], e['groupId']) for e in events])
+        self.assertEqual(
+            self.mock_store.get_scaling_group.call_args_list,
+            [mock.call(mock.ANY, e['tenantId'], e['groupId']) for e in events])

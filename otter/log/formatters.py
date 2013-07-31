@@ -34,7 +34,8 @@ def JSONObserverWrapper(observer, **kwargs):
     :rtype: ILogObserver
     """
     def JSONObserver(eventDict):
-        observer({'message': (json.dumps(eventDict, cls=ReprFallbackEncoder, **kwargs),)})
+        observer({'message': (json.dumps(eventDict, cls=ReprFallbackEncoder,
+                                         **kwargs),)})
 
     return JSONObserver
 
@@ -75,7 +76,8 @@ def SystemFilterWrapper(observer):
 
         if system == '-':  # No system.
             system = 'otter'
-        elif ',' in system:  # This is likely one of the tcp.Server/Client contexts.
+        elif ',' in system:
+            # This is likely one of the tcp.Server/Client contexts.
             eventDict['log_context'] = system
             system = 'otter'
 
@@ -113,7 +115,8 @@ def PEP3101FormattingWrapper(observer):
     return PEP3101FormattingObserver
 
 
-IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
+IGNORE_FIELDS = set(["message", "time", "isError", "system", "id",
+                     "failure", "why"])
 
 
 def GELFObserverWrapper(observer, hostname, seconds=None):
