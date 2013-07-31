@@ -15,8 +15,11 @@ from twisted.internet.defer import succeed
 from testtools.matchers import IsInstance
 
 from otter.test.utils import iMock, patch, matches
-from otter.log.graylog import GraylogUDPPublisher
-from otter.log.graylog import _GraylogProtocol
+
+try:
+    from otter.log.graylog import GraylogUDPPublisher, _GraylogProtocol
+except ImportError as e:
+    skip = "txgraylog2 not installed: {0}".format(e)
 
 
 class GraylogUDPPublisherTests(TestCase):
