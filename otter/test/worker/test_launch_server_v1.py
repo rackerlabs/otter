@@ -27,7 +27,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import patch
+from otter.test.utils import DummyException, mock_bound_log, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
@@ -779,12 +779,6 @@ instance_details = (
      (54321, {'nodes': [{'id': 2}]})])
 
 
-class DummyException(Exception):
-    """
-    Fake exception
-    """
-
-
 class DeleteServerTests(TestCase):
     """
     Test the delete server worker.
@@ -796,7 +790,7 @@ class DeleteServerTests(TestCase):
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
-        self.log = mock.Mock()
+        self.log = mock_bound_log()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 

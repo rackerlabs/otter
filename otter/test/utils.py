@@ -168,3 +168,15 @@ class LockMixin(object):
             return defer.succeed(release_result)
         lock.release.side_effect = _release
         return lock
+
+
+def mock_bound_log(*args, **kwargs):
+    new_log = mock.Mock(spec=['bind', 'err', 'msg'])
+    new_log.bind.side_effect = mock_bound_log
+    return new_log
+
+
+class DummyException(Exception):
+    """
+    Fake exception
+    """
