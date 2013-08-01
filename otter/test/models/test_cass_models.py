@@ -28,6 +28,8 @@ from otter.test.models.test_interface import (
 from otter.test.utils import patch
 from otter.util.timestamp import from_timestamp
 
+from otter.scheduler import next_cron_occurrence
+
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BusyLockError
@@ -765,14 +767,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_once_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
-    def test_update_scaling_policy_at_schedule_change(self):
+    def validate_update_policy(self, d, insert_event_cql, insert_event_data_part, policy_json):
         """
-        Updating at-style schedule policy updates respective entry in scaling_schedule table also
+        validate cql calls made during update of schedule policy
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
-        self.returns = [cass_response, None, None, None]
-        d = self.group.update_policy('12345678', {"type": "schedule",
-                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
         self.assertIsNone(self.successResultOf(d))
         selectCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                      'AND "groupId" = :groupId AND "policyId" = :policyId;')
@@ -781,24 +779,94 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                       "tenantId": '11111'}
         delCql = 'DELETE FROM scaling_schedule WHERE "policyId" = :policyId;'
         delData = {'policyId': '12345678'}
-        insertCql = ('BEGIN BATCH '
-                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
-                     'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
-                     'APPLY BATCH;')
-        insertData = selectData.copy()
-        insertData['policyTrigger'] = from_timestamp("2015-09-20T10:00:12Z")
+        insert_event_data = selectData.copy()
+        insert_event_data.update(insert_event_data_part)
         insertpolCql = (
             'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
             'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
         insertpolData = selectData.copy()
-        insertpolData["policy"] = ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
-                                   '"type": "schedule"}')
-
+        insertpolData["policy"] = policy_json
         self.assertEqual(self.connection.execute.call_args_list,
                          [mock.call(selectCql, selectData, ConsistencyLevel.TWO),
                           mock.call(delCql, delData, ConsistencyLevel.TWO),
-                          mock.call(insertCql, insertData, ConsistencyLevel.TWO),
+                          mock.call(insert_event_cql, insert_event_data, ConsistencyLevel.TWO),
                           mock.call(insertpolCql, insertpolData, ConsistencyLevel.TWO)])
+
+    def test_update_scaling_policy_at_schedule_change(self):
+        """
+        Updating at-style schedule policy updates respective entry in
+        scaling_schedule table also
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
+        self.returns = [cass_response, None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
+                            'APPLY BATCH;')
+        self.validate_update_policy(d, insert_event_cql,
+                                    {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")},
+                                    ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                     '"type": "schedule"}'))
+
+    def test_update_scaling_policy_cron_schedule_change(self):
+        """
+        Updating cron-style schedule policy updates respective entry in
+        scaling_schedule table also
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"cron":"1 * * * *"}}'}]
+        self.returns = [cass_response, None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "2 0 * * *"}})
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
+                            'trigger, cron) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
+                            'APPLY BATCH;')
+        self.validate_update_policy(d, insert_event_cql,
+                                    {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                     'policycron': "2 0 * * *"},
+                                    ('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                     '"type": "schedule"}'))
+
+    def test_update_scaling_policy_at_to_cron_schedule_change(self):
+        """
+        Updating at-style schedule policy to cron-style updates respective entry in
+        scaling_schedule table also
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
+        self.returns = [cass_response, None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "2 0 * * *"}})
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
+                            'trigger, cron) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
+                            'APPLY BATCH;')
+        self.validate_update_policy(d, insert_event_cql,
+                                    {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                     'policycron': "2 0 * * *"},
+                                    ('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                     '"type": "schedule"}'))
+
+    def test_update_scaling_policy_cron_to_at_schedule_change(self):
+        """
+        Updating cron-style schedule policy to at-style updates respective entry in
+        scaling_schedule table also
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"cron":"* * * * *"}}'}]
+        self.returns = [cass_response, None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
+                            'APPLY BATCH;')
+        self.validate_update_policy(d, insert_event_cql,
+                                    {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")},
+                                    ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                     '"type": "schedule"}'))
 
     def test_update_scaling_policy_bad(self):
         """
