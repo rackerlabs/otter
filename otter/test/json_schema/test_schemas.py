@@ -596,30 +596,104 @@ class ScalingPolicyTestCase(TestCase):
                                 group_schemas.validate_cron, invalid_cron)
 
 
+class CreateScalingPoliciesTestCase(TestCase):
+    """
+    Verification that the JSON schema for creating scaling policies is correct
+    """
+    one_policy = group_examples.policy()[0]
+
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(rest_schemas.create_policies_request)
+
+    def test_empty_array_valid(self):
+        """
+        Seems pointless to disallow empty arrays, so empty arrays validate.
+        """
+        validate([], rest_schemas.create_policies_request)
+
+    def test_duplicate_policies_valid(self):
+        """
+        Duplicate policies are valid
+        """
+        validate([self.one_policy] * 5,
+                 rest_schemas.create_policies_request)
+
+    def test_non_array_policy_fails(self):
+        """
+        A single policy, not in an array, fails to validate.
+        """
+        self.assertRaises(ValidationError, validate, self.one_policy,
+                          rest_schemas.create_policies_request)
+
+
 class CreateScalingGroupTestCase(TestCase):
     """
     Simple verification that the JSON schema for creating a scaling group is
     correct.
     """
+    def setUp(self):
+        """
+        Set up a reference to a standard, valid policy, config, and launch
+        configs.
+        """
+        self.policy = group_examples.policy()[0]
+        self.config = group_examples.config()[0]
+        self.launch = group_examples.launch_server_config()[0]
+
     def test_schema_valid(self):
         """
         The schema itself is a valid Draft 3 schema
         """
         Draft3Validator.check_schema(rest_schemas.create_group_request)
 
-    def test_valid_examples_validate(self):
+    def test_creation_with_no_scaling_policies_valid(self):
         """
-        The scaling policy examples all validate.
+        Creation without the ``scalingPolicies`` key validates.
         """
-        for example in rest_schemas.create_group_request_examples:
-            validate(example, rest_schemas.create_group_request)
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_empty_scaling_policies_valid(self):
+        """
+        Creation with an empty array of scaling policies validates
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': []
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_valid(self):
+        """
+        Creation with an array of scaling policies validates
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': [self.policy]
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_duplicate_scaling_policies_valid(self):
+        """
+        Seems pointless to disallow empty arrays, so empty arrays validate.
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': [self.policy] * 5
+        }, rest_schemas.create_group_request)
 
     def test_wrong_launch_config_fails(self):
         """
         Not including a launchConfiguration or including an invalid ones will
         fail to validate.
         """
-        invalid = {'groupConfiguration': group_examples.config()[0]}
+        invalid = {'groupConfiguration': self.config}
         self.assertRaisesRegexp(
             ValidationError, 'launchConfiguration',
             validate, invalid, rest_schemas.create_group_request)
@@ -632,8 +706,7 @@ class CreateScalingGroupTestCase(TestCase):
         Not including a groupConfiguration or including an invalid ones will
         fail to validate.
         """
-        invalid = {'launchConfiguration':
-                   group_examples.launch_server_config()[0]}
+        invalid = {'launchConfiguration': self.launch}
         self.assertRaisesRegexp(
             ValidationError, 'groupConfiguration',
             validate, invalid, rest_schemas.create_group_request)
@@ -644,15 +717,15 @@ class CreateScalingGroupTestCase(TestCase):
     def test_wrong_scaling_policy_fails(self):
         """
         An otherwise ok creation blob fails if the provided scaling policies
-        are wrong.
+        are wrong (not an array of policies).
         """
-        self.assertRaises(
-            ValidationError, validate, {
-                'groupConfiguration': group_examples.config()[0],
-                'launchConfiguration':
-                group_examples.launch_server_config()[0],
-                'scalingPolicies': {"Hello!": "Yes quite."}
-            }, rest_schemas.create_group_request)
+        for wrong_policy in (self.policy, {"Hello!": "Yes quite."}, 'what'):
+            self.assertRaises(
+                ValidationError, validate, {
+                    'groupConfiguration': self.config,
+                    'launchConfiguration': self.launch,
+                    'scalingPolicies': wrong_policy
+                }, rest_schemas.create_group_request)
 
 
 class CreateWebhookTestCase(TestCase):
