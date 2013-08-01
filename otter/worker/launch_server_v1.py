@@ -435,7 +435,6 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
-                    timeout=120,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -444,13 +443,14 @@ def verified_delete(log,
     There is a possibility Nova sometimes fails to delete servers.  Log if this
     happens, and if so, re-evaluate workarounds.
 
+    @TODO: Timeouts
+
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
     :param int interval: Deletion interval - how long until a delete is retried.
         Default: 2.
-    :param int timeout: Timeout before logging deletion failiure.
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -460,13 +460,34 @@ def verified_delete(log,
     d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
                     headers=headers(auth_token))
     d.addCallback(check_success, [204])
-
-    def verify_deletion(_):
-        vd = treq.head(append_segments(server_endpoint, 'servers', server_id),
-                       headers=headers(auth_token))
-        vd.addCallback(check_success, [404])
-        vd.addErrback(del_log.err)
-
-    d.addCallback(verify_deletion)
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+
+    verify = Deferred()
+
+    def looping_verify_deletion(_):
+        def on_success(_):
+            del_log.msg('Server deleted successfully')
+            verify.callback(None)
+
+        def on_failure(f):
+            del_log.info('Server not yet deleted', exc=f)
+
+        def check_status():
+            vd = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            vd.addCallback(check_success, [404])
+            vd.addCallback(on_success)
+            vd.addErrback(on_failure)
+            return vd
+
+        lc = LoopingCall(check_status)
+
+        if clock is not None:  # pragma: no cover
+            lc.clock = clock
+
+        verify.addBoth(lambda _: lc.stop())
+        lc.start(interval)
+
+    d.addCallback(looping_verify_deletion)
     return d

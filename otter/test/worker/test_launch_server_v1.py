@@ -880,12 +880,13 @@ class DeleteServerTests(TestCase):
         verified_delete returns as soon as the deletion succeeded, but also
         attempts to verify deleting the server.  It also logs the deletion.
         """
+        clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.head.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', clock=mock.Mock())
+                            'serverId', clock=clock)
         self.assertIsNone(self.successResultOf(d))
 
         self.treq.delete.assert_called_once_with('http://url/servers/serverId',
@@ -899,13 +900,14 @@ class DeleteServerTests(TestCase):
         """
         verified_delete propagates deletions from server deletion
         """
+        clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=500))
         self.treq.content.return_value = succeed(error_body)
         self.treq.head.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-                            'serverId', clock=mock.Mock())
+                            'serverId', clock=clock)
         failure = self.failureResultOf(d, RequestError)
         self.assertEqual(failure.value.reason.value.code, 500)
 
@@ -921,5 +923,46 @@ class DeleteServerTests(TestCase):
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
         self.assertIsNone(self.successResultOf(d))
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+
+    def test_verified_delete_retries_verification_until_success(self):
+        """
+        If the first verification didn't work, wait a bit and see if it's been
+        deleted, since a server can sit in DELETE state for a bit.
+
+        It also logs deletion success, and deletion failure
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.head.return_value = Deferred()
+        self.treq.content.return_value = succeed("")
+        logger = self.log.bind.return_value
+
+        verified_delete(self.log, 'http://url/', 'my-auth-token',
+                        'serverId', interval=5, clock=clock)
+
+        self.assertEqual((logger.msg.call_count, logger.info.call_count),
+                         (1, 0))
+        self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
+
+        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+                                               headers=expected_headers)
+        self.assertEqual((logger.msg.call_count, logger.info.call_count),
+                         (1, 1))
+
+        self.treq.head.return_value = succeed(
+            mock.Mock(spec=['code'], code=404))
+
+        clock.advance(5)
+        self.treq.head.assert_has_calls([
+            mock.call('http://url/servers/serverId', headers=expected_headers),
+            mock.call('http://url/servers/serverId', headers=expected_headers)
+        ])
+        self.assertEqual((logger.msg.call_count, logger.info.call_count),
+                         (2, 1))
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(self.treq.head.call_count, 2)
+        self.assertEqual((logger.msg.call_count, logger.info.call_count),
+                         (2, 1))
