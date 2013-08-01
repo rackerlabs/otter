@@ -3,7 +3,6 @@ System tests for multiple scheduler and webhook policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-import unittest
 
 
 class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
