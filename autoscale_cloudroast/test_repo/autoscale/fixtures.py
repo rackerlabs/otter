@@ -209,6 +209,8 @@ class AutoscaleFixture(BaseTestFixture):
         Given the group id, the server name is got from the group's launch
         config and returns server ID list of servers containing that server name
         on the tenant, from nova.
+        list_servers(name=params) returns list of servers that contain the
+        specified name within the server name.
         """
         if group_id:
             launch_config_response = self.autoscale_client.view_launch_config(

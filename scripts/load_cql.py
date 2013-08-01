@@ -84,7 +84,7 @@ def run(args):
     if args.verbose > 0:
         print "Attempting to connect to {0}:{1}".format(args.host, args.port)
     try:
-        connection = connect(args.host, args.port, cql_version='3')
+        connection = connect(args.host, args.port, cql_version='3.0.4')
     except Exception as e:
         print "CONNECTION ERROR: {0}".format(e.message)
         sys.exit(1)
