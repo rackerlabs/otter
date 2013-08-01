@@ -420,11 +420,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                        headers=headers(auth_token))
-        d.addCallback(check_success, [204])
-        d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
-        return d
+        return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
     return d
