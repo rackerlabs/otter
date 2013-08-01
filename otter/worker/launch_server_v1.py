@@ -458,9 +458,9 @@ def verified_delete(log,
     d.addCallback(check_success, [204])
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
-    verify = Deferred()
-
     def looping_verify_deletion(_):
+        verify = Deferred()
+
         def on_success(_):
             del_log.msg('Server deleted successfully')
             verify.callback(None)
