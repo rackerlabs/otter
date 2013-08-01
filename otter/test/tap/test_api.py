@@ -202,44 +202,6 @@ class APIMakeServiceTests(TestCase):
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
 
-    @mock.patch('otter.tap.api.GraylogUDPPublisher')
-    @mock.patch('otter.tap.api.log.addObserver')
-    def test_graylog(self, addObserver, GraylogUDPPublisher):
-        """
-        makeService configures the log observer to publish to graylog when
-        graylog is in the config and GraylogUDPPublisher is importable (and
-        hence not None)
-        """
-        mock_config = test_config.copy()
-        mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
-
-        makeService(mock_config)
-
-        # It's pretty hard to actually tell what the observer is, so we assume
-        # if addObserver was called once, and GraylogUDPPublisher was called,
-        # we set things up correctly.
-        addObserver.assert_called_once_with(mock.ANY)
-
-        GraylogUDPPublisher.assert_called_once_with(**mock_config['graylog'])
-
-    @mock.patch('otter.tap.api.GraylogUDPPublisher', new=None)
-    @mock.patch('otter.tap.api.log.addObserver')
-    def test_graylog_warning(self, addObserver):
-        """
-        makeService warns when graylog is in the config but GraylogUDPPublisher
-        is not importable (and hence None).  It does not add any log observers.
-        """
-        mock_config = test_config.copy()
-        mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
-
-        makeService(mock_config)
-        self.assertFalse(addObserver.called)
-        message = Equals("There is a configuration option for Graylog, but "
-                         "txgraylog is not installed.")
-        warnings = self.flushWarnings([makeService])
-        self.assertEqual(warnings,
-                         [matches(ContainsDict({'message': message}))])
-
     @mock.patch('otter.tap.api.AirbrakeLogObserver')
     def test_airbrake(self, airbrake_observer):
         """
