@@ -2,7 +2,6 @@
 Test to update and verify the updated scheduler policy.
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
-import unittest
 
 
 class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
@@ -36,25 +35,6 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                           msg='Create schedule policy (cron style) failed with {0} for group {1}'
                           .format(self.cron_style_policy['status_code'], self.group.id))
 
-    def test_disallow_cron_style_policy_update(self):
-        """
-        Updating an at style policy results in a 400.
-        ** Temporary test, remove when AUTO-467 is fixed **
-        """
-        upd_args = {'cron': '0 0 * * 1'}
-        self._update_policy(self.group.id, self.cron_style_policy,
-                            upd_args, 400)
-
-    def test_disallow_at_style_policy_update(self):
-        """
-        Updating an at style policy results in a 400.
-        ** Temporary test, remove when AUTO-467 is fixed **
-        """
-        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
-        self._update_policy(self.group.id, self.cron_style_policy,
-                            upd_args, 400)
-
-    @unittest.skip('AUTO-467')
     def test_update_at_style_scaling_policy(self):
         """
         Verify the update at style schedule policy by updating date
@@ -69,7 +49,6 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                           msg='At style schedule policy did not update for group {0}'
                           .format(self.group.id))
 
-    @unittest.skip('AUTO-467')
     def test_update_cron_style_scaling_policy(self):
         """
         Verify the update cron style schedule policy by updating date
@@ -135,7 +114,7 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                               update_policy_err_response.status_code, self.group.id,
                               self.cron_style_policy['id']))
 
-    def _update_policy(self, group_id, policy, upd_args, status=202):
+    def _update_policy(self, group_id, policy, upd_args, status=204):
         """
         Updates the policy with the given schedule value
         """
