@@ -9,14 +9,16 @@ import json
 from otter.util import timestamp
 
 from otter.rest.application import app, get_store
-from otter.rest.decorators import fails_with, succeeds_with
+from otter.rest.decorators import (fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 
 
 @app.route('/metrics', methods=['GET'])
+@with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_metrics(request, log):
+def list_metrics(request, log):
     """
     Get a list of metrics from cassandra.
 

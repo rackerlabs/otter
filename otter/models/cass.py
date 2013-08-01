@@ -942,7 +942,7 @@ class CassScalingGroupCollection:
         """
 
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
-        deferred = [self.connection.execute(_cql_count_all.format(cf=field),
+        deferred = [self.connection.execute(_cql_count_all.format(cf=field), {},
                                             get_consistency_level('count', 'group'))
                     for field in fields]
 
