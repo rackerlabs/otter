@@ -21,8 +21,7 @@ class DeleteAll(AutoscaleFixture):
             self.autoscale_client.delete_scaling_group(each_group.id)
         list_groups_response = self.autoscale_client.list_scaling_groups()
         list_groups = list_groups_response.entity
-        self.assertTrue(len(list_groups) is 0,
-                        msg="Groups still exist on the account")
+        self.assertEqual(len(list_groups), 0, msg="Groups still exist on the account")
 
     def test_delete_all_servers_on_account(self):
         """
