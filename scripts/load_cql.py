@@ -6,6 +6,7 @@ Loads cql into Cassandra
 
 import argparse
 import sys
+import re
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
@@ -100,7 +101,9 @@ def run(args):
             message = pe.message.lower()
             significant_error = (
                 "already exist" not in message and
-                "existing keyspace" not in message)
+                "existing keyspace" not in message and
+                "existing column" not in message and
+                not re.search("index '.*' could not be found", message))
 
             if args.verbose > 1 or significant_error:
                 print '\n----\n'
