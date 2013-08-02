@@ -978,28 +978,28 @@ DELETE /[tenantId]/groups/[groupId[
         <para>Q: How much does the Rackspace Autoscale service cost? </para>
         <para> A: Autoscale is a free service for Cloud Monitoring
             customers.</para>
-        <para> Q: How do users know that they are being billed for
-            autoscale events? </para>
+        <para> Q: How do I know that I'm being billed for autoscale
+            events? </para>
         <para> A: Autoscale will feature an advanced Audit Log that
             tracks when Rackspace takes actions on a user's behalf. </para>
-        <para>Q: Can users autoscale across data centers? </para>
-        <para> A: No, users will need to create separate scaling
-            groups for different data centers. The policies for these
-            scaling groups can be triggered across data centers. </para>
-        <para> Q: How do we moderate conflicting events? </para>
+        <para>Q: Can I use Autoscale across data centers? </para>
+        <para> A: No, you will need to create separate scaling groups
+            for different data centers. The policies for these scaling
+            groups can be triggered across data centers. </para>
+        <para> Q: How does Autoscale moderate conflicting events? </para>
         <para> A: Cool down timers are built into the Scaling Group
             and the individual scaling policies, so that the user can
             prevent too many servers being created or deleted too
             quickly. While there still exists the possibility of a
             scaling group see-sawing, cool downs will allow a customer
             to temper the churn in events. </para>
-        <para> Q: Can a customer suspend servers and restore them
-            quickly to the same IP address? </para>
+        <para> Q: Can I suspend servers and restore them quickly to
+            the same IP address? </para>
         <para> A: Autoscale will not suspend and restore servers to
             the same IP. Servers will be restored to a different IP
             address.</para>
-        <para> Q: Can customers scale up servers in a particular
-            order? (i.e. spinning up a DB server before a web server) </para>
+        <para> Q: Can I scale up servers in a particular order? (i.e.
+            spinning up a DB server before a web server) </para>
         <para> A: Autoscale will not handle scaling up servers,
             databases, load balancers, etc... in a particular order.
             This will be handled by Checkmate and Workflow. </para>
