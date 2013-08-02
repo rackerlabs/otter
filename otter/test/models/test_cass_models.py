@@ -714,175 +714,164 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
-    def test_update_scaling_policy(self):
+    def validate_policy_update(self, policy_json):
+        """
+        Validate CQL calls made to update the policy
+        """
+        expectedCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        expectedData = {"policy": policy_json,
+                        "groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "helvetica"}))
+    def test_update_scaling_policy(self, mock_get_policy):
         """
         Test that you can update a scaling policy, and if successful it returns
         None
         """
-        cass_response = [{'data': '{"type": "helvetica"}'}]
-        self.returns = [cass_response, None]
+        self.returns = [None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "helvetica"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
-        expectedCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "helvetica"}',
-                        "groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "helvetica"}')
 
-    def test_update_scaling_policy_schedule_no_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"ott": "er"}}))
+    def test_update_scaling_policy_schedule_no_change(self, mock_get_policy):
         """
-        Schedule policy update with no change in args works
+        Schedule policy update with no change in args does not update the scaling_schedule table.
+        It only updates the scaling_policies table
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
-        self.returns = [cass_response, None]
+        self.returns = [None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
         self.assertIsNone(self.successResultOf(d))  # update returns None
-        expectedCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}',
-                        "groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}')
+        self.assertEqual(self.connection.execute.call_count, 1)
 
-    def test_update_scaling_policy_type_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "helvetica"}))
+    def test_update_scaling_policy_type_change(self, mock_get_policy):
         """
         Policy type cannot be changed while updating it
         """
-        cass_response = [{'data': '{"type": "helvetica"}'}]
-        self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
         self.failureResultOf(d, ValidationError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.assertFalse(self.connection.execute.called)
 
-    def validate_update_policy(self, d, insert_event_cql, insert_event_data_part, policy_json):
+    def validate_schedule_update(self, insert_event_cql, insert_event_data_part):
         """
-        validate cql calls made during update of schedule policy
+        validate cql calls made to update scaling_schedule table
         """
-        self.assertIsNone(self.successResultOf(d))
-        selectCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                     'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        selectData = {"groupId": '12345678g',
-                      "policyId": '12345678',
-                      "tenantId": '11111'}
         delCql = 'DELETE FROM scaling_schedule WHERE "policyId" = :policyId;'
         delData = {'policyId': '12345678'}
-        insert_event_data = selectData.copy()
+        insert_event_data = {"groupId": '12345678g',
+                             "policyId": '12345678',
+                             "tenantId": '11111'}
         insert_event_data.update(insert_event_data_part)
-        insertpolCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        insertpolData = selectData.copy()
-        insertpolData["policy"] = policy_json
-        self.assertEqual(self.connection.execute.call_args_list,
-                         [mock.call(selectCql, selectData, ConsistencyLevel.TWO),
-                          mock.call(delCql, delData, ConsistencyLevel.TWO),
-                          mock.call(insert_event_cql, insert_event_data, ConsistencyLevel.TWO),
-                          mock.call(insertpolCql, insertpolData, ConsistencyLevel.TWO)])
+        self.assertEqual(self.connection.execute.call_args_list[:2],
+                         [mock.call(delCql, delData, ConsistencyLevel.TWO),
+                          mock.call(insert_event_cql, insert_event_data, ConsistencyLevel.TWO)])
 
-    def test_update_scaling_policy_at_schedule_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule",
+                                            "args": {"at": "2013-07-30T19:03:12Z"}}))
+    def test_update_scaling_policy_at_schedule_change(self, mock_get_policy):
         """
         Updating at-style schedule policy updates respective entry in
         scaling_schedule table also
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
-        self.returns = [cass_response, None, None, None]
+        self.returns = [None, None, None]
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"at": "2015-09-20T10:00:12Z"}})
+        self.assertIsNone(self.successResultOf(d))
         insert_event_cql = ('BEGIN BATCH '
                             'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                             'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
                             'APPLY BATCH;')
-        self.validate_update_policy(d, insert_event_cql,
-                                    {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")},
-                                    ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
-                                     '"type": "schedule"}'))
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")})
+        self.validate_policy_update('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                    '"type": "schedule"}')
 
-    def test_update_scaling_policy_cron_schedule_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"cron": "1 * * * *"}}))
+    def test_update_scaling_policy_cron_schedule_change(self, mock_get_policy):
         """
         Updating cron-style schedule policy updates respective entry in
         scaling_schedule table also
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"cron":"1 * * * *"}}'}]
-        self.returns = [cass_response, None, None, None]
+        self.returns = [None, None, None]
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"cron": "2 0 * * *"}})
+        self.assertIsNone(self.successResultOf(d))
         insert_event_cql = ('BEGIN BATCH '
                             'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
                             'trigger, cron) '
                             'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
                             'APPLY BATCH;')
-        self.validate_update_policy(d, insert_event_cql,
-                                    {'policyTrigger': next_cron_occurrence("2 0 * * *"),
-                                     'policycron': "2 0 * * *"},
-                                    ('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
-                                     '"type": "schedule"}'))
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                       'policycron': "2 0 * * *"})
+        self.validate_policy_update('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                    '"type": "schedule"}')
 
-    def test_update_scaling_policy_at_to_cron_schedule_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule",
+                                            "args": {"at": "2013-07-30T19:03:12Z"}}))
+    def test_update_scaling_policy_at_to_cron_schedule_change(self, mock_get_policy):
         """
         Updating at-style schedule policy to cron-style updates respective entry in
         scaling_schedule table also
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"at":"2013-07-30T19:03:12Z"}}'}]
-        self.returns = [cass_response, None, None, None]
+        self.returns = [None, None, None]
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"cron": "2 0 * * *"}})
+        self.assertIsNone(self.successResultOf(d))
         insert_event_cql = ('BEGIN BATCH '
                             'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
                             'trigger, cron) '
                             'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
                             'APPLY BATCH;')
-        self.validate_update_policy(d, insert_event_cql,
-                                    {'policyTrigger': next_cron_occurrence("2 0 * * *"),
-                                     'policycron': "2 0 * * *"},
-                                    ('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
-                                     '"type": "schedule"}'))
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                       'policycron': "2 0 * * *"})
+        self.validate_policy_update('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                    '"type": "schedule"}')
 
-    def test_update_scaling_policy_cron_to_at_schedule_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"cron": "* * * * *"}}))
+    def test_update_scaling_policy_cron_to_at_schedule_change(self, mock_get_policy):
         """
         Updating cron-style schedule policy to at-style updates respective entry in
         scaling_schedule table also
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"cron":"* * * * *"}}'}]
-        self.returns = [cass_response, None, None, None]
+        self.returns = [None, None, None]
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"at": "2015-09-20T10:00:12Z"}})
+        self.assertIsNone(self.successResultOf(d))
         insert_event_cql = ('BEGIN BATCH '
                             'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
                             'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
                             'APPLY BATCH;')
-        self.validate_update_policy(d, insert_event_cql,
-                                    {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")},
-                                    ('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
-                                     '"type": "schedule"}'))
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")})
+        self.validate_policy_update('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                    '"type": "schedule"}')
 
-    def test_update_scaling_policy_bad(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_update_scaling_policy_bad(self, mock_get_policy):
         """
         Tests that if you try to update a scaling policy that doesn't exist, the right thing happens
         """
-        self.returns = [[], None]
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.failureResultOf(d, NoSuchPolicyError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_config_bad(self):
