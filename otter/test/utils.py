@@ -181,7 +181,7 @@ def mock_log(*args, **kwargs):
 
     This can be done instead::
 
-        log.assert_called_with(mock.ANY, bound_value1="val", ...)
+        log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
 
     Since in all likelyhood, testing that certain values are bound would be more
     important than testing the exact logged message.
