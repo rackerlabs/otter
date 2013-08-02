@@ -81,7 +81,6 @@ def wait_for_active(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param str expected_status: Nova status string.
     :param int interval: Polling interval.  Default: 5.
 
     :return: Deferred that fires when the expected status has been seen.
@@ -390,7 +389,6 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
-
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
@@ -422,11 +420,70 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                        headers=headers(auth_token))
-        d.addCallback(check_success, [204])
-        d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
-        return d
+        return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
+    return d
+
+
+def verified_delete(log,
+                    server_endpoint,
+                    auth_token,
+                    server_id,
+                    interval=5,
+                    clock=None):
+    """
+    Attempt to delete a server from the server endpoint, and ensure that it is
+    deleted by trying again until getting the server results in a 404.
+
+    There is a possibility Nova sometimes fails to delete servers.  Log if this
+    happens, and if so, re-evaluate workarounds.
+
+    @TODO: Timeouts
+
+    :param log: A bound logger.
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth token.
+    :param str server_id: Opaque nova server id.
+    :param int interval: Deletion interval - how long until a delete is retried.
+        Default: 2.
+
+    :return: Deferred that fires when the expected status has been seen.
+    """
+    del_log = log.bind(server_id=server_id)
+    del_log.msg('Deleting server')
+
+    d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
+                    headers=headers(auth_token))
+    d.addCallback(check_success, [204])
+    d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+
+    def looping_verify_deletion(_):
+        verify = Deferred()
+
+        def on_success(_):
+            del_log.msg('Server deleted successfully')
+            verify.callback(None)
+
+        def on_failure(f):
+            del_log.msg('Server not yet deleted', exc=f)
+
+        def check_status():
+            vd = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            vd.addCallback(check_success, [404])
+            vd.addCallback(on_success)
+            vd.addErrback(on_failure)
+            return vd
+
+        lc = LoopingCall(check_status)
+
+        if clock is not None:  # pragma: no cover
+            lc.clock = clock
+
+        verify.addBoth(lambda _: lc.stop())
+        lc.start(interval)
+
+    d.addCallback(looping_verify_deletion)
     return d
