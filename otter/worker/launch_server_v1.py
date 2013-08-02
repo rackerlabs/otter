@@ -487,3 +487,20 @@ def verified_delete(log,
 
     d.addCallback(looping_verify_deletion)
     return d
+
+
+def timeout_deferred(deferred, time, clock):
+    """
+    Time out a deferred.
+
+    Returns the deferred that was passed in so that this can be used as a
+    callback if necessary.
+    """
+    delayed_call = clock.callLater(time, deferred.cancel)
+
+    def cancelTimeout(result):
+        if delayed_call.active():
+            delayed_call.cancel()
+        return result
+
+    return deferred.addBoth(cancelTimeout)

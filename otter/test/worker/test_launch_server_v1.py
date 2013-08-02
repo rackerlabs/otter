@@ -6,7 +6,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail, Deferred
+from twisted.internet.defer import CancelledError, Deferred, fail, succeed
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -23,7 +23,8 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
-    verified_delete
+    verified_delete,
+    timeout_deferred
 )
 
 
@@ -956,3 +957,58 @@ class DeleteServerTests(TestCase):
         clock.advance(5)
         self.assertEqual(self.treq.head.call_count, 2)
         self.assertEqual(self.log.msg.call_count, 3)
+
+
+class TimeoutHelperTests(TestCase):
+    """
+    Test the timeout helper
+    """
+    def test_timeout_returns_deferred_that_was_passed_in(self):
+        """
+        The function returns the deferred that was passed in.
+        """
+        clock = Clock()
+        d1 = Deferred()
+        d2 = timeout_deferred(d1, 10, clock)
+        self.assertIdentical(d1, d2)
+
+    def test_propagates_result_if_success_without_timeout(self):
+        """
+        If the deferred succeeds before the timeout, the result is propagated
+        and no error occurs
+        """
+        clock = Clock()
+        d = Deferred()
+        timeout_deferred(d, 10, clock)
+        d.callback("Result")
+
+        clock.advance(15)
+
+        self.assertEqual(self.successResultOf(d), "Result")
+
+    def test_propagates_failure_if_failed_without_timeout(self):
+        """
+        If the deferred fails before the timeout, the result is propagated
+        and no extra cancellation error happens
+        """
+        clock = Clock()
+        d = Deferred()
+        timeout_deferred(d, 10, clock)
+        d.errback(DummyException("fail"))
+
+        clock.advance(15)
+
+        self.failureResultOf(d, DummyException)
+
+    def test_cancels_if_past_timeout(self):
+        """
+        If the deferred fails before the timeout, the result is propagated
+        and no extra cancellation error happens
+        """
+        clock = Clock()
+        d = Deferred()
+        timeout_deferred(d, 10, clock)
+
+        clock.advance(15)
+
+        self.failureResultOf(d, CancelledError)
