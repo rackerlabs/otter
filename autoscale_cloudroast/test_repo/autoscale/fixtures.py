@@ -192,6 +192,29 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         sleep(self.scheduler_interval + delay)
 
+<<<<<<< HEAD
+=======
+    def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
+        """
+        The group_id or the server_name should be provided.
+        Given the group id, the server name is got from the group's launch
+        config and returns server ID list of servers containing that server name
+        on the tenant, from nova.
+        list_servers(name=params) returns list of servers that contain the
+        specified name within the server name.
+        """
+        if group_id:
+            launch_config_response = self.autoscale_client.view_launch_config(
+                group_id)
+            launch_config = launch_config_response.entity
+            params = launch_config.server.name
+        elif server_name:
+            params = server_name
+        list_server_resp = self.server_client.list_servers(name=params)
+        filtered_servers = list_server_resp.entity
+        return [server.id for server in filtered_servers]
+
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     @classmethod
     def tearDownClass(cls):
         """

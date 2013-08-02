@@ -17,8 +17,12 @@ from otter.supervisor import Supervisor
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
+<<<<<<< HEAD
 from otter.test.utils import (
     CheckFailure, DeferredTestMixin, iMock, matches, patch)
+=======
+from otter.test.utils import CheckFailure, iMock, matches, patch
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -878,7 +882,7 @@ class ExecScaleDownTests(TestCase):
         self.assertFalse(self.del_active_servers.called)
 
 
-class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
+class MaybeExecuteScalingPolicyTestCase(TestCase):
     """
     Tests for :func:`otter.controller.maybe_execute_scaling_policy`
     """
@@ -923,7 +927,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
 
         self.assertEqual(len(self.group.view_config.mock_calls), 0)
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
@@ -1010,7 +1014,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
         self.assertIn("Cooldowns not met", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
@@ -1035,9 +1039,8 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
                                                     self.group,
                                                     self.mock_state,
                                                     'pol1')
-        f = self.assert_deferred_failed(d, controller.CannotExecutePolicyError)
-        self.assertIn("Policy execution would violate min/max constraints",
-                      str(f.value))
+        f = self.failureResultOf(d, controller.CannotExecutePolicyError)
+        self.assertIn("No change in servers", str(f.value))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -1074,7 +1077,7 @@ class MaybeExecuteScalingPolicyTestCase(DeferredTestMixin, TestCase):
         self.mock_state.mark_executed.assert_called_once_with('pol1')
 
 
-class ExecuteLaunchConfigTestCase(DeferredTestMixin, TestCase):
+class ExecuteLaunchConfigTestCase(TestCase):
     """
     Tests for :func:`otter.controller.execute_launch_config`
     """

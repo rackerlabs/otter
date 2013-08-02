@@ -1,0 +1,33 @@
+{
+    "groups": [
+        {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
+                    "rel": "self"
+                }
+            ],
+            "paused": false,
+            "pendingCapacity": 0
+        },
+        {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "id": "f82bb000-f451-40c8-9dc3-6919097d2f7e",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                    "rel": "self"
+                }
+            ],
+            "paused": false,
+            "pendingCapacity": 0
+        }
+    ],
+    "groups_links": []
+}

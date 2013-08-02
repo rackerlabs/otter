@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
     "policies": [
         {
@@ -28,3 +29,6 @@
         }
     ]
 }
+=======
+ [{"cooldown": 600, "type": "webhook", "name": "scaling_policy_test982504", "change": 1}]
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3

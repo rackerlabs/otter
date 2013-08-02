@@ -13,7 +13,6 @@ from twisted.application.strports import service
 from twisted.application.service import MultiService
 
 from twisted.web.server import Site
-from twisted.python import log
 
 try:
     from txairbrake.observers import AirbrakeLogObserver as _a
@@ -21,20 +20,17 @@ try:
 except ImportError:
     AirbrakeLogObserver = None
 
-try:
-    from otter.log.graylog import GraylogUDPPublisher as _g
-    GraylogUDPPublisher = _g   # to get around pyflakes
-except ImportError:
-    GraylogUDPPublisher = None
-
 from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
-from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
+<<<<<<< HEAD
+=======
+from otter.auth import CachingAuthenticator
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
 from silverberg.cluster import RoundRobinCassandraCluster
 
@@ -90,6 +86,7 @@ def makeService(config):
     """
     set_config_data(dict(config))
 
+<<<<<<< HEAD
     # Try to configure graylog and airbrake.
 
     if config_value('graylog'):
@@ -101,6 +98,8 @@ def makeService(config):
             warnings.warn("There is a configuration option for Graylog, but "
                           "txgraylog is not installed.")
 
+=======
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     if config_value('airbrake'):
         if AirbrakeLogObserver is not None:
             airbrake = AirbrakeLogObserver(
@@ -125,10 +124,28 @@ def makeService(config):
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
+<<<<<<< HEAD
     authenticator = ImpersonatingAuthenticator(config_value('identity.username'),
                                                config_value('identity.password'),
                                                config_value('identity.url'),
                                                config_value('identity.admin_url'))
+=======
+    cache_ttl = config_value('identity.cache_ttl')
+
+    if cache_ttl is None:
+        # FIXME: Pick an arbitrary cache ttl value based on absolutely no
+        # science.
+        cache_ttl = 300
+
+    authenticator = CachingAuthenticator(
+        reactor,
+        ImpersonatingAuthenticator(
+            config_value('identity.username'),
+            config_value('identity.password'),
+            config_value('identity.url'),
+            config_value('identity.admin_url')),
+        cache_ttl)
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
     supervisor = Supervisor(authenticator.authenticate_tenant)
 

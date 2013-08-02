@@ -4,10 +4,15 @@ and desired caapacity
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+<<<<<<< HEAD
 import unittest
 
 
 @unittest.skip('cron not implemented yet')
+=======
+
+
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 class CronStyleSchedulerTests(AutoscaleFixture):
 
     """
@@ -82,6 +87,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         Create a cron style scheduler policy via change to scale up with cooldown>0,
         wait for it to execute. Re-execute the policy manually before the
+<<<<<<< HEAD
         cooldown results in 403. Then wait for the cron style policy to re-trigger
         after the cooldown period and verify the total active servers on the group
         are equal to be 2 times the change value specifies in scale up policy
@@ -89,6 +95,13 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_cooldown=50,
+=======
+        cooldown results in 403.
+        """
+        cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_cooldown=75,
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
             sp_change=self.sp_change,
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
@@ -97,6 +110,20 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             group_id=self.group.id,
             policy_id=cron_style_policy['id'])
         self.assertEquals(execute_scheduled_policy.status_code, 403)
+<<<<<<< HEAD
         self.verify_group_state(self.group.id, self.sp_change)
         sleep(60 + self.scheduler_interval)
+=======
+
+    def test_system_cron_style_policy_executes_again(self):
+        """
+        1-minute Cron-style policy executes in a minute and then again after 1 minute
+        """
+        self.autoscale_behaviors.create_schedule_policy_given(
+            group_id=self.group.id,
+            sp_cooldown=0,
+            sp_change=self.sp_change,
+            schedule_cron='* * * * *')
+        sleep(120 + self.scheduler_interval)
+>>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
         self.verify_group_state(self.group.id, self.sp_change * 2)

@@ -6,6 +6,7 @@ in the first place.
 
 from datetime import datetime
 from functools import partial
+from croniter import croniter
 
 from twisted.internet import defer
 from twisted.application.internet import TimerService
@@ -16,7 +17,14 @@ from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter import controller
 from otter.log import log as otter_log
-from otter.models.cass import LOCK_TABLE_NAME
+from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+
+
+def next_cron_occurrence(cron):
+    """
+    Return next occurence of given cron entry
+    """
+    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 class SchedulerService(TimerService):
@@ -34,6 +42,7 @@ class SchedulerService(TimerService):
                     :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
+        from otter.models.cass import LOCK_TABLE_NAME
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
@@ -46,15 +55,20 @@ class SchedulerService(TimerService):
         """
 
         def check_for_more(events):
-            if len(events) == batchsize:
+            if events and len(events) == batchsize:
                 return _do_check()
             return None
+
+        def check_fetch_error(failure):
+            # Return if we do not get lock as other process might be processing current events
+            failure.trap(BusyLockError)
+            otter_log.msg('No lock in scheduler')
 
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            # Return if we do not get lock as other process might be processing current events
-            d.addErrback(lambda f: f.trap(BusyLockError) and None)
+            d.addErrback(check_fetch_error)
+            d.addErrback(otter_log.err)
             return d
 
         return _do_check()
@@ -71,25 +85,44 @@ class SchedulerService(TimerService):
         def process_events(events):
 
             if not len(events):
-                return events
+                return events, set()
 
             log.msg('Processing events', num_events=len(events))
+
+            deleted_policy_ids = set()
+
+            def eb(failure, policy_id):
+                failure.trap(NoSuchPolicyError, NoSuchScalingGroupError)
+                deleted_policy_ids.add(policy_id)
+
             deferreds = [
-                self.execute_event(log, event) for event in events
+                self.execute_event(log, event).addErrback(eb, event['policyId']).addErrback(log.err)
+                for event in events
             ]
             d = defer.gatherResults(deferreds, consumeErrors=True)
+            return d.addCallback(lambda _: (events, deleted_policy_ids))
 
-            d.addErrback(log.err)
-            d.addCallback(lambda _: events)
+        def update_delete_events((events, deleted_policy_ids)):
+            """
+            Update events with cron entry with next trigger time
+            Delete other events
+            """
+            if not len(events):
+                return events
 
-            return d
+            events_to_delete, events_to_update = [], []
+            for event in events:
+                if event['cron'] and event['policyId'] not in deleted_policy_ids:
+                    event['trigger'] = next_cron_occurrence(event['cron'])
+                    events_to_update.append(event)
+                else:
+                    events_to_delete.append(event['policyId'])
 
-        def delete_events(events):
-            if len(events) != 0:
-                policy_ids = [event[2] for event in events]
-                log.bind(num_policy_ids=len(policy_ids)).msg('Deleting events')
-                get_store().delete_events(policy_ids)
-            return events
+            log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
+            log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
+            d = get_store().update_delete_events(events_to_delete, events_to_update)
+
+            return d.addCallback(lambda _: events)
 
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
@@ -97,7 +130,7 @@ class SchedulerService(TimerService):
         log.msg('Checking for events')
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
-        deferred.addCallback(delete_events)
+        deferred.addCallback(update_delete_events)
         deferred.addErrback(log.err)
         return deferred
 
@@ -106,12 +139,11 @@ class SchedulerService(TimerService):
         Execute a single event
 
         :param log: A bound log for logging
-
         :return: a deferred with the results of execution
         """
-        tenant_id, group_id, policy_id, trigger = event
-        log.msg('Executing policy', group_id=group_id, policy_id=policy_id)
-        group = get_store().get_scaling_group(log, tenant_id, group_id)
+        log.msg('Executing policy', group_id=event['groupId'], policy_id=event['policyId'])
+        group = get_store().get_scaling_group(log, event['tenantId'], event['groupId'])
+        policy_id = event['policyId']
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
