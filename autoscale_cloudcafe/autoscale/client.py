@@ -627,9 +627,16 @@ class LbaasAPIClient(AutoMarshallingRestClient):
 
     def delete_node(self, load_balancer_id, node_id, requestslib_kwargs=None):
         """
+        :summary: Delete a node
+        :param load_balancer_id: The id of an existing load balancer.
+        :type load_balancer_id: String
+        :param node_id: The id of an existing node.
+        :type node_id: String
+        :return: Response Object containing response code 204
+         on success and empty body
+        :rtype: Response Object
         """
         full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
                              str(node_id)])
         return self.request('DELETE', full_url,
                             requestslib_kwargs=requestslib_kwargs)
-
