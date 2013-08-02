@@ -28,7 +28,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch
+from otter.test.utils import CheckFailure, DummyException, mock_log, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
@@ -915,10 +915,14 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.head.return_value = fail(DummyException('failure'))
+        self.treq.content.side_effect = lambda *args: succeed("")
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
         self.assertIsNone(self.successResultOf(d))
+        self.log.msg.assert_called_with(
+            mock.ANY, server_id='serverId', exc=CheckFailure(DummyException),
+            time_delete=0.0)
 
     def test_verified_delete_retries_verification_until_success(self):
         """
@@ -931,7 +935,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.head.return_value = Deferred()
-        self.treq.content.return_value = succeed("")
+        self.treq.content.side_effect = lambda *args: succeed("")
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, clock=clock)
@@ -957,6 +961,34 @@ class DeleteServerTests(TestCase):
         clock.advance(5)
         self.assertEqual(self.treq.head.call_count, 2)
         self.assertEqual(self.log.msg.call_count, 3)
+
+    def test_verified_delete_retries_verification_until_timeout(self):
+        """
+        If the verification fails until the timeout, log a failure and do not
+        keep trying to verify.
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.content.side_effect = lambda *args: succeed("")
+        self.treq.head.side_effect = lambda *args, **kwargs: succeed(
+            mock.Mock(spec=['code'], code=204))
+
+        verified_delete(self.log, 'http://url/', 'my-auth-token',
+                        'serverId', interval=5, timeout=11, clock=clock)
+
+        clock.advance(11)
+        self.treq.head.assert_has_calls([
+            mock.call('http://url/servers/serverId', headers=expected_headers),
+            mock.call('http://url/servers/serverId', headers=expected_headers)
+        ])
+        self.log.err.assert_called_once_with(
+            CheckFailure(CancelledError), server_id="serverId", why=mock.ANY,
+            time_delete=11)
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(self.treq.head.call_count, 2)
 
 
 class TimeoutHelperTests(TestCase):

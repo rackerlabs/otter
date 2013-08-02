@@ -431,6 +431,7 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
+                    timeout=120,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -439,7 +440,8 @@ def verified_delete(log,
     There is a possibility Nova sometimes fails to delete servers.  Log if this
     happens, and if so, re-evaluate workarounds.
 
-    @TODO: Timeouts
+    Time out attempting to verify deletes after a period of time and log an
+    error.
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
@@ -447,6 +449,8 @@ def verified_delete(log,
     :param str server_id: Opaque nova server id.
     :param int interval: Deletion interval - how long until a delete is retried.
         Default: 2.
+    :param int timeout: Seconds after which the deletion will be logged as a
+        failure, if Nova fails to return a 404,
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -459,14 +463,19 @@ def verified_delete(log,
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
     def looping_verify_deletion(_):
-        verify = Deferred()
+        verify = timeout_deferred(Deferred(), timeout, clock)
+        start_time = clock.seconds()
 
         def on_success(_):
-            del_log.msg('Server deleted successfully')
+            time_delete = clock.seconds() - start_time
+            del_log.msg('Server deleted successfully: {time_delete} seconds.',
+                        time_delete=time_delete)
             verify.callback(None)
 
-        def on_failure(f):
-            del_log.msg('Server not yet deleted', exc=f)
+        def on_temporary_failure(f):
+            time_delete = clock.seconds() - start_time
+            del_log.msg('Server not yet deleted by {time_delete} seconds',
+                        exc=f, time_delete=time_delete)
 
         def check_status():
             vd = treq.head(
@@ -474,7 +483,7 @@ def verified_delete(log,
                 headers=headers(auth_token))
             vd.addCallback(check_success, [404])
             vd.addCallback(on_success)
-            vd.addErrback(on_failure)
+            vd.addErrback(on_temporary_failure)
             return vd
 
         lc = LoopingCall(check_status)
@@ -482,7 +491,15 @@ def verified_delete(log,
         if clock is not None:  # pragma: no cover
             lc.clock = clock
 
-        verify.addBoth(lambda _: lc.stop())
+        def on_timeout_failure(f):
+            time_delete = clock.seconds() - start_time
+            del_log.err(
+                f,
+                why='Server failed to be deleted by {time_delete} seconds.',
+                time_delete=time_delete)
+
+        verify.addErrback(on_timeout_failure)
+        verify.addCallback(lambda _: lc.stop())
         lc.start(interval)
 
     d.addCallback(looping_verify_deletion)
@@ -495,6 +512,8 @@ def timeout_deferred(deferred, time, clock):
 
     Returns the deferred that was passed in so that this can be used as a
     callback if necessary.
+
+    from:  https://twistedmatrix.com/trac/ticket/990
     """
     delayed_call = clock.callLater(time, deferred.cancel)
 
