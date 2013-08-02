@@ -5,11 +5,8 @@ from test_repo.autoscale.fixtures import ScalingGroupFixture
 
 
 class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
-
     """
     Verify update scheduler policy
-    @todo: temporary validation of update policy to have response code 400. Undo after
-    fix for AUTO-467 is in.
     """
 
     def setUp(self):
