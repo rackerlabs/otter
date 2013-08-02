@@ -466,7 +466,7 @@ def verified_delete(log,
             verify.callback(None)
 
         def on_failure(f):
-            del_log.info('Server not yet deleted', exc=f)
+            del_log.msg('Server not yet deleted', exc=f)
 
         def check_status():
             vd = treq.head(

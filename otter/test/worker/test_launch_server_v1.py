@@ -27,7 +27,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_bound_log, patch
+from otter.test.utils import DummyException, mock_log, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
@@ -790,7 +790,7 @@ class DeleteServerTests(TestCase):
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
-        self.log = mock_bound_log()
+        self.log = mock_log()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
@@ -877,6 +877,7 @@ class DeleteServerTests(TestCase):
         clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
+
         self.treq.head.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
@@ -888,7 +889,7 @@ class DeleteServerTests(TestCase):
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
 
-        self.assertEqual(self.log.bind.return_value.msg.call_count, 1)
+        self.log.msg.assert_called_once_with(mock.ANY, server_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
         """
@@ -930,19 +931,16 @@ class DeleteServerTests(TestCase):
             mock.Mock(spec=['code'], code=204))
         self.treq.head.return_value = Deferred()
         self.treq.content.return_value = succeed("")
-        logger = self.log.bind.return_value
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, clock=clock)
 
-        self.assertEqual((logger.msg.call_count, logger.info.call_count),
-                         (1, 0))
+        self.assertEqual(self.log.msg.call_count, 1)
         self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
 
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
-        self.assertEqual((logger.msg.call_count, logger.info.call_count),
-                         (1, 1))
+        self.assertEqual(self.log.msg.call_count, 2)
 
         self.treq.head.return_value = succeed(
             mock.Mock(spec=['code'], code=404))
@@ -952,11 +950,9 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.assertEqual((logger.msg.call_count, logger.info.call_count),
-                         (2, 1))
+        self.assertEqual(self.log.msg.call_count, 3)
 
         # the loop has stopped
         clock.advance(5)
         self.assertEqual(self.treq.head.call_count, 2)
-        self.assertEqual((logger.msg.call_count, logger.info.call_count),
-                         (2, 1))
+        self.assertEqual(self.log.msg.call_count, 3)

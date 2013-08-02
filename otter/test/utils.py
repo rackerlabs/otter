@@ -10,6 +10,8 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
 
+from otter.log.bound import BoundLog
+
 
 class matches(object):
     """
@@ -170,10 +172,11 @@ class LockMixin(object):
         return lock
 
 
-def mock_bound_log(*args, **kwargs):
-    new_log = mock.Mock(spec=['bind', 'err', 'msg'])
-    new_log.bind.side_effect = mock_bound_log
-    return new_log
+def mock_log(*args, **kwargs):
+    """
+    Returns a BoundLog whose msg and err methods are mocks.
+    """
+    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
 
 class DummyException(Exception):
