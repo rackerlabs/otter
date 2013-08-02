@@ -13,7 +13,7 @@ from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
 
 import os
-from time import sleep
+import time
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -201,7 +201,7 @@ class AutoscaleFixture(BaseTestFixture):
             sp_cooldown=0,
             sp_change=change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
-        sleep(self.scheduler_interval + delay)
+        time.sleep(self.scheduler_interval + delay)
 
     def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
         """
@@ -222,6 +222,22 @@ class AutoscaleFixture(BaseTestFixture):
         list_server_resp = self.server_client.list_servers(name=params)
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
+
+    def assert_servers_deleted_successfully(self, server_name):
+        """
+        Given a server name, polls for 15 mins to assert that the tenant id
+        does not have servers containing that name
+        """
+        endtime = time.time() + 900
+        while time.time() < endtime:
+            server_list = self.get_servers_containing_given_name_on_tenant(
+                server_name=server_name)
+            if len(server_list) == 0:
+                break
+            time.sleep(self.interval_time)
+        else:
+            self.fail('Servers on the tenant with name {0} were not deleted even'
+                      'after waiting 15 mins'.format(server_name))
 
     @classmethod
     def tearDownClass(cls):

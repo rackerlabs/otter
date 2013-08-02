@@ -82,8 +82,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     def test_update_existing_lbaas_in_launch_config(self):
         """
         Update the load balancer id in the launch config and verify a scale up after the update,
-        resulted in servers added as nodes to the newly added load balancer
-        ** to be tested**
+        resulted in servers added as nodes to the newly added load balancer.
         """
         policy_up_data = {'change': self.gc_min_entities_alt}
         policy_down_data = {'change': -self.gc_min_entities_alt}
@@ -107,6 +106,78 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
                                                         self.load_balancer_2)
+        lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(
+            self.load_balancer_1)]
+        scaled_down_server_ip = self._get_ipv4_address_list_on_servers(active_server_list)
+        self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
+        self.empty_scaling_group(group)
+
+    @unittest.skip('AUTO-504')
+    def test_delete_group_when_autoscale_server_is_the_last_node_on_lb(self):
+        """
+        Create a scaling group with load balancer. After the servers on the group are added to
+        the loadbalancer, delete the older node with which the lb was created. Update minentities
+        on the group to scale down and delete group.
+        """
+        load_balancer = self.load_balancer_3
+        lb_node_id_list_before_scale = [each_node.id for each_node in self._get_node_list_from_lb(
+            load_balancer)]
+        group = self._create_group_given_lbaas_id(load_balancer)
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        load_balancer)
+        lb_node_addresses_list = [each_node.address for each_node in self._get_node_list_from_lb(
+            load_balancer)]
+        for each_node_id in lb_node_id_list_before_scale:
+            self.lbaas_client.delete_node(load_balancer, each_node_id)
+        self.empty_scaling_group(group)
+        self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
+        # will the same server ip remain as node on load balancer? if not validate
+        server_ip = self._get_ipv4_address_list_on_servers(active_server_list)
+        self.assertTrue(set(server_ip) not in set(lb_node_addresses_list))
+
+    def test_existing_nodes_on_lb_unaffected_by_scaling(self):
+        """
+        Get load balancer node id list before anyscale operation, create a scaling group
+        with minentities>1, scale up and then scale down. After each scale operation,
+        verify the nodes existing on the load balancer before any scale operation persists
+        """
+        load_balancer = self.load_balancer_1
+        lb_node_list_before_scale = [each_node.address for each_node in
+                                     self._get_node_list_from_lb(load_balancer)]
+        policy_up_data = {'change': self.gc_min_entities_alt}
+        policy_down_data = {'change': -self.gc_min_entities_alt}
+        group = self._create_group_given_lbaas_id(load_balancer)
+        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
+                                                        load_balancer)
+        self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
+                                                                load_balancer)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt * 2)
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+                                                        load_balancer)
+        self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
+                                                                load_balancer)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
+        activeservers_scaledown = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
+                                                        load_balancer)
+        lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(
+            self.load_balancer_1)]
+        scaled_down_server_ip = self._get_ipv4_address_list_on_servers(active_server_list)
+        self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
+        self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
+                                                                load_balancer)
         self.empty_scaling_group(group)
 
     def test_remove_existing_lbaas_in_launch_config(self):
@@ -185,8 +256,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         # call list node for each lbaas, create list of Ips and ports
         ports_list = []
         for each_loadbalancer in lbaas_ids:
-            get_nodes_on_lb = (self.lbaas_client.list_nodes(
-                each_loadbalancer).entity)
+            get_nodes_on_lb = self._get_node_list_from_lb(each_loadbalancer)
             nodes_list_on_lb = []
             for each_node in get_nodes_on_lb:
                 nodes_list_on_lb.append(each_node.address)
@@ -254,3 +324,23 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         for each_lb in launch_config.loadBalancers:
             port_list.append(each_lb.port)
         return port_list
+
+    def _get_node_list_from_lb(self, load_balancer_id):
+        """
+        Returns the list of nodes on the load balancer
+        """
+        return self.lbaas_client.list_nodes(load_balancer_id).entity
+
+    def _assert_lb_nodes_before_scale_persists_after_scale(self, lb_node_list_before_any_operation,
+                                                           load_balancer_id):
+        """
+        Gets the current list of lb nodes address and asserts that provided node
+        address list (which is before any scale operation) still exists within the
+        current list of lb node addresses
+        """
+        current_lb_node_list = [each_node.address for each_node in
+                                self._get_node_list_from_lb(load_balancer_id)]
+        self.assertTrue(set(lb_node_list_before_any_operation).issubset(set(current_lb_node_list)),
+                        msg='nodes {0} is not a subset of {1}'.format(set(
+                            lb_node_list_before_any_operation),
+                            set(current_lb_node_list)))

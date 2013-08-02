@@ -624,3 +624,12 @@ class LbaasAPIClient(AutoMarshallingRestClient):
         return self.request('GET', full_url, params=params,
                             response_entity_type=NodeList,
                             requestslib_kwargs=requestslib_kwargs)
+
+    def delete_node(self, load_balancer_id, node_id, requestslib_kwargs=None):
+        """
+        """
+        full_url = '/'.join([self.url, str(load_balancer_id), 'nodes',
+                             str(node_id)])
+        return self.request('DELETE', full_url,
+                            requestslib_kwargs=requestslib_kwargs)
+
