@@ -10,6 +10,8 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
 
+from otter.log.bound import BoundLog
+
 
 class matches(object):
     """
@@ -168,3 +170,26 @@ class LockMixin(object):
             return defer.succeed(release_result)
         lock.release.side_effect = _release
         return lock
+
+
+def mock_log(*args, **kwargs):
+    """
+    Returns a BoundLog whose msg and err methods are mocks.  Makes it easier
+    to test logging, since instead of making a mock object and testing::
+
+        log.bind.return_value.msg.assert_called_with(...)
+
+    This can be done instead::
+
+        log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
+
+    Since in all likelyhood, testing that certain values are bound would be more
+    important than testing the exact logged message.
+    """
+    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+
+
+class DummyException(Exception):
+    """
+    Fake exception
+    """
