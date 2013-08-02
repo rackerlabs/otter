@@ -2,7 +2,6 @@
 Twisted Application plugin for otter API nodes.
 """
 import jsonfig
-import warnings
 
 from twisted.python import usage
 

@@ -10,10 +10,7 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import ContainsDict, Equals
-
 from otter.tap.api import Options, makeService
-from otter.test.utils import matches
 
 
 test_config = {
