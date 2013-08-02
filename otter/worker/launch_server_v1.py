@@ -463,7 +463,7 @@ def verified_delete(log,
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
     def looping_verify_deletion(_):
-        verify = timeout_deferred(Deferred(), timeout, clock)
+        verify = Deferred()
         start_time = clock.seconds()
 
         def on_success(_):
@@ -490,6 +490,8 @@ def verified_delete(log,
 
         if clock is not None:  # pragma: no cover
             lc.clock = clock
+
+        timeout_deferred(verify, timeout, lc.clock)
 
         def on_timeout_failure(f):
             time_delete = clock.seconds() - start_time
