@@ -78,7 +78,7 @@ POST /{tenantId}/groups
                 },
                 "personality": [
                     {
-                        "path": '/root/.ssh/authorized_keys',
+                        "path": "/root/.ssh/authorized_keys",
                         "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                     }
                 ],
@@ -151,7 +151,7 @@ POST /{tenantId}/groups
                     },
                     "personality": [
                         {
-                            "path": '/root/.ssh/authorized_keys',
+                            "path": "/root/.ssh/authorized_keys",
                             "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
@@ -252,7 +252,7 @@ GET /{tenantId}/groups/{groupId}
                     },
                     "personality": [
                         {
-                            "path": '/root/.ssh/authorized_keys',
+                            "path": "/root/.ssh/authorized_keys",
                             "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                         }
                     ],
@@ -436,7 +436,7 @@ GET /{tenantId}/groups/{groupId}/launch
                 },
                 "personality": [
                     {
-                        "path": '/root/.ssh/authorized_keys',
+                        "path": "/root/.ssh/authorized_keys",
                         "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                     }
                 ],
@@ -477,7 +477,7 @@ PUT /{tenantId}/groups/{groupId}/launch
             },
             "personality": [
                 {
-                    "path": '/root/.ssh/authorized_keys',
+                    "path": "/root/.ssh/authorized_keys",
                     "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                 }
             ],
@@ -671,7 +671,7 @@ If successful, no response body will be returned.
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
 > Accepts: application/json
 {
-    "name": 'scale down by 5.5 percent',
+    "name": "scale down by 5.5 percent",
     "changePercent": -5.5,
     "cooldown": 6,
     "type": "webhook"
