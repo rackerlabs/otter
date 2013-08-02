@@ -447,8 +447,8 @@ def verified_delete(log,
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval - how long until a delete is retried.
-        Default: 2.
+    :param int interval: Deletion interval in seconds - how long until
+        verifying a delete is retried. Default: 2.
     :param int timeout: Seconds after which the deletion will be logged as a
         failure, if Nova fails to return a 404,
 
@@ -508,16 +508,17 @@ def verified_delete(log,
     return d
 
 
-def timeout_deferred(deferred, time, clock):
+def timeout_deferred(deferred, timeout, clock):
     """
     Time out a deferred.
 
-    Returns the deferred that was passed in so that this can be used as a
-    callback if necessary.
+    :param int timeout: How long before timing out the deferred (in seconds)
+    :return: the deferred that was passed in so that this can be used as a
+        callback if necessary.
 
     from:  https://twistedmatrix.com/trac/ticket/990
     """
-    delayed_call = clock.callLater(time, deferred.cancel)
+    delayed_call = clock.callLater(timeout, deferred.cancel)
 
     def cancelTimeout(result):
         if delayed_call.active():
