@@ -1,1 +1,8 @@
- [{"cooldown": 600, "type": "webhook", "name": "scaling_policy_test982504", "change": 1}]
+[
+  {
+    "cooldown": 600,
+    "type": "webhook",
+    "name": "scaling_policy_test982504",
+    "change": 1
+  }
+]
