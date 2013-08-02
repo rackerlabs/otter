@@ -19,4 +19,4 @@ subunit-output.txt
 *.project
 *.pydev*
 .DS_Store
-target
+docbook/target

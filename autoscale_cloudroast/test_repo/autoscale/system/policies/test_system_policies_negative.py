@@ -10,17 +10,11 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
     System tests to verify execute scaling policies scenarios
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Instantiate client and configs
-        """
-        super(ScalingPoliciesNegativeFixture, cls).setUpClass()
-
     def setUp(self):
         """
         Create a scaling group with minentities = maxentities, scale up by 2
         """
+        super(ScalingPoliciesNegativeFixture, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=2,
             gc_cooldown=0)
@@ -43,6 +37,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         Emptying the scaling group by updating minentities=maxentities=0,
         which is then deleted by the Autoscale fixture's teardown
         """
+        super(ScalingPoliciesNegativeFixture, self).tearDown()
         self.empty_scaling_group(self.group)
 
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
@@ -129,7 +124,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
         Create a scaling group and execute a scale up policy, update min and max entities
         to be 0 and delete the group (while the servers from the create group and execute policy
         are still building). All the servers on the group should be deleted
-        before the user can delete the group (AUTO-373)
+        before the user can delete the group (AUTO-339)
         """
         execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
                                                                  self.policy_up['policy_id'])
@@ -169,6 +164,42 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Scale down policy executed when minentities=maxentities'
                           ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
+
+    def test_system_update_webhook_policy_to_at_style_scheduler(self):
+        """
+        Policy update fails when a webhook type policy is updated to be of type
+        at style scheduler, with error 400
+        """
+        upd_policy_response = self.autoscale_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_up['policy_id'],
+            name='upd_webhook_to_scheduler',
+            cooldown=self.sp_cooldown,
+            change=self.sp_change,
+            args={'at': self.autoscale_behaviors.get_time_in_utc(60)},
+            policy_type='schedule')
+        self.assertEquals(upd_policy_response.status_code, 400,
+                          msg='Update webhook policy to schedule policy type'
+                          ' on the group {0} with response code {1}'.format(
+                              self.group.id, upd_policy_response.status_code))
+
+    def test_system_update_webhook_policy_to_cron_style_scheduler(self):
+        """
+        Policy update fails when a webhook type policy is updated to be of type
+        cron style scheduler, with error 400
+        """
+        upd_policy_response = self.autoscale_client.update_policy(
+            group_id=self.group.id,
+            policy_id=self.policy_down['policy_id'],
+            name='upd_webhook_to_scheduler',
+            cooldown=self.sp_cooldown,
+            change=self.sp_change,
+            args={'cron': '* 3 * * *'},
+            policy_type='schedule')
+        self.assertEquals(upd_policy_response.status_code, 400,
+                          msg='Update webhook policy to schedule policy type'
+                          ' on the group {0} with response code {1}'.format(
+                              self.group.id, upd_policy_response.status_code))
 
     def _update_group_min_max_entities(self, group, maxentities=None, minentities=None):
         """

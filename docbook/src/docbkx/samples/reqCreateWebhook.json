@@ -1,0 +1,11 @@
+[
+    {
+        "name": "alice",
+        "metadata": {
+            "notes": "this is for Alice"
+        }
+    },
+    {
+        "name": "bob"
+    }
+]

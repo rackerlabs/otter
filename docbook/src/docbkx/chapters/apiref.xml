@@ -8,52 +8,41 @@
          xml:id="apiref"
          role="api-reference">
    <title>API Reference</title>
-   <section xml:id="Group_Resource">
-      <title>Group Resource</title>
+   <section xml:id="Groups">
+      <title>Groups</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups"/>
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D"/>
-         <resource href="../wadl/autoscale.wadl#delete-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D"/>
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fstate"/>
+         <resource href="../../wadl/autoscale.wadl#groups"/>
+         <resource href="../../wadl/autoscale.wadl#group"/>
+         <resource href="../../wadl/autoscale.wadl#group_state"/>
       </resources>
    </section>
-   <section xml:id="Config_Resource">
-      <title>Configuration Resource</title>
+   <section xml:id="Configurations">
+      <title>Configurations</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fconfig"/>
-         <resource href="../wadl/autoscale.wadl#put-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fconfig"/>
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Flaunch"/>
-         <resource href="../wadl/autoscale.wadl#put-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Flaunch"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpause"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fresume"/>
+         <resource href="../../wadl/autoscale.wadl#group_config"/>
+         <resource href="../../wadl/autoscale.wadl#launch_configuration"/>
+         <resource href="../../wadl/autoscale.wadl#pause"/>
+         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
-   <section xml:id="Policies_Resource">
-      <title>Policies Resource</title>
+   <section xml:id="Policies">
+      <title>Policies</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies"/>
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D"/>
-         <resource href="../wadl/autoscale.wadl#put-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D"/>
-         <resource href="../wadl/autoscale.wadl#delete-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fexecute"/>
+         <resource href="../../wadl/autoscale.wadl#policies"/>
+         <resource href="../../wadl/autoscale.wadl#policy"/>
+         <resource href="../../wadl/autoscale.wadl#execute"/>
       </resources>
    </section>
-   <section xml:id="Execute_Resource">
-      <title>Execute Resource</title>
+   <section xml:id="Executions">
+      <title>Executions</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02Fexecute2F7Bcapability_version7D2F7Bcapability_hash7D2F"/>
+         <resource href="../../wadl/autoscale.wadl#anonymous_execute_webhook"/>
       </resources>
    </section>
-   <section xml:id="Webhooks_Resource">
-      <title>Webhooks Resource</title>
+   <section xml:id="Webhooks">
+      <title>Webhooks</title>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks"/>
-         <resource href="../wadl/autoscale.wadl#post-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks"/>
-         <resource href="../wadl/autoscale.wadl#get-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks2F7BwebhookId7D"/>
-         <resource href="../wadl/autoscale.wadl#put-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks2F7BwebhookId7D"/>
-         <resource href="../wadl/autoscale.wadl#delete-2Fv1.02F7BtenantId7D2Fgroups2F7BgroupId7D2Fpolicies2F7BpolicyId7D2Fwebhooks2F7BwebhookId7D"/>
+         <resource href="../../wadl/autoscale.wadl#webhook"/>
       </resources>
    </section>
 </chapter>

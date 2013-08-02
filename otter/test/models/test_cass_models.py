@@ -153,7 +153,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
               return_value=ConsistencyLevel.TWO)
 
         self.lock = self.mock_lock()
-        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
+        self.basic_lock_mock = patch(self, 'otter.models.cass.BasicLock',
+                                     return_value=self.lock)
 
     def test_view_config(self):
         """
@@ -248,6 +249,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
+        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
+                                                     self.group.uuid, max_retry=5,
+                                                     retry_wait=mock.ANY)
+        args, kwargs = self.basic_lock_mock.call_args_list[0]
+        self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
+
         self.lock.acquire.assert_called_once_with()
         self.lock.release.assert_called_once_with()
 
@@ -273,6 +280,27 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(self.connection.execute.call_count, 0)
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
+
+    def test_modify_state_lock_with_different_retry(self):
+        """
+        `modify_state` gets lock by retrying with different wait intervals each time
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.returns = [None, None]
+
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
+        first_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= first_retry_wait <= 5)
+
+        self.group.modify_state(modifier)
+        args, kwargs = self.basic_lock_mock.call_args_list[-1]
+        second_retry_wait = kwargs['retry_wait']
+        self.assertTrue(3 <= second_retry_wait <= 5)
+        self.assertNotEqual(first_retry_wait, second_retry_wait)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -704,6 +732,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
+    def test_update_scaling_policy_schedule_no_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
+        self.assertIsNone(self.successResultOf(d))  # update returns None
+        expectedCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}',
+                        "groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
     def test_update_scaling_policy_type_change(self):
         """
         Test that you can update a scaling policy, and if successful it returns
@@ -712,6 +759,23 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = [{'data': '{"type": "helvetica"}'}]
         self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
+        self.assert_deferred_failed(d, ValidationError)
+        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
+                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expectedData = {"groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_once_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    def test_update_scaling_policy_schedule_change(self):
+        """
+        Test that you can update a scaling policy, and if successful it returns
+        None
+        """
+        cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
+        self.returns = [cass_response, None]
+        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
         self.assert_deferred_failed(d, ValidationError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')

@@ -19,6 +19,7 @@ from silverberg.lock import BasicLock, with_lock
 import json
 import iso8601
 from datetime import datetime
+import random
 
 
 LOCK_TABLE_NAME = 'locks'
@@ -402,7 +403,8 @@ class CassScalingGroup(object):
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
+                         max_retry=5, retry_wait=random.uniform(3, 5))
         return with_lock(lock, _modify_state)
 
     def update_config(self, data):
@@ -532,6 +534,10 @@ class CassScalingGroup(object):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
+                # TODO: Fix in https://issues.rax.io/browse/AUTO-467
+                if lastRev["type"] == 'schedule':
+                    if lastRev["args"] != data["args"]:
+                        raise ValidationError("Cannot change scheduled args")
 
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
 

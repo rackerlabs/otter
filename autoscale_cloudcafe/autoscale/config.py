@@ -184,3 +184,10 @@ class AutoscaleConfig(ConfigSectionInterface):
         server endpoint name in the service catalog
         """
         return self.get('server_endpoint_name')
+
+    @property
+    def server_endpoint(self):
+        """
+        server endpoint is the url to the otter application
+        """
+        return self.get('server_endpoint')

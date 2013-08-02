@@ -15,7 +15,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         """
         Create a scaling group with minentities=0
         """
-        super(AutoscaleFixture, self).setUp()
+        super(ScheduleScalingPolicyNegative, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
@@ -51,7 +51,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
-    @unittest.skip('AUTO-405')
     def test_schedule_at_style_policy_with_no_z_in_date(self):
         """
         Creating a scaling policy of type schedule with (at style) with no Z in date
@@ -68,24 +67,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
-    @unittest.skip('AUTO-405')
-    def test_schedule_at_style_policy_with_no_t_in_date(self):
-        """
-        Creating a scaling policy of type schedule with (at style) with no T in date
-        format results in a 400.
-        ** AUTO-405, fails with 201**
-        """
-        schedule_value = '2013-12-05 03:12:09Z'
-        schedule_policy_at_style = self.autoscale_behaviors.create_schedule_policy_given(
-            group_id=self.group.id,
-            sp_change=self.sp_change,
-            schedule_at=schedule_value)
-        self.assertEquals(schedule_policy_at_style['status_code'], 400,
-                          msg='Create schedule policy via at style with no T in date'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
-
-    @unittest.skip('AUTO-405')
     def test_schedule_at_style_policy_with_no_z_or_t_in_date(self):
         """
         Creating a scaling policy of type schedule with (at style) with no Z or T in date
@@ -102,7 +83,6 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
                           'results in {0} for group {1}'
                           .format(schedule_policy_at_style['status_code'], self.group.id))
 
-    @unittest.skip('AUTO-404')
     def test_schedule_at_style_policy_with_date_in_the_past(self):
         """
         Creating a scaling policy of type schedule with (at style) date in the past
@@ -241,7 +221,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_year(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid year in the year
+        Creating a scaling policy of type schedule with (at style) with invalid year in the date
         results in a 400.
         """
         schedule_value = '0000-12-05T03:12:00Z'
@@ -256,7 +236,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_day(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid day in the day
+        Creating a scaling policy of type schedule with (at style) with invalid day in the date
         results in a 400.
         """
         schedule_value = '2013-12-33T03:12:00Z'
@@ -271,7 +251,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_hour(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid hour in the hour
+        Creating a scaling policy of type schedule with (at style) with invalid hour in the date
         results in a 400.
         """
         schedule_value = '2013-12-10T27:12:00Z'
@@ -286,7 +266,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_minute(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid minute in the minute
+        Creating a scaling policy of type schedule with (at style) with invalid minute in the date
         results in a 400.
         """
         schedule_value = '2013-12-31T10:70:00Z'
@@ -301,7 +281,7 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
 
     def test_schedule_at_style_policy_with_invalid_second(self):
         """
-        Creating a scaling policy of type schedule with (at style) with invalid minute in the second
+        Creating a scaling policy of type schedule with (at style) with invalid second in the date
         results in a 400.
         """
         schedule_value = '2013-12-31T10:10:80Z'
