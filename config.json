@@ -6,17 +6,13 @@
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter"
     },
-    "graylog": {
-        "host": "127.0.0.1",
-        "port": 12201
-    },
     "identity": {
         "username": "autoscale",
         "password": "REPLACE_WITH_REAL_PASSWORD",
         "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
         "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
     },
-    "scheduler" {
+    "scheduler": {
         "interval": 10,
         "batchsize": 100
     }

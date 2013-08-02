@@ -12,13 +12,13 @@ from otter.models.interface import (
     NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
+from otter.util import timestamp
+from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
 
 import json
-import iso8601
-from datetime import datetime
 import random
 
 
@@ -69,8 +69,15 @@ _cql_update_group_state = (
     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
                      'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
+_cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
+                               'trigger, cron) '
+                               'VALUES (:tenantId, :groupId, {name}Id, '
+                               '{name}Trigger, {name}cron)')
+_cql_insert_event_batch = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
+                           'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
+                           '{name}trigger, {name}cron);')
 _cql_fetch_batch_of_events = (
-    'SELECT "tenantId", "groupId", "policyId", "trigger" FROM {cf} WHERE '
+    'SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
 _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
@@ -162,18 +169,39 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
 
             if "type" in policy:
                 if policy["type"] == 'schedule':
-                    queries.append(_cql_insert_event.format(cf=event_table,
-                                                            name=':' + polname))
-                    if 'at' in policy["args"]:
-                        data[polname + "Trigger"] = iso8601.parse_date(policy["args"]["at"])
-                    elif 'cron' in policy["args"]:
-                        # TODO
-                        #recurrence = Recurrence(cron=policy["args"]["cron"])
-                        # Temporarily storing date in far future to not trigger this
-                        # This is done to pass unitgration/test_rest_cass_model tests
-                        data[polname + "Trigger"] = datetime(2037, 12, 31)
+                    _build_schedule_policy(policy, event_table, queries, data, polname)
 
             outpolicies[polId] = policy
+
+
+def _build_schedule_policy(policy, event_table, queries, data, polname):
+    """
+    Build schedule-type policy
+    """
+    if 'at' in policy["args"]:
+        queries.append(_cql_insert_event.format(cf=event_table, name=':' + polname))
+        data[polname + "Trigger"] = timestamp.from_timestamp(policy["args"]["at"])
+    elif 'cron' in policy["args"]:
+        queries.append(_cql_insert_event_with_cron.format(cf=event_table, name=':' + polname))
+        cron = policy["args"]["cron"]
+        data[polname + "Trigger"] = next_cron_occurrence(cron)
+        data[polname + 'cron'] = cron
+
+
+def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_id, group_id):
+    # Delete existing entry in event table
+    d = connection.execute(_cql_delete_policy_events.format(cf=event_table),
+                           {'policyId': policy_id}, get_consistency_level('delete', 'event'))
+
+    def _insert_event(_):
+        queries, data = [], {}
+        data['tenantId'] = tenant_id
+        data['groupId'] = group_id
+        data['policyId'] = policy_id
+        _build_schedule_policy(policy, event_table, queries, data, 'policy')
+        return Batch(queries, data, get_consistency_level('update', 'event')).execute(connection)
+
+    return d.addCallback(_insert_event)
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
@@ -530,27 +558,26 @@ class CassScalingGroup(object):
         """
         self.log.bind(updated_policy=data, policy_id=policy_id).msg("Updating policy")
 
-        def _do_update_launch(lastRev):
+        def _do_update_schedule(lastRev):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
-                # TODO: Fix in https://issues.rax.io/browse/AUTO-467
-                if lastRev["type"] == 'schedule':
-                    if lastRev["args"] != data["args"]:
-                        raise ValidationError("Cannot change scheduled args")
+                if lastRev["type"] == 'schedule' and lastRev['args'] != data['args']:
+                    return _update_schedule_policy(self.connection, data, policy_id,
+                                                   self.event_table, self.tenant_id, self.uuid)
 
+        def _do_update_policy(_):
             queries = [_cql_update_policy.format(cf=self.policies_table, name=":policy")]
-
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id,
                                 "policy": serialize_json_data(data, 1)},
                       consistency=get_consistency_level('update', 'policy'))
-            d = b.execute(self.connection)
-            return d
+            return b.execute(self.connection)
 
         d = self.get_policy(policy_id)
-        d.addCallback(_do_update_launch)
+        d.addCallback(_do_update_schedule)
+        d.addCallback(_do_update_policy)
         return d
 
     def delete_policy(self, policy_id):
@@ -863,34 +890,29 @@ class CassScalingGroupCollection:
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
                                     get_consistency_level('list', 'events'))
-        d.addCallback(lambda rows: [(row['tenantId'], row['groupId'],
-                                     row['policyId'], row['trigger'])
-                                    for row in rows])
         return d
 
-    def delete_events(self, policy_ids):
+    def update_delete_events(self, delete_policy_ids, update_events):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.delete_events`
+        see :meth:`otter.models.interface.IScalingScheduleCollection.update_delete_events`
         """
-        query, params = _delete_events_query_and_params(policy_ids, self.event_table)
-        d = self.connection.execute(query, params,
-                                    get_consistency_level('delete', 'events'))
-        return d
+        # First delete all events
+        all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
+        query, data = _delete_events_query_and_params(all_delete_ids, self.event_table)
+        d = self.connection.execute(query, data, get_consistency_level('delete', 'events'))
 
-    def update_events_trigger(self, policy_and_triggers):
-        """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.update_events_trigger`
-        """
-        queries = []
-        data = {}
-        for i, (policy_id, trigger) in enumerate(policy_and_triggers):
-            queries.append(_cql_update_event.format(cf=self.event_table,
-                                                    trigger=':trigger{0}'.format(i),
-                                                    policy_id=':policyid{0}'.format(i)))
-            data.update({'trigger{0}'.format(i): trigger,
-                         'policyid{0}'.format(i): policy_id})
-        b = Batch(queries, data, get_consistency_level('update', 'events'))
-        return b.execute(self.connection)
+        # Then insert rows for trigger times to be updated. This is because trigger cannot be
+        # updated on an existing row since it is part of primary key
+        def _do_update(_):
+            queries, data = list(), dict()
+            for i, event in enumerate(update_events):
+                polname = 'policy{}'.format(i)
+                queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
+                data.update({polname + key: event[key] for key in event})
+            b = Batch(queries, data, get_consistency_level('update', 'events'))
+            return b.execute(self.connection)
+
+        return update_events and d.addCallback(_do_update) or d
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

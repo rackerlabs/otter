@@ -4,9 +4,12 @@ Test authentication functions.
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
+from twisted.internet.task import Clock
 
-from otter.test.utils import patch, SameJSON
+from zope.interface.verify import verifyObject
+
+from otter.test.utils import patch, SameJSON, iMock
 
 from otter.util.http import APIError, RequestError
 
@@ -16,6 +19,8 @@ from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
+from otter.auth import CachingAuthenticator
+from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -271,6 +276,12 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.ia = ImpersonatingAuthenticator(self.user, self.password,
                                              self.url, self.admin_url)
 
+    def test_verifyObject(self):
+        """
+        ImpersonatingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.ia)
+
     def test_authenticate_tenant_auth_as_service_user(self):
         """
         authenticate_tenant authenticates as the service user.
@@ -359,4 +370,138 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.endpoints_for_token.return_value = fail(APIError(500, '500'))
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
+        self.assertTrue(failure.check(APIError))
+
+
+class CachingAuthenticatorTests(TestCase):
+    """
+    Test the in memory cache of authentication tokens.
+    """
+    def setUp(self):
+        """
+        Configure a clock and a fake auth function.
+        """
+        self.authenticator = iMock(IAuthenticator)
+
+        def authenticate_tenant(tenant_id):
+            return succeed(('auth-token', 'catalog'))
+
+        self.authenticator.authenticate_tenant.side_effect = authenticate_tenant
+        self.auth_function = self.authenticator.authenticate_tenant
+
+        self.clock = Clock()
+        self.ca = CachingAuthenticator(self.clock, self.authenticator, 10)
+
+    def test_verifyObject(self):
+        """
+        CachingAuthenticator provides the IAuthenticator interface.
+        """
+        verifyObject(IAuthenticator, self.ca)
+
+    def test_calls_auth_function_with_empty_cache(self):
+        """
+        authenticate_tenant with no items in the cache returns the result
+        of the auth_function passed to the authenticator.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+        self.auth_function.assert_called_once_with(1)
+
+    def test_returns_token_from_cache(self):
+        """
+        authenticate_tenant returns tokens from the cache without calling
+        auth_function again for subsequent calls.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        self.auth_function.assert_called_once_with(1)
+
+    def test_cache_expires(self):
+        """
+        authenticate_tenant will call auth_function again after the ttl has
+        lapsed.
+        """
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token', 'catalog'))
+
+        self.auth_function.assert_called_once_with(1)
+
+        self.clock.advance(20)
+
+        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+
+        result = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(result, ('auth-token2', 'catalog2'))
+
+        self.auth_function.assert_has_calls([mock.call(1), mock.call(1)])
+
+    def test_serialize_auth_requests(self):
+        """
+        authenticate_tenant will serialize requests to authenticate the same
+        tenant to prevent multiple outstanding auth requests when no
+        value is cached.
+        """
+        auth_d = Deferred()
+        self.auth_function.side_effect = lambda _: auth_d
+
+        d1 = self.ca.authenticate_tenant(1)
+        d2 = self.ca.authenticate_tenant(1)
+
+        self.assertNotIdentical(d1, d2)
+
+        self.auth_function.assert_called_once_with(1)
+
+        auth_d.callback(('auth-token2', 'catalog2'))
+
+        r1 = self.successResultOf(d1)
+        r2 = self.successResultOf(d2)
+
+        self.assertEqual(r1, r2)
+        self.assertEqual(r1, ('auth-token2', 'catalog2'))
+
+    def test_cached_value_per_tenant(self):
+        """
+        authenticate_tenant calls auth_function for each distinct tenant_id
+        not found in the cache.
+        """
+        r1 = self.successResultOf(self.ca.authenticate_tenant(1))
+        self.assertEqual(r1, ('auth-token', 'catalog'))
+
+        self.auth_function.side_effect = lambda _: succeed(('auth-token2', 'catalog2'))
+
+        r2 = self.successResultOf(self.ca.authenticate_tenant(2))
+
+        self.assertEqual(r2, ('auth-token2', 'catalog2'))
+
+    def test_auth_failure_propagated_to_waiters(self):
+        """
+        authenticate_tenant propagates auth failures to all waiters
+        """
+        auth_d = Deferred()
+        self.auth_function.side_effect = lambda _: auth_d
+
+        d1 = self.ca.authenticate_tenant(1)
+        d2 = self.ca.authenticate_tenant(1)
+
+        self.assertNotIdentical(d1, d2)
+
+        auth_d.errback(APIError(500, '500'))
+
+        self.failureResultOf(d1)
+
+        f2 = self.failureResultOf(d2)
+        self.assertTrue(f2.check(APIError))
+
+    def test_auth_failure_propagated_to_caller(self):
+        """
+        authenticate_tenant propagates auth failures to the caller.
+        """
+        self.auth_function.side_effect = lambda _: fail(APIError(500, '500'))
+
+        d = self.ca.authenticate_tenant(1)
+        failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))

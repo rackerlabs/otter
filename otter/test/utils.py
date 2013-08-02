@@ -10,6 +10,8 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
 
+from otter.log.bound import BoundLog
+
 
 class matches(object):
     """
@@ -64,38 +66,6 @@ class CheckFailure(object):
     def __eq__(self, other):
         return isinstance(other, Failure) and other.check(
             self.exception_type)
-
-
-class DeferredTestMixin(object):
-    """
-    Class that can be used for asserting whether a ``Deferred`` has fired or
-    failed
-    """
-
-    def assert_deferred_failed(self, deferred, *expected_failures):
-        """
-        Asserts that the deferred should have errbacked with the given
-        expected failures.  This is like
-        :func:`twisted.trial.unittest.TestCase.assertFailure` except that it
-        asserts that it has _already_ failed.
-
-        :param deferred: the ``Deferred`` to check
-        :type deferred: :class:`twisted.internet.defer.Deferred`
-
-        :param expected_failures: all the failures that are expected.  If None,
-            will return true so long as the deferred errbacks, with whatever
-            error.  If provided, ensures that the failure matches
-            one of the expected failures.
-        :type expected_failures: Exceptions
-
-        :return: whatever the Exception was that was expected, or None if the
-            test failed
-        """
-        failure = self.failureResultOf(deferred)
-        if expected_failures and not failure.check(*expected_failures):
-            self.fail('\nExpected: {0!r}\nGot:\n{1!s}'.format(
-                expected_failures, failure))
-        return failure
 
 
 def fixture(fixture_name):
@@ -200,3 +170,26 @@ class LockMixin(object):
             return defer.succeed(release_result)
         lock.release.side_effect = _release
         return lock
+
+
+def mock_log(*args, **kwargs):
+    """
+    Returns a BoundLog whose msg and err methods are mocks.  Makes it easier
+    to test logging, since instead of making a mock object and testing::
+
+        log.bind.return_value.msg.assert_called_with(...)
+
+    This can be done instead::
+
+        log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
+
+    Since in all likelyhood, testing that certain values are bound would be more
+    important than testing the exact logged message.
+    """
+    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+
+
+class DummyException(Exception):
+    """
+    Fake exception
+    """

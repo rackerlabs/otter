@@ -5,7 +5,6 @@ from test_repo.autoscale.fixtures import ScalingGroupFixture
 
 
 class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
-
     """
     Verify update scheduler policy
     """
@@ -39,24 +38,10 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         and verify the response code 204, headers and data
         """
         upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(6000)}
-        updated_at_style_policy = self._update_policy(self.group.id,
-                                                      self.at_style_policy,
-                                                      upd_args)
-        self.assertEquals(
-            updated_at_style_policy.id, self.at_style_policy['id'],
-            msg='Policy Id is not as expected after update')
-        self.assertEquals(
-            updated_at_style_policy.links, self.at_style_policy['links'],
-            msg='Links for the scaling policy is none after the update')
-        self.assertEquals(
-            updated_at_style_policy.name, self.at_style_policy['name'],
-            msg='Name of the policy is None after update')
-        self.assertEquals(
-            updated_at_style_policy.cooldown, self.at_style_policy['cooldown'],
-            msg='Cooldown of the policy in null after an update')
-        self.assertEquals(
-            updated_at_style_policy.change, self.at_style_policy['change'],
-            msg='Change in the policy is not as expected')
+        updated_at_style_policy = self._update_policy(
+            self.group.id, self.at_style_policy, upd_args)
+        self._assert_updated_policy(updated_at_style_policy,
+                                    self.at_style_policy)
         self.assertEquals(updated_at_style_policy.args.at, upd_args['at'],
                           msg='At style schedule policy did not update for group {0}'
                           .format(self.group.id))
@@ -68,24 +53,9 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         """
         upd_args = {'cron': '0 0 * * 1'}
         updated_cron_style_policy = self._update_policy(self.group.id,
-                                                        self.cron_style_policy,
-                                                        upd_args)
-        self.assertEquals(
-            updated_cron_style_policy.id, self.cron_style_policy['id'],
-            msg='Policy Id is not as expected after update')
-        self.assertEquals(
-            updated_cron_style_policy.links, self.cron_style_policy['links'],
-            msg='Links for the scaling policy is none after the update')
-        self.assertEquals(
-            updated_cron_style_policy.name, self.cron_style_policy['name'],
-            msg='Name of the policy is None after update')
-        self.assertEquals(
-            updated_cron_style_policy.cooldown, self.cron_style_policy[
-                'cooldown'],
-            msg='Cooldown of the policy in null after an update')
-        self.assertEquals(
-            updated_cron_style_policy.change, self.cron_style_policy['change'],
-            msg='Change in the policy is not as expected')
+                                                        self.cron_style_policy, upd_args)
+        self._assert_updated_policy(updated_cron_style_policy,
+                                    self.cron_style_policy)
         self.assertEquals(
             updated_cron_style_policy.args.cron, upd_args['cron'],
             msg='Cron style schedule policy did not update for group {0}'
@@ -141,7 +111,7 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
                               update_policy_err_response.status_code, self.group.id,
                               self.cron_style_policy['id']))
 
-    def _update_policy(self, group_id, policy, upd_args):
+    def _update_policy(self, group_id, policy, upd_args, status=204):
         """
         Updates the policy with the given schedule value
         """
@@ -157,10 +127,31 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
             group_id,
             policy['id'])
         updated_policy = policy_response.entity
-        self.assertEquals(update_policy_response.status_code, 204,
+        self.assertEquals(update_policy_response.status_code, status,
                           msg='Update scaling policy failed with {0}'
                           .format(update_policy_response.status_code))
         self.assertTrue(update_policy_response.headers is not None,
                         msg='The headers are not as expected')
         self.validate_headers(update_policy_response.headers)
         return updated_policy
+
+    def _assert_updated_policy(self, updated_policy, policy):
+        """
+        Verify the updated policy
+        """
+        self.assertEquals(
+            updated_policy.id, policy['id'],
+            msg='Policy Id is not as expected after update')
+        self.assertEquals(
+            updated_policy.links, policy['links'],
+            msg='Links for the scaling policy is none after the update')
+        self.assertEquals(
+            updated_policy.name, policy['name'],
+            msg='Name of the policy is None after update')
+        self.assertEquals(
+            updated_policy.cooldown, policy[
+                'cooldown'],
+            msg='Cooldown of the policy in null after an update')
+        self.assertEquals(
+            updated_policy.change, policy['change'],
+            msg='Change in the policy is not as expected')

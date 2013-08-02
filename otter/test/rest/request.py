@@ -17,7 +17,7 @@ from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
 from otter.rest.application import root, set_store
-from otter.test.utils import iMock, DeferredTestMixin, patch
+from otter.test.utils import iMock, patch
 
 
 def _render(resource, request):
@@ -56,8 +56,6 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     """
     # build mock request
     mock_request = requestMock(endpoint, method, headers=headers, body=body)
-    # because the first one is empty, it breaks getChildForRequest
-    mock_request.postpath.pop(0)
 
     # these are used when writing the response
     mock_request.code = 200
@@ -135,7 +133,7 @@ class DummyException(Exception):
     pass
 
 
-class RequestTestMixin(DeferredTestMixin):
+class RequestTestMixin(object):
     """
     Mixin that has utilities for asserting something about the status code,
     getting header info, etc.

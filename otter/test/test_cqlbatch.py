@@ -3,12 +3,11 @@ from twisted.trial.unittest import TestCase
 from otter.util.cqlbatch import Batch
 import mock
 from twisted.internet import defer
-from otter.test.utils import DeferredTestMixin
 
 from silverberg.client import ConsistencyLevel
 
 
-class CqlBatchTestCase(DeferredTestMixin, TestCase):
+class CqlBatchTestCase(TestCase):
     """
     CQL Batch wrapper test case
     """

@@ -6,6 +6,7 @@ Loads cql into Cassandra
 
 import argparse
 import sys
+import re
 
 from cql.apivalues import ProgrammingError
 from cql.connection import connect
@@ -84,7 +85,7 @@ def run(args):
     if args.verbose > 0:
         print "Attempting to connect to {0}:{1}".format(args.host, args.port)
     try:
-        connection = connect(args.host, args.port, cql_version='3')
+        connection = connect(args.host, args.port, cql_version='3.0.4')
     except Exception as e:
         print "CONNECTION ERROR: {0}".format(e.message)
         sys.exit(1)
@@ -100,7 +101,9 @@ def run(args):
             message = pe.message.lower()
             significant_error = (
                 "already exist" not in message and
-                "existing keyspace" not in message)
+                "existing keyspace" not in message and
+                "existing column" not in message and
+                not re.search("index '.*' could not be found", message))
 
             if args.verbose > 1 or significant_error:
                 print '\n----\n'

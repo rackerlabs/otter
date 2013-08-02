@@ -4,8 +4,6 @@ Tests for :mod:`otter.models.mock`
 from collections import namedtuple
 import json
 import mock
-from datetime import datetime
-import iso8601
 
 from twisted.trial.unittest import TestCase
 from jsonschema import ValidationError
@@ -28,6 +26,9 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch
+from otter.util.timestamp import from_timestamp
+
+from otter.scheduler import next_cron_occurrence
 
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
@@ -356,7 +357,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.view_config()
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -400,7 +401,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.view_launch_config()
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM launch_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -467,7 +468,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         for callback in updates:
             self.group.view_config = mock.MagicMock(
                 return_value=defer.fail(DummyException('boo')))
-            self.assert_deferred_failed(callback(), DummyException)
+            self.failureResultOf(callback(), DummyException)
 
             # view is called
             self.group.view_config.assert_called_once_with()
@@ -497,7 +498,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = []
         self.returns = [cass_response]
         d = self.group.get_policy('3444')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
         expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
                        'AND "groupId" = :groupId AND "policyId" = :policyId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g", "policyId": "3444"}
@@ -595,8 +596,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingGroupError`
         """
-        self.assert_deferred_failed(self.group.list_policies(),
-                                    NoSuchScalingGroupError)
+        self.failureResultOf(self.group.list_policies(),
+                             NoSuchScalingGroupError)
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_list_policy_no_version(self):
@@ -654,7 +655,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                     '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
                         "groupId": '12345678g',
                         "policy0Id": '12345678',
-                        "policy0Trigger": iso8601.parse_date(expected_at),
+                        "policy0Trigger": from_timestamp(expected_at),
                         "tenantId": '11111'}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
@@ -708,98 +709,169 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         :class:`NoSuchPolicyError` is raised
         """
         d = self.group.delete_policy('3222')
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
         mock_get_policy.assert_called_once_with('3222')
         self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
-    def test_update_scaling_policy(self):
+    def validate_policy_update(self, policy_json):
+        """
+        Validate CQL calls made to update the policy
+        """
+        expectedCql = (
+            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
+            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
+        expectedData = {"policy": policy_json,
+                        "groupId": '12345678g',
+                        "policyId": '12345678',
+                        "tenantId": '11111'}
+        self.connection.execute.assert_called_with(
+            expectedCql, expectedData, ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "helvetica"}))
+    def test_update_scaling_policy(self, mock_get_policy):
         """
         Test that you can update a scaling policy, and if successful it returns
         None
         """
-        cass_response = [{'data': '{"type": "helvetica"}'}]
-        self.returns = [cass_response, None]
+        self.returns = [None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "helvetica"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
-        expectedCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "helvetica"}',
-                        "groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "helvetica"}')
 
-    def test_update_scaling_policy_schedule_no_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"ott": "er"}}))
+    def test_update_scaling_policy_schedule_no_change(self, mock_get_policy):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        Schedule policy update with no change in args does not update the scaling_schedule table.
+        It only updates the scaling_policies table
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"ott": "er"}}'}]
-        self.returns = [cass_response, None]
+        self.returns = [None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
         self.assertIsNone(self.successResultOf(d))  # update returns None
-        expectedCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :policy) APPLY BATCH;')
-        expectedData = {"policy": '{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}',
-                        "groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}')
+        self.assertEqual(self.connection.execute.call_count, 1)
 
-    def test_update_scaling_policy_type_change(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "helvetica"}))
+    def test_update_scaling_policy_type_change(self, mock_get_policy):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        Policy type cannot be changed while updating it
         """
-        cass_response = [{'data': '{"type": "helvetica"}'}]
-        self.returns = [cass_response, None]
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
-        self.assert_deferred_failed(d, ValidationError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        self.failureResultOf(d, ValidationError)
+        self.assertFalse(self.connection.execute.called)
 
-    def test_update_scaling_policy_schedule_change(self):
+    def validate_schedule_update(self, insert_event_cql, insert_event_data_part):
         """
-        Test that you can update a scaling policy, and if successful it returns
-        None
+        validate cql calls made to update scaling_schedule table
         """
-        cass_response = [{'data': '{"type": "schedule", "args": {"ott":"er"}}'}]
-        self.returns = [cass_response, None]
-        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"y": "arrr"}})
-        self.assert_deferred_failed(d, ValidationError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(
-            expectedCql, expectedData, ConsistencyLevel.TWO)
+        delCql = 'DELETE FROM scaling_schedule WHERE "policyId" = :policyId;'
+        delData = {'policyId': '12345678'}
+        insert_event_data = {"groupId": '12345678g',
+                             "policyId": '12345678',
+                             "tenantId": '11111'}
+        insert_event_data.update(insert_event_data_part)
+        self.assertEqual(self.connection.execute.call_args_list[:2],
+                         [mock.call(delCql, delData, ConsistencyLevel.TWO),
+                          mock.call(insert_event_cql, insert_event_data, ConsistencyLevel.TWO)])
 
-    def test_update_scaling_policy_bad(self):
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule",
+                                            "args": {"at": "2013-07-30T19:03:12Z"}}))
+    def test_update_scaling_policy_at_schedule_change(self, mock_get_policy):
+        """
+        Updating at-style schedule policy updates respective entry in
+        scaling_schedule table also
+        """
+        self.returns = [None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
+        self.assertIsNone(self.successResultOf(d))
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
+                            'APPLY BATCH;')
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")})
+        self.validate_policy_update('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                    '"type": "schedule"}')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"cron": "1 * * * *"}}))
+    def test_update_scaling_policy_cron_schedule_change(self, mock_get_policy):
+        """
+        Updating cron-style schedule policy updates respective entry in
+        scaling_schedule table also
+        """
+        self.returns = [None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "2 0 * * *"}})
+        self.assertIsNone(self.successResultOf(d))
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
+                            'trigger, cron) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
+                            'APPLY BATCH;')
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                       'policycron': "2 0 * * *"})
+        self.validate_policy_update('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                    '"type": "schedule"}')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule",
+                                            "args": {"at": "2013-07-30T19:03:12Z"}}))
+    def test_update_scaling_policy_at_to_cron_schedule_change(self, mock_get_policy):
+        """
+        Updating at-style schedule policy to cron-style updates respective entry in
+        scaling_schedule table also
+        """
+        self.returns = [None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "2 0 * * *"}})
+        self.assertIsNone(self.successResultOf(d))
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", '
+                            'trigger, cron) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger, :policycron) '
+                            'APPLY BATCH;')
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': next_cron_occurrence("2 0 * * *"),
+                                       'policycron': "2 0 * * *"})
+        self.validate_policy_update('{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
+                                    '"type": "schedule"}')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({"type": "schedule", "args": {"cron": "* * * * *"}}))
+    def test_update_scaling_policy_cron_to_at_schedule_change(self, mock_get_policy):
+        """
+        Updating cron-style schedule policy to at-style updates respective entry in
+        scaling_schedule table also
+        """
+        self.returns = [None, None, None]
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"at": "2015-09-20T10:00:12Z"}})
+        self.assertIsNone(self.successResultOf(d))
+        insert_event_cql = ('BEGIN BATCH '
+                            'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger) '
+                            'VALUES (:tenantId, :groupId, :policyId, :policyTrigger) '
+                            'APPLY BATCH;')
+        self.validate_schedule_update(insert_event_cql,
+                                      {'policyTrigger': from_timestamp("2015-09-20T10:00:12Z")})
+        self.validate_policy_update('{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
+                                    '"type": "schedule"}')
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
+    def test_update_scaling_policy_bad(self, mock_get_policy):
         """
         Tests that if you try to update a scaling policy that doesn't exist, the right thing happens
         """
-        self.returns = [[], None]
         d = self.group.update_policy('12345678', {"b": "lah"})
-        self.assert_deferred_failed(d, NoSuchPolicyError)
-        expectedCql = ('SELECT data FROM scaling_policies WHERE "tenantId" = :tenantId '
-                       'AND "groupId" = :groupId AND "policyId" = :policyId;')
-        expectedData = {"groupId": '12345678g',
-                        "policyId": '12345678',
-                        "tenantId": '11111'}
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.failureResultOf(d, NoSuchPolicyError)
+        self.assertFalse(self.connection.execute.called)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_config_bad(self):
@@ -809,7 +881,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.update_config({"b": "lah"})
-        self.assert_deferred_failed(d, NoSuchScalingGroupError)
+        self.failureResultOf(d, NoSuchScalingGroupError)
         expectedCql = ('SELECT data FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
@@ -824,8 +896,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.group.get_policy = mock.MagicMock(
             return_value=defer.fail(DummyException("Cassandra failure")))
-        self.assert_deferred_failed(self.group.update_policy('1', {'b': 'lah'}),
-                                    DummyException)
+        self.failureResultOf(self.group.update_policy('1', {'b': 'lah'}),
+                             DummyException)
 
         # view is called
         self.group.get_policy.assert_called_once_with('1')
@@ -928,7 +1000,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
-        self.assert_deferred_failed(d, NoSuchPolicyError)
+        self.failureResultOf(d, NoSuchPolicyError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
@@ -1028,8 +1100,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If the group does not exist, `list_policies` raises a
         :class:`NoSuchScalingPolicy`
         """
-        self.assert_deferred_failed(self.group.list_webhooks('23456789'),
-                                    NoSuchPolicyError)
+        self.failureResultOf(self.group.list_webhooks('23456789'),
+                             NoSuchPolicyError)
         mock_naive.assert_called_with('23456789')
         mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
@@ -1059,7 +1131,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[]]
         d = self.group.get_webhook('3444', '4555')
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_view_webhook_no_version(self):
@@ -1132,7 +1204,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         class:`NoSuchWebhookError` failure, and no update is attempted
         """
         d = self.group.update_webhook('3444', '4555', {'name': 'aname'})
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.assertEqual(len(self.connection.execute.mock_calls), 0)
         self.flushLoggedErrors(NoSuchWebhookError)
 
@@ -1165,7 +1237,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[], None]
         d = self.group.delete_webhook('3444', '4555')
-        self.assert_deferred_failed(d, NoSuchWebhookError)
+        self.failureResultOf(d, NoSuchWebhookError)
         self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
         self.flushLoggedErrors(NoSuchWebhookError)
 
@@ -1204,8 +1276,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed('policies'))
 
-        self.assert_deferred_failed(self.group.view_manifest(),
-                                    NoSuchScalingGroupError)
+        self.failureResultOf(self.group.view_manifest(),
+                             NoSuchScalingGroupError)
         self.group.view_config.assert_called_once_with()
         self.assertEqual(len(self.group.view_launch_config.mock_calls), 0)
         self.assertEqual(len(self.group._naive_list_policies), 0)
@@ -1218,7 +1290,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, {'1': {}}, {}, None, {}, False))
-        self.assert_deferred_failed(self.group.delete_group(), GroupNotEmptyError)
+        self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
         self.assertTrue(mock_view_state.called)
@@ -1352,56 +1424,99 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         Tests that you can fetch a list of events
         """
-        self.returns = [_cassandrify_data(
-            [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef', 'trigger': 100},
-             {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex', 'trigger': 122}])]
+        self.returns = [[{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                          'trigger': 100, 'cron': 'c1'},
+                         {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
+                          'trigger': 122, 'cron': 'c2'}]]
+        fetch_returns = self.returns[0]
 
         expectedData = {'now': 1234, 'size': 100}
-        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger" FROM scaling_schedule '
+        expectedCql = ('SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM scaling_schedule '
                        'WHERE trigger <= :now LIMIT :size ALLOW FILTERING;')
 
         result = self.validate_fetch_batch_of_events(1234, 100)
-        self.assertEqual(result, [('1d2', 'gr2', 'ef', 100),
-                                  ('1d2', 'gr2', 'ex', 122)])
+        self.assertEqual(result, fetch_returns)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-    def test_delete_events(self):
+    def test_update_delete_events(self):
         """
-        Tests that you can delete event of a given policy_ids
+        Tests for `update_delete_events`
         """
-        expectedData = {'policyid0': 'p1', 'policyid1': 'p2'}
-        expectedCql = 'DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);'
-        result = self.successResultOf(self.collection.delete_events(['p1', 'p2']))
+        del_ids = ['p1', 'p2', 'p3']
+        up_events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                      'trigger': 100, 'cron': 'c1'},
+                     {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
+                      'trigger': 122, 'cron': 'c2'}]
+        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1,'
+                  ':policyid2,:policyid3,:policyid4);')
+        deldata = {'policyid0': 'p1', 'policyid1': 'p2', 'policyid2': 'p3',
+                   'policyid3': 'ef', 'policyid4': 'ex'}
+        insertcql = ('BEGIN BATCH '
+                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                     'VALUES (:policy0tenantId, :policy0groupId, :policy0policyId, :policy0trigger, '
+                     ':policy0cron); '
+                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                     'VALUES (:policy1tenantId, :policy1groupId, :policy1policyId, :policy1trigger, '
+                     ':policy1cron); '
+                     'APPLY BATCH;')
+        insertdata = {'policy0tenantId': '1d2', 'policy0groupId': 'gr2', 'policy0policyId': 'ef',
+                      'policy0trigger': 100, 'policy0cron': 'c1',
+                      'policy1tenantId': '1d2', 'policy1groupId': 'gr2', 'policy1policyId': 'ex',
+                      'policy1trigger': 122, 'policy1cron': 'c2'}
+
+        self.returns = [None, None]
+        result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
         self.assertEqual(result, None)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        self.assertEqual(self.connection.execute.mock_calls,
+                         [mock.call(delcql, deldata, ConsistencyLevel.TWO),
+                          mock.call(insertcql, insertdata, ConsistencyLevel.TWO)])
 
-    def test_update_events_trigger(self):
+    def test_update_delete_events_no_delete(self):
         """
-        Tests that you can update trigger times of one or more policies
+        Tests for `update_delete_events` when there are no events to delete. only events to update
         """
-        datetime0 = datetime(2012, 10, 20, 5, 24, 31)
-        datetime1 = datetime(2012, 10, 22, 7, 20, 30)
-        expectedData = {
-            'trigger0': datetime0,
-            'policyid0': 'p1',
-            'trigger1': datetime1,
-            'policyid1': 'p2'}
-        expectedCql = ('BEGIN BATCH '
-                       'UPDATE scaling_schedule SET trigger = :trigger0 '
-                       'WHERE "policyId" = :policyid0; '
-                       'UPDATE scaling_schedule SET trigger = :trigger1 '
-                       'WHERE "policyId" = :policyid1; '
-                       'APPLY BATCH;')
-        d = self.collection.update_events_trigger([('p1', datetime0),
-                                                   ('p2', datetime1)])
-        self.assertEqual(self.successResultOf(d), None)
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
+        del_ids = []
+        up_events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                      'trigger': 100, 'cron': 'c1'},
+                     {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
+                      'trigger': 122, 'cron': 'c2'}]
+        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);')
+        deldata = {'policyid0': 'ef', 'policyid1': 'ex'}
+        insertcql = ('BEGIN BATCH '
+                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                     'VALUES (:policy0tenantId, :policy0groupId, :policy0policyId, :policy0trigger, '
+                     ':policy0cron); '
+                     'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
+                     'VALUES (:policy1tenantId, :policy1groupId, :policy1policyId, :policy1trigger, '
+                     ':policy1cron); '
+                     'APPLY BATCH;')
+        insertdata = {'policy0tenantId': '1d2', 'policy0groupId': 'gr2', 'policy0policyId': 'ef',
+                      'policy0trigger': 100, 'policy0cron': 'c1',
+                      'policy1tenantId': '1d2', 'policy1groupId': 'gr2', 'policy1policyId': 'ex',
+                      'policy1trigger': 122, 'policy1cron': 'c2'}
+
+        self.returns = [None, None]
+        result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
+        self.assertEqual(result, None)
+        self.assertEqual(self.connection.execute.mock_calls,
+                         [mock.call(delcql, deldata, ConsistencyLevel.TWO),
+                          mock.call(insertcql, insertdata, ConsistencyLevel.TWO)])
+
+    def test_update_delete_events_no_update(self):
+        """
+        Tests for `update_delete_events` when there are no events to update. only events to delete
+        """
+        del_ids = ['p1', 'p2', 'p3']
+        up_events = []
+        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN '
+                  '(:policyid0,:policyid1,:policyid2);')
+        deldata = {'policyid0': 'p1', 'policyid1': 'p2', 'policyid2': 'p3'}
+        self.returns = [None, None]
+        result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
+        self.assertEqual(result, None)
+        self.connection.execute.assert_called_once_with(delcql, deldata, ConsistencyLevel.TWO)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
@@ -1652,7 +1767,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = ('SELECT "tenantId", "groupId", "policyId" FROM policy_webhooks WHERE '
                        '"webhookKey" = :webhookKey;')
         d = self.collection.webhook_info_by_hash(self.mock_log, 'x')
-        self.assert_deferred_failed(d, UnrecognizedCapabilityError)
+        self.failureResultOf(d, UnrecognizedCapabilityError)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

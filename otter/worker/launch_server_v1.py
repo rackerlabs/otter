@@ -31,6 +31,22 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 
 
+class UnexpectedServerStatus(Exception):
+    """
+    An exception to be raised when a server is found in an unexpected state.
+    """
+    def __init__(self, server_id, status, expected_status):
+        super(UnexpectedServerStatus, self).__init__(
+            'Expected {server_id} to have {expected_status}, '
+            'has {status}'.format(server_id=server_id,
+                                  status=status,
+                                  expected_status=expected_status)
+        )
+        self.server_id = server_id
+        self.status = status
+        self.expected_status = expected_status
+
+
 def server_details(server_endpoint, auth_token, server_id):
     """
     Fetch the details of a server as specified by id.
@@ -50,24 +66,21 @@ def server_details(server_endpoint, auth_token, server_id):
     return d.addCallback(treq.json_content)
 
 
-def wait_for_status(log,
+def wait_for_active(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    expected_status,
                     interval=5,
                     clock=None):
     """
-    Wait until the server specified by server_id's status is expected_status.
+    Wait until the server specified by server_id's status is 'ACTIVE'
 
     @TODO: Timeouts
-    @TODO: Errback on error statuses.
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param str expected_status: Nova status string.
     :param int interval: Polling interval.  Default: 5.
 
     :return: Deferred that fires when the expected status has been seen.
@@ -78,16 +91,20 @@ def wait_for_status(log,
     d = Deferred()
 
     def poll():
-        def _check_status(server):
-            log.msg("Waiting for status {expected_status} got {status}.",
-                    expected_status=expected_status,
-                    status=server['server']['status'])
+        def check_status(server):
+            status = server['server']['status']
 
-            if server['server']['status'] == expected_status:
+            log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
+            if server['server']['status'] == 'ACTIVE':
                 d.callback(server)
+            elif server['server']['status'] != 'BUILD':
+                d.errback(UnexpectedServerStatus(
+                    server_id,
+                    status,
+                    'ACTIVE'))
 
         sd = server_details(server_endpoint, auth_token, server_id)
-        sd.addCallback(_check_status)
+        sd.addCallback(check_status)
 
         return sd
 
@@ -96,11 +113,11 @@ def wait_for_status(log,
     if clock is not None:  # pragma: no cover
         lc.clock = clock
 
-    def _stop(r):
+    def stop(r):
         lc.stop()
         return r
 
-    d.addCallback(_stop)
+    d.addBoth(stop)
 
     return lc.start(interval).addCallback(lambda _: d)
 
@@ -312,11 +329,11 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     def _wait_for_server(server):
         ilog = log.bind(instance_id=server['server']['id'])
-        return wait_for_status(
+        return wait_for_active(
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'], 'ACTIVE')
+            server['server']['id'])
 
     d.addCallback(_wait_for_server)
 
@@ -372,7 +389,6 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
-
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
@@ -404,11 +420,70 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                        headers=headers(auth_token))
-        d.addCallback(check_success, [204])
-        d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
-        return d
+        return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
+    return d
+
+
+def verified_delete(log,
+                    server_endpoint,
+                    auth_token,
+                    server_id,
+                    interval=5,
+                    clock=None):
+    """
+    Attempt to delete a server from the server endpoint, and ensure that it is
+    deleted by trying again until getting the server results in a 404.
+
+    There is a possibility Nova sometimes fails to delete servers.  Log if this
+    happens, and if so, re-evaluate workarounds.
+
+    @TODO: Timeouts
+
+    :param log: A bound logger.
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth token.
+    :param str server_id: Opaque nova server id.
+    :param int interval: Deletion interval - how long until a delete is retried.
+        Default: 2.
+
+    :return: Deferred that fires when the expected status has been seen.
+    """
+    del_log = log.bind(server_id=server_id)
+    del_log.msg('Deleting server')
+
+    d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
+                    headers=headers(auth_token))
+    d.addCallback(check_success, [204])
+    d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+
+    def looping_verify_deletion(_):
+        verify = Deferred()
+
+        def on_success(_):
+            del_log.msg('Server deleted successfully')
+            verify.callback(None)
+
+        def on_failure(f):
+            del_log.msg('Server not yet deleted', exc=f)
+
+        def check_status():
+            vd = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            vd.addCallback(check_success, [404])
+            vd.addCallback(on_success)
+            vd.addErrback(on_failure)
+            return vd
+
+        lc = LoopingCall(check_status)
+
+        if clock is not None:  # pragma: no cover
+            lc.clock = clock
+
+        verify.addBoth(lambda _: lc.stop())
+        lc.start(interval)
+
+    d.addCallback(looping_verify_deletion)
     return d

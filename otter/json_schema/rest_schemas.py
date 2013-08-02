@@ -10,10 +10,6 @@ from itertools import cycle
 
 from otter.json_schema.group_schemas import (
     policy, config, launch_config, webhook)
-from otter.json_schema.group_examples import (
-    launch_server_config as launch_server_config_examples,
-    config as config_examples,
-    policy as policy_examples)
 
 
 #------------- subschemas and other utilities -----------------
@@ -174,8 +170,7 @@ list_policies_response = _openstackify_schema("policies", _view_policies_list,
 
 create_policies_request = {
     "type": "array",
-    "items": [policy],
-    "uniqueItems": True
+    "items": [policy]
 }
 
 create_policies_response = _openstackify_schema("policies", _view_policies_list)
@@ -196,22 +191,6 @@ create_group_request = {
     "additionalProperties": False
 }
 
-create_group_request_examples = [
-    {
-        "groupConfiguration": config_examples()[0],
-        "launchConfiguration": launch_server_config_examples()[0]
-    },
-    {
-        "groupConfiguration": config_examples()[0],
-        "launchConfiguration": launch_server_config_examples()[0],
-        "scalingPolicies": [policy_examples()[0]]
-    },
-    {
-        "groupConfiguration": config_examples()[1],
-        "launchConfiguration": launch_server_config_examples()[1],
-        "scalingPolicies": policy_examples()[1:3]
-    }
-]
 
 # the response from creating a group and the response for viewing the manifest
 # is exactly the same.
