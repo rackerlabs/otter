@@ -21,8 +21,6 @@
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#group_config"/>
          <resource href="../../wadl/autoscale.wadl#launch_configuration"/>
-         <resource href="../../wadl/autoscale.wadl#pause"/>
-         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
    <section xml:id="Policies">
@@ -31,6 +29,8 @@
          <resource href="../../wadl/autoscale.wadl#policies"/>
          <resource href="../../wadl/autoscale.wadl#policy"/>
          <resource href="../../wadl/autoscale.wadl#execute"/>
+         <resource href="../../wadl/autoscale.wadl#pause"/>
+         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
    <section xml:id="Executions">
