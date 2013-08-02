@@ -14,12 +14,6 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
-try:
-    from txairbrake.observers import AirbrakeLogObserver as _a
-    AirbrakeLogObserver = _a   # to get around pyflakes
-except ImportError:
-    AirbrakeLogObserver = None
-
 from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassScalingGroupCollection
@@ -82,19 +76,6 @@ def makeService(config):
     Set up the otter-api service.
     """
     set_config_data(dict(config))
-
-    if config_value('airbrake'):
-        if AirbrakeLogObserver is not None:
-            airbrake = AirbrakeLogObserver(
-                config_value('airbrake.api_key'),
-                config_value('environment'),
-                use_ssl=True
-            )
-
-            airbrake.start()
-        else:
-            warnings.warn("There is a configuration option for Airbrake, but "
-                          "txairbrake is not installed.")
 
     if not config_value('mock'):
         seed_endpoints = [
