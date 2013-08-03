@@ -3,10 +3,6 @@ System tests for multiple scheduler and webhook policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-<<<<<<< HEAD
-import unittest
-=======
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
 
 class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
@@ -35,10 +31,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
             change=self.change)
 
-<<<<<<< HEAD
-    @unittest.skip('AUTO-441')
-=======
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     def test_system_create_group_with_multiple_webhook_policies_with_same_attributes(self):
         """
         Creating a group with a list of multiple webhook policies, with the same
@@ -47,10 +39,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group = self._create_multi_policy_group(2, self.wb_policy)
         self.empty_scaling_group(group)
 
-<<<<<<< HEAD
-    @unittest.skip('AUTO-441')
-=======
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     def test_system_create_multiple_scheduler_policies_same_payload(self):
         """
         Creating a group with a list of multiple scheduler policies, (at style and
@@ -60,10 +48,6 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             2, self.at_style_policy, self.cron_style_policy)
         self.empty_scaling_group(group)
 
-<<<<<<< HEAD
-    @unittest.skip('cron not implemented yet')
-=======
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     def test_system_webhook_and_scheduler_policies_same_group(self):
         """
         Create a group with scheduler and webhook policies and verify the
@@ -72,18 +56,10 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group = self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy)
         self._execute_webhook_policies_within_group(group)
-<<<<<<< HEAD
-        sleep(self.delta + self.scheduler_interval)
-        self.verify_group_state(group.id, 3 * self.change)
-        self.empty_scaling_group(group)
-
-    @unittest.skip('cron not implemented yet')
-=======
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, 3 * self.change)
         self.empty_scaling_group(group)
 
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
         Create 2 groups each with the same type of scheduler and webhook policies and
@@ -94,11 +70,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         group2 = self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy)
         self._execute_webhook_policies_within_group(group1, group2)
-<<<<<<< HEAD
-        sleep(self.delta + self.scheduler_interval)
-=======
         sleep(60 + self.scheduler_interval)
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
         self.empty_scaling_group(group1)
@@ -136,14 +108,9 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         Creates a group with the given list of policies and asserts the
         group creation was successful
         """
-<<<<<<< HEAD
-        for each_policy in args:
-            policy_list = [each_policy for _ in range(multi_num)]
-=======
         policy_list = []
         for each_policy in args:
             policy_list.extend([each_policy] * multi_num)
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling',
             sp_list=policy_list,
