@@ -234,10 +234,10 @@ class AutoscaleBehaviors(BaseBehavior):
                 sp_change = sp_change
             else:
                 sp_change = int(self.autoscale_config.sp_change)
-                create_response = self.autoscale_client.create_policy(
-                    group_id=group_id,
-                    name=sp_name, cooldown=sp_cooldown,
-                    change=sp_change, policy_type=sp_policy_type, args=args)
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change=sp_change, policy_type=sp_policy_type, args=args)
         if create_response.status_code != 201:
             return dict(status_code=create_response.status_code)
         else:
