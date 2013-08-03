@@ -37,14 +37,14 @@ class UpdateSchedulerTests(AutoscaleFixture):
         update the policy to execute in the next few seconds and
         verify the servers are as expected.
         """
-        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(5)}
         at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(604800))
         sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
+        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(10)}
         self._update_policy(self.group.id, at_style_policy, upd_args)
-        sleep(5 + self.scheduler_interval)
+        sleep(10 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
 
@@ -115,7 +115,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
             change=change_value,
             policy_type=policy['type'],
             args=upd_args)
-        self.assertEqual(update_policy_response.status_code, 202, msg='update scheduler'
+        self.assertEqual(update_policy_response.status_code, 204, msg='update scheduler'
                          ' policy resulted in {0}'.format(update_policy_response.status_code))
         updated_policy = (self.autoscale_client.get_policy_details(group_id,
                                                                    policy['id'])).entity

@@ -230,10 +230,7 @@ class AutoscaleBehaviors(BaseBehavior):
                 name=sp_name, cooldown=sp_cooldown,
                 desired_capacity=sp_desired_capacity, policy_type=sp_policy_type, args=args)
         else:
-            if sp_change is not None:
-                sp_change = sp_change
-            else:
-                sp_change = int(self.autoscale_config.sp_change)
+            sp_change = sp_change or int(self.autoscale_config.sp_change)
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
