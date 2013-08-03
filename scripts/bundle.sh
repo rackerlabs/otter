@@ -45,7 +45,7 @@ fi
 
 echo "${SELF_DEP}" > ./.self.txt
 
-REQUIREMENTS="./requirements.txt ./opt_requirements.txt ./.self.txt"
+REQUIREMENTS="./requirements.txt ./.self.txt"
 
 if [[ "$1" == "--dev" ]]; then
     # if bundling for development, also include the development requirements
