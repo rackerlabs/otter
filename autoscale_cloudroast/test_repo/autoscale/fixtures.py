@@ -192,8 +192,6 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         sleep(self.scheduler_interval + delay)
 
-<<<<<<< HEAD
-=======
     def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
         """
         The group_id or the server_name should be provided.
@@ -214,7 +212,6 @@ class AutoscaleFixture(BaseTestFixture):
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
 
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     @classmethod
     def tearDownClass(cls):
         """

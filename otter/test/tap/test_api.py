@@ -10,10 +10,7 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import ContainsDict, Equals
-
 from otter.tap.api import Options, makeService
-from otter.test.utils import matches
 
 
 test_config = {
@@ -201,38 +198,6 @@ class APIMakeServiceTests(TestCase):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
-
-    @mock.patch('otter.tap.api.AirbrakeLogObserver')
-    def test_airbrake(self, airbrake_observer):
-        """
-        makeService configures the log observer to publish to airbrake when
-        airbrake is in the config and AirbrakeLogObserver is importable
-        (and hence not None)
-        """
-        mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
-
-        makeService(mock_config)
-
-        airbrake_observer.assert_called_once_with('XXX', 'prod', use_ssl=True)
-        airbrake_observer.return_value.start.assert_called_once_with()
-
-    @mock.patch('otter.tap.api.AirbrakeLogObserver', new=None)
-    def test_airbrake_warning(self):
-        """
-        makeService warns when airbrake is in the config but AirbrakeLogObserver
-        is not importable (and hence None).  It does not add any log observers.
-        """
-        mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
-
-        makeService(mock_config)
-
-        message = Equals("There is a configuration option for Airbrake, but "
-                         "txairbrake is not installed.")
-        warnings = self.flushWarnings([makeService])
-        self.assertEqual(warnings,
-                         [matches(ContainsDict({'message': message}))])
 
     @mock.patch('otter.tap.api.SchedulerService')
     def test_scheduler_service(self, scheduler_service):

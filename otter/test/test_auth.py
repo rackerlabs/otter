@@ -19,11 +19,8 @@ from otter.auth import impersonate_user
 from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
-<<<<<<< HEAD
-=======
 from otter.auth import CachingAuthenticator
 from otter.auth import IAuthenticator
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
 expected_headers = {'accept': ['application/json'],
                     'content-type': ['application/json'],
@@ -278,15 +275,12 @@ class ImpersonatingAuthenticatorTests(TestCase):
         self.password = 'service_password'
         self.ia = ImpersonatingAuthenticator(self.user, self.password,
                                              self.url, self.admin_url)
-<<<<<<< HEAD
-=======
 
     def test_verifyObject(self):
         """
         ImpersonatingAuthenticator provides the IAuthenticator interface.
         """
         verifyObject(IAuthenticator, self.ia)
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
     def test_authenticate_tenant_auth_as_service_user(self):
         """
@@ -377,8 +371,6 @@ class ImpersonatingAuthenticatorTests(TestCase):
 
         failure = self.failureResultOf(self.ia.authenticate_tenant(111111))
         self.assertTrue(failure.check(APIError))
-<<<<<<< HEAD
-=======
 
 
 class CachingAuthenticatorTests(TestCase):
@@ -513,4 +505,3 @@ class CachingAuthenticatorTests(TestCase):
         d = self.ca.authenticate_tenant(1)
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3

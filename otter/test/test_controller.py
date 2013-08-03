@@ -17,12 +17,7 @@ from otter.supervisor import Supervisor
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
-<<<<<<< HEAD
-from otter.test.utils import (
-    CheckFailure, DeferredTestMixin, iMock, matches, patch)
-=======
 from otter.test.utils import CheckFailure, iMock, matches, patch
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 
 
 class CalculateDeltaTestCase(TestCase):

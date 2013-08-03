@@ -10,6 +10,8 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
 
+from otter.log.bound import BoundLog
+
 
 class matches(object):
     """
@@ -53,23 +55,6 @@ class matches(object):
 
 
 class CheckFailure(object):
-<<<<<<< HEAD
-    """
-    Class that can be passed to an `assertEquals` or `assert_called_with` -
-    shortens checking whether a `twisted.python.failure.Failure` wraps an
-    Exception of a particular type.
-    """
-    def __init__(self, exception_type):
-        self.exception_type = exception_type
-
-    def __eq__(self, other):
-        return isinstance(other, Failure) and other.check(
-            self.exception_type)
-
-
-class DeferredTestMixin(object):
-=======
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
     """
     Class that can be passed to an `assertEquals` or `assert_called_with` -
     shortens checking whether a `twisted.python.failure.Failure` wraps an
@@ -185,3 +170,26 @@ class LockMixin(object):
             return defer.succeed(release_result)
         lock.release.side_effect = _release
         return lock
+
+
+def mock_log(*args, **kwargs):
+    """
+    Returns a BoundLog whose msg and err methods are mocks.  Makes it easier
+    to test logging, since instead of making a mock object and testing::
+
+        log.bind.return_value.msg.assert_called_with(...)
+
+    This can be done instead::
+
+        log.msg.assert_called_with(mock.ANY, bound_value1="val", ...)
+
+    Since in all likelyhood, testing that certain values are bound would be more
+    important than testing the exact logged message.
+    """
+    return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+
+
+class DummyException(Exception):
+    """
+    Fake exception
+    """

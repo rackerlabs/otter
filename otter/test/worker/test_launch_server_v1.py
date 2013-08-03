@@ -22,11 +22,12 @@ from otter.worker.launch_server_v1 import (
     delete_server,
     remove_from_load_balancer,
     public_endpoint_url,
-    UnexpectedServerStatus
+    UnexpectedServerStatus,
+    verified_delete
 )
 
 
-from otter.test.utils import patch
+from otter.test.utils import DummyException, mock_log, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
@@ -789,7 +790,7 @@ class DeleteServerTests(TestCase):
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
-        self.log = mock.Mock()
+        self.log = mock_log()
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
@@ -867,3 +868,91 @@ class DeleteServerTests(TestCase):
         failure = self.failureResultOf(d)
 
         self.assertEqual(failure.value.reason.value.code, 500)
+
+    def test_verified_delete_returns_after_delete_but_verifies_deletion(self):
+        """
+        verified_delete returns as soon as the deletion succeeded, but also
+        attempts to verify deleting the server.  It also logs the deletion.
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+
+        self.treq.head.return_value = Deferred()
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=clock)
+        self.assertIsNone(self.successResultOf(d))
+
+        self.treq.delete.assert_called_once_with('http://url/servers/serverId',
+                                                 headers=expected_headers)
+        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+                                               headers=expected_headers)
+
+        self.log.msg.assert_called_once_with(mock.ANY, server_id='serverId')
+
+    def test_verified_delete_propagates_delete_server_api_failures(self):
+        """
+        verified_delete propagates deletions from server deletion
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=500))
+        self.treq.content.return_value = succeed(error_body)
+        self.treq.head.return_value = Deferred()
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=clock)
+        failure = self.failureResultOf(d, RequestError)
+        self.assertEqual(failure.value.reason.value.code, 500)
+
+    def test_verified_delete_does_not_propagate_verification_failure(self):
+        """
+        verified_delete propagates deletions from server deletion
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.head.return_value = fail(DummyException('failure'))
+
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', clock=clock)
+        self.assertIsNone(self.successResultOf(d))
+
+    def test_verified_delete_retries_verification_until_success(self):
+        """
+        If the first verification didn't work, wait a bit and see if it's been
+        deleted, since a server can sit in DELETE state for a bit.
+
+        It also logs deletion success, and deletion failure
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.head.return_value = Deferred()
+        self.treq.content.return_value = succeed("")
+
+        verified_delete(self.log, 'http://url/', 'my-auth-token',
+                        'serverId', interval=5, clock=clock)
+
+        self.assertEqual(self.log.msg.call_count, 1)
+        self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
+
+        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+                                               headers=expected_headers)
+        self.assertEqual(self.log.msg.call_count, 2)
+
+        self.treq.head.return_value = succeed(
+            mock.Mock(spec=['code'], code=404))
+
+        clock.advance(5)
+        self.treq.head.assert_has_calls([
+            mock.call('http://url/servers/serverId', headers=expected_headers),
+            mock.call('http://url/servers/serverId', headers=expected_headers)
+        ])
+        self.assertEqual(self.log.msg.call_count, 3)
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(self.treq.head.call_count, 2)
+        self.assertEqual(self.log.msg.call_count, 3)

@@ -45,16 +45,11 @@ from zope.interface import Interface, implementer
 
 import treq
 
-<<<<<<< HEAD
-=======
 from otter.log import log
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
 
 
-<<<<<<< HEAD
-=======
 class IAuthenticator(Interface):
     """
     Authenticators know how to authenticate tenants.
@@ -139,7 +134,6 @@ class CachingAuthenticator(object):
 
 
 @implementer(IAuthenticator)
->>>>>>> f70cd5d786dd35f32af0d90c3695fabde599d7c3
 class ImpersonatingAuthenticator(object):
     """
     An authentication handler that first uses a identity admin account to authenticate
