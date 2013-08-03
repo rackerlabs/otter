@@ -71,17 +71,18 @@ def wait_for_active(log,
                     auth_token,
                     server_id,
                     interval=5,
+                    timeout=3600,
                     clock=None):
     """
     Wait until the server specified by server_id's status is 'ACTIVE'
-
-    @TODO: Timeouts
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Polling interval.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int timeout: timeout to poll for the server status in seconds.
+        Default 3600 (1 hour)
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -105,7 +106,6 @@ def wait_for_active(log,
 
         sd = server_details(server_endpoint, auth_token, server_id)
         sd.addCallback(check_status)
-
         return sd
 
     lc = LoopingCall(poll)
@@ -113,13 +113,17 @@ def wait_for_active(log,
     if clock is not None:  # pragma: no cover
         lc.clock = clock
 
+    timeout_deferred(d, timeout, lc.clock)
+
     def stop(r):
         lc.stop()
         return r
 
     d.addBoth(stop)
 
-    return lc.start(interval).addCallback(lambda _: d)
+    lc.start(interval)
+
+    return d
 
 
 def create_server(server_endpoint, auth_token, server_config):

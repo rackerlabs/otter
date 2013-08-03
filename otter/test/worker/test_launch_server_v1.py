@@ -1,7 +1,6 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
-
 import mock
 import json
 
@@ -479,6 +478,32 @@ class ServerTests(TestCase):
         self.assertEqual(server_details.call_count, 2)
 
         self.successResultOf(d)
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_timeout(self, server_details):
+        """
+        wait_for_active stops looping when the timeout passes
+        """
+        clock = Clock()
+        server_details.side_effect = lambda *args, **kwargs: succeed(
+            {'server': {'status': 'BUILD'}})
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, timeout=6, clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+        clock.advance(5)
+        self.assertEqual(server_details.call_count, 2)
+        self.assertNoResult(d)
+
+        clock.advance(1)
+        self.failureResultOf(d, CancelledError)
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(server_details.call_count, 2)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
