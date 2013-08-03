@@ -14,6 +14,8 @@
          <resource href="../../wadl/autoscale.wadl#groups"/>
          <resource href="../../wadl/autoscale.wadl#group"/>
          <resource href="../../wadl/autoscale.wadl#group_state"/>
+         <resource href="../../wadl/autoscale.wadl#pause"/>
+         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
    <section xml:id="Configurations">
@@ -29,8 +31,6 @@
          <resource href="../../wadl/autoscale.wadl#policies"/>
          <resource href="../../wadl/autoscale.wadl#policy"/>
          <resource href="../../wadl/autoscale.wadl#execute"/>
-         <resource href="../../wadl/autoscale.wadl#pause"/>
-         <resource href="../../wadl/autoscale.wadl#resume"/>
       </resources>
    </section>
    <section xml:id="Executions">

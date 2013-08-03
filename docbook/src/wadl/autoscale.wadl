@@ -309,7 +309,7 @@
     </method>
 
     <method id="pauseGroup" name="POST">
-        <doc title="Pause Policy Execution">
+        <doc title="Pause Group Policy Execution">
             <db:para role="shortdesc">
                 Pause policy execution.
             </db:para>
@@ -326,7 +326,7 @@
     </method>
 
     <method id="resumeGroup" name="POST">
-        <doc title="Resume Policy Execution">
+        <doc title="Resume Group Policy Execution">
             <db:para role="shortdesc">
                 Resume policy execution.
             </db:para>
