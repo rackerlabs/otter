@@ -380,10 +380,29 @@
                 <li>The response body provides an array of scaling policies.</li>
             </ul>
             </p>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+            The examples below demonstrate several methods of creating autoscaling policies:
+            <ul>
+                <li>a request to create a policy based on desired capacity</li>
+                <li>a request to create a policy based on incremental change</li>
+                <li>a request to create a policy based on change percentage</li>
+                <ul>
+                    <li>a request to create a policy based on change percentage scheduled for a specific time of day</li>
+                    <li>a request to create a policy based on change percentage scheduled for a specific date</li>
+                    <li>a request to create a policy based on change percentage in response to an alarm</li>
+                </ul>
+                <li>a request to create multiple policies, followed by the matching response</li>
+            </ul>
+            </p>
         </doc>
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Desired Capcity) Request: JSON" />
+                    <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policies Request: JSON" />
                     <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
                 </doc>
             </representation>
@@ -391,10 +410,12 @@
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policies Response: JSON" />
                     <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
                 </doc>
             </representation>
         </response>
+        
     </method>
 
     <method name="GET" id="getPolicy">
