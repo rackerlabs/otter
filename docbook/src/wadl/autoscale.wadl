@@ -386,11 +386,9 @@
                 <li>a request to create a policy based on desired capacity</li>
                 <li>a request to create a policy based on incremental change</li>
                 <li>a request to create a policy based on change percentage</li>
-                <ul>
-                    <li>a request to create a policy based on change percentage scheduled for a specific time of day</li>
-                    <li>a request to create a policy based on change percentage scheduled for a specific date</li>
-                    <li>a request to create a policy based on change percentage in response to an alarm</li>
-                </ul>
+                <li>a request to create a policy based on change percentage scheduled for a specific time of day</li>
+                <li>a request to create a policy based on change percentage scheduled for a specific date</li>
+                <li>a request to create a policy based on change percentage in response to an alarm</li>
                 <li>a request to create multiple policies, followed by the matching response</li>
             </ul>
             </p>
@@ -398,20 +396,23 @@
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:sample title="Create Policy (Desired Capcity) Request: JSON" />
-                    <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                    <xsdxt:sample title="Create Policy (Desired Capacity) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                    </xsdxt:sample>
                 </doc>
                 <doc xml:lang="en">
-                    <xsdxt:sample title="Create Policies Request: JSON" />
-                    <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
+                    <xsdxt:sample title="Create Policies Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
+                    </xsdxt:sample>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:sample title="Create Policies Response: JSON" />
-                    <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
+                    <xsdxt:sample title="Create Policies Response: JSON" >
+                        <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
+                    </xsdxt:sample>
                 </doc>
             </representation>
         </response>
