@@ -386,8 +386,8 @@
                 <li>a request to create a policy based on desired capacity</li>
                 <li>a request to create a policy based on incremental change</li>
                 <li>a request to create a policy based on change percentage</li>
-                <li>a request to create a policy based on change percentage scheduled for a specific time of day</li>
-                <li>a request to create a policy based on change percentage scheduled for a specific date</li>
+                <li>a request to create a policy based on change percentage scheduled daily, at a specific time of day</li>
+                <li>a request to create a policy based on change percentage scheduled once, for a specific date and time</li>
                 <li>a request to create a policy based on change percentage in response to an alarm</li>
                 <li>a request to create multiple policies, followed by the matching response</li>
             </ul>
@@ -398,6 +398,31 @@
                 <doc xml:lang="en">
                     <xsdxt:sample title="Create Policy (Desired Capacity) Request: JSON" >
                         <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Incremental Change) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-change.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercent.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change at Time) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentTime.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change on Date) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentDate.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change on Alarm) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentAlarm.json"/>
                     </xsdxt:sample>
                 </doc>
                 <doc xml:lang="en">
