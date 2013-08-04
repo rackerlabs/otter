@@ -100,10 +100,10 @@ format="SVG" scale="60"/>
                 </revdescription>
             </revision>           
         </revhistory>
-  <!-- plan is that raxm:product will be cas, Cloud Autoscale; still fails validation, fix it later. use cdb now because it is valid -->
+      <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
 	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
-            <raxm:product version="v1.0">cdb</raxm:product>
+            <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
         </raxm:metadata>
     </info>
