@@ -3,6 +3,7 @@ System tests for execute updated policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
@@ -28,17 +29,9 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_policy=True)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(ExecuteUpdatedPoliciesTest, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='slow')
     def test_system_update_policy_from_change_to_desired_capacity_scale_down(self):
         """
         Update the existing scale up policy from change to desired capacity,
@@ -57,6 +50,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_update_policy_from_change_to_desired_capacity_scale_up(self):
         """
         Update the existing scale up policy from change to desired capacity,
@@ -76,6 +70,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=upd_desired_capacity)
 
+    @tags(speed='slow')
     def test_system_update_policy_desired_capacity(self):
         """
         Update a scale up via 'change', to a scale down policy via 'desiredCapacity', with
@@ -106,6 +101,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.maxEntities)
 
+    @tags(speed='slow')
     def test_system_update_scale_up_to_scale_down(self):
         """
         Update a scale up policy to scale down by the same change and execute
@@ -123,6 +119,7 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_update_minentities_and_scale_down(self):
         """
         Create a scaling group with min entities > 0, scale up (setup)

@@ -2,6 +2,8 @@
 System tests for account with multiple scaling groups
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
+import time
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -18,28 +20,9 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         first_group = self.autoscale_behaviors.create_scaling_group_given(
             gc_cooldown=0)
         self.first_scaling_group = first_group.entity
-        second_group = self.autoscale_behaviors.create_scaling_group_given(
-            gc_cooldown=0)
-        self.second_scaling_group = second_group.entity
-        third_group = self.autoscale_behaviors.create_scaling_group_given(
-            gc_cooldown=0)
-        self.third_scaling_group = third_group.entity
-        self.resources.add(self.first_scaling_group.id,
-                           self.autoscale_client.delete_scaling_group)
-        self.resources.add(self.second_scaling_group.id,
-                           self.autoscale_client.delete_scaling_group)
-        self.resources.add(self.third_scaling_group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.first_scaling_group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Delete scaling groups
-        """
-        super(ScalingGroupMultiplesTest, self).tearDown()
-        self.empty_scaling_group(self.first_scaling_group)
-        self.empty_scaling_group(self.second_scaling_group)
-        self.empty_scaling_group(self.third_scaling_group)
-
+    @tags(speed='quick')
     def test_system_create_group_with_multiple_policies(self):
         """
         Scaling group can have multiple policies and can be executed
@@ -70,6 +53,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         sp3 = self.autoscale_behaviors.calculate_servers(sp2, percentage)
         self.verify_group_state(self.first_scaling_group.id, sp3)
 
+    @tags(speed='quick')
     def test_system_create_policy_with_multiple_webhooks(self):
         """
         Scaling policy in a group can have multiple webhooks and they can be
@@ -103,6 +87,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.assertEquals(execute_webhook.status_code, 202,
                               msg='Policy webhook execution failed for group {0} with {1}'.format(
                               self.first_scaling_group.id, execute_webhook.status_code))
+        time.sleep(5)
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 
@@ -114,12 +99,12 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
 
     def test_system_max_policies_on_a_scaling_group(self):
         """
-        The maximum scaling policies allowed on a scaling group are XXX.
+        The maximum scaling policies allowed on a scaling group are ???.
         """
         pass
 
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
-        The maximum webhooks allowed on a scaling policy are XXX.
+        The maximum webhooks allowed on a scaling policy are ???.
         """
         pass

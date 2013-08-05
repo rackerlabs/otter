@@ -2,6 +2,7 @@
 System tests for launch config
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
 
 
 class LaunchConfigTest(AutoscaleFixture):
@@ -20,6 +21,7 @@ class LaunchConfigTest(AutoscaleFixture):
         cls.upd_image_ref = cls.lc_image_ref_alt
         cls.upd_flavor_ref = "3"
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_scale_up(self):
         """
         Create a scaling group with a scaling policy, update the launch config.
@@ -42,8 +44,8 @@ class LaunchConfigTest(AutoscaleFixture):
         self._verify_server_list_for_launch_config(
             upd_lc_server, self.upd_server_name,
             self.upd_image_ref, self.upd_flavor_ref)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_scale_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute the scale up
@@ -80,8 +82,8 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_scale_up_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute the scale up
@@ -120,8 +122,8 @@ class LaunchConfigTest(AutoscaleFixture):
             expected_servers=server_after_down)
         self.assertEqual(set(active_list_after_down), (
             set(active_list_after_up) - set(first_server)))
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_server_details_name_and_metadata(self):
         """
         Server name is appended by random characters and metadata of servers includes the group id,
@@ -132,6 +134,7 @@ class LaunchConfigTest(AutoscaleFixture):
             gc_min_entities=self.gc_min_entities_alt,
             lc_name=server_name)
         group = create_group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
         active_servers_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
@@ -144,9 +147,11 @@ class LaunchConfigTest(AutoscaleFixture):
                 server.image.id, group.launchConfiguration.server.imageRef)
             self.assertEquals(
                 server.flavor.id, group.launchConfiguration.server.flavorRef)
-            self.assertEquals(metadata, expected_metadata)
+            self.assertEquals(metadata['rax:auto_scaling_group_id'],
+                              expected_metadata['rax:auto_scaling_group_id'])
             self.assertTrue(server_name in server.name)
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_while_group_building(self):
         """
         Updates to the launch config do not apply to the servers building,
@@ -164,8 +169,8 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_group_minentities(self):
         """
         Create a scaling group, update the launch config.
@@ -200,8 +205,8 @@ class LaunchConfigTest(AutoscaleFixture):
         servers_from_upd = set(servers_list_on_upd) - set(servers_first_list)
         self._verify_server_list_for_launch_config(
             servers_from_upd, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_update_launchconfig_group_maxentities(self):
         """
         Create a scaling group with scaling policy and with minentities=sp_change in the scaling policy.
@@ -239,18 +244,15 @@ class LaunchConfigTest(AutoscaleFixture):
             max_entities=group.groupConfiguration.minEntities,
             metadata={})
         self.assertEquals(update_group_response.status_code, 204)
-        self._execute_policy(group)
         servers_list_on_upd_group = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
-            expected_servers=group.groupConfiguration.minentities)
-        active_servers_on_upd_group = set(
-            servers_list_on_upd_group) - set(active_list_after_upd_lc)
-        self.assertEquals(set(active_servers_on_upd_group),
-                         (set(active_list_after_upd_lc) - set(servers_list_b4_upd)))
+            expected_servers=group.groupConfiguration.minEntities)
+        self.assertEquals(set(servers_list_on_upd_group), set(servers_after_scale_up))
         self._verify_server_list_for_launch_config(
-            active_servers_on_upd_group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
-        self.empty_scaling_group(group)
+            servers_list_on_upd_group, self.upd_server_name, self.upd_image_ref,
+            self.upd_flavor_ref)
 
+    @tags(speed='slow')
     def test_system_scale_down_oldest_on_active_servers(self):
         """
         Create a scaling group with minentities=scale up=scale_down=sp_change(from config).
@@ -303,8 +305,7 @@ class LaunchConfigTest(AutoscaleFixture):
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {0}'.format(group.id))
-        self.resources.add(group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group, self.empty_scaling_group)
         return group
 
     def _update_launch_config(self, group, server_name=None, image_ref=None,

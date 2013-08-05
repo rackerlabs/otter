@@ -2,6 +2,7 @@
 System tests for scaling policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
 
 
 class ScalingDownExecuteWebhookTest(AutoscaleFixture):
@@ -24,17 +25,9 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(ScalingDownExecuteWebhookTest, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_change(self):
         """
         Execute a scale down webhook with change as the number
@@ -52,6 +45,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
         Execute a webhook with scale down with change percentage 60
@@ -71,6 +65,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
 
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_desired_capacity(self):
         """
         Execute a webhook with scale down with desired capacity as the

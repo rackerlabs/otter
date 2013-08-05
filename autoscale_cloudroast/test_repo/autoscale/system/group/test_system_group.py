@@ -3,6 +3,7 @@ System tests for multiple scaling groups scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import base64
+from cafe.drivers.unittest.decorators import tags
 
 
 class GroupFixture(AutoscaleFixture):
@@ -11,6 +12,7 @@ class GroupFixture(AutoscaleFixture):
     System tests to verify scaling group scenarios
     """
 
+    @tags(speed='quick')
     def test_system_update_minentities_to_scaleup(self):
         """
         The scaling group scales up when the minentities are updated,
@@ -22,8 +24,8 @@ class GroupFixture(AutoscaleFixture):
         upd_minentities = 3
         self._update_group(group=group, minentities=upd_minentities)
         self.verify_group_state(group.id, upd_minentities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_update_minentities_to_be_lesser_than_during_create_group(self):
         """
         The scaling group does not scale down when the minenetities are updated,
@@ -35,8 +37,8 @@ class GroupFixture(AutoscaleFixture):
         upd_minentities = 1
         self._update_group(group=group, minentities=upd_minentities)
         self.verify_group_state(group.id, minentities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_update_maxentities_less_than_desiredcapacity(self):
         """
         Create a scaling group and execute a policy to be within maxentities,
@@ -62,8 +64,8 @@ class GroupFixture(AutoscaleFixture):
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=upd_maxentities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_update_maxenetities_and_execute_policy(self):
         """
         Execute policy on scaling group such that the maxentities are met,
@@ -90,8 +92,8 @@ class GroupFixture(AutoscaleFixture):
         policy = self._execute_policy(group)
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_group_cooldown_enforced_when_reexecuting_same_policy(self):
         """
         The group cooldown is enforced when executing a scaling policy
@@ -113,8 +115,8 @@ class GroupFixture(AutoscaleFixture):
                           ' for group {1}'
                           .format(reexecute_policy_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_group_cooldown_enforced_when_executing_different_policies(self):
         """
         The group cooldown is enforced when executing different scaling policies,
@@ -137,9 +139,9 @@ class GroupFixture(AutoscaleFixture):
                           ' for group {1}'
                           .format(execute_policy2_response.status_code, group.id))
         self.verify_group_state(group.id, policy['change'])
-        self.empty_scaling_group(group)
 
-    def test_systemupdate_group_cooldown_and_execute_policy(self):
+    @tags(speed='quick')
+    def test_system_update_group_cooldown_and_execute_policy(self):
         """
         Different scaling policies can be executed when the group cooldown
         is updated to be 0
@@ -177,8 +179,8 @@ class GroupFixture(AutoscaleFixture):
         total_servers = policy2[
             'change'] + group.groupConfiguration.minEntities + policy['change']
         self.verify_group_state(group.id, total_servers)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_execute_policy_beyond_maxentities(self):
         """
         Scaling policy is executed when change + minentities > maxentities, upto
@@ -212,8 +214,8 @@ class GroupFixture(AutoscaleFixture):
         self._execute_policy(group)
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_execute_policy_beyond_maxentities_when_min_equals_max(self):
         """
         Scaling group with minentities = maxentities cannot execute scale up
@@ -245,8 +247,8 @@ class GroupFixture(AutoscaleFixture):
         policy = self._execute_policy(group)
         total_servers = maxentities + policy['change']
         self.verify_group_state(group.id, total_servers)
-        self.empty_scaling_group(group)
 
+    @tags(speed='quick')
     def test_system_create_scaling_group_with_same_attributes(self):
         """
         Scaling groups can be created with the exact same attributes
@@ -277,8 +279,7 @@ class GroupFixture(AutoscaleFixture):
             sp_list=sp_list)
         self.assertEquals(create_group1_response.status_code, 201)
         group1 = create_group1_response.entity
-        self.resources.add(group1.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group1, self.empty_scaling_group)
         create_group2_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_name=group1.groupConfiguration.name,
             gc_metadata=gc_metadata,
@@ -290,10 +291,7 @@ class GroupFixture(AutoscaleFixture):
             sp_list=sp_list)
         self.assertEquals(create_group2_response.status_code, 201)
         group2 = create_group2_response.entity
-        self.resources.add(group2.id,
-                           self.autoscale_client.delete_scaling_group)
-        self.empty_scaling_group(group1)
-        self.empty_scaling_group(group2)
+        self.resources.add(group2, self.empty_scaling_group)
 
     def _create_group(self, minentities=None, maxentities=None, cooldown=None,
                       splist=None):
@@ -307,8 +305,7 @@ class GroupFixture(AutoscaleFixture):
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {0}'.format(group.id))
-        self.resources.add(group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group, self.empty_scaling_group)
         return group
 
     def _update_group(self, group, minentities=None, maxentities=None,

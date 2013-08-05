@@ -3,6 +3,7 @@ System tests for execute multiple policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class ExecuteMultiplePoliciesTest(AutoscaleFixture):
@@ -44,17 +45,9 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up_execute,
             execute_policy=True)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(ExecuteMultiplePoliciesTest, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='quick')
     def test_system_policy_up_cooldown(self):
         """
         Execute a scale up policy with cooldown > 0 more than once within the cooldown period,
@@ -68,6 +61,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
                           ' when cooldown is not met: {1}'
                           .format(self.group.id, execute_on_cooldown.status_code))
 
+    @tags(speed='quick')
     def test_system_policy_down_cooldown(self):
         """
         Execute a scale down policy with cooldown > 0 more than once within the cooldown period,
@@ -87,6 +81,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
                           ' for group {1}'
                           .format(execute_on_cooldown.status_code, self.group.id))
 
+    @tags(speed='slow')
     def test_system_execute_different_policies_simaltaneously(self):
         """
         The policy cooldown times are not enforced when executing different policies,
@@ -116,6 +111,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_scale_up_scale_down_multiple_policies_in_sequence(self):
         """
         Different scale up and scale down policies on the scaling group can be executed
@@ -139,6 +135,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
 
+    @tags(speed='quick')
     def test_system_multiple_webhook_policies_in_group_in_different_requests(self):
         """
         Creating multiple webhook policies with the same payload, using multiple

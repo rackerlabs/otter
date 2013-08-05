@@ -5,6 +5,7 @@ cron style scheduler policies
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
 import unittest
+from cafe.drivers.unittest.decorators import tags
 
 
 class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
@@ -13,6 +14,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
     Verify update scheduler policy
     """
 
+    @tags(speed='slow')
     def test_system_execute_at_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, an at style
@@ -25,8 +27,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.create_default_at_style_policy_wait_for_execution(
             group.id, scale_down=True)
         self.verify_group_state(group.id, group.groupConfiguration.maxEntities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_execute_cron_style_scale_up_when_min_maxentities_are_met(self):
         """
         When min and max entities are already met on a scaling group, a cron style
@@ -48,8 +50,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_cron_style_when_policy_cooldown_over_trigger_period(self):
         """
         When policy cooldown is set to be greater than a minute by few seconds for a
@@ -68,8 +70,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.sp_change * 2)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_cron_style_when_group_cooldown_over_trigger_period(self):
         """
         When group cooldown is set to be greater than a minute by few seconds for a
@@ -88,8 +90,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         self.verify_group_state(group.id, self.sp_change)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.sp_change * 2)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_at_cron_style_execution_after_delete(self):
         """
         Create an at style and cron scheduler policy and delete them.
@@ -112,7 +114,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group.id, cron_style_policy['id'])
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, self.gc_min_entities)
-        self.empty_scaling_group(group)
 
     def test_system_scheduler_down(self):
         """
@@ -122,6 +123,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
+    @tags(speed='slow')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
@@ -140,11 +142,12 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='multi_scheduling', gc_cooldown=0,
             sp_list=at_style_policies_list)
+        self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
         sleep(self.scheduler_interval + 1)
         self.verify_group_state(
             create_group_reponse.entity.id, self.scheduler_batch + size)
-        self.empty_scaling_group(create_group_reponse.entity)
 
+    @tags(speed='slow')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):
         """
         Create multiple scheduler policies within the same group such that all of them are
@@ -164,9 +167,9 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             lc_name='multi_scheduling', gc_cooldown=0,
             sp_list=at_style_policies_list)
         group = create_group_reponse.entity
+        self.resources.add(group, self.empty_scaling_group)
         sleep(self.scheduler_interval)
         self.verify_group_state(group.id, 1 + 2 + 3)
-        self.empty_scaling_group(group)
 
     @unittest.skip('AUTO-425')
     def test_system_update_at_and_cron_style_scheduler_policy_to_webhook_type(self):
@@ -197,7 +200,6 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
                               msg='Update scheduler policy to webhook policy type'
                               ' on the group {0} with response code {1}'.format(
                               group.id, upd_policy_response.status_code))
-        self.empty_scaling_group(group)
 
     def _create_group(self, minentities=None, maxentities=None, cooldown=None):
         """
@@ -209,6 +211,5 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             gc_max_entities=maxentities,
             lc_name='execute_scheduled')
         group = create_group_response.entity
-        self.resources.add(group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group, self.empty_scaling_group)
         return group

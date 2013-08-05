@@ -103,17 +103,33 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
-    def empty_scaling_group(self, group):
+    def empty_scaling_group(self, group, dont_delete=None):
         """
         Given the group, updates the group to be of 0 minentities and maxentities.
         """
-        self.autoscale_client.update_group_config(
-            group_id=group.id,
-            name="delete_me_please",
-            cooldown=0,
-            min_entities=0,
-            max_entities=0,
-            metadata={})
+        servers_on_group = (self.autoscale_client.list_status_entities_sgroups(group.id)).entity
+        if servers_on_group.desiredCapacity is not 0:
+            if dont_delete is None:
+                self.autoscale_client.update_group_config(
+                    group_id=group.id,
+                    name="delete_me_please",
+                    cooldown=0,
+                    min_entities=0,
+                    max_entities=0,
+                    metadata={})
+                self.resources.add(group.id,
+                                   self.autoscale_client.delete_scaling_group)
+            elif dont_delete is not None:
+                self.autoscale_client.update_group_config(
+                    group_id=group.id,
+                    name="delete_me_please",
+                    cooldown=0,
+                    min_entities=0,
+                    max_entities=0,
+                    metadata={})
+        elif servers_on_group.desiredCapacity is 0 and dont_delete is None:
+            self.resources.add(group.id,
+                               self.autoscale_client.delete_scaling_group)
 
     def verify_group_state(self, group_id, desired_capacity):
         """
