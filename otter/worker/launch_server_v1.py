@@ -188,9 +188,9 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
             endpoint,
             auth_token,
             lb_config,
-            ip_address).addCallback(
-                lambda response, lb_id: (lb_id, response),
-                lb_config['loadBalancerId'])
+            ip_address).addCallback(lambda response,
+                                    lb_id: (lb_id, response),
+                                    lb_config['loadBalancerId'])
         for lb_config in lb_configs
     ], consumeErrors=True)
 
@@ -226,7 +226,8 @@ def public_endpoint_url(service_catalog, service_name, region):
 
     :return: URL as a string.
     """
-    return list(endpoints(service_catalog, service_name, region))[0]['publicURL']
+    return list(endpoints(service_catalog,
+                          service_name, region))[0]['publicURL']
 
 
 def private_ip_addresses(server):
@@ -274,22 +275,26 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
             lb_config['metadata'] = {}
-        lb_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
-        lb_config['metadata']['rax:auto_scaling_server_name'] = server_config['name']
+        lb_config['metadata'][
+            'rax:auto_scaling_group_id'] = scaling_group_uuid
+        lb_config['metadata'][
+            'rax:auto_scaling_server_name'] = server_config['name']
 
     return launch_config
 
 
-def launch_server(log, region, scaling_group, service_catalog, auth_token, launch_config):
+def launch_server(log, region, scaling_group, service_catalog, auth_token,
+                  launch_config):
     """
-    Launch a new server given the launch config auth tokens and service catalog.
-    Possibly adding the newly launched server to a load balancer.
+    Launch a new server given the launch config auth tokens and service
+    catalog.  Possibly adding the newly launched server to a load balancer.
 
     :param BoundLog log: A bound logger.
     :param str region: A rackspace region as found in the service catalog.
     :param IScalingGroup scaling_group: The scaling group to add the launched
         server to.
-    :param list service_catalog: A list of services as returned by the auth apis.
+    :param list service_catalog: A list of services as returned by the auth
+        apis.
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
@@ -339,7 +344,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     def _add_lb(server):
         ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        lbd = add_to_load_balancers(lb_endpoint, auth_token,
+                                    lb_config, ip_address)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
@@ -356,10 +362,11 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     :param str loadbalancer_id: The ID for a cloud loadbalancer.
     :param str node_id: The ID for a node in that cloudloadbalancer.
 
-    :returns: A Deferred that fires with None if the operation completed successfully,
-        or errbacks with an APIError.
+    :returns: A Deferred that fires with None if the operation completed
+        successfully, or errbacks with an APIError.
     """
-    path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
+    path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id),
+                           'nodes', str(node_id))
     d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
     d.addErrback(wrap_request_error, endpoint, 'remove')
@@ -374,7 +381,8 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     TODO: Load balancer draining.
 
     :param str region: A rackspace region as found in the service catalog.
-    :param list service_catalog: A list of services as returned by the auth apis.
+    :param list service_catalog: A list of services as returned by the auth
+        apis.
     :param str auth_token: The user's auth token.
     :param tuple instance_details: A 2-tuple of server_id and a list of
         load balancer Add Node responses.
@@ -416,7 +424,8 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
           for (loadbalancer_id, node_details) in loadbalancer_details])
 
     d = gatherResults(
-        [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
+        [remove_from_load_balancer(lb_endpoint, auth_token,
+                                   loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
