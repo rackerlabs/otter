@@ -1,7 +1,14 @@
+"""
+Tests for undo stacks.
+"""
+
+from zope.interface.verify import verifyObject
+
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred
 from twisted.internet.task import Cooperator
 
+from otter.undo import IUndoStack
 from otter.undo import InMemoryUndoStack
 
 
@@ -23,6 +30,12 @@ class InMemoryUndoStackTests(TestCase):
             terminationPredicateFactory=termination,
             scheduler=run_immediately)
         self.undo = InMemoryUndoStack(self.cooperator.coiterate)
+
+    def test_provides_IUndoStack(self):
+        """
+        InMemoryUndoStack provides IUndoStack.
+        """
+        verifyObject(IUndoStack, self.undo)
 
     def test_push(self):
         """
@@ -59,7 +72,6 @@ class InMemoryUndoStackTests(TestCase):
                                  (('bar',), {}),
                                  (('foo',), {})])
 
-
     def test_rewind_handles_deferreds(self):
         """
         rewind will wait on any deferreds returned by the undo operation
@@ -78,13 +90,13 @@ class InMemoryUndoStackTests(TestCase):
 
         self.successResultOf(d)
 
-
     def test_rewind_blocks_on_deferreds_returned_by_ops(self):
         """
         rewind will serialize operations waiting on any deferreds returned
         before running the next operation.
         """
         called = [0]
+
         def op(op_d):
             called[0] += 1
             return op_d
@@ -111,6 +123,7 @@ class InMemoryUndoStackTests(TestCase):
         error.
         """
         called = [0]
+
         def op(op_d):
             called[0] += 1
             return op_d

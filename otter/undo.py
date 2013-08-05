@@ -1,5 +1,11 @@
+"""
+Tools for managing an undo stack and rewinding it to perform a series of
+operations to clean up after an error.
+"""
+
 from zope.interface import Interface, implementer
 from twisted.internet.defer import maybeDeferred
+
 
 class IUndoStack(Interface):
     """
