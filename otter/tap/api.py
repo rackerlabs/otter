@@ -115,7 +115,7 @@ def makeService(config):
     api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
 
-    if config_value('scheduler'):
+    if config_value('scheduler') and not config_value('mock'):
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                              int(config_value('scheduler.interval')),
                                              cassandra_cluster)
