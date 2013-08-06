@@ -1030,10 +1030,11 @@ class TimeoutHelperTests(TestCase):
         d = Deferred()
         timeout_deferred(d, 10, clock)
         d.callback("Result")
-
-        clock.advance(15)
-
         self.assertEqual(self.successResultOf(d), "Result")
+
+        # the timeout never happens - no errback occurs
+        clock.advance(15)
+        self.assertIsNone(self.successResultOf(d))
 
     def test_propagates_failure_if_failed_before_timeout(self):
         """
@@ -1045,10 +1046,11 @@ class TimeoutHelperTests(TestCase):
         d = Deferred()
         timeout_deferred(d, 10, clock)
         d.errback(DummyException("fail"))
-
-        clock.advance(15)
-
         self.failureResultOf(d, DummyException)
+
+        # the timeout never happens - no further errback occurs
+        clock.advance(15)
+        self.assertIsNone(self.successResultOf(d))
 
     def test_cancels_if_past_timeout(self):
         """
@@ -1058,6 +1060,7 @@ class TimeoutHelperTests(TestCase):
         clock = Clock()
         d = Deferred()
         timeout_deferred(d, 10, clock)
+        self.assertNoResult(d)
 
         clock.advance(15)
 
