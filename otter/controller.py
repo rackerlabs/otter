@@ -233,7 +233,7 @@ def calculate_delta(log, state, config, policy):
 
     :return: C{int} representing the desired change - can be 0
     """
-    current = len(state.active) + len(state.pending)
+    current = state.current_capacity
     if "change" in policy:
         desired = current + policy['change']
     elif "changePercent" in policy:
