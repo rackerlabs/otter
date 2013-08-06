@@ -888,8 +888,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
         """
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
-                                    {"size": size, "now": now},
-                                    get_consistency_level('list', 'events'))
+                                    {"size": size, "now": now}, ConsistencyLevel.QUORUM)
         return d
 
     def update_delete_events(self, delete_policy_ids, update_events):
@@ -899,7 +898,7 @@ class CassScalingGroupCollection:
         # First delete all events
         all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
         query, data = _delete_events_query_and_params(all_delete_ids, self.event_table)
-        d = self.connection.execute(query, data, get_consistency_level('delete', 'events'))
+        d = self.connection.execute(query, data, ConsistencyLevel.QUORUM)
 
         # Then insert rows for trigger times to be updated. This is because trigger cannot be
         # updated on an existing row since it is part of primary key
@@ -909,7 +908,7 @@ class CassScalingGroupCollection:
                 polname = 'policy{}'.format(i)
                 queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
                 data.update({polname + key: event[key] for key in event})
-            b = Batch(queries, data, get_consistency_level('update', 'events'))
+            b = Batch(queries, data, ConsistencyLevel.QUORUM)
             return b.execute(self.connection)
 
         return update_events and d.addCallback(_do_update) or d
