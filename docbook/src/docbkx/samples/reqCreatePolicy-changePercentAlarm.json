@@ -1,0 +1,27 @@
+[
+    {
+        "name": "scale down by 5.5 percent when response time is high",
+        "changePercent": -5.5,
+        "cooldown": 1800,
+        "type": "cloud_monitoring",
+        "args": {
+            "check": {
+                "label": "Website check 1",
+                "type": "remote.http",
+                "details": {
+                    "url": "http://www.example.com",
+                    "method": "GET"
+                },
+                "monitoring_zones_poll": [
+                    "mzA"
+                ],
+                "timeout": 30,
+                "period": 100,
+                "target_alias": "default"
+            },
+            "alarm_criteria": {
+                "criteria": "if (metric[\"duration\"] >= 2) { return new AlarmStatus(OK); } return new AlarmStatus(CRITICAL);"
+            }
+        }
+    }
+]
