@@ -29,7 +29,7 @@ def format_state_dict(state):
     return {
         'activeCapacity': len(state.active),
         'pendingCapacity': len(state.pending),
-        'desiredCapacity': len(state.active) + len(state.pending),
+        'desiredCapacity': state.current_capacity,
         'paused': state.paused,
         'id': state.group_id,
         'links': get_autoscale_links(state.tenant_id, state.group_id),
