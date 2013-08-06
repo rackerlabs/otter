@@ -7,7 +7,7 @@ import json
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
-from twisted.internet.task import Clock, Cooperator
+from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
@@ -34,7 +34,6 @@ from otter.util.deferredutils import unwrap_first_error
 
 from otter.test.utils import iMock
 from otter.undo import IUndoStack
-from otter.undo import InMemoryUndoStack
 
 fake_config = {
     'regionOverrides': {},
