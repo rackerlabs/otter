@@ -1018,7 +1018,7 @@ class DeleteServerTests(TestCase):
 
 class TimeoutHelperTests(TestCase):
     """
-    Test the timeout helper
+    Tests for the helper method method ``timeout_deferred``
     """
     def test_timeout_returns_deferred_that_was_passed_in(self):
         """
