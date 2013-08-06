@@ -89,13 +89,25 @@ def wait_for_active(log,
     log.msg("Checking instance status every {interval} seconds",
             interval=interval)
 
-    d = Deferred()
+    start_time = clock.seconds()
+
+    def on_timeout(_):
+        time_building = clock.seconds() - start_time
+        log.msg(('Server {instance_id} failed to change from BUILD state to '
+                 'ACTIVE within a {timeout} second timeout (it has been '
+                 '{time_building} seconds).'),
+                timeout=timeout, time_building=time_building)
+
+    d = Deferred(on_timeout)
 
     def poll():
         def check_status(server):
             status = server['server']['status']
+            time_building = clock.seconds() - start_time
 
-            log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
+            log.msg(
+                "Waiting for 'ACTIVE' got {status} ({time_building} seconds).",
+                status=status, time_building=time_building)
             if server['server']['status'] == 'ACTIVE':
                 d.callback(server)
             elif server['server']['status'] != 'BUILD':
@@ -458,7 +470,7 @@ def verified_delete(log,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    del_log = log.bind(server_id=server_id)
+    del_log = log.bind(instance_id=server_id)
     del_log.msg('Deleting server')
 
     d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
@@ -467,8 +479,16 @@ def verified_delete(log,
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
     def looping_verify_deletion(_):
-        verify = Deferred()
         start_time = clock.seconds()
+
+        def on_timeout(_):
+            time_delete = clock.seconds() - start_time
+            del_log.err(None, timeout=timeout, time_delete=time_delete,
+                        why=('Server {instance_id} failed to be deleted within '
+                             'a {timeout} second timeout (it has been '
+                             '{time_delete} seconds).'))
+
+        verify = Deferred(on_timeout)
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
@@ -497,15 +517,7 @@ def verified_delete(log,
 
         timeout_deferred(verify, timeout, lc.clock)
 
-        def on_timeout_failure(f):
-            time_delete = clock.seconds() - start_time
-            del_log.err(
-                f,
-                why='Server failed to be deleted by {time_delete} seconds.',
-                time_delete=time_delete)
-
-        verify.addErrback(on_timeout_failure)
-        verify.addCallback(lambda _: lc.stop())
+        verify.addBoth(lambda _: lc.stop())
         lc.start(interval)
 
     d.addCallback(looping_verify_deletion)

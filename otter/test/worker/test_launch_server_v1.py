@@ -259,7 +259,7 @@ class ServerTests(TestCase):
         """
         Set up test dependencies.
         """
-        self.log = mock.Mock()
+        self.log = mock_log()
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
@@ -500,6 +500,8 @@ class ServerTests(TestCase):
 
         clock.advance(1)
         self.failureResultOf(d, CancelledError)
+        # instance id was previously bound by launch_server
+        self.log.msg.assert_called_with(mock.ANY, timeout=6, time_building=6)
 
         # the loop has stopped
         clock.advance(5)
@@ -915,7 +917,7 @@ class DeleteServerTests(TestCase):
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
 
-        self.log.msg.assert_called_once_with(mock.ANY, server_id='serverId')
+        self.log.msg.assert_called_once_with(mock.ANY, instance_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
         """
@@ -946,7 +948,7 @@ class DeleteServerTests(TestCase):
                             'serverId', clock=clock)
         self.assertIsNone(self.successResultOf(d))
         self.log.msg.assert_called_with(
-            mock.ANY, server_id='serverId', exc=CheckFailure(DummyException),
+            mock.ANY, instance_id='serverId', exc=CheckFailure(DummyException),
             time_delete=0.0)
 
     def test_verified_delete_retries_verification_until_success(self):
@@ -1008,7 +1010,7 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
         self.log.err.assert_called_once_with(
-            CheckFailure(CancelledError), server_id="serverId", why=mock.ANY,
+            None, instance_id="serverId", why=mock.ANY, timeout=11,
             time_delete=11)
 
         # the loop has stopped
