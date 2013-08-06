@@ -22,6 +22,7 @@ from copy import deepcopy
 
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet.task import LoopingCall
+from twisted.internet.task import coiterate
 
 import treq
 
@@ -29,7 +30,6 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
-
 
 class UnexpectedServerStatus(Exception):
     """
@@ -280,7 +280,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     return launch_config
 
 
-def launch_server(log, region, scaling_group, service_catalog, auth_token, launch_config):
+def launch_server(log, region, scaling_group, service_catalog, auth_token,
+                  launch_config, undo):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -327,23 +328,35 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     d = create_server(server_endpoint, auth_token, server_config)
 
-    def _wait_for_server(server):
-        ilog = log.bind(instance_id=server['server']['id'])
+    def wait_for_server(server):
+        server_id = server['server']['id']
+
+        undo.push(
+            verified_delete, log, server_endpoint, auth_token, server_id)
+
+        ilog = log.bind(instance_id=server_id)
         return wait_for_active(
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'])
+            server_id)
 
-    d.addCallback(_wait_for_server)
+    d.addCallback(wait_for_server)
 
-    def _add_lb(server):
+    def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
-    d.addCallback(_add_lb)
+    d.addCallback(add_lb)
+
+    def rewind(result):
+        ud = undo.rewind()
+        ud.addBoth(lambda _: result)
+        return ud
+
+    d.addErrback(rewind)
     return d
 
 
