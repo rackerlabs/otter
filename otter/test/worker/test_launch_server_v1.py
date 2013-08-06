@@ -1020,16 +1020,7 @@ class TimeoutHelperTests(TestCase):
     """
     Tests for the helper method method ``timeout_deferred``
     """
-    def test_timeout_returns_deferred_that_was_passed_in(self):
-        """
-        The function returns the deferred that was passed in.
-        """
-        clock = Clock()
-        d1 = Deferred()
-        d2 = timeout_deferred(d1, 10, clock)
-        self.assertIdentical(d1, d2)
-
-    def test_propagates_result_if_success_without_timeout(self):
+    def test_deferred_propagates_result_if_success_without_timeout(self):
         """
         If the deferred succeeds before the timeout, the result is propagated
         and no error occurs

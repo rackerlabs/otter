@@ -514,11 +514,11 @@ def verified_delete(log,
 
 def timeout_deferred(deferred, timeout, clock):
     """
-    Time out a deferred.
+    Time out a deferred - schedule for it to be canceling it after ``timeout``
+    seconds from now, as per the clock.
 
+    :param Deferred deferred: Which deferred to time out (cancel)
     :param int timeout: How long before timing out the deferred (in seconds)
-    :return: the deferred that was passed in so that this can be used as a
-        callback if necessary.
 
     from:  https://twistedmatrix.com/trac/ticket/990
     """
@@ -529,4 +529,4 @@ def timeout_deferred(deferred, timeout, clock):
             delayed_call.cancel()
         return result
 
-    return deferred.addBoth(cancelTimeout)
+    deferred.addBoth(cancelTimeout)
