@@ -43,15 +43,21 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view = ('SELECT {column} FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND "policyId" = :policyId;')
 _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tenantId AND '
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
-_cql_insert = ('INSERT INTO {cf}("tenantId", "groupId", data) '
-               'VALUES (:tenantId, :groupId, {name})')
+_cql_insert_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
+                     'pending, "groupTouched", "policyTouched", paused) '
+                     'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
+                     ':groupTouched, :policyTouched, :paused)')
+_cql_view_manifest = ('SELECT group_config, launch_config, active, '
+                      'pending, "groupTouched", "policyTouched", paused) '
+                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
+                     ':groupTouched, :policyTouched, :paused)')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
 _cql_create_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, '
@@ -63,10 +69,6 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                          '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
                          '"groupId" = :groupId;')
-_cql_update_group_state = (
-    'INSERT INTO group_state("tenantId", "groupId", active, pending, "groupTouched", '
-    '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, :pending, '
-    ':groupTouched, :policyTouched, :paused);')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
                      'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
 _cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
@@ -81,12 +83,11 @@ _cql_fetch_batch_of_events = (
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
 _cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
 _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
-_cql_update_event = 'UPDATE {cf} SET trigger = {trigger} WHERE "policyId" = {policy_id};'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
     ':{name}Capability, :{name}Key)')
-_cql_update = ('INSERT INTO {cf}("tenantId", "groupId", data) '
+_cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
                'VALUES (:tenantId, :groupId, {name})')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
@@ -273,10 +274,10 @@ def _assemble_webhook_from_row(row):
     return webhook_base
 
 
-def _check_empty_and_grab_data(results, exception_if_empty):
+def _check_empty_and_grab_data(results, data_to_grab, exception_if_empty):
     if len(results) == 0:
         raise exception_if_empty
-    return _jsonloads_data(results[0]['data'])
+    return _jsonloads_data(results[0][data_to_grab])
 
 
 def _jsonloads_data(raw_data):
@@ -344,36 +345,41 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
-        def _get_launch_and_policies(the_config):
+        def _get_policies(group):
             """
-            Now that we know the group exists, get the launch config and
-            policies
+            Now that we know the group exists, get the policies
             """
-            d = defer.gatherResults([
-                self.view_launch_config(), self._naive_list_policies()])
+            group = group[0]
+            d = self._naive_list_policies()
 
-            d.addCallback(lambda launch_and_policies: {
-                'groupConfiguration': the_config,
-                'launchConfiguration': launch_and_policies[0],
-                'scalingPolicies': launch_and_policies[1],
+            d.addCallback(lambda policies: {
+                'groupConfiguration': group['group_config'],
+                'launchConfiguration': group['launch_config'],
+                'scalingPolicies': policies[0],
                 'id': self.uuid
             })
 
             return d
 
-        return self.view_config().addCallback(_get_launch_and_policies)
+        query = _cql_view_manifest.format(cf=self.config_table)
+        d = self.connection.execute(query,
+                                    {"tenantId": self.tenant_id,
+                                     "groupId": self.uuid},
+                                    get_consistency_level('view', 'group'))
+
+        return d.addCallback(_get_policies)
 
     def view_config(self):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
-        query = _cql_view.format(cf=self.config_table)
+        query = _cql_view.format(cf=self.config_table, column='group_config')
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('view', 'partial'))
 
-        d.addCallback(_check_empty_and_grab_data,
+        d.addCallback(_check_empty_and_grab_data, 'group_config',
                       NoSuchScalingGroupError(self.tenant_id, self.uuid))
         return d
 
@@ -381,12 +387,12 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
-        query = _cql_view.format(cf=self.launch_table)
+        query = _cql_view.format(cf=self.config_table, column='launch_config')
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('view', 'partial'))
-        d.addCallback(_check_empty_and_grab_data,
+        d.addCallback(_check_empty_and_grab_data, 'launch_config',
                       NoSuchScalingGroupError(self.tenant_id, self.uuid))
         return d
 
@@ -400,7 +406,7 @@ class CassScalingGroup(object):
                 raise NoSuchScalingGroupError(self.tenant_id, self.uuid)
             return _unmarshal_state(res[0])
 
-        query = _cql_view_group_state.format(cf=self.state_table)
+        query = _cql_view_group_state.format(cf=self.config_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
@@ -424,8 +430,8 @@ class CassScalingGroup(object):
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
-            return self.connection.execute(_cql_update_group_state, params,
-                                           get_consistency_level('update', 'state'))
+            return self.connection.execute(_cql_insert_group_state.format(cf=self.config_table),
+                                           params, get_consistency_level('update', 'state'))
 
         def _modify_state():
             d = self.view_state()
@@ -442,7 +448,8 @@ class CassScalingGroup(object):
         self.log.bind(updated_config=data).msg("Updating config")
 
         def _do_update_config(lastRev):
-            queries = [_cql_update.format(cf=self.config_table, name=":scaling")]
+            queries = [_cql_update.format(cf=self.config_table, column='group_config',
+                                          name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -461,7 +468,8 @@ class CassScalingGroup(object):
         self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
         def _do_update_launch(lastRev):
-            queries = [_cql_update.format(cf=self.launch_table, name=":launch")]
+            queries = [_cql_update.format(cf=self.launch_table, column='launch_config',
+                                          name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
@@ -732,8 +740,7 @@ class CassScalingGroup(object):
             }
             queries = [
                 _cql_delete_all_in_group.format(cf=table) for table in
-                (self.config_table, self.launch_table, self.policies_table,
-                 self.webhooks_table, self.state_table)]
+                (self.config_table, self.policies_table, self.webhooks_table)]
 
             if len(policies) > 0:
                 events_query, events_params = _delete_events_query_and_params(
@@ -837,15 +844,17 @@ class CassScalingGroupCollection:
 
         log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
 
-        queries = [
-            _cql_insert.format(cf=self.config_table, name=":scaling"),
-            _cql_insert.format(cf=self.launch_table, name=":launch"),
-            _cql_create_group_state.format(cf=self.state_table)]
+        queries = [_cql_create_group.format(cf=self.config_table)]
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
-                "scaling": serialize_json_data(config, 1),
-                "launch": serialize_json_data(launch, 1),
+                "group_config": serialize_json_data(config, 1),
+                "launch_config": serialize_json_data(launch, 1),
+                "active": '{{}}',
+                "pending": '{{}}',
+                "policyTouched": '{{}}',
+                "groupTouched": False,
+                "paused": False
                 }
 
         outpolicies = {}
@@ -870,7 +879,7 @@ class CassScalingGroupCollection:
         def _build_states(group_states):
             return [_unmarshal_state(state) for state in group_states]
 
-        d = self.connection.execute(_cql_list_states.format(cf=self.state_table),
+        d = self.connection.execute(_cql_list_states.format(cf=self.config_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
         d.addCallback(_build_states)
