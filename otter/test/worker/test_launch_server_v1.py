@@ -32,6 +32,8 @@ from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error
 
+from otter.test.utils import iMock
+from otter.undo import IUndoStack
 from otter.undo import InMemoryUndoStack
 
 fake_config = {
@@ -277,16 +279,8 @@ class ServerTests(TestCase):
 
         self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid)
 
-        def termination():
-            return lambda: True
-
-        def run_immediately(f):
-            f()
-
-        self.cooperator = Cooperator(
-            terminationPredicateFactory=termination,
-            scheduler=run_immediately)
-        self.undo = InMemoryUndoStack(self.cooperator.coiterate)
+        self.undo = iMock(IUndoStack)
+        self.undo.rewind.side_effect = lambda: succeed(None)
 
     def test_server_details(self):
         """
@@ -675,7 +669,7 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
     @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    def test_launch_server_deletes_server_on_load_balancer_error(
+    def test_launch_server_pushes_verified_delete_onto_undo(
             self, wait_for_active, create_server, add_to_load_balancers,
             verified_delete):
         """
@@ -706,52 +700,14 @@ class ServerTests(TestCase):
                           launch_config,
                           self.undo)
 
+        self.undo.push.assert_called_once_with(
+            verified_delete,
+            self.log.bind.return_value,
+            'http://dfw.openstack/',
+            'my-auth-token',
+            '1')
+
         self.failureResultOf(d, RequestError)
-
-        verified_delete.assert_called_once_with(
-            self.log.bind.return_value,
-            'http://dfw.openstack/', 'my-auth-token', '1'
-        )
-
-
-    @mock.patch('otter.worker.launch_server_v1.verified_delete')
-    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
-    @mock.patch('otter.worker.launch_server_v1.create_server')
-    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
-    def test_launch_server_deletes_server_on_wait_for_active_error(
-            self, wait_for_active, create_server, add_to_load_balancers,
-            verified_delete):
-        """
-        launch_server will delete any servers if it encounters an error
-        adding a node to the load_balancer.
-        """
-        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
-                         'loadBalancers': []}
-
-        server_details = {
-            'server': {
-                'id': '1',
-                'addresses': {'private': [
-                    {'version': 4, 'addr': '10.0.0.1'}]}}}
-
-        create_server.return_value = succeed(server_details)
-
-        wait_for_active.return_value = fail(UnexpectedServerStatus('foo', 'bar', 'baz'))
-
-        d = launch_server(self.log,
-                          'DFW',
-                          self.scaling_group,
-                          fake_service_catalog,
-                          'my-auth-token',
-                          launch_config,
-                          self.undo)
-
-        self.failureResultOf(d, UnexpectedServerStatus)
-
-        verified_delete.assert_called_once_with(
-            self.log.bind.return_value,
-            'http://dfw.openstack/', 'my-auth-token', '1'
-        )
 
 
 class ConfigPreparationTests(TestCase):

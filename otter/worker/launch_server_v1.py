@@ -22,7 +22,6 @@ from copy import deepcopy
 
 from twisted.internet.defer import Deferred, gatherResults
 from twisted.internet.task import LoopingCall
-from twisted.internet.task import coiterate
 
 import treq
 
@@ -30,6 +29,7 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
+
 
 class UnexpectedServerStatus(Exception):
     """
@@ -294,6 +294,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
+    :param IUndoStack undo: The stack that will be rewound if undo fails.
 
     :return: Deferred that fires with a 2-tuple of server details and the
         list of load balancer responses from add_to_load_balancers.
@@ -350,13 +351,6 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         return lbd
 
     d.addCallback(add_lb)
-
-    def rewind(result):
-        ud = undo.rewind()
-        ud.addBoth(lambda _: result)
-        return ud
-
-    d.addErrback(rewind)
     return d
 
 

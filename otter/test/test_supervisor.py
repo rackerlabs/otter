@@ -5,6 +5,7 @@ import mock
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail
+from twisted.internet.task import Cooperator
 
 from otter.models.interface import IScalingGroup
 from otter.supervisor import Supervisor
@@ -39,7 +40,20 @@ class SupervisorTests(TestCase):
         set_config_data({'region': 'ORD'})
         self.addCleanup(set_config_data, {})
 
-        self.supervisor = Supervisor(self.auth_function)
+        def termination():
+            return lambda: True
+
+        def run_immediately(f):
+            f()
+
+        self.cooperator = Cooperator(
+            terminationPredicateFactory=termination,
+            scheduler=run_immediately)
+
+        self.supervisor = Supervisor(self.auth_function, self.cooperator.coiterate)
+
+        self.undo = patch(self, 'otter.supervisor.InMemoryUndoStack').return_value
+        self.undo.rewind.return_value = succeed(None)
 
 
 class LaunchConfigTests(SupervisorTests):
@@ -117,7 +131,24 @@ class LaunchConfigTests(SupervisorTests):
             self.group,
             self.service_catalog,
             self.auth_token,
-            {'server': {}})
+            {'server': {}},
+            self.undo)
+
+    def test_execute_config_winds_undo_stack_on_failure(self):
+        """
+        execute_config rewinds the undo stack passed to launch_server,
+        when launch_server fails.
+        """
+        expected = ValueError('auth failure')
+        self.auth_function.return_value = fail(expected)
+
+        d = self.supervisor.execute_config(self.log, 'transaction-id',
+                                           self.group, self.launch_config)
+
+        (job_id, completed_d) = self.successResultOf(d)
+
+        self.failureResultOf(completed_d)
+        self.undo.rewind.assert_called_once_with()
 
 
 class DeleteServerTests(SupervisorTests):
