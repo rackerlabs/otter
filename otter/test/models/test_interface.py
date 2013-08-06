@@ -175,6 +175,28 @@ class GroupStateTestCase(TestCase):
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
 
+    def test_current_capacity(self):
+        """
+        Current capacity is the number of current active servers and the number
+        of current pending jobs
+        """
+        self.assertEqual(
+            GroupState('tid', 'gid', {}, {}, 'date', {}, True).current_capacity,
+            0)
+        self.assertEqual(
+            GroupState('tid', 'gid', {'1': {}, '2': {}, '3': {}}, {},
+                       'date', {}, True).current_capacity,
+            3)
+        self.assertEqual(
+            GroupState('tid', 'gid', {}, {'1': {}, '2': {}, '3': {}},
+                       'date', {}, True).current_capacity,
+            3)
+        self.assertEqual(
+            GroupState('tid', 'gid', {'1': {}, '2': {}, '3': {}},
+                       {'1': {}, '2': {}, '3': {}}, 'date', {},
+                       True).current_capacity,
+            6)
+
 
 class IScalingGroupProviderMixin(object):
     """

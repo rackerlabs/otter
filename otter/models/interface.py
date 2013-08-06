@@ -127,6 +127,14 @@ class GroupState(object):
         """
         self.policy_touched[policy_id] = self.group_touched = self.now()
 
+    @property
+    def current_capacity(self):
+        """
+        :returns: the current capacity of the scaling group
+        :rtype: int
+        """
+        return len(self.active) + len(self.pending)
+
 
 class UnrecognizedCapabilityError(Exception):
     """
