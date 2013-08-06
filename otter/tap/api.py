@@ -85,7 +85,7 @@ def makeService(config):
 
         cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
             seed_endpoints,
-            config_value('cassandra.keyspace')), log)
+            config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
