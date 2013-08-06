@@ -51,20 +51,21 @@ class UpdateSchedulerTests(AutoscaleFixture):
     def test_system_update_at_style_scheduler_to_execute_in_the_future(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,
-        update the policy to execute in next week and verify the servers
-        are as expected.
+        update the policy to execute after 10 secs and verify the scheduler policy
+        triggers server creation as expected.
         """
-        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(604800)}
         at_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            schedule_at=self.autoscale_behaviors.get_time_in_utc(5))
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(5),
+            sp_cooldown=0)
         sleep(5 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
+        upd_args = {'at': self.autoscale_behaviors.get_time_in_utc(10)}
         self._update_policy(self.group.id, at_style_policy, upd_args)
-        sleep(self.scheduler_interval)
+        sleep(10 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
-                                at_style_policy['change'])
+                                (at_style_policy['change'] * 2))
 
     def test_system_update_cron_style_scheduler_to_execute_now(self):
         """
@@ -86,20 +87,29 @@ class UpdateSchedulerTests(AutoscaleFixture):
     def test_system_update_cron_style_scheduler_to_execute_in_the_future(self):
         """
         Create an cron style scheduler policy to execute the next minute,
-        update the policy to execute on a future day and
-        verify the server count on the group is as expected.
+        update the policy to execute every 2 minutes and
+        verify the server count on the group is as expected when the policy is updated,
+        wait one minute after the policy update and verify the older policy (every minute)
+        is not executed.
         """
-        upd_args = {'cron': '0 23 1 12 *'}
+        upd_args = {'cron': '*/2 * * * *'}
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
-            schedule_cron='* * * * *')
+            schedule_cron='* * * * *',
+            sp_cooldown=0)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 cron_style_policy['change'])
         self._update_policy(self.group.id, cron_style_policy, upd_args)
-        sleep(self.scheduler_interval)
+        sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
-                                cron_style_policy['change'])
+                                (cron_style_policy['change'] * 2))
+        sleep(60 + self.scheduler_interval)
+        self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
+                                (cron_style_policy['change'] * 2))
+        sleep(60 + self.scheduler_interval)
+        self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
+                                (cron_style_policy['change'] * 3))
 
     def _update_policy(self, group_id, policy, upd_args, cooldown=None, change_value=None):
         """
