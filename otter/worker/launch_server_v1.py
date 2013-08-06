@@ -527,7 +527,11 @@ def verified_delete(log,
 def timeout_deferred(deferred, timeout, clock):
     """
     Time out a deferred - schedule for it to be canceling it after ``timeout``
-    seconds from now, as per the clock.
+    seconds from now, as per the clock.  If it gets cancelled, it errbacks with
+    a :class:`twisted.internet.defer.CancelledError`, unless a cancelable
+    function is passed to the Deferred's initialization and it callbacks or
+    errbacks when cancelled.  (see the documentation for
+    :class:`twisted.internet.defer.Deferred`) for more details.
 
     :param Deferred deferred: Which deferred to time out (cancel)
     :param int timeout: How long before timing out the deferred (in seconds)
