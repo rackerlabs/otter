@@ -1020,10 +1020,11 @@ class TimeoutHelperTests(TestCase):
     """
     Tests for the helper method method ``timeout_deferred``
     """
-    def test_deferred_propagates_result_if_success_without_timeout(self):
+    def test_propagates_result_if_success_before_timeout(self):
         """
-        If the deferred succeeds before the timeout, the result is propagated
-        and no error occurs
+        The deferred callbacks with the result if it succeeds before the
+        timeout (e.g. timing out the deferred does not obscure the callback
+        value).
         """
         clock = Clock()
         d = Deferred()
@@ -1034,10 +1035,11 @@ class TimeoutHelperTests(TestCase):
 
         self.assertEqual(self.successResultOf(d), "Result")
 
-    def test_propagates_failure_if_failed_without_timeout(self):
+    def test_propagates_failure_if_failed_before_timeout(self):
         """
-        If the deferred fails before the timeout, the result is propagated
-        and no extra cancellation error happens
+        The deferred errbacks with the failure if it fails before the
+        timeout (e.g. timing out the deferred does not obscure the errback
+        failure).
         """
         clock = Clock()
         d = Deferred()
@@ -1050,8 +1052,8 @@ class TimeoutHelperTests(TestCase):
 
     def test_cancels_if_past_timeout(self):
         """
-        If the deferred fails before the timeout, the result is propagated
-        and no extra cancellation error happens
+        The deferred errbacks with an CancelledError if the timeout occurs
+        before it either callbacks or errbacks.
         """
         clock = Clock()
         d = Deferred()
