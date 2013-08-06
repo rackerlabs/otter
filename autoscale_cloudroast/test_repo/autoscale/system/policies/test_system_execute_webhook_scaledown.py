@@ -3,6 +3,7 @@ System tests for scaling policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
+from time import sleep
 
 
 class ScalingDownExecuteWebhookTest(AutoscaleFixture):
@@ -41,6 +42,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
@@ -61,6 +63,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
@@ -79,6 +82,7 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=policy_down['desired_capacity'])

@@ -43,6 +43,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
                           msg='Executing the updated scale up policy using the webhook failed with {0}'
                           'for group {1}'
                           .format(upd_scale_up_execute_webhook, self.group.id))
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities +
@@ -62,6 +63,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
         self.assertEquals(upd_to_scale_down_execute_webhook, 202,
                           msg='Executing the updated scale down policy failed with {0} for group {1}'
                           .format(upd_to_scale_down_execute_webhook, self.group.id))
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
@@ -85,6 +87,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=upd_change_percent)
+        sleep(0.1)
         self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
