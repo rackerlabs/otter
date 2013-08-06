@@ -46,6 +46,7 @@ class SchedulerService(TimerService):
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
+        self.log = otter_log.bind(system='otter.scheduler')
 
     def check_for_events(self, batchsize):
         """
@@ -62,13 +63,13 @@ class SchedulerService(TimerService):
         def check_fetch_error(failure):
             # Return if we do not get lock as other process might be processing current events
             failure.trap(BusyLockError)
-            otter_log.msg('No lock in scheduler')
+            self.log.msg("Couldn't get lock to process events")
 
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
             d.addErrback(check_fetch_error)
-            d.addErrback(otter_log.err)
+            d.addErrback(self.log.err)
             return d
 
         return _do_check()
@@ -80,8 +81,6 @@ class SchedulerService(TimerService):
 
         :return: a deferred that fires with list of events processed
         """
-        log = otter_log.bind(scheduler_run_id=generate_transaction_id())
-
         def process_events(events):
 
             if not len(events):
@@ -126,7 +125,7 @@ class SchedulerService(TimerService):
 
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
-        log = log.bind(utcnow=utcnow)
+        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
         log.msg('Checking for events')
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
