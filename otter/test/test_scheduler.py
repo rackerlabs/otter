@@ -75,12 +75,13 @@ class SchedulerTestCase(TestCase):
         self.mock_with_lock = patch(self, 'otter.scheduler.with_lock')
         self.mock_with_lock.side_effect = _mock_with_lock
         self.slv_client = mock.MagicMock()
+        self.otter_log = patch(self, 'otter.scheduler.otter_log')
 
         self.clock = Clock()
         self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
 
-        self.otter_log = patch(self, 'otter.scheduler.otter_log')
-        self.otter_log.msg.return_value = None
+        self.otter_log.bind.assert_called_once_with(system='otter.scheduler')
+        self.log = self.otter_log.bind.return_value
 
         self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence')
         self.next_cron_occurrence.return_value = 'newtrigger'
@@ -114,6 +115,8 @@ class SchedulerTestCase(TestCase):
         d = self.scheduler_service.check_for_events(100)
         self.validate_calls(d, [[]], None)
         self.assertFalse(self.mock_store.update_delete_events.called)
+        self.log.bind.assert_called_once_with(scheduler_run_id=mock.ANY, utcnow=mock.ANY)
+        self.log.bind.return_value.msg.assert_called_once_with('Checking for events')
 
     def test_one(self):
         """
@@ -233,7 +236,7 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
-        self.otter_log.msg.assert_called_once_with('No lock in scheduler')
+        self.log.msg.assert_called_once_with("Couldn't get lock to process events")
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
@@ -265,7 +268,7 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
-        self.otter_log.msg.assert_called_once_with('No lock in scheduler')
+        self.log.msg.assert_called_once_with("Couldn't get lock to process events")
 
     def test_cron_updates(self):
         """
