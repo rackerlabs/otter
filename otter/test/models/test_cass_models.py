@@ -1417,8 +1417,6 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.side_effect = _responses
 
         self.collection = CassScalingGroupCollection(self.connection)
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
 
     def test_fetch(self):
         """
