@@ -453,3 +453,9 @@ class MockScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
         """
         return defer.succeed(None)
+
+    def get_metrics(self, log):
+        """
+        see :meth:`otter.models.cass.CassScalingGroupCollection.get_metrics`
+        """
+        return defer.succeed({})
