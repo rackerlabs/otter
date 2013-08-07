@@ -229,6 +229,11 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         call for the lbaas id.
         Get list of port of lbaas on the group and compare to the list of
         port on the lbaas id.
+        (note: the test ensures the port are distint during group creation,
+        which escapes the case this function would fail for, which is if the
+        loadbalancer had a node with the port on it already, and autoscale
+        failed to add node to that same port, this will not fail. This was done
+        to keep it simple.)
         """
         # call nova list server, filter by ID and create ip address list
         servers_address_list = self._get_ipv4_address_list_on_servers(
