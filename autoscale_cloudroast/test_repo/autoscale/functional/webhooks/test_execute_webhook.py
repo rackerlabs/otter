@@ -45,3 +45,4 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
                           msg='Execute webhook failed with {0}'
                           .format(execute_wb_resp.status_code))
         self.validate_headers(execute_wb_resp.headers)
+        self.empty_scaling_group(self.group)
