@@ -219,12 +219,7 @@ class AutoscaleBehaviors(BaseBehavior):
             args = {'at': schedule_at}
         else:
             args = {'at': AutoscaleBehaviors.get_time_in_utc(self, 5)}
-        if sp_change is not None:
-            create_response = self.autoscale_client.create_policy(
-                group_id=group_id,
-                name=sp_name, cooldown=sp_cooldown,
-                change=sp_change, policy_type=sp_policy_type, args=args)
-        elif sp_change_percent is not None:
+        if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
@@ -234,6 +229,12 @@ class AutoscaleBehaviors(BaseBehavior):
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 desired_capacity=sp_desired_capacity, policy_type=sp_policy_type, args=args)
+        else:
+            sp_change = sp_change or int(self.autoscale_config.sp_change)
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change=sp_change, policy_type=sp_policy_type, args=args)
         if create_response.status_code != 201:
             return dict(status_code=create_response.status_code)
         else:
