@@ -202,7 +202,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         load_balancer_list = [00000, self.lb_other_region]
         for each_load_balancer in load_balancer_list:
             group = self._create_group_given_lbaas_id(each_load_balancer)
-            self._wait_for_active_servers_to_be_deleted(group.id, group.groupConfiguration.minEntities)
+            self._wait_for_servers_to_be_deleted_when_lb_invalid(
+                group.id, group.groupConfiguration.minEntities)
             self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(group_id=group.id)),
                               0, msg='Servers created on the group before trying to add the '
                               'invalid load balancer were not deleted on group {0}'.format(group.id))
@@ -333,10 +334,12 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                             lb_node_list_before_any_operation),
                             set(current_lb_node_list)))
 
-    def _wait_for_active_servers_to_be_deleted(self, group_id, servers_before_lb, server_after_lb=0):
+    def _wait_for_servers_to_be_deleted_when_lb_invalid(self, group_id,
+                                                        servers_before_lb, server_after_lb=0):
         """
         waits for servers_before_lb number of servers to be the desired capacity,
-        then waits for the desired capacity to be server_after_lb
+        then waits for the desired capacity to be server_after_lb when a group with an
+        invalid load balancer is created.
         """
         end_time = time.time() + 600
         group_state = (self.autoscale_client.list_status_entities_sgroups(
