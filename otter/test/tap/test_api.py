@@ -104,6 +104,10 @@ class APIMakeServiceTests(TestCase):
         self.CassScalingGroupCollection = CassScalingGroupCollection_patcher.start()
         self.addCleanup(CassScalingGroupCollection_patcher.stop)
 
+        SchedulerService_patcher = mock.patch('otter.tap.api.SchedulerService')
+        self.SchedulerService = SchedulerService_patcher.start()
+        self.addCleanup(SchedulerService_patcher.stop)
+
     def test_service_site_on_port(self):
         """
         makeService will create a strports service on tcp:9999 with a
@@ -190,10 +194,30 @@ class APIMakeServiceTests(TestCase):
         """
         mock_config = test_config.copy()
         mock_config['mock'] = True
+
         makeService(mock_config)
 
         for mocked in (self.RoundRobinCassandraCluster,
                        self.CassScalingGroupCollection,
+                       self.set_store, self.clientFromString):
+            mock_calls = getattr(mocked, 'mock_calls')
+            self.assertEqual(len(mock_calls), 0,
+                             "{0} called with {1}".format(mocked, mock_calls))
+
+    def test_mock_store_with_scheduler(self):
+        """
+        makeService does not setup a SchedulerService when Cassandra is
+        mocked, and a scheduler config exists.
+        """
+        mock_config = test_config.copy()
+        mock_config['mock'] = True
+        mock_config['scheduler'] = {'interval': 1, 'batchsize': 5}
+
+        makeService(mock_config)
+
+        for mocked in (self.RoundRobinCassandraCluster,
+                       self.CassScalingGroupCollection,
+                       self.SchedulerService,
                        self.set_store, self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
