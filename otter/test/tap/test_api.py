@@ -10,10 +10,7 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import ContainsDict, Equals
-
 from otter.tap.api import Options, makeService
-from otter.test.utils import matches
 
 
 test_config = {
@@ -107,6 +104,10 @@ class APIMakeServiceTests(TestCase):
         self.CassScalingGroupCollection = CassScalingGroupCollection_patcher.start()
         self.addCleanup(CassScalingGroupCollection_patcher.stop)
 
+        SchedulerService_patcher = mock.patch('otter.tap.api.SchedulerService')
+        self.SchedulerService = SchedulerService_patcher.start()
+        self.addCleanup(SchedulerService_patcher.stop)
+
     def test_service_site_on_port(self):
         """
         makeService will create a strports service on tcp:9999 with a
@@ -193,6 +194,7 @@ class APIMakeServiceTests(TestCase):
         """
         mock_config = test_config.copy()
         mock_config['mock'] = True
+
         makeService(mock_config)
 
         for mocked in (self.RoundRobinCassandraCluster,
@@ -202,37 +204,24 @@ class APIMakeServiceTests(TestCase):
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
 
-    @mock.patch('otter.tap.api.AirbrakeLogObserver')
-    def test_airbrake(self, airbrake_observer):
+    def test_mock_store_with_scheduler(self):
         """
-        makeService configures the log observer to publish to airbrake when
-        airbrake is in the config and AirbrakeLogObserver is importable
-        (and hence not None)
+        makeService does not setup a SchedulerService when Cassandra is
+        mocked, and a scheduler config exists.
         """
         mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
+        mock_config['mock'] = True
+        mock_config['scheduler'] = {'interval': 1, 'batchsize': 5}
 
         makeService(mock_config)
 
-        airbrake_observer.assert_called_once_with('XXX', 'prod', use_ssl=True)
-        airbrake_observer.return_value.start.assert_called_once_with()
-
-    @mock.patch('otter.tap.api.AirbrakeLogObserver', new=None)
-    def test_airbrake_warning(self):
-        """
-        makeService warns when airbrake is in the config but AirbrakeLogObserver
-        is not importable (and hence None).  It does not add any log observers.
-        """
-        mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
-
-        makeService(mock_config)
-
-        message = Equals("There is a configuration option for Airbrake, but "
-                         "txairbrake is not installed.")
-        warnings = self.flushWarnings([makeService])
-        self.assertEqual(warnings,
-                         [matches(ContainsDict({'message': message}))])
+        for mocked in (self.RoundRobinCassandraCluster,
+                       self.CassScalingGroupCollection,
+                       self.SchedulerService,
+                       self.set_store, self.clientFromString):
+            mock_calls = getattr(mocked, 'mock_calls')
+            self.assertEqual(len(mock_calls), 0,
+                             "{0} called with {1}".format(mocked, mock_calls))
 
     @mock.patch('otter.tap.api.SchedulerService')
     def test_scheduler_service(self, scheduler_service):
