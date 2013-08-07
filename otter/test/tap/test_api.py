@@ -161,7 +161,7 @@ class APIMakeServiceTests(TestCase):
         makeService(test_config)
         self.log.bind.assert_called_once_with(system='otter.silverberg')
         self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
-                                                        self.log.bind.return_value)
+                                                      self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
 
     def test_cassandra_store(self):
