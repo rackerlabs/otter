@@ -13,7 +13,8 @@ from otter.json_schema import group_examples
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
-    serialize_json_data)
+    serialize_json_data,
+    get_consistency_level)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -91,6 +92,40 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
+
+
+class GetConsistencyTests(TestCase):
+    """
+    Tests for `get_consistency_level`
+    """
+    def test_unknown_resource(self):
+        """
+        When called with unknown resource it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('list', 'junk')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_unknown_operation(self):
+        """
+        When called with unknown operation it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('junk', 'event')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_unknown_operation_and_resource(self):
+        """
+        When called with unknown operation and resource it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('junk', 'junk2')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_event_list(self):
+        """
+        Gives QUORUM on event list
+        """
+        level = get_consistency_level('list', 'event')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
 
 
 class DummyException(Exception):
