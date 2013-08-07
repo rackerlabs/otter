@@ -7,13 +7,13 @@ from cloudcafe.common.resources import ResourcePool
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.config import AutoscaleConfig
 from cloudcafe.auth.config import UserAuthConfig, UserConfig
-from autoscale.client import AutoscalingAPIClient
+from autoscale.client import AutoscalingAPIClient, LbaasAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
 
 import os
-from time import sleep
+import time
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -36,7 +36,11 @@ class AutoscaleFixture(BaseTestFixture):
                                                    user_config)
         server_service = access_data.get_service(
             cls.autoscale_config.server_endpoint_name)
+        load_balancer_service = access_data.get_service(
+            cls.autoscale_config.load_balancer_endpoint_name)
         server_url = server_service.get_endpoint(
+            cls.autoscale_config.region).public_url
+        lbaas_url = load_balancer_service.get_endpoint(
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
@@ -56,6 +60,9 @@ class AutoscaleFixture(BaseTestFixture):
             'json', 'json')
         cls.server_client = ServersClient(
             server_url, access_data.token.id_,
+            'json', 'json')
+        cls.lbaas_client = LbaasAPIClient(
+            lbaas_url, access_data.token.id_,
             'json', 'json')
         cls.autoscale_behaviors = AutoscaleBehaviors(cls.autoscale_config,
                                                      cls.autoscale_client)
@@ -78,6 +85,10 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
+        cls.load_balancer_1 = int(cls.autoscale_config.load_balancer_1)
+        cls.load_balancer_2 = int(cls.autoscale_config.load_balancer_2)
+        cls.load_balancer_3 = int(cls.autoscale_config.load_balancer_3)
+        cls.lb_other_region = int(cls.autoscale_config.lb_other_region)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
@@ -190,7 +201,7 @@ class AutoscaleFixture(BaseTestFixture):
             sp_cooldown=0,
             sp_change=change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
-        sleep(self.scheduler_interval + delay)
+        time.sleep(self.scheduler_interval + delay)
 
     def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
         """
@@ -211,6 +222,22 @@ class AutoscaleFixture(BaseTestFixture):
         list_server_resp = self.server_client.list_servers(name=params)
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
+
+    def assert_servers_deleted_successfully(self, server_name):
+        """
+        Given a server name, polls for 15 mins to assert that the tenant id
+        does not have servers containing that name
+        """
+        endtime = time.time() + 900
+        while time.time() < endtime:
+            server_list = self.get_servers_containing_given_name_on_tenant(
+                server_name=server_name)
+            if len(server_list) == 0:
+                break
+            time.sleep(self.interval_time)
+        else:
+            self.fail('Servers on the tenant with name {0} were not deleted even'
+                      'after waiting 15 mins'.format(server_name))
 
     @classmethod
     def tearDownClass(cls):
