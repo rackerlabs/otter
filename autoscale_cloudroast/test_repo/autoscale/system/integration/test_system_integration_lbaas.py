@@ -4,6 +4,7 @@ System Integration tests autoscaling with lbaas
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import random
 import unittest
+import time
 
 
 class AutoscaleLbaasFixture(AutoscaleFixture):
@@ -186,12 +187,9 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
-        get_nodes_on_lb = (self.lbaas_client.list_nodes(self.load_balancer_1).entity)
-        nodes_list_on_lb = []
-        for each_node in get_nodes_on_lb:
-                nodes_list_on_lb.append(each_node.address)
-        for each_server in active_servers_from_scale:
-            self.assertTrue(each_server not in nodes_list_on_lb)
+        server_ip_list = self._get_ipv4_address_list_on_servers(active_servers_from_scale)
+        node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
+        self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
         self.empty_scaling_group(group)
 
     @unittest.skip('AUTO-378')
@@ -199,19 +197,15 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         Create group with a random number/lb from a differnt region as the load balancer id
         and verify the scaling group deletes the servers after trying to add loadbalancer.
+        Also, when 25 nodes already exist on a lb
         """
         load_balancer_list = [00000, self.lb_other_region]
         for each_load_balancer in load_balancer_list:
             group = self._create_group_given_lbaas_id(each_load_balancer)
-            try:
-                self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
-                    group.id,
-                    self.gc_min_entities_alt)
-            except ValueError:
-                pass
-            self.assertTrue((self.get_servers_containing_given_name_on_tenant(group.id))
-                            is None, msg='Servers created on the group before trying to add the'
-                            'invalid load balancer were not deleted on group {0}'.format(group.id))
+            self._wait_for_active_servers_to_be_deleted(group.id, group.groupConfiguration.minEntities)
+            self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(group_id=group.id)),
+                              0, msg='Servers created on the group before trying to add the '
+                              'invalid load balancer were not deleted on group {0}'.format(group.id))
 
     def _create_group_given_lbaas_id(self, *lbaas_ids):
         """
@@ -332,3 +326,24 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                         msg='nodes {0} is not a subset of {1}'.format(set(
                             lb_node_list_before_any_operation),
                             set(current_lb_node_list)))
+
+    def _wait_for_active_servers_to_be_deleted(self, group_id, servers_before_lb, server_after_lb=0):
+        """
+        waits for servers_before_lb number of servers to be the desired capacity,
+        then waits for the desired capacity to be server_after_lb
+        """
+        end_time = time.time() + 600
+        group_state = (self.autoscale_client.list_status_entities_sgroups(
+            group_id)).entity
+        if group_state.desiredCapacity is servers_before_lb:
+            while time.time() < end_time:
+                time.sleep(10)
+                group_state = (self.autoscale_client.list_status_entities_sgroups(
+                    group_id)).entity
+                if group_state.desiredCapacity is server_after_lb:
+                    return
+            else:
+                self.fail('Servers not deleted from group even when group has invalid'
+                          ' load balancers!')
+        else:
+            self.fail('Number of servers building on the group are not as expected')

@@ -121,17 +121,13 @@ class AutoscaleBehaviors(BaseBehavior):
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
-
             if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
                 raise BuildErrorException(
                     'Group Id %s failed to attempt server creation. Group has no servers'
                     % group_id)
-
             if len(active_list) == expected_servers:
                 return [server.id for server in active_list]
             time.sleep(interval_time)
-            #print "waiting for servers to be active..."
-
             if group_state.desiredCapacity != expected_servers:
                 raise BuildErrorException(
                     'Group %s should have %s servers, but has reduced the build %s servers'
