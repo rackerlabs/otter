@@ -127,7 +127,6 @@ class GetConsistencyTests(TestCase):
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
-
 class DummyException(Exception):
     """
     Specific exception class, to be used in testing exception handling
