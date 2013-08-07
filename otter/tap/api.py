@@ -22,7 +22,9 @@ from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
 
+from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
+from silverberg.logger import LoggingCQLClient
 
 
 class Options(usage.Options):
@@ -81,9 +83,9 @@ def makeService(config):
             clientFromString(reactor, str(host))
             for host in config_value('cassandra.seed_hosts')]
 
-        cassandra_cluster = RoundRobinCassandraCluster(
+        cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
             seed_endpoints,
-            config_value('cassandra.keyspace'))
+            config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
