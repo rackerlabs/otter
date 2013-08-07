@@ -1,5 +1,5 @@
 """
-Autoscale REST endpoints having to do with internal metrics.
+Autoscale REST endpoints having to do with administration of otter.
 
 (/metrics)
 """
@@ -8,13 +8,24 @@ import json
 
 from otter.util import timestamp
 
-from otter.rest.application import app, get_store
+from otter.rest.application import admin_app, get_store
 from otter.rest.decorators import (fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
 
 
-@app.route('/metrics', methods=['GET'])
+@admin_app.route('/', methods=['GET'])
+@with_transaction_id()
+@fails_with(exception_codes)
+@succeeds_with(200)
+def root(request, log):
+    """
+    Root response for admin API.
+    """
+    return ''
+
+
+@admin_app.route('/metrics', methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)

@@ -155,10 +155,13 @@ def transaction_id(request):
     """
     return request.responseHeaders.getRawHeaders('X-Response-Id')[0]
 
-
+# Otter Application
 app = Klein()
 app.route = partial(app.route, strict_slashes=False)
 
 root = Resource()
 root.putChild('v1.0', app.resource())
 root.putChild('', Data('', 'text/plain'))
+
+# Admin Application
+admin_app = Klein()
