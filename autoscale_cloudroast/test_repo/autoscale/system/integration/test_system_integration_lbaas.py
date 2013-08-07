@@ -214,7 +214,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
-            lc_load_balancers=self._create_lbaas_list(*lbaas_ids))
+            lc_load_balancers=self._create_lbaas_list(*lbaas_ids),
+            gc_cooldown=0)
         group = create_group_response.entity
         self.resources.add(group.id,
                            self.autoscale_client.delete_scaling_group)
