@@ -91,20 +91,50 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 
+    @tags(speed='quick')
     def test_system_max_scaling_groups_on_one_account(self):
         """
-        The maximum scaling groups an account can have are 100.
+        The maximum scaling groups an account cannot be more than 100.
         """
-        pass
+        current_group_count = len(self.autoscale_client.list_scaling_groups().entity)
+        max_groups = self.max_groups - current_group_count
+        for group in (range(max_groups)):
+            create_group_reponse = self.autoscale_behaviors.create_scaling_group_min()
+            self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
+        self.assertEquals(len(self.autoscale_client.list_scaling_groups().entity),
+                          self.max_groups)
 
-    def test_system_max_policies_on_a_scaling_group(self):
+    @tags(speed='quick')
+    def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
-        The maximum scaling policies allowed on a scaling group are ???.
+        Verify the maximum scaling policies are allowed on a scaling group.
         """
-        pass
+        for policy in (range(self.max_policies)):
+            self.autoscale_behaviors.create_policy_min(
+                self.first_scaling_group.id)
+        self.assertEquals(len(self.autoscale_client.list_policies(
+            self.first_scaling_group.id).entity), self.max_policies)
 
+    @tags(speed='quick')
+    def test_system_max_scheduler_policies_on_a_scaling_group(self):
+        """
+        Verify the maximum scaling policies are allowed on a scaling group.
+        """
+        for policy in (range(self.max_policies)):
+            self.autoscale_behaviors.create_schedule_policy_given(
+                self.first_scaling_group.id,
+                sp_change_percent=100)
+        self.assertEquals(len(self.autoscale_client.list_policies(
+            self.first_scaling_group.id).entity), self.max_policies)
+
+    @tags(speed='quick')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
-        The maximum webhooks allowed on a scaling policy are ???.
+        Verify the maximum scaling policies are allowed on a scaling policy.
         """
-        pass
+        policy = self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
+        for webhook in (range(self.max_webhooks)):
+            self.autoscale_client.create_webhook(self.first_scaling_group.id,
+                                                 policy['id'], 'wb_{0}'.format(webhook))
+        self.assertEquals(len(self.autoscale_client.list_webhooks(
+            self.first_scaling_group.id, policy['id']).entity), self.max_webhooks)

@@ -9,20 +9,6 @@ class DeleteWebhook(ScalingGroupWebhookFixture):
     verify delete webhook call's response code, headers.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create a scaling group with a webhook.
-        """
-        super(DeleteWebhook, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the webhook
-        """
-        super(DeleteWebhook, cls).tearDownClass()
-
     def test_delete_webhook(self):
         """
         Test delete webhook returns 204 when successful

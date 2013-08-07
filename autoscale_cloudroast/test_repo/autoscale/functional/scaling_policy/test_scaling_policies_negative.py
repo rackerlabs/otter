@@ -23,13 +23,6 @@ class ScalingPolicyNegative(AutoscaleFixture):
         cls.resources.add(cls.group.id,
                           cls.autoscale_client.delete_scaling_group)
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(ScalingPolicyNegative, cls).tearDownClass()
-
     def test_scaling_policy_nonexistant(self):
         """
         Negative Test: A newly created scaling group does not contain a scaling policy,

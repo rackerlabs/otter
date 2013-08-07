@@ -128,24 +128,26 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         Create more number of policies than specified in scheduler batch size and verify all
         of them are executed in the batch size specified.
+        ** is failing **
         """
         at_style_policies_list = []
         size = 5
+        at_style_time = self.autoscale_behaviors.get_time_in_utc(1)
         for policy in (range(self.scheduler_batch * size)):
             policy = {
-                'args': {'at': self.autoscale_behaviors.get_time_in_utc(1)},
+                'args': {'at': at_style_time},
                 'cooldown': 0,
                 'type': 'schedule',
                 'name': 'multi_at_style{0}'.format(policy),
                 'change': 1}
             at_style_policies_list.append(policy)
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
-            lc_name='multi_scheduling', gc_cooldown=0,
+            lc_name='scheduler_batch_size_check', gc_cooldown=0,
             sp_list=at_style_policies_list)
         self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
-        sleep(self.scheduler_interval + 1)
+        sleep(self.scheduler_interval + 5)
         self.verify_group_state(
-            create_group_reponse.entity.id, self.scheduler_batch + size)
+            create_group_reponse.entity.id, self.scheduler_batch * size)
 
     @tags(speed='slow')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):

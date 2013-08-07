@@ -9,20 +9,6 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
     Create a webhook, get and validate
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create scaling group with webhook.
-        """
-        super(ExecuteWebhook, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete scaling group.
-        """
-        super(ExecuteWebhook, cls).tearDownClass()
-
     def test_execute_webhook(self):
         """
         Execute a webhook and verify response code 202 and headers.

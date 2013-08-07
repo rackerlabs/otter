@@ -84,6 +84,9 @@ class AutoscaleFixture(BaseTestFixture):
         cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
         cls.max_maxentities = OtterConstants.MAX_MAXENTITIES
         cls.max_cooldown = OtterConstants.MAX_COOLDOWN
+        cls.max_groups = OtterConstants.MAX_GROUPS
+        cls.max_policies = OtterConstants.MAX_POLICIES
+        cls.max_webhooks = OtterConstants.MAX_WEBHOOKS
 
     def validate_headers(self, headers):
         """

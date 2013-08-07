@@ -11,20 +11,6 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
     Verify negative scenarios for webhooks
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create scaling group with policy.
-        """
-        super(ScalingWebhooksNegative, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete scaling group.
-        """
-        super(ScalingWebhooksNegative, cls).tearDownClass()
-
     def test_webhooks_nonexistant(self):
         """
         Negative Test: Verify no webhooks exist on a newly created policy.

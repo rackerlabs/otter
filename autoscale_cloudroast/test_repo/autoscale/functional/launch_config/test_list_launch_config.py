@@ -42,13 +42,6 @@ class ListLaunchConfigTest(AutoscaleFixture):
             cls.group.id)
         cls.launch_config = cls.launch_config_response.entity
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(ListLaunchConfigTest, cls).tearDownClass()
-
     def test_list_launch_config_response(self):
         """
         Verify the list config call for response code, headers and data.

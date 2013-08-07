@@ -21,7 +21,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         cls.upd_image_ref = cls.lc_image_ref_alt
         cls.upd_flavor_ref = "3"
 
-    @tags(speed='slow')
+    @tags(speed='check')
     def test_system_min_max_entities_at_style(self):
         """
         Create a scaling group with minentities between 0 and maxentities and
@@ -89,7 +89,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self.create_default_at_style_policy_wait_for_execution(group.id)
         self.verify_group_state(group.id, self.sp_change * 2)
 
-    @tags(speed='slow')
+    @tags(speed='check')
     def test_system_upd_launch_config_at_style_scheduler(self):
         """
         Create a scaling group with minentities>0, update launch config, schedule at style
@@ -117,7 +117,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             expected_servers=group.groupConfiguration.minEntities)
         self._verify_server_list_for_launch_config(active_list_on_scale_down)
 
-    @tags(speed='slow')
+    @tags(speed='check')
     def test_system_upd_launch_config_cron_style_scheduler(self):
         """
         Create a scaling group with minentities>0, update launch config, schedule cron style

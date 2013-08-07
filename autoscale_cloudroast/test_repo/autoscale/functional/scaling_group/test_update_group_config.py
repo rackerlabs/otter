@@ -29,13 +29,6 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         cls.gc_max_entities = 15
         cls.gc_metadata = {'upd_key1': 'upd_value1'}
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(UpdateGroupConfigTest, cls).tearDownClass()
-
     def test_update_minentities_to_be_the_same(self):
         """
         Verify update with an incomplete request containing minentities to be the same,

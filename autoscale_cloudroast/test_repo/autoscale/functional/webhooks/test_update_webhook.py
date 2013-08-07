@@ -17,13 +17,6 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
         cls.metadata = {'hello': 'world'}
         super(UpdateWebhook, cls).setUpClass(metadata=cls.metadata)
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete scaling group.
-        """
-        super(UpdateWebhook, cls).tearDownClass()
-
     def test_update_webhook_name_only(self):
         """
         Update webhook with only name in the request fails with 400.
