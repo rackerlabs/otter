@@ -86,7 +86,7 @@ class APIMakeServiceTests(TestCase):
         self.clientFromString = patch(self, 'otter.tap.api.clientFromString')
 
         self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
-        self.logging_cql_client = patch(self, 'otter.tap.api.LoggingCQLClient')
+        self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
         self.set_store = patch(self, 'otter.tap.api.set_store')
@@ -160,9 +160,9 @@ class APIMakeServiceTests(TestCase):
         """
         makeService(test_config)
         self.log.bind.assert_called_once_with(system='otter.silverberg')
-        self.logging_cql_client.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
+        self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
                                                         self.log.bind.return_value)
-        self.CassScalingGroupCollection.assert_called_once_with(self.logging_cql_client.return_value)
+        self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
 
     def test_cassandra_store(self):
         """
@@ -182,7 +182,7 @@ class APIMakeServiceTests(TestCase):
         makeService(mock_config)
 
         for mocked in (self.RoundRobinCassandraCluster,
-                       self.logging_cql_client,
+                       self.LoggingCQLClient,
                        self.CassScalingGroupCollection,
                        self.set_store, self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
@@ -199,5 +199,5 @@ class APIMakeServiceTests(TestCase):
 
         expected_parent = makeService(mock_config)
         scheduler_service.assert_called_once_with(100, 10,
-                                                  self.logging_cql_client.return_value)
+                                                  self.LoggingCQLClient.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
