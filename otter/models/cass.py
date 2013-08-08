@@ -53,26 +53,26 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
                      'pending, "groupTouched", "policyTouched", paused, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
-                     ':groupTouched, :policyTouched, :paused, :created_at)')
+                     ':groupTouched, :policyTouched, :paused, :created_at);')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
 _cql_view_manifest = ('SELECT group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused) '
                       'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
-                     ':groupTouched, :policyTouched, :paused)')
+                     ':groupTouched, :policyTouched, :paused);')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
-                      'VALUES (:tenantId, :groupId, {name}Id, {name})')
+                      'VALUES (:tenantId, :groupId, {name}Id, {name});')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active:'
-                           ':pending, :groupTouched, :policyTouched, :paused)')
+                           ':pending, :groupTouched, :policyTouched, :paused);')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                          '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
                          '"groupId" = :groupId;')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
-                     'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
+                     'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger);')
 _cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
                                'trigger, cron) '
                                'VALUES (:tenantId, :groupId, {name}Id, '
-                               '{name}Trigger, {name}cron)')
+                               '{name}Trigger, {name}cron);')
 _cql_insert_event_batch = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
                            'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
                            '{name}trigger, {name}cron);')
@@ -84,20 +84,20 @@ _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
-    ':{name}Capability, :{name}Key)')
+    ':{name}Capability, :{name}Key);')
 _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
-               'VALUES (:tenantId, :groupId, {name})')
+               'VALUES (:tenantId, :groupId, {name});')
 _cql_update_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
-                      'VALUES (:tenantId, :groupId, {name}Id, {name})')
+                      'VALUES (:tenantId, :groupId, {name}Id, {name});')
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                            '"groupId" = :groupId')
+                            '"groupId" = :groupId;')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
-                             'AND "groupId" = :groupId AND "policyId" = :policyId')
+                             'AND "groupId" = :groupId AND "policyId" = :policyId;')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
-                           '"webhookId" = :webhookId')
+                           '"webhookId" = :webhookId;')
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                     '"policyTouched", paused FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
