@@ -2,7 +2,6 @@
 System tests for scaling policies negative scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import time
 from cafe.drivers.unittest.decorators import tags
 
 
@@ -134,17 +133,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Delete group failed for group {0} when min and maxentities '
                           'is update to 0 with response {1}'
                           .format(self.group.id, delete_group.status_code))
-        endtime = time.time() + 900
-        while time.time() < endtime:
-            server_list = self.get_servers_containing_given_name_on_tenant(
-                server_name=server_name)
-            if len(server_list) == 0:
-                break
-            time.sleep(self.interval_time)
-        else:
-            self.fail('Servers in the group were not deleted even after waiting 15 mins '
-                      'when the group was updated with min and max entities as 0 for the '
-                      'group {0} with server name {1}'.format(self.group.id, server_name))
+        self.assert_servers_deleted_successfully(server_name)
 
     @tags(speed='quick')
     def test_system_scaleup_update_min_scale_down(self):
