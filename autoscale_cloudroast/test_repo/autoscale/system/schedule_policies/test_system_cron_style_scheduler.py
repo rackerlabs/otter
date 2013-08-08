@@ -20,7 +20,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         super(CronStyleSchedulerTests, self).setUp()
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            lc_name="cron_style_scheduled",
+            lc_name='cron_style_scheduled',
             gc_cooldown=0)
         self.group = create_group_response.entity
         self.resources.add(self.group, self.empty_scaling_group)

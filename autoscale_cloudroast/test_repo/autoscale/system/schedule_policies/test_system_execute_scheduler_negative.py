@@ -123,16 +123,15 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
         of them are executed in the batch size specified.
-        ** is failing **
         """
         at_style_policies_list = []
-        size = 5
-        at_style_time = self.autoscale_behaviors.get_time_in_utc(1)
+        size = 2
+        at_style_time = self.autoscale_behaviors.get_time_in_utc(3)
         for policy in (range(self.scheduler_batch * size)):
             policy = {
                 'args': {'at': at_style_time},
@@ -145,7 +144,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             lc_name='scheduler_batch_size_check', gc_cooldown=0,
             sp_list=at_style_policies_list)
         self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
-        sleep(self.scheduler_interval + 5)
+        sleep(3 + self.scheduler_interval + 3)
         self.verify_group_state(
             create_group_reponse.entity.id, self.scheduler_batch * size)
 

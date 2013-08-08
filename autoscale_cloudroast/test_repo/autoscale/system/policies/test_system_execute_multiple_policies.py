@@ -86,7 +86,6 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         """
         The policy cooldown times are not enforced when executing different policies,
         and executing such polcies result in active servers as expected
-        ** Busy lock error sometimes **
         """
         execute_change_percent_scale_up = self.autoscale_client.execute_policy(
             self.group.id,
@@ -107,9 +106,13 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
                           msg='Policy with desired capacity=minentities failed to execute with {0}'
                           ' for group {1}'
                           .format(execute_desired_capacity_scale.status_code, self.group.id))
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
+        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
+            self.group.id)), self.group.groupConfiguration.minEntities,
+            msg='Servers after scale down is not {0}'.format(
+                self.group.groupConfiguration.minEntities))
 
     @tags(speed='slow')
     def test_system_scale_up_scale_down_multiple_policies_in_sequence(self):
@@ -131,9 +134,14 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
             self.group.id, self.policy_down_change_percent['id'])
         self._execute_policy_after_cooldown(
             self.group.id, self.policy_desired_capacity['id'])
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
+        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
+            self.group.launchConfiguration.server.name)),
+            self.group.groupConfiguration.minEntities,
+            msg='Servers after scale down is not {0}'.format(
+                self.group.groupConfiguration.minEntities))
 
     @tags(speed='quick')
     def test_system_multiple_webhook_policies_in_group_in_different_requests(self):

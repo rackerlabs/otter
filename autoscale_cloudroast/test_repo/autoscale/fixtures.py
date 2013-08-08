@@ -11,9 +11,10 @@ from autoscale.client import AutoscalingAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
+from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 import os
-from time import sleep
+import time
 
 
 class AutoscaleFixture(BaseTestFixture):
@@ -209,7 +210,7 @@ class AutoscaleFixture(BaseTestFixture):
             sp_cooldown=0,
             sp_change=change,
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
-        sleep(self.scheduler_interval + delay)
+        time.sleep(self.scheduler_interval + delay)
 
     def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
         """
@@ -221,15 +222,98 @@ class AutoscaleFixture(BaseTestFixture):
         specified name within the server name.
         """
         if group_id:
-            launch_config_response = self.autoscale_client.view_launch_config(
-                group_id)
-            launch_config = launch_config_response.entity
+            launch_config = self.autoscale_client.view_launch_config(
+                group_id).entity
             params = launch_config.server.name
         elif server_name:
             params = server_name
         list_server_resp = self.server_client.list_servers(name=params)
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
+
+    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
+                                                   interval_time=None, timeout=None):
+        """
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and waits for the specified number of servers to be active on a group
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
+        """
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        if group_state.desiredCapacity != expected_servers:
+            raise BuildErrorException(
+                'Group %s should have %s servers, but is trying to build %s servers'
+                % (group_id, expected_servers, group_state.desiredCapacity))
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+
+            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
+                raise BuildErrorException(
+                    'Group Id %s failed to attempt server creation. Group has no servers'
+                    % group_id)
+
+            if len(active_list) == expected_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
+            print "waiting for servers to be active..."
+
+            if group_state.desiredCapacity != expected_servers:
+                raise BuildErrorException(
+                    'Group %s should have %s servers, but has reduced the build %s servers'
+                    % (group_id, expected_servers, group_state.desiredCapacity))
+        else:
+            raise TimeoutException(
+                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
+                "observe the active server list achieving the expected servers count: {2}.".format(
+                    timeout, group_id, expected_servers))
+
+    def check_for_expected_number_of_building_servers(self, group_id, expected_servers,
+                                                      desired_capacity=None, server_name=None):
+        """
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and verifies for the specified number of servers with the name specified in the
+         group's launch config exist on the tenant
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
+        """
+        end_time = time.time() + 60
+        desired_capacity = desired_capacity or expected_servers
+        while time.time() < end_time:
+            group_state = self.autoscale_client.list_status_entities_sgroups(
+                group_id).entity
+            if group_state.desiredCapacity != desired_capacity or group_state.desiredCapacity == 0:
+                raise BuildErrorException(
+                    'Group %s should have %s servers, but is trying to build %s servers'
+                    % (group_id, desired_capacity, group_state.desiredCapacity))
+            if group_state.desiredCapacity == desired_capacity:
+                if server_name:
+                    server_list = self.get_servers_containing_given_name_on_tenant(
+                        server_name=server_name)
+                else:
+                    server_list = self.get_servers_containing_given_name_on_tenant(
+                        group_id=group_id)
+                if (len(server_list) == expected_servers):
+                        return server_list
+        else:
+            raise TimeoutException(
+                "wait_for_active_list_in_group_state ran for 60 seconds for group {0} and did not "
+                "observe the active server list achieving the expected servers count: {1}.".format(
+                    group_id, desired_capacity))
 
     @classmethod
     def tearDownClass(cls):

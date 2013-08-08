@@ -22,7 +22,7 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         self.group = self.create_group_response.entity
         self.resources.add(self.group, self.empty_scaling_group)
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_execute_webhook_scale_up_change(self):
         """
         Create a scale up policy with change and execute its webhook
@@ -35,11 +35,11 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         self.assertEquals(execute_webhook_in_change_policy[
                           'execute_response'], 202)
         sleep(0.1)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=policy_up['change'] + self.group.groupConfiguration.minEntities)
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_execute_webhook_scale_up_change_percent(self):
         """
         Execute a webhook for scale up policy with change percent.
@@ -55,11 +55,11 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities,
             percentage=policy_up['change_percent'])
         sleep(0.1)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_up)
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_execute_webhook_scale_up_desired_capacity(self):
         """
         Execute a webhook for scale up policy with desired capacity.
@@ -73,6 +73,6 @@ class ScalingUpExecuteWebhookTest(AutoscaleFixture):
         self.assertEquals(execute_webhook_in_desired_capacity_policy[
                           'execute_response'], 202)
         sleep(0.1)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=policy_up['desired_capacity'])

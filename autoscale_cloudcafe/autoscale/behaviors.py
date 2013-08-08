@@ -1,7 +1,6 @@
 """
 Behaviors for Autoscale
 """
-import time
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timedelta
 
@@ -9,7 +8,6 @@ from datetime import datetime, timedelta
 from cafe.engine.behaviors import BaseBehavior
 from cloudcafe.common.tools.datagen import rand_name
 from autoscale.models.servers import Metadata
-from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 
 class AutoscaleBehaviors(BaseBehavior):
@@ -92,55 +90,6 @@ class AutoscaleBehaviors(BaseBehavior):
             lc_load_balancers=lc_load_balancers,
             sp_list=sp_list)
         return create_response
-
-    def wait_for_expected_number_of_active_servers(
-        self, group_id, expected_servers,
-            interval_time=None, timeout=None):
-        """
-        :summary: verify the desired capacity in group state is equal to expected servers
-         and waits for the specified number of servers to be active on a group
-        :param group_id: Group id
-        :param expected_servers: Total active servers expected on the group
-        :param interval_time: Time to wait during polling group state
-        :param timeout: Time to wait before exiting this function
-        :return: returns the list of active servers in the group
-        """
-        interval_time = interval_time or int(
-            self.autoscale_config.interval_time)
-        timeout = timeout or int(self.autoscale_config.timeout)
-        end_time = time.time() + timeout
-
-        group_state_response = self.autoscale_client.list_status_entities_sgroups(
-            group_id)
-        group_state = group_state_response.entity
-        if group_state.desiredCapacity != expected_servers:
-            raise BuildErrorException(
-                'Group %s should have %s servers, but is trying to build %s servers'
-                % (group_id, expected_servers, group_state.desiredCapacity))
-        while time.time() < end_time:
-            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
-            group_state = resp.entity
-            active_list = group_state.active
-
-            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
-                raise BuildErrorException(
-                    'Group Id %s failed to attempt server creation. Group has no servers'
-                    % group_id)
-
-            if len(active_list) == expected_servers:
-                return [server.id for server in active_list]
-            time.sleep(interval_time)
-            print "waiting for servers to be active..."
-
-            if group_state.desiredCapacity != expected_servers:
-                raise BuildErrorException(
-                    'Group %s should have %s servers, but has reduced the build %s servers'
-                    % (group_id, expected_servers, group_state.desiredCapacity))
-        else:
-            raise TimeoutException(
-                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
-                "observe the active server list achieving the expected servers count: {2}.".format(
-                    timeout, group_id, expected_servers))
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
                           sp_change=None, sp_change_percent=None,

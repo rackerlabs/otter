@@ -63,7 +63,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_delete_policy_during_execution(self):
         """
         Policy execution is not affected/paused when the policy is deleted during execution.
@@ -83,7 +83,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Scale up policy failed for group {0} cause policy was deleted'
                           ' during execution: {1}'
                           .format(self.group.id, execute_policy_up.status_code))
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities +
             self.policy_up_data['change'])
@@ -117,7 +117,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' has maxentities, response code: {1}'
                           .format(self.group.id, reexecute_scale_up.status_code))
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_scaleup_update_min_max_0_delete_group(self):
         """
         Create a scaling group and update min and max entities to be 0 and delete
