@@ -191,3 +191,38 @@ class AutoscaleConfig(ConfigSectionInterface):
         server endpoint is the url to the otter application
         """
         return self.get('server_endpoint')
+
+    @property
+    def load_balancer_endpoint_name(self):
+        """
+        load balancer endpoint name in the service catalog
+        """
+        return self.get('load_balancer_endpoint_name')
+
+    @property
+    def load_balancer_1(self):
+        """
+        first load balancer id
+        """
+        return self.get('load_balancer_1')
+
+    @property
+    def load_balancer_2(self):
+        """
+        second load balancer id
+        """
+        return self.get('load_balancer_2')
+
+    @property
+    def load_balancer_3(self):
+        """
+        third load balancer id
+        """
+        return self.get('load_balancer_3')
+
+    @property
+    def lb_other_region(self):
+        """
+        load balancer id from a different region
+        """
+        return self.get('lb_other_region')
