@@ -62,7 +62,7 @@ _cql_view_manifest = ('SELECT group_config, launch_config, active, '
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name});')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active:'
+                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused);')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                          '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -296,7 +296,7 @@ def _unmarshal_state(state_dict):
     )
 
 
-def verified_view(connection, view_query, del_query, data, consistency, exeception_if_empty,
+def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty,
                   timeout=None):
     """
     Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
@@ -311,14 +311,14 @@ def verified_view(connection, view_query, del_query, data, consistency, execepti
     def _check_resurrection(result):
         if len(result) == 0:
             raise exception_if_empty
-        if result['created_at']:
+        if result[0].get('created_at'):
             return result[0]
         else:
             # resurrected row, trigger its deletion and raise empty exception
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
 
-    d = connection.execute(query, data, consistency)
+    d = connection.execute(view_query, data, consistency)
     return d.addCallback(_check_resurrection)
 
 
@@ -384,7 +384,7 @@ class CassScalingGroup(object):
 
         view_query = _cql_view_manifest.format(cf=self.config_table)
         del_query = _cql_delete_all_in_group.format(cf=self.config_table)
-        d = verified_view(view_query, del_query,
+        d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
@@ -398,7 +398,7 @@ class CassScalingGroup(object):
         """
         view_query = _cql_view.format(cf=self.config_table, column='group_config')
         del_query = _cql_delete_all_in_group.format(cf=self.config_table)
-        d = verified_view(view_query, del_query,
+        d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),
@@ -412,7 +412,7 @@ class CassScalingGroup(object):
         """
         view_query = _cql_view.format(cf=self.config_table, column='launch_config')
         del_query = _cql_delete_all_in_group.format(cf=self.config_table)
-        d = verified_view(view_query, del_query,
+        d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),
@@ -426,7 +426,7 @@ class CassScalingGroup(object):
         """
         view_query = _cql_view_group_state.format(cf=self.config_table)
         del_query = _cql_delete_all_in_group.format(cf=self.config_table)
-        d = verified_view(view_query, del_query,
+        d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),

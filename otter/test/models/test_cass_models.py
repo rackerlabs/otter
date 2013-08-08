@@ -13,13 +13,14 @@ from otter.json_schema import group_examples
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
-    serialize_json_data)
+    serialize_json_data,
+    verified_view)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError)
 
-from otter.test.utils import LockMixin
+from otter.test.utils import LockMixin, CheckFailure
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -99,6 +100,40 @@ class DummyException(Exception):
     """
 
 
+class VerifiedViewTests(TestCase):
+
+    def setUp(self):
+        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection.execute.return_value = defer.succeed([{'c1':2, 'created_at':23}])
+
+    def test_valid_view(self):
+        """
+        Returns row if it is valid
+        """
+        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
+        self.assertEqual(self.successResultOf(r), {'c1':2, 'created_at':23})
+        self.connection.execute.assert_called_once_with('vq', {'d':2}, 6)
+
+    def test_resucrrected_view(self):
+        """
+        Raise empty error if recurrected view
+        """
+        self.connection.execute.return_value = defer.succeed([{'c1':2}])
+        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
+        self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
+        self.connection.execute.has_calls([mock.call('vq', {'d':2}, 6),
+                                           mock.call('dq', {'d':2}, 6)])
+
+    def test_empty_view(self):
+        """
+        Raise empty error if no result
+        """
+        self.connection.execute.return_value = defer.succeed([])
+        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
+        self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
+        self.connection.execute.assert_called_once_with('vq', {'d':2}, 6)
+
+
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     """
     Tests for :class:`MockScalingGroup`
@@ -161,16 +196,16 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         Test that you can call view and receive a valid parsed response
         """
-        self.returns = [[{'data': '{}'}]]
+        self.returns = [[{'group_config': '{}', 'created_at': 24}]]
         d = self.group.view_config()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT data FROM scaling_config WHERE '
+        expectedCql = ('SELECT group_config FROM scaling_config WHERE '
                        '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assertEqual(r, {})
+        self.assertEqual(r, '{}')
 
     def test_view_state(self):
         """
@@ -179,13 +214,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00'}])
-
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}])
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
-                       '"groupTouched", "policyTouched", paused FROM group_state '
+                       '"groupTouched", "policyTouched", paused FROM scaling_config '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -213,7 +247,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x01'}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
@@ -236,7 +270,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
         expectedCql = (
-            'INSERT INTO group_state("tenantId", "groupId", active, '
+            'INSERT INTO scaling_config("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
             ':policyTouched, :paused);')
