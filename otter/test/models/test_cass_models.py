@@ -205,7 +205,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
-        self.assertEqual(r, '{}')
+        self.assertEqual(r, {})
 
     def test_view_state(self):
         """
