@@ -140,7 +140,7 @@ def create_server(server_endpoint, auth_token, server_config):
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
+def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
@@ -151,6 +151,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     :param str lb_config: An lb_config dictionary.
     :param str ip_address: The IP Address of the node to add to the load
         balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with the Add Node to load balancer response
         as a dict.
@@ -167,10 +168,19 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
     d.addErrback(wrap_request_error, endpoint, 'add')
-    return d.addCallback(treq.json_content)
+
+    def when_done(result):
+        undo.push(remove_from_load_balancer,
+                  endpoint,
+                  auth_token,
+                  lb_id,
+                  result['nodes'][0]['id'])
+        return result
+
+    return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
+def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -179,16 +189,19 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
     :param str ip_address: IP address of the node to add to the load balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
+
     return gatherResults([
         add_to_load_balancer(
             endpoint,
             auth_token,
             lb_config,
-            ip_address).addCallback(
+            ip_address,
+            undo).addCallback(
                 lambda response, lb_id: (lb_id, response),
                 lb_config['loadBalancerId'])
         for lb_config in lb_configs

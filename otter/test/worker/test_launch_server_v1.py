@@ -123,6 +123,8 @@ class LoadBalancersTests(TestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
+        self.undo = iMock(IUndoStack)
+
     def test_add_to_load_balancer(self):
         """
         add_to_load_balancer will make a properly formed post request to
@@ -133,13 +135,14 @@ class LoadBalancersTests(TestCase):
         response.code = 200
         self.treq.post.return_value = succeed(response)
 
-        content = mock.Mock()
+        content = {'nodes': [{'id': 1}]}
         self.treq.json_content.return_value = succeed(content)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
-                                 '192.168.1.1')
+                                 '192.168.1.1',
+                                 self.undo)
 
         result = self.successResultOf(d)
         self.assertEqual(result, content)
@@ -174,7 +177,8 @@ class LoadBalancersTests(TestCase):
         d = add_to_load_balancer('http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
-                                 '192.168.1.1')
+                                 '192.168.1.1',
+                                 self.undo)
 
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(RequestError))
@@ -182,6 +186,31 @@ class LoadBalancersTests(TestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
+        """
+        add_to_load_balancer pushes an inverse remove_from_load_balancer
+        operation onto the undo stack.
+        """
+        response = mock.Mock()
+        response.code = 200
+
+        self.treq.post.return_value = succeed(response)
+        self.treq.json_content.return_value = succeed({'nodes': [{'id': 1}]})
+
+        d = add_to_load_balancer('http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo)
+
+        self.successResultOf(d)
+
+        self.undo.push.assert_called_once_with(
+            remove_from_load_balancer,
+            'http://url/', 'my-auth-token',
+            12345,
+            1)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
@@ -193,10 +222,8 @@ class LoadBalancersTests(TestCase):
         d2 = Deferred()
         add_to_load_balancer_deferreds = [d1, d2]
 
-        def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
-            # Include the ID and port in the response so that we can verify
-            # that add_to_load_balancers associates the response with the correct
-            # load balancer.
+        def _add_to_load_balancer(
+                endpoint, auth_token, lb_config, ip_address, undo):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
@@ -206,7 +233,12 @@ class LoadBalancersTests(TestCase):
                                     'port': 80},
                                    {'loadBalancerId': 54321,
                                     'port': 81}],
-                                  '192.168.1.1')
+                                  '192.168.1.1',
+                                  self.undo)
+
+        # Include the ID and port in the response so that we can verify
+        # that add_to_load_balancers associates the response with the correct
+        # load balancer.
 
         d2.callback((54321, 81))
         d1.callback((12345, 80))
@@ -279,7 +311,6 @@ class ServerTests(TestCase):
         self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid)
 
         self.undo = iMock(IUndoStack)
-        self.undo.rewind.side_effect = lambda: succeed(None)
 
     def test_server_details(self):
         """
