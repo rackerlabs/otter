@@ -43,7 +43,7 @@ def serialize_json_data(data, ver):
 # Otherwise it won't.
 #
 # Thus, selects have a semicolon, everything else doesn't.
-_cql_view = ('SELECT {column} FROM {cf} WHERE "tenantId" = :tenantId AND '
+_cql_view = ('SELECT {column}, created_at FROM {cf} WHERE "tenantId" = :tenantId AND '
              '"groupId" = :groupId;')
 _cql_view_policy = ('SELECT data FROM {cf} WHERE "tenantId" = :tenantId AND '
                     '"groupId" = :groupId AND "policyId" = :policyId;')
@@ -56,16 +56,15 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      ':groupTouched, :policyTouched, :paused, :created_at);')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
 _cql_view_manifest = ('SELECT group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused) '
-                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
-                     ':groupTouched, :policyTouched, :paused);')
+                      'pending, "groupTouched", "policyTouched", paused, created_at '
+                      'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name});')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused);')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                         '"policyTouched", paused FROM {cf} WHERE "tenantId" = :tenantId AND '
+                         '"policyTouched", paused, created_at FROM {cf} WHERE "tenantId" = :tenantId AND '
                          '"groupId" = :groupId;')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
                      'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger);')
@@ -99,7 +98,7 @@ _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId;')
 _cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                    '"policyTouched", paused FROM {cf} WHERE '
+                    '"policyTouched", paused, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -272,10 +271,10 @@ def _assemble_webhook_from_row(row):
     return webhook_base
 
 
-def _check_empty_and_grab_data(results, data_to_grab, exception_if_empty):
+def _check_empty_and_grab_data(results, exception_if_empty):
     if len(results) == 0:
         raise exception_if_empty
-    return _jsonloads_data(results[0][data_to_grab])
+    return _jsonloads_data(results[0]['data'])
 
 
 def _jsonloads_data(raw_data):
@@ -375,8 +374,8 @@ class CassScalingGroup(object):
             """
             d = self._naive_list_policies()
             d.addCallback(lambda policies: {
-                'groupConfiguration': group['group_config'],
-                'launchConfiguration': group['launch_config'],
+                'groupConfiguration': _jsonloads_data(group['group_config']),
+                'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
                 'id': self.uuid
             })
@@ -388,7 +387,7 @@ class CassScalingGroup(object):
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
-                          NoSuchScalingGroupError(self.tanant_id, self.uuid))
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid))
 
         return d.addCallback(_get_policies)
 
@@ -404,7 +403,7 @@ class CassScalingGroup(object):
                           get_consistency_level('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid))
 
-        return d.addCallback(lambda group: group['group_config'])
+        return d.addCallback(lambda group: _jsonloads_data(group['group_config']))
 
     def view_launch_config(self):
         """
@@ -418,7 +417,7 @@ class CassScalingGroup(object):
                           get_consistency_level('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid))
 
-        return d.addCallback(lambda group: group['launch_config'])
+        return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
     def view_state(self):
         """
@@ -488,7 +487,7 @@ class CassScalingGroup(object):
         self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
         def _do_update_launch(lastRev):
-            queries = [_cql_update.format(cf=self.launch_table, column='launch_config',
+            queries = [_cql_update.format(cf=self.config_table, column='launch_config',
                                           name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -763,9 +762,9 @@ class CassScalingGroup(object):
                 (self.config_table, self.policies_table, self.webhooks_table)]
 
             if len(policies) > 0:
-                events_query, events_params = _delete_events_query_and_params(
-                    policies.keys(), self.event_table)
-                queries.append(events_query.rstrip(';'))
+                events_query, events_params = _delete_many_query_and_params(
+                    self.event_table, '"policyId"', policies.keys())
+                queries.append(events_query)
                 params.update(events_params)
 
             b = Batch(queries, params,
@@ -790,28 +789,13 @@ class CassScalingGroup(object):
         return with_lock(lock, _delete_group)
 
 
-def _delete_events_query_and_params(policy_ids, event_table):
-    """
-    Given an iterable of policy_ids, returns the query and params needed to
-    execute deleting all events associated with the policy ids.
-
-    :param iterable policy_ids: strings representing the policy ids
-    :return: ``tuple`` of query, params that can be passed to execute
-    """
-    policy_ids_cql = ','.join(
-        [':policyid{0}'.format(i) for i in range(len(policy_ids))])
-    params = {'policyid{0}'.format(i): policy_id
-              for i, policy_id in enumerate(policy_ids)}
-    query = _cql_delete_events.format(cf=event_table,
-                                      policy_ids=policy_ids_cql)
-    return (query, params)
-
 def _delete_many_query_and_params(cf, column, column_values):
     """
     Creates query and parameters that deletes many rows based on given column and values
 
-    :param iterable policy_ids: strings representing the policy ids
-    :return: ``tuple`` of query, params that can be passed to execute
+    :param cf: column family
+    :param column: column name based on which row will be deleted
+    :return: iterable column_values, column values that will match deleted row
     """
     column_values_args = ','.join(
         [':column_value{}'.format(i) for i in range(len(column_values))])
