@@ -43,7 +43,6 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
                           msg='Executing the updated scale up policy using the webhook failed with {0}'
                           'for group {1}'
                           .format(upd_scale_up_execute_webhook, self.group.id))
-        sleep(0.1)
         self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities +

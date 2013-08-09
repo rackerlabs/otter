@@ -4,7 +4,6 @@ cron style scheduler policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
-import unittest
 from cafe.drivers.unittest.decorators import tags
 
 
@@ -172,7 +171,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         sleep(self.scheduler_interval)
         self.verify_group_state(group.id, 1 + 2 + 3)
 
-    @unittest.skip('AUTO-425')
+    @tags(speed='quick')
     def test_system_update_at_and_cron_style_scheduler_policy_to_webhook_type(self):
         """
         Policy updation fails when a cron style scheduler /at style scheduler is updated to
@@ -183,7 +182,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
             group_id=group.id,
             sp_cooldown=0,
             sp_change=self.sp_change,
-            schedule_at=self.autoscale_behaviors.get_time_in_utc(10))
+            schedule_at=self.autoscale_behaviors.get_time_in_utc(600))
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=group.id,
             sp_cooldown=0,
@@ -197,7 +196,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
                 cooldown=self.sp_cooldown,
                 change=self.sp_change,
                 policy_type='webhook')
-            self.assertEquals(upd_policy_response.status_code, 403,
+            self.assertEquals(upd_policy_response.status_code, 400,
                               msg='Update scheduler policy to webhook policy type'
                               ' on the group {0} with response code {1}'.format(
                               group.id, upd_policy_response.status_code))

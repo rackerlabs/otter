@@ -2,7 +2,6 @@
 System tests for delete scaling group
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import time
 from cafe.drivers.unittest.decorators import tags
 
 
@@ -92,8 +91,7 @@ class DeleteGroupTest(AutoscaleFixture):
         execute_webhook = self.autoscale_client.execute_webhook(
             self.policy_webhook['webhook_url'])
         self.assertEquals(execute_webhook.status_code, 202)
-        time.sleep(0.1)  # the state table is not updating immediately
-        self.verify_group_state(
+        self.check_for_expected_number_of_building_servers(
             self.group0.id, self.policy_up_execute['change'])
         delete_group_response = self.autoscale_client.delete_scaling_group(
             self.group0.id)

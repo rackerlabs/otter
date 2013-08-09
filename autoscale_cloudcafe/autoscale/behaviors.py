@@ -167,7 +167,7 @@ class AutoscaleBehaviors(BaseBehavior):
         elif schedule_at:
             args = {'at': schedule_at}
         else:
-            args = {'at': AutoscaleBehaviors.get_time_in_utc(self, 5)}
+            args = {'at': AutoscaleBehaviors.get_time_in_utc(self, 60)}
         if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,

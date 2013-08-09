@@ -116,7 +116,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' has maxentities, response code: {1}'
                           .format(self.group.id, reexecute_scale_up.status_code))
 
-    @tags(speed='quick')
+    @tags(speed='slow')
     def test_system_scaleup_update_min_max_0_delete_group(self):
         """
         Create a scaling group and update min and max entities to be 0 and delete

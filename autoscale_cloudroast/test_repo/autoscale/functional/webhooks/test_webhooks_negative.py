@@ -4,9 +4,12 @@ Test to verify negative cases for webhooks.
 from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 from autoscale.status_codes import HttpStatusCodes
 import urlparse
+from time import sleep
+import unittest
 
 
 class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
+
     """
     Verify negative scenarios for webhooks
     """
@@ -181,9 +184,11 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
                         msg='Create webhooks with invalid request returned: {0}'
                         .format(create_error))
 
+    @unittest.skip('AUTO-528')
     def test_execute_invalid_version_webhook(self):
         """
         Negative Test: Executing a webhook with an invalid version, returns 202.
+        and does not cause the scaling policy to execute.
         """
         create_resp = self.autoscale_client.create_webhook(
             group_id=self.group.id,
@@ -203,12 +208,14 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             netloc,
             '/'.join(segments),
             '', '', ''))
-
         execute_wb_resp = self.autoscale_client.execute_webhook(
             invalid_cap_url)
         self.assertEquals(execute_wb_resp.status_code, 202,
                           msg='Execute webhook did not fail. Response: {0}'
                           .format(execute_wb_resp.status_code))
+        sleep(1)  # time for the webhook to execute
+        self.verify_group_state(self.group.id, 0)
+        self.empty_scaling_group(self.group, dont_delete=True)
 
     def test_execute_nonexistant_webhook(self):
         """
@@ -232,12 +239,13 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             netloc,
             '/'.join(segments),
             '', '', ''))
-
         execute_wb_resp = self.autoscale_client.execute_webhook(
             invalid_cap_url)
         self.assertEquals(execute_wb_resp.status_code, 202,
                           msg='Execute webhook did not fail. Response: {0}'
                               .format(execute_wb_resp.status_code))
+        sleep(1)  # time for the webhook to execute
+        self.verify_group_state(self.group.id, 0)
 
     def test_execute_webhook_after_deletion(self):
         """
@@ -263,6 +271,8 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
         self.assertEquals(execute_wb_resp.status_code, 202,
                           msg='Execute webhook failed with {0}'
                           .format(execute_wb_resp.status_code))
+        sleep(1)  # time for the webhook to execute
+        self.verify_group_state(self.group.id, 0)
 
     def test_verify_webhook_with_metadata_as_string(self):
         """

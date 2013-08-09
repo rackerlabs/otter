@@ -274,12 +274,9 @@ class AutoscaleFixture(BaseTestFixture):
                 raise BuildErrorException(
                     'Group Id %s failed to attempt server creation. Group has no servers'
                     % group_id)
-
             if len(active_list) == expected_servers:
                 return [server.id for server in active_list]
             time.sleep(interval_time)
-            print "waiting for servers to be active..."
-
             if group_state.desiredCapacity != expected_servers:
                 raise BuildErrorException(
                     'Group %s should have %s servers, but has reduced the build %s servers'
@@ -307,10 +304,6 @@ class AutoscaleFixture(BaseTestFixture):
         while time.time() < end_time:
             group_state = self.autoscale_client.list_status_entities_sgroups(
                 group_id).entity
-            if group_state.desiredCapacity != desired_capacity or group_state.desiredCapacity == 0:
-                raise BuildErrorException(
-                    'Group %s should have %s servers, but is trying to build %s servers'
-                    % (group_id, desired_capacity, group_state.desiredCapacity))
             if group_state.desiredCapacity == desired_capacity:
                 if server_name:
                     server_list = self.get_servers_containing_given_name_on_tenant(
@@ -322,9 +315,8 @@ class AutoscaleFixture(BaseTestFixture):
                         return server_list
         else:
             raise TimeoutException(
-                "wait_for_active_list_in_group_state ran for 60 seconds for group {0} and did not "
-                "observe the active server list achieving the expected servers count: {1}.".format(
-                    group_id, desired_capacity))
+                'Waited 60 seconds for desired capacity/active server list to reach the'
+                ' server count of {0} for group {1}'.format(desired_capacity, group_id))
 
     def assert_servers_deleted_successfully(self, server_name):
         """

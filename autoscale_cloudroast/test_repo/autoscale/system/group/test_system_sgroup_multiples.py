@@ -125,7 +125,9 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                 self.first_scaling_group.id,
                 sp_change_percent=100)
         self.assertEquals(len(self.autoscale_client.list_policies(
-            self.first_scaling_group.id).entity), self.max_policies)
+            self.first_scaling_group.id).entity), self.max_policies,
+            msg='Policies on the group {0} is under/over max allowed'.format(
+                self.first_scaling_group.id))
 
     @tags(speed='quick')
     def test_system_max_webhooks_on_a_scaling_policy(self):
@@ -137,4 +139,6 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.autoscale_client.create_webhook(self.first_scaling_group.id,
                                                  policy['id'], 'wb_{0}'.format(webhook))
         self.assertEquals(len(self.autoscale_client.list_webhooks(
-            self.first_scaling_group.id, policy['id']).entity), self.max_webhooks)
+            self.first_scaling_group.id, policy['id']).entity), self.max_webhooks,
+            msg='Webhooks on the group {0} is under/over max allowed for policy {1}'.format(
+                self.first_scaling_group.id, policy['id']))
