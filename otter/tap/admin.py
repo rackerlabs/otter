@@ -27,7 +27,8 @@ try:
 except ImportError:
     GraylogUDPPublisher = None
 
-from otter.rest.application import admin_app, set_store
+from otter.rest.admin import OtterAdmin
+from otter.rest.application import set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
 from otter.models.cass import CassScalingGroupCollection
@@ -126,7 +127,8 @@ def makeService(config):
 
     s = MultiService()
 
-    site = Site(admin_app.resource())
+    otterAdmin = OtterAdmin()
+    site = Site(otterAdmin.app.resource())
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
