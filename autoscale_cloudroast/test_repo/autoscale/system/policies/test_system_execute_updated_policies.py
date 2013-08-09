@@ -49,10 +49,9 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='quick')
     def test_system_update_policy_from_change_to_desired_capacity_scale_up(self):
@@ -131,10 +130,9 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_update_minentities_and_scale_down(self):
@@ -166,9 +164,9 @@ class ExecuteUpdatedPoliciesTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=new_minentities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), new_minentities,
-            msg='Servers after scale down is not {0}'.format(new_minentities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            new_minentities)
 
     def _update_execute_policy_dc(self, group_id, policy_id, policy_data):
         """

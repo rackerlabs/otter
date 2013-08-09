@@ -24,7 +24,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.group = self.create_group_response.entity
         self.change = 2
         self.change_percent = 50
-        self.cooldown = 1
+        self.cooldown = 3
         self.policy_up_change = self.autoscale_behaviors.create_policy_given(
             group_id=self.group.id, sp_change=self.change, sp_cooldown=self.cooldown)
         self.policy_down_change = self.autoscale_behaviors.create_policy_given(
@@ -109,10 +109,9 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_scale_up_scale_down_multiple_policies_in_sequence(self):
@@ -137,11 +136,9 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.launchConfiguration.server.name)),
-            self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='quick')
     def test_system_multiple_webhook_policies_in_group_in_different_requests(self):

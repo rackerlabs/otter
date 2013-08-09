@@ -82,9 +82,9 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            group.id)), server_after_down,
-            msg='Servers after scale down is not {0}'.format(server_after_down))
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            server_after_down)
 
     @tags(speed='slow')
     def test_system_update_launchconfig_scale_up_down(self):
@@ -125,9 +125,9 @@ class LaunchConfigTest(AutoscaleFixture):
             expected_servers=server_after_down)
         self.assertEqual(set(active_list_after_down), (
             set(active_list_after_up) - set(first_server)))
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            group.id)), server_after_down,
-            msg='Servers after scale down is not {0}'.format(server_after_down))
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            server_after_down)
 
     @tags(speed='quick')
     def test_system_server_details_name_and_metadata(self):
@@ -256,10 +256,9 @@ class LaunchConfigTest(AutoscaleFixture):
         self._verify_server_list_for_launch_config(
             servers_list_on_upd_group, self.upd_server_name, self.upd_image_ref,
             self.upd_flavor_ref)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            group.id)), group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_scale_down_oldest_on_active_servers(self):
@@ -291,9 +290,9 @@ class LaunchConfigTest(AutoscaleFixture):
                 expected_servers=self.sp_change)
         self.assertEqual(set(servers_from_scale_up), set(
             active_server_list_after_scale_down))
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            group.id)), self.sp_change,
-            msg='Servers after scale down is not {0}'.format(self.sp_change))
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            self.sp_change)
 
     def _create_group(self, minentities=None, maxentities=None, policy=False):
         """

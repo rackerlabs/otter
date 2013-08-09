@@ -66,10 +66,9 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_update_policy_from_change_to_change_percent_scale_down_execute_webhook(self):
@@ -94,9 +93,9 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), servers_from_scale_down,
-            msg='Servers after scale down is not {0}'.format(servers_from_scale_down))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            servers_from_scale_down)
 
     def _update_policy_cp_execute_webhook(self, group_id, policy_id, policy_data, webhook_url):
         """

@@ -138,7 +138,6 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             load_balancer)]
         for each_node_id in lb_node_id_list_before_scale:
             self.lbaas_client.delete_node(load_balancer, each_node_id)
-        self.empty_scaling_group(group)
         self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
         # will the same server ip remain as node on load balancer? if not validate
         server_ip = self._get_ipv4_address_list_on_servers(active_server_list)

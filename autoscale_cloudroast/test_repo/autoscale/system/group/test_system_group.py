@@ -64,9 +64,9 @@ class GroupFixture(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=upd_maxentities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            group.launchConfiguration.server.name)), upd_maxentities,
-            msg='Servers after scale down is not {0}'.format(upd_maxentities))
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            count=upd_maxentities)
 
     @tags(speed='quick')
     def test_system_update_maxenetities_and_execute_policy(self):

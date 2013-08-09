@@ -45,10 +45,9 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_scale_down_policy_execution_change_percent(self):
@@ -69,9 +68,9 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), servers_from_scale_down,
-            msg='Servers after scale down is not {0}'.format(servers_from_scale_down))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            servers_from_scale_down)
 
     @tags(speed='slow')
     def test_system_scale_down_policy_execution_desired_capacity(self):
@@ -89,9 +88,9 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=policy_down['desired_capacity'])
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), policy_down['desired_capacity'],
-            msg='Servers after scale down is not {0}'.format(policy_down['desired_capacity']))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            policy_down['desired_capacity'])
 
     @tags(speed='slow')
     def test_system_execute_scale_down_below_minentities_change(self):
@@ -130,10 +129,9 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
     @tags(speed='slow')
     def test_system_execute_scale_down_below_minentities_desired_capacity(self):
@@ -154,7 +152,6 @@ class ExecutePoliciesDownTest(AutoscaleFixture):
         self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
-        self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(
-            self.group.id)), self.group.groupConfiguration.minEntities,
-            msg='Servers after scale down is not {0}'.format(
-                self.group.groupConfiguration.minEntities))
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)

@@ -11,7 +11,6 @@ from autoscale.client import AutoscalingAPIClient, LbaasAPIClient
 from cloudcafe.auth.provider import AuthProvider
 from cloudcafe.compute.servers_api.client import ServersClient
 from autoscale.otter_constants import OtterConstants
-from cloudcafe.compute.common.exceptions import TimeoutException, BuildErrorException
 
 import os
 import time
@@ -223,7 +222,7 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         time.sleep(self.scheduler_interval + delay)
 
-    def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
+    def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
         The group_id or the server_name should be provided.
         Given the group id, the server name is got from the group's launch
@@ -261,28 +260,28 @@ class AutoscaleFixture(BaseTestFixture):
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group_id)
         group_state = group_state_response.entity
-        if group_state.desiredCapacity != expected_servers:
-            raise BuildErrorException(
-                'Group %s should have %s servers, but is trying to build %s servers'
-                % (group_id, expected_servers, group_state.desiredCapacity))
+        self.assertEquals(group_state.desiredCapacity, expected_servers,
+                          msg='Group {0} should have {1} servers, but is trying to '
+                          'build {2} servers'.format(group_id, expected_servers,
+                                                     group_state.desiredCapacity))
         while time.time() < end_time:
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
 
-            if (group_state.activeCapacity + group_state.pendingCapacity) == 0:
-                raise BuildErrorException(
-                    'Group Id %s failed to attempt server creation. Group has no servers'
-                    % group_id)
+            self.assertNotEquals((group_state.activeCapacity + group_state.pendingCapacity), 0,
+                                 msg='Group Id {0} failed to attempt server creation. Group has no'
+                                 ' servers'.format(group_id))
+
             if len(active_list) == expected_servers:
                 return [server.id for server in active_list]
             time.sleep(interval_time)
-            if group_state.desiredCapacity != expected_servers:
-                raise BuildErrorException(
-                    'Group %s should have %s servers, but has reduced the build %s servers'
-                    % (group_id, expected_servers, group_state.desiredCapacity))
+
+            self.assertEquals(group_state.desiredCapacity, expected_servers,
+                              msg='Group {0} should have {1} servers, but has reduced the build {2}'
+                              'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
         else:
-            raise TimeoutException(
+            self.fail(
                 "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
@@ -314,25 +313,26 @@ class AutoscaleFixture(BaseTestFixture):
                 if (len(server_list) == expected_servers):
                         return server_list
         else:
-            raise TimeoutException(
+            self.fail(
                 'Waited 60 seconds for desired capacity/active server list to reach the'
-                ' server count of {0} for group {1}'.format(desired_capacity, group_id))
+                ' server count of {0} but was {1} for group {2}'.format(desired_capacity,
+                group_state.desiredCapacity, group_id))
 
-    def assert_servers_deleted_successfully(self, server_name):
+    def assert_servers_deleted_successfully(self, server_name, count=0):
         """
         Given a server name, polls for 15 mins to assert that the tenant id
-        does not have servers containing that name
+        has only specified count of servers containing that name.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
             server_list = self.get_servers_containing_given_name_on_tenant(
                 server_name=server_name)
-            if len(server_list) == 0:
+            if len(server_list) == count:
                 break
             time.sleep(self.interval_time)
         else:
             self.fail('Servers on the tenant with name {0} were not deleted even'
-                      'after waiting 15 mins'.format(server_name))
+                      ' after waiting 15 mins'.format(server_name))
 
     @classmethod
     def tearDownClass(cls):
