@@ -194,18 +194,23 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
+    lb_iter = iter(lb_configs)
 
-    return gatherResults([
-        add_to_load_balancer(
-            endpoint,
-            auth_token,
-            lb_config,
-            ip_address,
-            undo).addCallback(
-                lambda response, lb_id: (lb_id, response),
-                lb_config['loadBalancerId'])
-        for lb_config in lb_configs
-    ], consumeErrors=True)
+    results = []
+
+    def add_next(_):
+        try:
+            lb_config = lb_iter.next()
+
+            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
+            d.addCallback(results.append)
+            d.addCallback(add_next)
+            return d
+        except StopIteration:
+            return results
+
+    return add_next(None)
 
 
 def endpoints(service_catalog, service_name, region):
@@ -359,7 +364,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
 
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        lbd = add_to_load_balancers(
+            lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 

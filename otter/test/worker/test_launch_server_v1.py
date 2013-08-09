@@ -248,6 +248,53 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(sorted(results), [(12345, (12345, 80)),
                                            (54321, (54321, 81))])
 
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
+    def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
+        """
+        add_to_load_balancers calls add_to_load_balancer in series.
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+
+        add_to_load_balancer_deferreds = [d1, d2]
+
+        def _add_to_load_balancer(*args):
+            return add_to_load_balancer_deferreds.pop(0)
+
+        add_to_load_balancer.side_effect = _add_to_load_balancer
+
+        d = add_to_load_balancers('http://url/', 'my-auth-token',
+                                  [{'loadBalancerId': 12345,
+                                    'port': 80},
+                                   {'loadBalancerId': 54321,
+                                    'port': 81}],
+                                  '192.168.1.1',
+                                  self.undo)
+
+        self.assertNoResult(d)
+
+        add_to_load_balancer.assert_called_once_with(
+            'http://url/',
+            'my-auth-token',
+            {'loadBalancerId': 12345, 'port': 80},
+            '192.168.1.1',
+            self.undo
+        )
+
+        d1.callback(None)
+
+        add_to_load_balancer.assert_called_with(
+            'http://url/',
+            'my-auth-token',
+            {'loadBalancerId': 54321, 'port': 81},
+            '192.168.1.1',
+            self.undo
+        )
+
+        d2.callback(None)
+
+        self.successResultOf(d)
+
     def test_remove_from_load_balancer(self):
         """
         remove_from_load_balancer makes a DELETE request against the
@@ -588,7 +635,7 @@ class ServerTests(TestCase):
 
         add_to_load_balancers.assert_called_once_with(
             'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
-            '10.0.0.1')
+            '10.0.0.1', self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
