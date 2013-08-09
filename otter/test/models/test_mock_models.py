@@ -861,3 +861,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         for deferred in failed_deferreds:
             self.failureResultOf(deferred, NoSuchScalingGroupError)
+
+    def test_get_metrics_returns_mock_metrics(self):
+        """
+        Getting mock metrics will return an empty dict.
+        """
+        deferred = self.collection.get_metrics(self.mock_log)
+        self.assertEqual(self.successResultOf(deferred), {})
