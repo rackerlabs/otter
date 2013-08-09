@@ -953,7 +953,7 @@ class CassScalingGroupCollection:
         """
         # First delete all events
         all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
-        query, data = _delete_events_query_and_params(all_delete_ids, self.event_table)
+        query, data = _delete_many_query_and_params(self.event_table, '"policyId"', all_delete_ids)
         d = self.connection.execute(query, data, get_consistency_level('delete', 'events'))
 
         # Then insert rows for trigger times to be updated. This is because trigger cannot be

@@ -1527,10 +1527,10 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                       'trigger': 100, 'cron': 'c1'},
                      {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
                       'trigger': 122, 'cron': 'c2'}]
-        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1,'
-                  ':policyid2,:policyid3,:policyid4);')
-        deldata = {'policyid0': 'p1', 'policyid1': 'p2', 'policyid2': 'p3',
-                   'policyid3': 'ef', 'policyid4': 'ex'}
+        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:column_value0,:column_value1,'
+                  ':column_value2,:column_value3,:column_value4);')
+        deldata = {'column_value0': 'p1', 'column_value1': 'p2', 'column_value2': 'p3',
+                   'column_value3': 'ef', 'column_value4': 'ex'}
         insertcql = ('BEGIN BATCH '
                      'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
                      'VALUES (:policy0tenantId, :policy0groupId, :policy0policyId, :policy0trigger, '
@@ -1560,8 +1560,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                       'trigger': 100, 'cron': 'c1'},
                      {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
                       'trigger': 122, 'cron': 'c2'}]
-        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:policyid0,:policyid1);')
-        deldata = {'policyid0': 'ef', 'policyid1': 'ex'}
+        delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN (:column_value0,:column_value1);')
+        deldata = {'column_value0': 'ef', 'column_value1': 'ex'}
         insertcql = ('BEGIN BATCH '
                      'INSERT INTO scaling_schedule("tenantId", "groupId", "policyId", trigger, cron) '
                      'VALUES (:policy0tenantId, :policy0groupId, :policy0policyId, :policy0trigger, '
@@ -1589,8 +1589,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         del_ids = ['p1', 'p2', 'p3']
         up_events = []
         delcql = ('DELETE FROM scaling_schedule WHERE "policyId" IN '
-                  '(:policyid0,:policyid1,:policyid2);')
-        deldata = {'policyid0': 'p1', 'policyid1': 'p2', 'policyid2': 'p3'}
+                  '(:column_value0,:column_value1,:column_value2);')
+        deldata = {'column_value0': 'p1', 'column_value1': 'p2', 'column_value2': 'p3'}
         self.returns = [None, None]
         result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
         self.assertEqual(result, None)
