@@ -63,18 +63,16 @@ class LaunchConfigTest(AutoscaleFixture):
             group_id=group.id,
             expected_servers=minentities)
         self._execute_policy(group)
-        active_list_b4_upd = self.autoscale_behaviors.\
-            wait_for_expected_number_of_active_servers(
-                group_id=group.id,
-                expected_servers=minentities + self.sp_change)
+        active_list_b4_upd = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities + self.sp_change)
         self._update_launch_config(
             group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
         self._execute_policy(group, policy_down['id'])
         server_after_down = len(active_list_b4_upd) + scale_down_change
-        active_server_list_after_scale_down = self.autoscale_behaviors.\
-            wait_for_expected_number_of_active_servers(
-                group_id=group.id,
-                expected_servers=server_after_down)
+        active_server_list_after_scale_down = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=server_after_down)
         self.assertEqual(set(active_server_list_after_scale_down), (
             set(active_list_b4_upd) - set(first_server)))
         self._verify_server_list_for_launch_config(
@@ -222,10 +220,9 @@ class LaunchConfigTest(AutoscaleFixture):
         minentities = self.sp_change
         group = self._create_group(
             minentities=minentities, policy=True)
-        servers_list_b4_upd = self.autoscale_behaviors.\
-            wait_for_expected_number_of_active_servers(
-                group_id=group.id,
-                expected_servers=minentities)
+        servers_list_b4_upd = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities)
         self._verify_server_list_for_launch_config(
             servers_list_b4_upd,
             group.launchConfiguration.server.name,
@@ -277,17 +274,15 @@ class LaunchConfigTest(AutoscaleFixture):
             group_id=group.id,
             expected_servers=minentities)
         self._execute_policy(group)
-        active_list_after_scale_up = self.autoscale_behaviors.\
-            wait_for_expected_number_of_active_servers(
-                group_id=group.id,
-                expected_servers=minentities + self.sp_change)
+        active_list_after_scale_up = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities + self.sp_change)
         servers_from_scale_up = set(
             active_list_after_scale_up) - set(first_server)
         self._execute_policy(group, policy_down['id'])
-        active_server_list_after_scale_down = self.autoscale_behaviors.\
-            wait_for_expected_number_of_active_servers(
-                group_id=group.id,
-                expected_servers=self.sp_change)
+        active_server_list_after_scale_down = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=self.sp_change)
         self.assertEqual(set(servers_from_scale_up), set(
             active_server_list_after_scale_down))
         self.assert_servers_deleted_successfully(

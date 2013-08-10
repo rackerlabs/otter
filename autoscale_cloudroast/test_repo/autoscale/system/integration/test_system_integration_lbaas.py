@@ -22,7 +22,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         group = self._create_group_given_lbaas_id(self.load_balancer_1,
                                                   self.load_balancer_2, self.load_balancer_3)
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
@@ -39,7 +39,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         policy_data = {'change': self.sp_change}
         group = self._create_group_given_lbaas_id(self.load_balancer_1)
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
@@ -47,7 +47,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self._update_launch_config(group, self.load_balancer_1, self.load_balancer_2,
                                    self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_data, execute_policy=True)
-        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
@@ -66,13 +66,13 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         policy_data = {'change': self.sp_change}
         group = (self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt)).entity
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._update_launch_config(group, self.load_balancer_1, self.load_balancer_2,
                                    self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_data, execute_policy=True)
-        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
@@ -94,14 +94,14 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         policy_up_data = {'change': self.gc_min_entities_alt}
         policy_down_data = {'change': -self.gc_min_entities_alt}
         group = self._create_group_given_lbaas_id(self.load_balancer_1)
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
                                                         self.load_balancer_1)
         self._update_launch_config(group, self.load_balancer_2)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
-        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt * 2)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
@@ -109,7 +109,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2)
         scaled_down_server_ip = self._get_ipv4_address_list_on_servers(active_server_list)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
-        activeservers_scaledown = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        activeservers_scaledown = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
@@ -129,7 +129,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         lb_node_id_list_before_scale = [each_node.id for each_node in self._get_node_list_from_lb(
             load_balancer)]
         group = self._create_group_given_lbaas_id(load_balancer)
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
@@ -157,13 +157,13 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         policy_down_data = {'change': -self.gc_min_entities_alt}
         group = self._create_group_given_lbaas_id(load_balancer)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt * 2)
         self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
                                                                 load_balancer)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
@@ -177,14 +177,14 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         policy_up_data = {'change': self.sp_change}
         group = self._create_group_given_lbaas_id(self.load_balancer_1)
-        active_server_list = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
                                                         self.load_balancer_1)
         self._update_launch_config(group)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
-        activeservers_after_scale = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt + self.sp_change)
         active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
