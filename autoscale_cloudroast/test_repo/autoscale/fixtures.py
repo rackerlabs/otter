@@ -298,7 +298,7 @@ class AutoscaleFixture(BaseTestFixture):
         :param timeout: Time to wait before exiting this function
         :return: returns the list of active servers in the group
         """
-        end_time = time.time() + 60
+        end_time = time.time() + 120
         desired_capacity = desired_capacity or expected_servers
         while time.time() < end_time:
             group_state = self.autoscale_client.list_status_entities_sgroups(
@@ -314,9 +314,10 @@ class AutoscaleFixture(BaseTestFixture):
                         return server_list
         else:
             self.fail(
-                'Waited 60 seconds for desired capacity/active server list to reach the'
-                ' server count of {0} but was {1} for group {2}'.format(desired_capacity,
-                group_state.desiredCapacity, group_id))
+                'Waited 2 mins for desired capacity/active server list to reach the'
+                ' server count of {0}. Has desired capacity {1} on the group {2}'
+                ' and {3} servers on the account' .format(desired_capacity,
+                group_state.desiredCapacity, group_id, len(server_list)))
 
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """
