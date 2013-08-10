@@ -20,6 +20,7 @@ from silverberg.lock import BasicLock, with_lock
 
 import json
 import random
+from datetime import datetime
 
 
 LOCK_TABLE_NAME = 'locks'
@@ -78,7 +79,6 @@ _cql_insert_event_batch = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", 
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM {cf} WHERE '
     'trigger <= :now LIMIT :size ALLOW FILTERING;')
-_cql_delete_events = 'DELETE FROM {cf} WHERE "policyId" IN ({policy_ids});'
 _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -916,14 +916,9 @@ class CassScalingGroupCollection:
             query, params = _delete_many_query_and_params(
                                     self.config_table, '"groupId"',
                                     (group['groupId'] for group in groups))
-            #group_ids = ','.join([':groupId{}'.format(i) for i in range(len(groups))])
-            #group_id_values = {'groupId{}'.format(i): group['groupId']
-            #                   for i, group in enumerate(groups)}
-            #query = _cql_delete_groups.format(cq=self.config_table, groupIds=group_ids)
             return self.connnection.execute(query, params,
                                             get_consistency_level('delete', 'group'))
 
-        # TODO: Use verified_view
         d = self.connection.execute(_cql_list_states.format(cf=self.config_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
