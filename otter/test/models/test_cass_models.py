@@ -230,10 +230,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         Test that you can call view state and receive a valid parsed response
         """
-        cass_response = _cassandrify_data([
+        cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
@@ -502,8 +502,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When viewing the launch config, if the returned row is rescurrected row, it
         is not returned and it is triggerred for deletion
         """
-        mock_verfied_view.return_value = defer.fail(NoSuchScalingGroupError)
+        mock_verfied_view.return_value = defer.fail(NoSuchScalingGroupError('a', 'b'))
         d = self.group.view_launch_config()
+        self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = ('SELECT launch_config, created_at FROM scaling_config WHERE '
                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_config WHERE '

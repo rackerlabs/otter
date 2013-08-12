@@ -869,9 +869,9 @@ class CassScalingGroupCollection:
                 "groupId": scaling_group_id,
                 "group_config": serialize_json_data(config, 1),
                 "launch_config": serialize_json_data(launch, 1),
-                "active": '{{}}',
-                "pending": '{{}}',
-                "policyTouched": '{{}}',
+                "active": '{}',
+                "pending": '{}',
+                "policyTouched": '{}',
                 "groupTouched": False,
                 "paused": False,
                 "created_at": datetime.utcnow()
