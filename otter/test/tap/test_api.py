@@ -18,6 +18,7 @@ from otter.test.utils import matches
 
 test_config = {
     'port': 'tcp:9999',
+    'admin': 'tcp:9789',
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
         'keyspace': 'otter_test'
@@ -55,6 +56,22 @@ class APIOptionsTests(TestCase):
         config = Options()
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
+
+    def test_port_options(self):
+        """
+        The port long option should end up in the 'port' key.
+        """
+        config = Options()
+        config.parseOptions(['--admin=tcp:9789'])
+        self.assertEqual(config['admin'], 'tcp:9789')
+
+    def test_short_admin_options(self):
+        """
+        The a short option should end up in the 'admin' key.
+        """
+        config = Options()
+        config.parseOptions(['-a', 'tcp:9789'])
+        self.assertEqual(config['admin'], 'tcp:9789')
 
     def test_store_options(self):
         """
@@ -113,7 +130,15 @@ class APIMakeServiceTests(TestCase):
         Site instance.
         """
         makeService(test_config)
-        self.service.assert_called_with('tcp:9999', self.Site.return_value)
+        self.service.assert_any_call('tcp:9999', self.Site.return_value)
+
+    def test_admin_site_on_port(self):
+        """
+        makeService will create a strports admin service on tcp:9789 with a
+        Site instance.
+        """
+        makeService(test_config)
+        self.service.assert_any_call('tcp:9789', self.Site.return_value)
 
     def test_unicode_service_site_on_port(self):
         """
@@ -122,7 +147,7 @@ class APIMakeServiceTests(TestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.service.assert_called_with('tcp:9999', self.Site.return_value)
+        self.service.assert_any_call('tcp:9999', self.Site.return_value)
         self.assertTrue(isinstance(self.service.call_args[0][0], str))
 
     def test_is_MultiService(self):
