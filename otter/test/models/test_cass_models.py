@@ -13,6 +13,7 @@ from otter.json_schema import group_examples
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
+    CassAdmin,
     serialize_json_data)
 
 from otter.models.interface import (
@@ -1727,6 +1728,33 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)
+
+
+class CassAdminTestCase(TestCase):
+    """
+    Tests for :class:`CassAdmin`
+    """
+
+    def setUp(self):
+        """ Setup mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
+
+        self.mock_log = mock.MagicMock()
+
+        self.collection = CassAdmin(self.connection)
+
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
 
     def test_get_metrics(self):
         """

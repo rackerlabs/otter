@@ -7,7 +7,8 @@ from twisted.trial.unittest import TestCase
 
 from otter.json_schema import group_examples
 from otter.models.mock import (
-    generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
+    generate_entity_links, MockScalingGroup, MockScalingGroupCollection,
+    MockAdmin)
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
@@ -861,6 +862,17 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         for deferred in failed_deferreds:
             self.failureResultOf(deferred, NoSuchScalingGroupError)
+
+
+class MockAdminTestCase(TestCase):
+    """
+    Tests for :class:`MockAdmin`
+    """
+
+    def setUp(self):
+        """ Setup mocks """
+        self.collection = MockAdmin()
+        self.mock_log = mock.MagicMock()
 
     def test_get_metrics_returns_mock_metrics(self):
         """
