@@ -148,14 +148,26 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                 complete the following tasks:</para>
             <itemizedlist>
                 <listitem>
-                    <para>Configure alarms by using Cloud Monitoring </para>
+                    <para>Configure alarms by using Cloud Monitoring.
+                        For more information, see the 
+                        <link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html">
+                            Rackspace Cloud Monitoring Getting
+                            Started Guide</link>.
+                        </para>
                 </listitem>
                 <listitem>
-                    <para>Create servers by using Cloud Servers</para>
+                    <para xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html">
+                        Create servers by using Cloud Servers. For
+                        more information, see the <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html">Next
+                            Generation Cloud Servers™ Developer
+                            Guide</link>.</para>
                 </listitem>
                 <listitem>
                     <para>Create load balancers by using Cloud Load
-                        Balancers</para>
+                        Balancers. For more information see the <link
+                            xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html"
+                            >Rackspace Cloud Load Balancers Developers
+                            Guide</link>.</para>
                 </listitem>
             </itemizedlist>
             <para>You
@@ -452,8 +464,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                     APIs or an other Cloud technologies. Visit the
                     Developer Forum at <link
                         xlink:href="https://community.rackspace.com/developers/default"
-                        >https://community.rackspace.com/developers/default</link>.
-                </para>
+                        >https://community.rackspace.com/developers/default</link>. </para>
             </tip>
         </section>
         <section xml:id="Scaling_Policies">
