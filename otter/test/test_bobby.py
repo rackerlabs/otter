@@ -8,11 +8,9 @@ import json
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed
 
-from otter import bobby
-
+from otter.bobby import BobbyClient
 
 from otter.test.utils import patch
-from otter.util.config import set_config_data
 
 
 class BobbyTests(TestCase):
@@ -23,15 +21,10 @@ class BobbyTests(TestCase):
         """
         set up test dependencies for Bobby.
         """
-
-        fake_config = {
-            'bobby_endpoint': 'url'
-        }
-
         self.treq = patch(self, 'otter.bobby.treq')
         patch(self, 'otter.bobby.treq', new=self.treq)
 
-        set_config_data(fake_config)
+        self.client = BobbyClient('url')
 
     def test_create_policy(self):
         """
@@ -44,7 +37,7 @@ class BobbyTests(TestCase):
         content = mock.Mock()
         self.treq.json_content.return_value = succeed(content)
 
-        d = bobby.create_policy('t1', 'g1', 'pol1', {'f': 'rrrr'}, 'ALARM DSL')
+        d = self.client.create_policy('t1', 'g1', 'pol1', {'f': 'rrrr'}, 'ALARM DSL')
 
         result = self.successResultOf(d)
         self.assertEqual(result, content)
@@ -74,7 +67,7 @@ class BobbyTests(TestCase):
         content = mock.Mock()
         self.treq.json_content.return_value = succeed(content)
 
-        d = bobby.create_server('t1', 'g1',  'you_got_served', 'the_q_entity')
+        d = self.client.create_server('t1', 'g1',  'you_got_served')
 
         result = self.successResultOf(d)
         self.assertEqual(result, content)
@@ -87,7 +80,7 @@ class BobbyTests(TestCase):
         data = self.treq.post.mock_calls[0][2]['data']
 
         self.assertEqual(json.loads(data),
-                         {'entityId': 'the_q_entity',
+                         {'entityId': 'Damnit, Bobby',
                           'serverId': 'you_got_served'})
 
         self.treq.json_content.assert_called_once_with(response)
@@ -103,7 +96,7 @@ class BobbyTests(TestCase):
         content = mock.Mock()
         self.treq.json_content.return_value = succeed(content)
 
-        d = bobby.create_group('t1', 'g1')
+        d = self.client.create_group('t1', 'g1')
 
         result = self.successResultOf(d)
         self.assertEqual(result, content)
