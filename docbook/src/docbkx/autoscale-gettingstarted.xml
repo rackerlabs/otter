@@ -42,31 +42,26 @@ format="SVG" scale="60"/>
 <!ENTITY MUST_NOT '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
 ]>
 
-<book version="5.0" status="draft"
-    xmlns="http://docbook.org/ns/docbook"
-    xmlns:xlink="http://www.w3.org/1999/xlink"
-    xmlns:xi="http://www.w3.org/2001/XInclude"
-    xmlns:svg="http://www.w3.org/2000/svg"
-    xmlns:m="http://www.w3.org/1998/Math/MathML"
-    xmlns:html="http://www.w3.org/1999/xhtml"
-    xml:id="autoscale-getting-started"
-    xmlns:raxm="http://docs.rackspace.com/api/metadata"
-    xlink:href="http:// docs.autoscale.apiary.io/ ">
-    <!-- this Getting Started content comes directly from a wiki page,
-https://one.rackspace.com/display/Stretch/Getting+Started+with+Autoscale -->
-    <!-- some sample code displayed on that page does NOT validate via JSONlint;
-use code in attachment, https://one.rackspace.com/download/attachments/47874827/autoscale_notes_gus.txt, instead -->
-    <?rax title.font.size="35px" subtitle.font.size="20px"?
-canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-started/content"?>
-    <?rax status.bar.text="PREVIEW" ?>
+<book version="5.0" 
+      xmlns="http://docbook.org/ns/docbook"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      xmlns:xi="http://www.w3.org/2001/XInclude"
+      xmlns:svg="http://www.w3.org/2000/svg"
+      xmlns:m="http://www.w3.org/1998/Math/MathML"
+      xmlns:html="http://www.w3.org/1999/xhtml"
+      xml:id="autoscale-getting-started"
+      xmlns:raxm="http://docs.rackspace.com/api/metadata"
+      xlink:href="http:// docs.autoscale.apiary.io/ ">
+<!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
+<title>&PRODNAME; Getting Started Guide</title>
+<titleabbrev>&PRODABBV; Intro</titleabbrev>    
+<?rax title.font.size="35px" subtitle.font.size="20px"?
+      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
-        <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
-        <title>&PRODNAME; Getting Started Guide</title>
-        <titleabbrev>&PRODABBV; Intro</titleabbrev>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-02</pubdate>
+        <pubdate>2013-08-13</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -79,16 +74,15 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
         </legalnotice>
         <revhistory>
             <revision>
-                <date>2013-07-22</date>
+                <date>2013-08-13</date>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial draft for preview
-                                release.</para>
+                            <para>Initial Unlimited Availability release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision>
+            </revision> 
             <revision>
                 <date>2013-08-02</date>
                 <revdescription>
@@ -96,6 +90,17 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                         <listitem>
                             <para>Additional updates after
                                 edit.</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
+            <revision>
+                <date>2013-07-22</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Initial draft for preview
+                                release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>

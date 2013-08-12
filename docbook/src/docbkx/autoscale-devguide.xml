@@ -43,7 +43,6 @@ format="SVG" scale="60"/>
 ]>
 
 <book version="5.0"
-         status="draft"
          xmlns="http://docbook.org/ns/docbook"
          xmlns:xlink="http://www.w3.org/1999/xlink"
          xmlns:xi="http://www.w3.org/2001/XInclude"
@@ -51,21 +50,16 @@ format="SVG" scale="60"/>
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
          xml:id="autoscale-getting-started">
-     
-    <?rax title.font.size="35px" subtitle.font.size="20px"
-          canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
-    <?rax status.bar.text="PREVIEW" ?>
+<!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
+<title>&PRODNAME; Developer Guide</title>
+<titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
+<?rax title.font.size="35px" subtitle.font.size="20px"
+      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <info>
-        <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
-        <title>&PRODNAME; Developer Guide</title>
-        <titleabbrev>&PRODABBV; DevGuide</titleabbrev>
-        <copyright>
-            <year>2013</year>
-        </copyright>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-07-22</pubdate>
+        <pubdate>2013-08-13</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -76,6 +70,16 @@ format="SVG" scale="60"/>
             </annotation>
         </legalnotice>
         <revhistory>
+          <revision>
+              <date>2013-08-13</date>
+              <revdescription>
+                  <itemizedlist spacing="compact">
+                      <listitem>
+                          <para>Initial Unlimited Availability release.</para>
+                      </listitem>
+                  </itemizedlist>
+              </revdescription>
+            </revision>
             <revision>
                 <date>2013-07-22</date>
                 <revdescription>
