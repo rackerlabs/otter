@@ -65,8 +65,8 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused);')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
-                         '"policyTouched", paused, created_at FROM {cf} WHERE "tenantId" = :tenantId AND '
-                         '"groupId" = :groupId;')
+                         '"policyTouched", paused, created_at FROM {cf} WHERE '
+                         '"tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
                      'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger);')
 _cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
@@ -915,8 +915,8 @@ class CassScalingGroupCollection:
             if not groups:
                 return None
             query, params = _delete_many_query_and_params(
-                                    self.config_table, '"groupId"',
-                                    (group['groupId'] for group in groups))
+                self.config_table, '"groupId"',
+                (group['groupId'] for group in groups))
             return self.connection.execute(query, params,
                                            get_consistency_level('delete', 'group'))
 

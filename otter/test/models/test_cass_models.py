@@ -28,6 +28,7 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
+from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
 
 from otter.scheduler import next_cron_occurrence
@@ -213,8 +214,17 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If group row returned is resurrected, i.e. does not have 'created_at', then
         NoSuchScalingGroupError is returned and that row's deletion is triggered
         """
-        # TODO
-        pass
+        self.returns = [[{'group_config': '{}', 'created_at': None}], None]
+        r = self.group.view_config()
+        self.failureResultOf(r, NoSuchScalingGroupError)
+        view_cql = ('SELECT group_config, created_at FROM scaling_config WHERE '
+                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
+        del_cql = ('DELETE FROM scaling_config WHERE '
+                   '"tenantId" = :tenantId AND "groupId" = :groupId;')
+        expectedData = {"tenantId": "11111", "groupId": "12345678g"}
+        self.connection.execute.assert_has_calls(
+                [mock.call(view_cql, expectedData, ConsistencyLevel.TWO),
+                 mock.call(del_cql, expectedData, ConsistencyLevel.TWO)])
 
     def test_view_state(self):
         """
@@ -253,8 +263,22 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If group row returned is resurrected, i.e. does not have 'created_at', then
         NoSuchScalingGroupError is returned and that row's deletion is triggered
         """
-        # TODO
-        pass
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
+        self.returns = [cass_response, None]
+        d = self.group.view_state()
+        self.failureResultOf(d, NoSuchScalingGroupError)
+        viewCql = ('SELECT "tenantId", "groupId", active, pending, '
+                   '"groupTouched", "policyTouched", paused, created_at FROM scaling_config '
+                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
+        delCql = ('DELETE FROM scaling_config '
+                  'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
+        expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
+        self.connection.execute.assert_has_calls(
+                [mock.call(viewCql, expectedData, ConsistencyLevel.TWO),
+                 mock.call(delCql, expectedData, ConsistencyLevel.TWO)])
 
     def test_view_paused_state(self):
         """
@@ -1341,7 +1365,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                     'FROM scaling_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         del_cql = 'DELETE FROM scaling_config WHERE "tenantId" = :tenantId AND "groupId" = :groupId;'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
-        from testtools.matchers import IsInstance
         verified_view.assert_called_once_with(self.connection, view_cql, del_cql,
                                               exp_data, ConsistencyLevel.TWO,
                                               matches(IsInstance(NoSuchScalingGroupError)))
