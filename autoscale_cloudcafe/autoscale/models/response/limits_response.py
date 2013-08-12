@@ -5,7 +5,9 @@ from cafe.engine.models.base import AutoMarshallingModel
 import json
 import re
 
+
 class Limits(AutoMarshallingModel):
+
     """
     works for limits call
     """
@@ -113,6 +115,7 @@ class Rate(AutoMarshallingModel):
 
 
 class Absolute(AutoMarshallingModel):
+
     """
     Absolute limit
     """

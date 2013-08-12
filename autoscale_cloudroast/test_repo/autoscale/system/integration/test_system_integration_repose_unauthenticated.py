@@ -18,6 +18,10 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
 
     @classmethod
     def setUpClass(cls):
+        """
+        Create a client for a test account that does not have the autoscale endpoint
+        in its service catalog
+        """
         super(AutoscaleReposeUnauthTests, cls).setUpClass()
         cls.url = cls.url.replace(cls.tenant_id, cls.non_autoscale_tenant)
         endpoint = cls.endpoint_config.auth_endpoint
@@ -25,8 +29,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
             endpoint, 'json', 'json')
         token_behaviors = OSTokenAPI_Behaviors(token_client)
         access_data = token_behaviors.get_access_data(cls.non_autoscale_username,
-                                                     cls.non_autoscale_password,
-                                                     cls.non_autoscale_tenant)
+                                                      cls.non_autoscale_password,
+                                                      cls.non_autoscale_tenant)
         cls.autoscale_temp_client = AutoscalingAPIClient(
             url=cls.url, auth_token=access_data.token.id_, serialize_format='json',
             deserialize_format='json')
@@ -40,7 +44,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         limits_response = self.autoscale_temp_client.view_limits()
         self.assertEquals(limits_response.status_code, 403,
                           msg='Get Limits returned response code {0}'.format(
-                            limits_response.status_code))
+                          limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_rate_limits_with_trailing_slash(self):
@@ -51,7 +55,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         limits_response = self.autoscale_temp_client.view_limits(self.url + '/limits/')
         self.assertEquals(limits_response.status_code, 403,
                           msg='Limits returned response code {0}'.format(
-                            limits_response.status_code))
+                          limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_list_groups_on_account_without_trailing_slash(self):
@@ -62,7 +66,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups')
         self.assertEquals(list_response.status_code, 403,
                           msg='List scaling group returned response code {0}'.format(
-                            list_response.status_code))
+                          list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_list_groups_on_account_with_trailing_slash(self):
@@ -73,7 +77,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/')
         self.assertEquals(list_response.status_code, 403,
                           msg='List scaling group returned response code {0}'.format(
-                            list_response.status_code))
+                          list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_list_groups_on_account_with_non_existant_group(self):
@@ -84,7 +88,7 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/76765')
         self.assertEquals(list_response.status_code, 403,
                           msg='List scaling group returned response code {0}'.format(
-                            list_response.status_code))
+                          list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthenticated_execute_webhook(self):

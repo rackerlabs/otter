@@ -30,7 +30,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         limits_response = self.autoscale_temp_client.view_limits()
         self.assertEquals(limits_response.status_code, 401,
-            msg='Get Limits returned response code {0}'.format(limits_response.status_code))
+                          msg='Get Limits returned response code '
+                          '{0}'.format(limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_rate_limits_with_trailing_slash(self):
@@ -40,7 +41,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         limits_response = self.autoscale_temp_client.view_limits(self.url + '/limits/')
         self.assertEquals(limits_response.status_code, 401,
-            msg='Limits returned response code {0}'.format(limits_response.status_code))
+                          msg='Limits returned response code '
+                          '{0}'.format(limits_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_list_groups_on_account_without_trailing_slash(self):
@@ -50,7 +52,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups')
         self.assertEquals(list_response.status_code, 401,
-            msg='List scaling group returned response code {0}'.format(list_response.status_code))
+                          msg='List scaling group returned response code '
+                          '{0}'.format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_list_groups_on_account_with_trailing_slash(self):
@@ -60,7 +63,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/')
         self.assertEquals(list_response.status_code, 401,
-            msg='List scaling group returned response code {0}'.format(list_response.status_code))
+                          msg='List scaling group returned response code '
+                          '{0}'.format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_list_groups_on_account_with_non_existant_group(self):
@@ -70,7 +74,8 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         """
         list_response = self.autoscale_temp_client.list_scaling_groups(self.url + '/groups/76765')
         self.assertEquals(list_response.status_code, 401,
-            msg='List scaling group returned response code {0}'.format(list_response.status_code))
+                          msg='List scaling group returned response code '
+                          '{0}'.format(list_response.status_code))
 
     @tags(type='repose')
     def test_system_repose_unauthorized_execute_webhook(self):
@@ -82,5 +87,5 @@ class AutoscaleReposeUnauthTests(AutoscaleFixture):
         policy = self.autoscale_behaviors.create_policy_webhook(group.id, {'change': 1})
         execute_wb_response = self.autoscale_temp_client.execute_webhook(policy['webhook_url'])
         self.assertEquals(execute_wb_response.status_code, 202,
-            msg='List scaling group returned response code {0}'.format(
-                execute_wb_response.status_code))
+                          msg='List scaling group returned response code {0}'.format(
+                          execute_wb_response.status_code))
