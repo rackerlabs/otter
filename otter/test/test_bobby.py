@@ -22,7 +22,6 @@ class BobbyTests(TestCase):
         set up test dependencies for Bobby.
         """
         self.treq = patch(self, 'otter.bobby.treq')
-        patch(self, 'otter.bobby.treq', new=self.treq)
 
         self.client = BobbyClient('url')
 
