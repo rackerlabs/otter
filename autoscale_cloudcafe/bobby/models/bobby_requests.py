@@ -44,7 +44,7 @@ class BobbyPolicies_Request(AutoMarshallingModel):
     """
 
     def __init__(self, entity_id, policy_id, alarm_template,
-        check_template):
+                 check_template):
         super(BobbyPolicies_Request, self).__init__()
         self.entity_id = entity_id
         self.policy_id = policy_id

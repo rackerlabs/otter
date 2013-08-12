@@ -8,6 +8,7 @@ import re
 
 
 class BobbyGroup(AutoMarshallingModel):
+
     """
     Marshalling objects for Bobby's groups
     """
@@ -54,6 +55,7 @@ class BobbyGroup(AutoMarshallingModel):
 
 
 class ServerGroup(AutoMarshallingModel):
+
     """
     Marshalling objects for Bobby's server group
     """
@@ -98,7 +100,9 @@ class ServerGroup(AutoMarshallingModel):
                 setattr(server_group, newkey, server_group_dict[each])
         return server_group
 
+
 class Policies(AutoMarshallingModel):
+
     """
     Marshalling objects for Bobby's Policies Instance
     """
