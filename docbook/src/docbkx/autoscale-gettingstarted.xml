@@ -464,8 +464,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
                     APIs or an other Cloud technologies. Visit the
                     Developer Forum at <link
                         xlink:href="https://community.rackspace.com/developers/default"
-                        >https://community.rackspace.com/developers/default</link>.
-                </para>
+                        >https://community.rackspace.com/developers/default</link>. </para>
             </tip>
         </section>
         <section xml:id="Scaling_Policies">
