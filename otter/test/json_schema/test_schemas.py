@@ -548,7 +548,7 @@ class ScalingPolicyTestCase(TestCase):
         invalid = self.at_policy
         past = datetime.utcnow() - timedelta(days=1)
         invalid['args']['at'] = past.isoformat() + 'Z'
-        self.assertRaisesRegexp(ValueError, 'time must be in future',
+        self.assertRaisesRegexp(ValidationError, 'must be in the future',
                                 group_schemas.validate_datetime, invalid['args']['at'])
         self.assertRaises(ValidationError, validate, invalid, group_schemas.policy)
 
@@ -592,7 +592,7 @@ class ScalingPolicyTestCase(TestCase):
         # This is tested for validation in above test.
         # Here it is checked for correct exception rased
         invalid_cron = '* * * * * *'
-        self.assertRaisesRegexp(ValueError, 'Seconds not allowed',
+        self.assertRaisesRegexp(ValidationError, 'Seconds not allowed',
                                 group_schemas.validate_cron, invalid_cron)
 
 
