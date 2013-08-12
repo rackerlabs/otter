@@ -21,7 +21,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError)
 
-from otter.test.utils import LockMixin, CheckFailure
+from otter.test.utils import LockMixin, CheckFailure, DummyException
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -94,12 +94,6 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
-
-
-class DummyException(Exception):
-    """
-    Specific exception class, to be used in testing exception handling
-    """
 
 
 class VerifiedViewTests(TestCase):
@@ -1682,9 +1676,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config': _S(self.launch),
             'groupId': '12345678',
             'tenantId': '123',
-            "active": '{{}}',
-            "pending": '{{}}',
-            "policyTouched": '{{}}',
+            "active": '{}',
+            "pending": '{}',
+            "policyTouched": '{}',
             "groupTouched": False,
             "paused": False}
         expectedCql = ('BEGIN BATCH '
@@ -1727,9 +1721,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config': _S(self.launch),
             'groupId': '12345678',
             'tenantId': '123',
-            "active": '{{}}',
-            "pending": '{{}}',
-            "policyTouched": '{{}}',
+            "active": '{}',
+            "pending": '{}',
+            "policyTouched": '{}',
             "groupTouched": False,
             "paused": False,
             'policy0Id': '12345678',
@@ -1775,9 +1769,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'launch_config': _S(self.launch),
             'groupId': '1',
             'tenantId': '123',
-            "active": '{{}}',
-            "pending": '{{}}',
-            "policyTouched": '{{}}',
+            "active": '{}',
+            "pending": '{}',
+            "policyTouched": '{}',
             "groupTouched": False,
             "paused": False,
             'policy0Id': '2',
