@@ -57,7 +57,7 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
-    def test_port_options(self):
+    def test_admin_options(self):
         """
         The port long option should end up in the 'port' key.
         """
