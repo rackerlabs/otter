@@ -103,37 +103,43 @@ class DummyException(Exception):
 
 
 class VerifiedViewTests(TestCase):
+    """
+    Tests for `verified_view`
+    """
 
     def setUp(self):
+        """
+        mock connection object
+        """
         self.connection = mock.MagicMock(spec=['execute'])
-        self.connection.execute.return_value = defer.succeed([{'c1':2, 'created_at':23}])
+        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': 23}])
 
     def test_valid_view(self):
         """
         Returns row if it is valid
         """
-        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
-        self.assertEqual(self.successResultOf(r), {'c1':2, 'created_at':23})
-        self.connection.execute.assert_called_once_with('vq', {'d':2}, 6)
+        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
+        self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
+        self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
 
     def test_resucrrected_view(self):
         """
         Raise empty error if recurrected view
         """
-        self.connection.execute.return_value = defer.succeed([{'c1':2}])
-        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
+        self.connection.execute.return_value = defer.succeed([{'c1': 2}])
+        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
         self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
-        self.connection.execute.has_calls([mock.call('vq', {'d':2}, 6),
-                                           mock.call('dq', {'d':2}, 6)])
+        self.connection.execute.has_calls([mock.call('vq', {'d': 2}, 6),
+                                           mock.call('dq', {'d': 2}, 6)])
 
     def test_empty_view(self):
         """
         Raise empty error if no result
         """
         self.connection.execute.return_value = defer.succeed([])
-        r = verified_view(self.connection, 'vq', 'dq', {'d':2}, 6, ValueError)
+        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
         self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
-        self.connection.execute.assert_called_once_with('vq', {'d':2}, 6)
+        self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
 
 
 class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
@@ -223,8 +229,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                    '"tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         self.connection.execute.assert_has_calls(
-                [mock.call(view_cql, expectedData, ConsistencyLevel.TWO),
-                 mock.call(del_cql, expectedData, ConsistencyLevel.TWO)])
+            [mock.call(view_cql, expectedData, ConsistencyLevel.TWO),
+             mock.call(del_cql, expectedData, ConsistencyLevel.TWO)])
 
     def test_view_state(self):
         """
@@ -277,8 +283,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_has_calls(
-                [mock.call(viewCql, expectedData, ConsistencyLevel.TWO),
-                 mock.call(delCql, expectedData, ConsistencyLevel.TWO)])
+            [mock.call(viewCql, expectedData, ConsistencyLevel.TWO),
+             mock.call(delCql, expectedData, ConsistencyLevel.TWO)])
 
     def test_view_paused_state(self):
         """
@@ -517,7 +523,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertTrue(isinstance(args[-1], NoSuchScalingGroupError))
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
-                return_value = defer.succeed({}))
+                return_value=defer.succeed({}))
     def test_update_config(self, view_config):
         """
         Test that you can update a config, and if its successful the return
@@ -536,7 +542,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
-                return_value = defer.succeed({}))
+                return_value=defer.succeed({}))
     def test_update_launch(self, view_config):
         """
         Test that you can update a launch config, and if successful the return
@@ -566,7 +572,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         ]
 
         for i, callback in enumerate(updates):
-            view_config.return_value=defer.fail(DummyException('boo'))
+            view_config.return_value = defer.fail(DummyException('boo'))
             self.failureResultOf(callback(), DummyException)
 
             # view is called
@@ -1349,8 +1355,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         config, launch config, and scaling policies is returned.
         """
         verified_view.return_value = defer.succeed(
-                    {'group_config': serialize_json_data(self.config, 1.0),
-                     'launch_config': serialize_json_data(self.launch_config, 1.0)})
+            {'group_config': serialize_json_data(self.config, 1.0),
+             'launch_config': serialize_json_data(self.launch_config, 1.0)})
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed({}))
 
@@ -1895,7 +1901,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                          mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
         self.assertEqual(r, [
             GroupState('123', 'group123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
-
 
     def test_list_states_deletes_resurrected_groups(self):
         """
