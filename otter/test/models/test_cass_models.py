@@ -1796,7 +1796,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         ``list_scaling_group_states`` returns a list of :class:`GroupState`
         objects from cassandra
         """
-        self.returns = [_cassandrify_data([{
+        self.returns = [[{
             'tenantId': '123',
             'groupId': 'group{}'.format(i),
             'active': '{}',
@@ -1805,7 +1805,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'policyTouched': '{}',
             'paused': '\x00',
             'created_at': 23
-        } for i in range(2)])]
+        } for i in range(2)]]
 
         expectedData = {'tenantId': '123'}
         expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
@@ -1841,16 +1841,72 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         If any of the rows returned is resurrected, i.e. does not contain created_at
         then it is not returned
         """
-        # TODO
-        pass
+        group_dicts = [{
+            'tenantId': '123',
+            'groupId': 'group123',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'created_at': 23
+        }, {
+            'tenantId': '23',
+            'groupId': 'group23',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'created_at': None
+        }]
+        self.returns = [group_dicts, None]
+
+        expectedData = {'tenantId': '123'}
+        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       'scaling_config WHERE "tenantId" = :tenantId;')
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.assertEqual(self.connection.execute.call_args_list[0],
+                         mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
+        self.assertEqual(r, [
+            GroupState('123', 'group123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
+
 
     def test_list_states_deletes_resurrected_groups(self):
         """
         If any of the rows returned is resurrected, i.e. does not contain created_at
         then it is triggered for deletion
         """
-        # TODO
-        pass
+        group_dicts = [{
+            'tenantId': '123',
+            'groupId': 'group123',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'created_at': 23
+        }, {
+            'tenantId': '23',
+            'groupId': 'group23',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'created_at': None
+        }]
+        self.returns = [group_dicts, None]
+
+        expectedCql = 'DELETE FROM scaling_config WHERE "groupId" IN (:column_value0);'
+        expectedData = {'column_value0': 'group23'}
+        r = self.validate_list_states_return_value(self.mock_log, '123')
+        self.assertEqual(self.connection.execute.call_count, 2)
+        self.assertEqual(self.connection.execute.call_args_list[1],
+                         mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
+        self.assertEqual(r, [
+            GroupState('123', 'group123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
     def test_get_scaling_group(self):
         """

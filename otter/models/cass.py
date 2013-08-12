@@ -797,6 +797,7 @@ def _delete_many_query_and_params(cf, column, column_values):
     :param column: column name based on which row will be deleted
     :return: iterable column_values, column values that will match deleted row
     """
+    column_values = list(column_values)
     column_values_args = ','.join(
         [':column_value{}'.format(i) for i in range(len(column_values))])
     params = {'column_value{}'.format(i): column_value
@@ -916,8 +917,8 @@ class CassScalingGroupCollection:
             query, params = _delete_many_query_and_params(
                                     self.config_table, '"groupId"',
                                     (group['groupId'] for group in groups))
-            return self.connnection.execute(query, params,
-                                            get_consistency_level('delete', 'group'))
+            return self.connection.execute(query, params,
+                                           get_consistency_level('delete', 'group'))
 
         d = self.connection.execute(_cql_list_states.format(cf=self.config_table),
                                     {"tenantId": tenant_id},
