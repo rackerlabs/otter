@@ -137,8 +137,10 @@ def get_consistency_level(operation, resource):
     # TODO: configurable consistency level, possibly different for read
     # and write operations
     resource_operations = _consistency_levels.get(resource)
-    return (resource_operations and resource_operations.get(operation, ConsistencyLevel.ONE)
-            or ConsistencyLevel.ONE)
+    if resource_operations:
+        return resource_operations.get(operation, ConsistencyLevel.ONE)
+    else:
+        return ConsistencyLevel.ONE
 
 
 def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
