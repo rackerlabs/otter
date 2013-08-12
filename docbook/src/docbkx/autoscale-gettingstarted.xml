@@ -149,16 +149,16 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-getting-sta
             <itemizedlist>
                 <listitem>
                     <para>Configure alarms by using Cloud Monitoring.
-                        For more information, see the <link
-                            xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html"
-                            >Rackspace Cloud Monitoring Getting
-                            Started Guide</link>.</para>
+                        For more information, see the 
+                        <link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html">
+                            Rackspace Cloud Monitoring Getting
+                            Started Guide</link>.
+                        </para>
                 </listitem>
                 <listitem>
-                    <para
-                        xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
-                        >Create servers by using Cloud Servers. For
-                        more information, see the <link>Next
+                    <para xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html">
+                        Create servers by using Cloud Servers. For
+                        more information, see the <link xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html">Next
                             Generation Cloud Servers™ Developer
                             Guide</link>.</para>
                 </listitem>
