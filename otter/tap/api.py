@@ -27,10 +27,11 @@ try:
 except ImportError:
     GraylogUDPPublisher = None
 
+from otter.rest.admin import OtterAdmin
 from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
-from otter.models.cass import CassScalingGroupCollection
+from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
@@ -53,6 +54,8 @@ class Options(usage.Options):
     """
 
     optParameters = [
+        ["admin", "a", "tcp:9001",
+         "strports description of the admin API port."],
         ["port", "p", "tcp:9000",
          "strports description of the port for API connections."],
         ["config", "c", "config.json",
@@ -148,12 +151,26 @@ def makeService(config):
 
     s = MultiService()
 
+    # Setup root service
     site = Site(root)
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
 
+    # Setup admin service
+    if not config_value('mock'):
+        otterAdmin = OtterAdmin(CassAdmin(cassandra_cluster))
+    else:
+        otterAdmin = OtterAdmin()
+
+    admin_site = Site(otterAdmin.app.resource())
+    admin_site.displayTracebacks = False
+
+    admin_service = service(str(config_value('admin')), admin_site)
+    admin_service.setServiceParent(s)
+
+    # Setup scheduler service
     if config_value('scheduler') and not config_value('mock'):
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                              int(config_value('scheduler.interval')),

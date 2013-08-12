@@ -21,12 +21,6 @@ run:
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
 
-admin:
-	twistd -n --logger=otter.log.observer_factory_debug otter-admin-api
-
-mockadmin:
-	twistd -n --logger=otter.log.observer_factory_debug otter-admin-api --mock
-
 env:
 	./scripts/bootstrap-virtualenv.sh
 
