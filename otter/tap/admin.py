@@ -28,10 +28,9 @@ except ImportError:
     GraylogUDPPublisher = None
 
 from otter.rest.admin import OtterAdmin
-from otter.rest.application import set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
-from otter.models.cass import CassScalingGroupCollection
+from otter.models.cass import CassAdmin
 
 from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
@@ -103,8 +102,6 @@ def makeService(config):
             seed_endpoints,
             config_value('cassandra.keyspace'))
 
-        set_store(CassScalingGroupCollection(cassandra_cluster))
-
     cache_ttl = config_value('identity.cache_ttl')
 
     if cache_ttl is None:
@@ -127,7 +124,11 @@ def makeService(config):
 
     s = MultiService()
 
-    otterAdmin = OtterAdmin()
+    if not config_value('mock'):
+        otterAdmin = OtterAdmin(CassAdmin(cassandra_cluster))
+    else:
+        otterAdmin = OtterAdmin()
+
     site = Site(otterAdmin.app.resource())
     site.displayTracebacks = False
 

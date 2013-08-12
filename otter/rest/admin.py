@@ -10,7 +10,7 @@ from klein import Klein
 
 from otter.util import timestamp
 
-from otter.rest.application import get_store
+from otter.models.mock import MockAdmin
 
 
 class OtterAdmin(object):
@@ -19,6 +19,12 @@ class OtterAdmin(object):
     otter.
     """
     app = Klein()
+
+    def __init__(self, store=None):
+        if store is not None:
+            self.store = store
+        else:
+            self.store = MockAdmin()
 
     @app.route('/', methods=['GET'])
     def root(self, request):
@@ -64,7 +70,7 @@ class OtterAdmin(object):
 
             return {'metrics': metrics}
 
-        deferred = get_store().get_metrics(log)
+        deferred = self.store.get_metrics(log)
         deferred.addCallback(format_data)
         deferred.addCallback(json.dumps)
         return deferred

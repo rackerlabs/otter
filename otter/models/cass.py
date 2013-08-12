@@ -9,7 +9,8 @@ from jsonschema import ValidationError
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
+    NoSuchWebhookError, UnrecognizedCapabilityError,
+    IScalingScheduleCollection, IAdmin)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -936,9 +937,19 @@ class CassScalingGroupCollection:
             ('groups', 'policies', 'webhooks'), results)))
         return d
 
+
+@implementer(IAdmin)
+class CassAdmin(object):
+    """
+    .. autointerface:: otter.models.interface.IAdmin
+    """
+
+    def __init__(self, connection):
+        self.connection = connection
+
     def get_metrics(self, log):
         """
-        Return a count of tables from cassandra.
+        see :meth:`otter.models.interface.IAdmin.get_metrics`
         """
 
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
