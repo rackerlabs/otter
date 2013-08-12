@@ -226,3 +226,24 @@ class AutoscaleConfig(ConfigSectionInterface):
         load balancer id from a different region
         """
         return self.get('lb_other_region')
+
+    @property
+    def non_autoscale_username(self):
+        """
+        Test username without autoscale endpoint in its service catalog
+        """
+        return self.get('non_autoscale_username')
+
+    @property
+    def non_autoscale_password(self):
+        """
+        Test password without autoscale endpoint in its service catalog
+        """
+        return self.get('non_autoscale_password')
+
+    @property
+    def non_autoscale_tenant(self):
+        """
+        Test tenant without autoscale endpoint in its service catalog
+        """
+        return self.get('non_autoscale_tenant')
