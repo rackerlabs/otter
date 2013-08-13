@@ -140,12 +140,10 @@ class SchedulerService(TimerService):
         :param log: A bound log for logging
         :return: a deferred with the results of execution
         """
-        tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
-        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
-        log.msg('Executing policy')
-        group = get_store().get_scaling_group(log, , group_id)
+        log.msg('Executing policy', group_id=event['groupId'], policy_id=event['policyId'])
+        group = get_store().get_scaling_group(log, event['tenantId'], event['groupId'])
+        policy_id = event['policyId']
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
-        d.addErrback(ignore_and_log, CannotExecutePolicyError, log, 'Cannot execute policy')
         return d
