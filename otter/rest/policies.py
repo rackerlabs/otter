@@ -304,5 +304,6 @@ def execute_policy(request, log, tenantId, groupId, policyId):
     d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                    log, transaction_id(request),
                                    policy_id=policyId))
+    d.addErrback(ignore_and_log, CannotExecutePolicyError, log, 'Cannot execute policy')
     d.addCallback(lambda _: "{}")  # Return value TBD
     return d

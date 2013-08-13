@@ -10,7 +10,7 @@ from otter import controller
 from otter.json_schema.rest_schemas import create_group_request
 from otter.rest.application import app, get_autoscale_links, get_store, transaction_id
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+                                   with_transaction_id, bind_log)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
@@ -296,6 +296,7 @@ def create_new_scaling_group(request, log, tenantId, data):
         group = get_store().get_scaling_group(log, tenantId, group_id)
         d = group.modify_state(partial(controller.obey_config_change, log,
                                        transaction_id(request), config))
+        # TODO: Ignore CannotExecutePolicyError
         return d.addCallback(lambda _: result)
 
     deferred.addCallback(_do_obey_config_change)
@@ -314,11 +315,12 @@ def create_new_scaling_group(request, log, tenantId, data):
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/', methods=['GET'])
+@app.route('/<string:tenant_id>/groups/<string:scaling_group_id>/', methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
+@bind_log()
+def view_manifest_config_for_scaling_group(request, log, tenant_id, scaling_group_id):
     """
     View manifested view of the scaling group configuration, including the
     launch configuration, and the scaling policies.  This data is returned in
@@ -418,19 +420,20 @@ def view_manifest_config_for_scaling_group(request, log, tenantId, groupId):
         }
     """
     def openstack_formatting(data, uuid):
-        data["links"] = get_autoscale_links(tenantId, uuid)
+        data["links"] = get_autoscale_links(tenant_id, uuid)
 
         policies = []
         for policy_id, policy in data["scalingPolicies"].iteritems():
             policy["id"] = policy_id
-            policy["links"] = get_autoscale_links(tenantId, uuid, policy_id)
+            policy["links"] = get_autoscale_links(tenant_id, uuid, policy_id)
             policies.append(policy)
 
         data["scalingPolicies"] = policies
 
         return {"group": data}
 
-    group = get_store().get_scaling_group(log, tenantId, groupId)
+    log.msg('Manish testing')
+    group = get_store().get_scaling_group(log, tenant_id, scaling_group_id)
     deferred = group.view_manifest()
     deferred.addCallback(openstack_formatting, group.uuid)
     deferred.addCallback(json.dumps)

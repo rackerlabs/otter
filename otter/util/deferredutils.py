@@ -23,3 +23,11 @@ def unwrap_first_error(possible_first_error):
     if possible_first_error.check(defer.FirstError):
         return unwrap_first_error(possible_first_error.value.subFailure)
     return possible_first_error  # not a defer.FirstError
+
+
+def ignore_and_log(failure, exception_type, log, msg):
+    """
+    Ignore the given exception type and log it. This method is to be used as errback handler
+    """
+    failure.trap(exception_type)
+    log.msg(msg, reason=failure)

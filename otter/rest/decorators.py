@@ -101,6 +101,19 @@ def succeeds_with(success_code):
     return decorator
 
 
+def bind_log():
+    """
+    Binds kwargs passed in the function to bound_log
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(request, log, *args, **kwargs):
+            bound_log = log.bind(**kwargs)
+            return f(request, bound_log, *args, **kwargs)
+        return _
+    return decorator
+
+
 def with_transaction_id():
     """
     Generates a request txnid
