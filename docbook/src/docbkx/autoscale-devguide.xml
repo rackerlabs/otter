@@ -85,7 +85,7 @@ format="SVG" scale="60"/>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial public draft of full DevGuide for Early Access
+                            <para>Initial public draft of full developer guide for Early Access
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -114,10 +114,11 @@ format="SVG" scale="60"/>
 <chapter xml:id="Overview">
     <title>Overview</title>
     <para> The &PRODNAME; service responds to events by changing
-      capacity to meet current needs. This ability to change the
-      configuration in response to changing workloads means that you
-      can begin with a minimal cloud configuration and grow only when
-      the cost of that growth is justified. </para>
+      capacity to meet current needs. This ability to change an
+      autoscaling group's configuration in response to changing
+      workloads means that you can begin with a minimal cloud
+      configuration and grow only when the cost of that growth is
+      justified. </para>
     <para> Autoscale is a web service that automatically scales
       resources in response to an increase or decrease in overall
       workload based on user-defined thresholds. You can set up a
@@ -140,13 +141,13 @@ format="SVG" scale="60"/>
     </para>
     <section xml:id="Intended_Audience-d1e166">
         <title>Intended Audience</title>
-        <para>This document is intended for software developers who are
-            interested in developing applications that use the Rackspace
-            Cloud Cloud &PROD; API. To use this API, we assume you have the following
-            skills:</para>
+        <para>This document is intended for software developers who
+        are interested in developing applications that use the
+        Rackspace &PROD; API. To use this API, you need the following
+        skills:</para>
         <itemizedlist>
             <listitem>
-                <para>ReSTful web services</para>
+                <para>RESTful web services</para>
             </listitem>
             <listitem>
                 <para>HTTP/1.1 conventions</para>
