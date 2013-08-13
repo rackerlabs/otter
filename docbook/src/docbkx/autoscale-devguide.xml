@@ -54,6 +54,7 @@ format="SVG" scale="60"/>
 <title>&PRODNAME; Developer Guide</title>
 <titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
 <?rax title.font.size="35px" subtitle.font.size="20px"
+      status.bar.text="Early Access" 
       canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
@@ -105,7 +106,7 @@ format="SVG" scale="60"/>
             </revision>           
         </revhistory>
       <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
-	<raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
+	<raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
