@@ -31,7 +31,10 @@
 	              autoscale-reference.xml
               </includes>
               -->
+              <!-- if <security> specified, build doc for narrow audience such as INTERNAL or REVIEWER;
+                to build doc for all readers, leave this commented out
                 <security>internal</security>
+              -->
             </configuration>
           </execution>
         </executions>
