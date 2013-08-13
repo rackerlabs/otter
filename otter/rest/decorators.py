@@ -101,18 +101,15 @@ def succeeds_with(success_code):
     return decorator
 
 
-def bind_log():
+def bind_log(f):
     """
-    Binds kwargs passed in the function to bound_log
+    Binds keyword arguments to log
     """
-    def decorator(f):
-        @wraps(f)
-        def _(request, log, *args, **kwargs):
-            bound_log = log.bind(**kwargs)
-            return f(request, bound_log, *args, **kwargs)
-        return _
-    return decorator
-
+    @wraps(f)
+    def _(request, log, *args, **kwargs):
+        bound_log = log.bind(**kwargs)
+        return f(request, bound_log, *args, **kwargs)
+    return _
 
 def with_transaction_id():
     """
@@ -133,7 +130,7 @@ def with_transaction_id():
                 referer=request.getHeader("referer"),
                 useragent=request.getHeader("user-agent")
             ).msg("Received request")
-            return f(request, bound_log, *args, **kwargs)
+            return bind_log(f)(request, bound_log, *args, **kwargs)
         return _
     return decorator
 
