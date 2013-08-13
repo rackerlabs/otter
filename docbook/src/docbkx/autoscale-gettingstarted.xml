@@ -55,7 +55,8 @@ format="SVG" scale="60"/>
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Getting Started Guide</title>
 <titleabbrev>&PRODABBV; Intro</titleabbrev>    
-<?rax title.font.size="35px" subtitle.font.size="20px"?
+<?rax title.font.size="35px" subtitle.font.size="20px"
+      status.bar.text="Early Access" 
       canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
@@ -106,7 +107,7 @@ format="SVG" scale="60"/>
                 </revdescription>
             </revision>
         </revhistory>
-        <raxm:metadata>
+        <raxm:metadata role="hidden">
             <raxm:displayname>Getting Started Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>10</raxm:priority>
