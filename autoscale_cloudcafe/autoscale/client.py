@@ -3,6 +3,7 @@ Client objects for all the autoscale api calls
 """
 from autoscale.models.response.autoscale_response import Group,\
     Config, Policy, Webhook, ScalingGroup
+from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import \
     Group_Request, Policy_Request, Webhook_Request, Config_Request, \
     ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request
@@ -23,12 +24,27 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                                                    deserialize_format)
         self.url = url
         self.auth_token = auth_token
-        # self.tenant_id = tenant_id
         self.default_headers['X-Auth-Token'] = auth_token
         self.default_headers['Content-Type'] = 'application/%s' % \
                                                self.serialize_format
         self.default_headers['Accept'] = 'application/%s' % \
                                          self.deserialize_format
+
+    def view_limits(self, url=None, requestslib_kwargs=None):
+        """
+        :summary: Lists the relative and absolute limits for the tenant
+        :return: Response Object containing response code 200 and body with
+                details of autoscaling groups such as id and links
+        :rtype: Response Object
+
+        GET
+        {tenant_id}/limits
+        ({tenant_id}/limits/ results in 404)
+        """
+        url = url or '%s/limits' % (self.url)
+        return self.request('GET', url,
+                            requestslib_kwargs=requestslib_kwargs,
+                            response_entity_type=Limits)
 
     def create_scaling_group(self, gc_name, gc_cooldown, gc_min_entities,
                              lc_name, lc_image_ref, lc_flavor_ref,
@@ -105,7 +121,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=ScalingGroup)
 
-    def list_scaling_groups(self, requestslib_kwargs=None):
+    def list_scaling_groups(self, url=None, requestslib_kwargs=None):
         """
         :summary: Lists IDs and links for all scaling groups
         :return: Response Object containing response code 200 and body with
@@ -116,7 +132,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         {tenant_id}/groups/
         """
 
-        url = '%s/groups/' % (self.url)
+        url = url or '%s/groups/' % (self.url)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Group)

@@ -113,33 +113,30 @@ format="SVG" scale="60"/>
     </info>
 <chapter xml:id="Overview">
     <title>Overview</title>
-    <para>
-        The &PRODNAME; service responds to events by changing capacity to meet current needs.
-        This ability to expand the configuration in response to increased workload 
-        means that you can begin with a minimal cloud configuration and grow only when the cost of that growth is 
-        justified.
-    </para>
-    <para>
-      Autoscale is a Web service that automatically scales resources up and down as a response to an increase or decrease in overall workload based on user-defined thresholds.
-      You can set up a schedule for launching Autoscale or define an event that is triggered by Cloud Monitoring. You can also specify a minimum and maximum number of cloud servers, the amount of resources you want to increase or decrease and the thresholds in Cloud Monitoring that will trigger the scaling activities. 
-      Autoscale requires the following services to work together:
-      <itemizedlist>
+    <para> The &PRODNAME; service responds to events by changing
+      capacity to meet current needs. This ability to change the
+      configuration in response to changing workloads means that you
+      can begin with a minimal cloud configuration and grow only when
+      the cost of that growth is justified. </para>
+    <para> Autoscale is a web service that automatically scales
+      resources in response to an increase or decrease in overall
+      workload based on user-defined thresholds. You can set up a
+      schedule for launching Autoscale or define an event that is
+      triggered by Cloud Monitoring. You can also specify a minimum
+      and maximum number of cloud servers, the amount of resources
+      that you want to increase or decrease, and the thresholds in
+      Cloud Monitoring that trigger the scaling activities. Autoscale
+      requires the following services to work together: <itemizedlist>
         <listitem>
-          <para>
-            Cloud Monitoring
-          </para>
+          <para> Cloud Monitoring </para>
         </listitem>
         <listitem>
-          <para>
-            Cloud Servers
-          </para>
+          <para> Cloud Servers </para>
         </listitem>
         <listitem>
-          <para>
-            Cloud Load Balancers
-          </para>
+          <para> Cloud Load Balancers </para>
         </listitem>
-      </itemizedlist> 
+      </itemizedlist>
     </para>
     <section xml:id="Intended_Audience-d1e166">
         <title>Intended Audience</title>

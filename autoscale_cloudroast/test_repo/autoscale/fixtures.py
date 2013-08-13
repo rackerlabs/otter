@@ -95,6 +95,13 @@ class AutoscaleFixture(BaseTestFixture):
         cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
         cls.max_maxentities = OtterConstants.MAX_MAXENTITIES
         cls.max_cooldown = OtterConstants.MAX_COOLDOWN
+        cls.limit_value_all = OtterConstants.LIMIT_VALUE_ALL
+        cls.limit_unit_all = OtterConstants.LIMIT_UNIT_ALL
+        cls.limit_value_webhook = OtterConstants.LIMIT_VALUE_WEBHOOK
+        cls.limit_unit_webhook = OtterConstants.LIMIT_UNIT_WEBHOOK
+        cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
+        cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
+        cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
 
     def validate_headers(self, headers):
         """

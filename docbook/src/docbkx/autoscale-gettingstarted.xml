@@ -141,7 +141,11 @@ format="SVG" scale="60"/>
             <para>
                 <itemizedlist>
                     <listitem>
-                        <para>Rackspace Cloud account </para>
+                        <para>Rackspace Cloud account. To sign up for
+                            a Rackspace Cloud account, go to the
+                            Rackspace Public Cloud <link
+                                xlink:href="https://cart.rackspace.com/cloud/signup/"
+                                >signup page</link>. </para>
                     </listitem>
                     <listitem>
                         <para>Rackspace username and password
@@ -475,8 +479,7 @@ format="SVG" scale="60"/>
                     APIs or an other Cloud technologies. Visit the
                     Developer Forum at <link
                         xlink:href="https://community.rackspace.com/developers/default"
-                        >https://community.rackspace.com/developers/default</link>.
-                </para>
+                        >https://community.rackspace.com/developers/default</link>. </para>
             </tip>
         </section>
         <section xml:id="Scaling_Policies">
@@ -992,102 +995,100 @@ DELETE /{tenantId}/groups/{groupId}
     <chapter xml:id="F_A_Q">
         <title>Frequently Asked Questions</title>
         <para>Q: How much does the Rackspace Autoscale service cost? </para>
-        <para> A: Autoscale is a free service for Cloud Monitoring
+        <para>A: Autoscale is a free service for Cloud Monitoring
             customers.</para>
-        <para> Q: How do I know that I'm being billed for autoscale
+        <para>Q: How do I know that I'm being billed for Autoscale
             events? </para>
-        <para> A: Autoscale will feature an advanced Audit Log that
+        <para>A: Autoscale will feature an advanced Audit Log that
             tracks when Rackspace takes actions on a user's behalf. </para>
         <para>Q: Can I use Autoscale across data centers? </para>
-        <para> A: No, you will need to create separate scaling groups
+        <para>A: No, you will need to create separate scaling groups
             for different data centers. The policies for these scaling
             groups can be triggered across data centers. </para>
-        <para> Q: How does Autoscale moderate conflicting events? </para>
-        <para> A: Cool down timers are built into the Scaling Group
-            and the individual scaling policies, so that the user can
-            prevent too many servers being created or deleted too
-            quickly. While there still exists the possibility of a
-            scaling group see-sawing, cool downs will allow a customer
-            to temper the churn in events. </para>
-        <para> Q: Can I suspend servers and restore them quickly to
-            the same IP address? </para>
-        <para> A: Autoscale will not suspend and restore servers to
-            the same IP. Servers will be restored to a different IP
+        <para>Q: How does Autoscale moderate conflicting events? </para>
+        <para>A: Cooldown timers are built into the Scaling Group and
+            the individual scaling policies, so that the user can
+            prevent too many servers from being created or deleted too
+            quickly.</para>
+        <para>Q: Can I suspend servers and restore them quickly to the
+            same IP address? </para>
+        <para>A: Autoscale will not suspend and restore servers to the
+            same IP address. Servers will be restored to a different IP
             address.</para>
-        <para> Q: Can I scale up servers in a particular order? (i.e.
+        <para>Q: Can I scale up servers in a particular order? (i.e.
             spinning up a DB server before a web server) </para>
-        <para> A: Autoscale will not handle scaling up servers,
+        <para>A: Autoscale will not handle scaling up servers,
             databases, load balancers, etc... in a particular order.
-            This will be handled by Checkmate and Workflow. </para>
-        <para> Q: Will Autoscalw integrate with image services or
-            other automation services, such as Chef or Puppet? </para>
-        <para> A: Autoscale is service-agnostic and API based, so it
+            This will be handled by Checkmate and Workflow.</para>
+        <para>Q: Will Autoscale integrate with image services or other
+            automation services, such as Chef or Puppet?</para>
+        <para>A: Autoscale is service-agnostic and API based, so it
             will work well with these services but will not explicitly
-            integrate with them. </para>
-        <para> Q: When a server is automatically created it is
-            attached to a load balancer. Is it possible to bring up a
-            server(s) that is not attached to a load balancer? </para>
-        <para> A: Yes, you do not require a load balancer as part of
+            integrate with them.</para>
+        <para>Q: When a server is automatically created it is attached
+            to a load balancer. Is it possible to bring up a server(s)
+            that is not attached to a load balancer? </para>
+        <para>A: Yes, you do not require a load balancer as part of
             the launch configuration, but you will have to configure
             how your servers get requests. </para>
-        <para> Q: Multiple scaling policies can be associated to the
+        <para>Q: Multiple scaling policies can be associated to the
             same scaling group. How is the "correct" policy selected
             when servers are generated? </para>
-        <para> A: The "handle" for each policy is defined by a
+        <para>A: The "handle" for each policy is defined by a
             construct called "webhook" which is a URL endpoint you
             need to call to invoke the policy execution.</para>
-        <para> Q: What is the minimum amount of time you can set a
-            cool down for? </para>
-        <para> A: 5 minutes. </para>
-        <para> Q: What is the maximum limit you can set a cool down
+        <para>Q: What is the minimum amount of time you can set a cool
+            down for? </para>
+        <para>A: 5 minutes. </para>
+        <para>Q: What is the maximum limit you can set a cool down
             for? </para>
-        <para> A: There is no maximum cool down limit. </para>
-        <para> Q: What is a "group"? </para>
+        <para>A: There is no maximum cool down limit. </para>
+        <para>Q: What is a "group"? </para>
         <para>A: It is a construct that contains the configuration for
             spinning up of individual servers and has one or more
             associated policies which describe what actions to take
             when the policy is activated.</para>
-        <para> Q: Do the servers that I'm going to automatically scale
+        <para>Q: Do the servers that I'm going to automatically scale
             up have to be associated with a group? If so, why? </para>
-        <para>A: Yes. Scaling policy is associated with a specific
+        <para>A: Yes. A scaling policy is associated with a specific
             group and we want to "manage" all the scaled up servers
             for health and monitoring in aggregate so they need to be
             a part of the group. </para>
-        <para> Q: The number of servers that can be scaled up with a
+        <para>Q: The number of servers that can be scaled up with a
             group is limited to 25. How can I auto-scale beyond 25
             servers? </para>
-        <para> A: That limitation is for a load balancer. If you need
+        <para>A: That limitation is for a load balancer. If you need
             to auto-scale beyond 25 servers, add more than one
             autoscaling group, each associated with a load balancer
             and if needed create a pyramid of load balancers. </para>
-        <para> Q: Can I create an autoscale group with no servers in
+        <para>Q: Can I create an autoscale group with no servers in
             it? </para>
-        <para> A: Right now, you need at least one server in the
+        <para>A: Right now, you need at least one server in the
             Autoscale group. This is a requirement of the load
             balancer. </para>
-        <para> Q: Are monitoring rules for the entire cluster or can
+        <para>Q: Are monitoring rules for the entire cluster or can
             you specify specific servers in the cluster? </para>
-        <para> A: The checks and alarms will be written and specified
+        <para>A: The checks and alarms will be written and specified
             within the launch configuration and then submitted to the
             newly created entities. There are no specific rules for
             specific servers. </para>
-        <para> Q: Will we drain connections on a node behind a load
+        <para>Q: Will we drain connections on a node behind a load
             balancer as a service (LBaaS) before removing it from a
             pool? </para>
-        <para> A: We remove the server from the load balancer before
-            we send the delete command. At present, we do not drain
+        <para>A: We remove the server from the load balancer before we
+            send the delete command. At present, we do not drain
             connections. But we are working on this. </para>
-        <para> Q: Will we use the default threshold set by monitoring
+        <para>Q: Will we use the default threshold set by monitoring
             as a service (MaaS) for each check to trigger a scale up? </para>
-        <para> A: This threshold will be defined with the alerting
+        <para>A: This threshold will be defined with the alerting
             language in MaaS.</para>
-        <para> Q: Will we be recording the history of a scale for a
+        <para>Q: Will we be recording the history of a scale for a
             customer? </para>
-        <para> A: There will be an audit log that shows scaling
+        <para>A: There will be an audit log that shows scaling
             history, triggers, and user changes. </para>
-        <para> Q: Will there be an easy path for customers to come
-            from other autoscaling products such as Rightscale? </para>
-        <para> A: We won't be able to migrate a users configurations
+        <para>Q: Will there be an easy path for customers to come from
+            other autoscaling products such as Rightscale? </para>
+        <para>A: We won't be able to migrate a users configurations
             from other providers. </para>
     </chapter>
 </book>
