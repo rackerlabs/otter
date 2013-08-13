@@ -387,7 +387,7 @@ format="SVG" scale="60"/>
             <para>
               Authentication tokens are typically valid for 24 hours. 
               Applications should be designed to re-authenticate after 
-              receiving a 401 (Unauthorized) response from a service endpoint. 
+              receiving a <errorcode>401</errorcode> (Unauthorized) response from a service endpoint. 
             </para>
             <note>
               <para>The token's expiration time is formatted
@@ -515,10 +515,6 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
         </calloutlist>
-        <para>Authentication tokens are typically valid for 24
-          hours. Applications should be designed to
-          re-authenticate after receiving a 401
-          (Unauthorized) response from a service endpoint. </para>
       </section>  
     </section>
     <section xml:id="serviceEndpoints">
@@ -534,7 +530,7 @@ format="SVG" scale="60"/>
           Endpoints in LON and SYD will be available soon.
         </para>
       </important>
-      <para>The table below lists the service access/endpoints for
+      <para>The following table lists the service access endpoints for
         &PROD;.</para>
       <?rax-fo keep-with-next?>
       <para>
@@ -576,16 +572,15 @@ format="SVG" scale="60"/>
       </para>
       <para>Replace the sample project ID number,
           <parameter>1234</parameter>, with your actual account
-        number, returned as part of the authentication service
-        response.</para>
+        number.</para>
       <para>You will find your account number after the final '/' in
         the <code>publicURL</code> field returned by the
         authentication response. For example, in <xref
-          linkend="auth-response-example-json"/> you can see from the
-          <code>publicURL</code> field for <code>cloudServers</code>
-          ("https://servers.api.rackspacecloud.com/v1.0/<emphasis
-          role="bold">1100111</emphasis>") that the account number is
-        1100111. </para>
+          linkend="auth-response-example-json"/>,  the
+          <code>publicURL</code> field for <code>autoscale</code>
+          ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
+          role="bold">1100111</emphasis>") shows that the account
+        number is 1100111. </para>
     </section>
     <section xml:id="contractVersion">
       <title>Contract Versions</title>
@@ -594,7 +589,7 @@ format="SVG" scale="60"/>
       <para> The contract version denotes the data model and behavior
         that the API supports. The requested contract version is
         included in all request URLs. Different contract versions of
-        the API may be available at any given time and are not
+        the API might be available at any given time and are not
         guaranteed to be compatible with one another. </para>
       <example>
         <title>Sample Request URL for Contract Version 1.0</title>
@@ -605,15 +600,15 @@ format="SVG" scale="60"/>
       </note>
     </section>
     <section xml:id="Request_Response_Types-d1e903">
-      <title>Request/Response Types</title>
+      <title>Request and Response Types</title>
       <para>The &PRODNAME; API supports JSON data serialization
-        formats. The request format is specified using the
-          <code>Content-Type</code> header and is <emphasis
-          role="italic">required</emphasis> for calls that have a
-        request body. The response format can be specified in requests
-        either by using the <code>Accept</code> header or by adding a
-          <code>.json</code> extension to the request URI. JSON is
-        also used for the response format.</para>
+        formats. You specify the request format by using the
+          <code>Content-Type</code> header. The request format is
+          <emphasis role="italic">required</emphasis> for calls that
+        have a request body. You can specify the response format in
+        requests either by using the <code>Accept</code> header or by
+        adding a <code>.json</code> extension to the request URI. JSON
+        is also used for the response format.</para>
       <table rules="all">
         <caption>Response Format</caption>
         <?dbfo keep-together="always"?>
@@ -644,15 +639,13 @@ format="SVG" scale="60"/>
     <?hard-pagebreak?>
     <section xml:id="Limits-d1e1208">
       <title>Limits</title>
-      <para>
-        All accounts, by default, have a preconfigured set of
-        thresholds (or limits) to manage capacity and prevent
-        abuse of the system.  The system recognizes two kinds
-        of limits: <firstterm>rate limits</firstterm> and
-        <firstterm>absolute limits</firstterm>. Rate limits
-        are thresholds that are reset after a certain amount
-        of time passes. Absolute limits are fixed.
-      </para>
+      <para> All accounts, by default, have a preconfigured set of
+        thresholds (or limits) to manage capacity and prevent abuse of
+        the system. The system recognizes <firstterm>rate
+          limits</firstterm> and <firstterm>absolute
+          limits</firstterm>. Rate limits are thresholds that are
+        reset after a certain amount of time passes. Absolute limits
+        are fixed. </para>
       <section xml:id="Rate_Limits-d1e1222">
         <!-- 
         rate limits are managed by Repose rate limiting filter, 
@@ -660,20 +653,19 @@ format="SVG" scale="60"/>
         -->
         <title>Rate Limits</title>
         <para> Rate limits are specified in terms of both a
-          human-readable wild-card URI and a
-          machine-processable regular expression. The
-          regular expression boundary matcher '^' takes
-          effect after the root URI path. For example, the
-          regular expression ^/v1.0/execute would match
+          human-readable wildcard URI and a machine-processable
+          regular expression. The regular expression boundary matcher
+          '^' takes effect after the root URI path. For example, the
+          regular expression <code>^/v1.0/execute</code> would match
           the bolded portion of the following URI:
-          https://ord.autoscale.api.rackspacecloud.com<emphasis
+            https://ord.autoscale.api.rackspacecloud.com<emphasis
             role="bold">/v1.0/execute</emphasis>. </para>
         <para>
           For any user, all &PROD; operations are limited to 1,000 calls per minute.
         </para>
         <para>In addition, the following table specifies the default rate limits
           for specific &PROD; API operations: </para>
-        <table rules="all">
+        <table rules="all" width="556">
           <caption>Default Rate Limits</caption>
           <thead>
             <tr align="center">
@@ -685,24 +677,24 @@ format="SVG" scale="60"/>
           </thead>
           <tbody>
             <tr>
-              <td colspan="1">&POST; {capability_version}/{capability_hash}</td>
-              <td colspan="2">/v1.0/execute/*</td>
-              <td colspan="2">/v1\\.0/execute/(.*)</td>
-              <td colspan="1">1/second</td>
+              <td colspan="1">&POST;
+                {capability_version}/{capability_hash}</td>
+              <td colspan="2"><code>/v1.0/execute/*</code></td>
+              <td colspan="2"><code>/v1\\.0/execute/(.*)</code></td>
+              <td colspan="1">1 per second</td>
             </tr>
           </tbody>
         </table>
         <para> Rate limits are applied in order relative to the verb,
           going from least to most specific. For example, although the
-          general threshold for operations to /v1/0/* is 1,000 per
-          minute, one cannot &POST; to /v1.0/execute* more than 1 time
-          per second, which is 60 times per minute. </para>
-        <para> If you exceed the thresholds established for
-          your account, a <errorcode>413 (Rate
-            Control)</errorcode> HTTP response will be
-          returned with a <code>Retry-After</code> header to
-          notify the client when it can attempt to try
-          again. </para>
+          general threshold for operations to <code>/v1/0/*</code> is
+          1,000 per minute, one cannot &POST; to
+            <code>/v1.0/execute*</code> more than 1 time per second,
+          which is 60 times per minute. </para>
+        <para> If you exceed the thresholds established for your
+          account, a <errorcode>413</errorcode> (Rate Control) HTTP
+          response is returned with a <code>Retry-After</code> header
+          to notify the client when it can attempt to try again. </para>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
@@ -736,19 +728,21 @@ format="SVG" scale="60"/>
       </section>
     </section>
     <section xml:id="datetimeformat">
-      <title>Date/Time Format</title>
-      <para> 
-        The &PROD; service uses an ISO-8601 compliant date
-        format for the display and consumption of date/time values. 
-        While the standard allows specification of time zones &PROD; does not use time zones. All times are expressed as GMT
-      </para>
-      <para>
-        The two tables below show how this works. The first table identifies the elements of the
-        ISO-8601 standard. The second table shows how a sample time appears when formatted for use by &PROD;
-        in compliance with the ISO-8601 standard.
-      </para>
-      <table rules="all">
-        <caption>Explanation of ISO-8601 Date/Time Format Codes</caption>
+      <title>Date and Time Format</title>
+      <para> The &PROD; service uses an ISO-8601 compliant date format
+        for the display and consumption of date and time values. While
+        the standard allows specification of time zones, &PROD; does
+        not use time zones. All times are expressed as GMT. </para>
+      <para> The following tables show how the date and time format
+        works. The first table identifies the elements of the ISO-8601
+        standard. The second table shows how a sample time appears
+        when formatted for use by &PROD; in compliance with the
+        ISO-8601 standard. </para>
+      <table rules="all" width="566">
+        <caption>Explanation of ISO-8601 Date and Time Format
+          Codes</caption>
+        <col width="14%"/>
+        <col width="86%"/>
         <thead>
           <tr>
             <td>Code</td>
@@ -758,39 +752,39 @@ format="SVG" scale="60"/>
         <tbody>
           <tr>
             <td>yyyy</td>
-            <td>Four digit year</td>
+            <td>Four-digit year</td>
           </tr>
           <tr>
             <td>MM</td>
-            <td>Two digit month</td>
+            <td>Two-digit month</td>
           </tr>
           <tr>
             <td>dd</td>
-            <td>Two digit day of month</td>
+            <td>Two-digit day of month</td>
           </tr>
           <tr>
             <td>T</td>
-            <td>Separator for date/time</td>
+            <td>Separator between date and time</td>
           </tr>
           <tr>
             <td>HH</td>
-            <td>Two digit hour of day (00-23)</td>
+            <td>Two-digit hour of day (00-23)</td>
           </tr>
           <tr>
             <td>mm</td>
-            <td>Two digit minutes of hour</td>
+            <td>Two-digit minutes of hour (00-59)</td>
           </tr>
           <tr>
             <td>ss</td>
-            <td>Two digit seconds of the minute</td>
+            <td>Two-digit seconds of the minute (00-59)</td>
           </tr>
           <tr>
             <td>SSS</td>
-            <td>Three digit milliseconds of the second</td>
+            <td>Three-digit milliseconds of the second</td>
           </tr>
           <tr>
             <td>Z</td>
-            <td>RFC-822 timezone</td>
+            <td>RFC 822 time zone</td>
           </tr>
         </tbody>
       </table>
@@ -814,21 +808,23 @@ format="SVG" scale="60"/>
     </section>
     <section xml:id="removing-servers">
       <title>Removing Servers</title>
-      <para>Servers are removed in reverse order of creation, with an
-        exception for when currently building.</para>
+      <para>Servers are removed in reverse order of creation. However,
+        servers that are in the process of building are not
+        removed.</para>
         </section> 
       <section xml:id="audit-log">
         <title>Audit Log</title>
       <para>Because of the deferred nature of Autoscale, most errors
         occur outside of the user's session. Errors are logged to a
-        user's Cloud Feed as an Audit Log. The Audit log contains all
-        the events that have occurred within a user's Autoscale Group. </para>
+        user's cloud feed as an audit log. The audit log contains all
+        the events that have occurred within a user's scaling group. </para>
         </section> 
       <section xml:id="faults-dle101">
         <title>Faults</title>
       <para>If any &PRODNAME; request results in an error, the service
-        returns an appropriate 4xx or 5xx HTTP status code, as well as
-        the following information in the body: </para>
+        returns an appropriate 4<emphasis role="italic">xx</emphasis>
+        or 5<emphasis role="italic">xx</emphasis> HTTP status code,
+        and the following information in the body: </para>
       <itemizedlist>
         <listitem>
           <para>Title</para>
@@ -843,11 +839,10 @@ format="SVG" scale="60"/>
           <para>Link to more information</para>
         </listitem>
       </itemizedlist>
-      <para>
-        For &PROD; users, common faults are caused by invalid configurations. 
-        For example, trying to boot a server from an image that does not exist causes a fault; 
-        so does trying to attach a load balancer to a scaling group that does not exist. 
-      </para>
+      <para> For &PROD; users, common faults are caused by invalid
+        configurations. For example, trying to boot a server from an
+        image that does not exist causes a fault, as does trying to
+        attach a load balancer to a scaling group that does not exist. </para>
       <para>An example of an error message follows. </para>
       <!-- improve this example to show something that an Autoscale user would really see -->
       <example>
