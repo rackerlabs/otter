@@ -4,13 +4,15 @@
 <!-- -->
 <!-- You can resolve the entites with xmllint -->
 <!-- -->
-<!-- xmllint -noent RAX-AUTH.wadl -->
+<!-- xmllint -noent autoscale.wadl -->
 <!--*******************************************************-->
+<!-- need xmlns:identity to use &commonFaults; &getFaults; &postPutFaults; in METHODS -->
 <!DOCTYPE application [
 <!ENTITY % common SYSTEM "../common/common.ent">
 %common;
 ]>
 <application xmlns="http://wadl.dev.java.net/2009/02"
+    xmlns:identity="http://docs.openstack.org/identity/api/v2.0" 
     xmlns:db="http://docbook.org/ns/docbook"
     xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
     xmlns:wadl="http://wadl.dev.java.net/2009/02"
@@ -129,6 +131,7 @@
                 </doc>
             </representation>
         </response>
+          &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getGroups" name="GET">
@@ -150,6 +153,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults;  
     </method>
 
     <method id="getGroupManifest" name="GET">
@@ -170,6 +174,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="deleteGroup" name="DELETE">
@@ -184,6 +189,7 @@
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getGroupState" name="GET">
@@ -206,6 +212,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="getGroupConfig" name="GET">
@@ -229,6 +236,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putGroupConfig" name="PUT">
@@ -255,6 +263,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getLaunchConfig" name="GET">
@@ -279,6 +288,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults;  
     </method>
 
     <method id="putLaunchConfig" name="PUT">
@@ -306,6 +316,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="pauseGroup" name="POST">
@@ -323,6 +334,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="resumeGroup" name="POST">
@@ -340,6 +352,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getPolicies">
@@ -361,6 +374,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method name="POST" id="createPolicies">
@@ -441,7 +455,7 @@
                 </doc>
             </representation>
         </response>
-        
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getPolicy">
@@ -463,6 +477,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putPolicy" name="PUT">
@@ -486,6 +501,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="deletePolicy" name="DELETE">
@@ -499,6 +515,7 @@
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="executePolicy" name="POST">
@@ -517,6 +534,7 @@
             </representation>
         </request>
         <response status="202"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getWebhooks">
@@ -536,6 +554,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="createWebhook" name="POST">
@@ -564,6 +583,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getWebhook" name="GET">
@@ -584,6 +604,7 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putWebhook" name="PUT">
@@ -607,6 +628,7 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="deleteWebhook" name="DELETE">
@@ -620,6 +642,7 @@
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="anonymousExecute" name="POST">
@@ -635,5 +658,7 @@
             </representation>
         </request>
         <response status="202"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
+
 </application>

@@ -862,7 +862,7 @@ Content-Type: application/json
 }</programlisting>
       </example>
       <para>Error information for each API operation is included with
-        the description of that operation in <xref linkend="apiref"
+        the description of that operation in <xref linkend="API_Operations"
         />.</para>
     </section> 
   </chapter>
