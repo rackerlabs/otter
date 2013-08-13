@@ -111,6 +111,7 @@ def bind_log(f):
         return f(request, bound_log, *args, **kwargs)
     return _
 
+
 def with_transaction_id():
     """
     Generates a request txnid
