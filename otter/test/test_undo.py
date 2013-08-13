@@ -142,3 +142,9 @@ class InMemoryUndoStackTests(TestCase):
         op_d1.errback(DummyOpFailure())
         self.assertEqual(called[0], 1)
         self.failureResultOf(d, DummyOpFailure)
+
+    def test_rewind_empty_stack(self):
+        """
+        rewind completes successfully if the stack is empty.
+        """
+        self.successResultOf(self.undo.rewind())
