@@ -222,11 +222,10 @@ format="SVG" scale="60"/>
     </chapter>
       <chapter xml:id="Gen_API_Info-de01">
     <title>General API Information</title>
-    <para>The &PROD; API is implemented using a ReSTful web service
-            interface. Like other products in the Rackspace Cloud
-            suite, &PROD; shares a common token-based
-            authentication system that allows seamless access between
-            products and services.</para>
+    <para>The &PROD; API is implemented using a RESTful web service
+      interface. Like other products in the Rackspace Cloud suite,
+      &PROD; shares a common token-based authentication system that
+      allows seamless access between products and services.</para>
     <note>
       <para>All requests to authenticate against and operate the
         service are performed using SSL over HTTP (HTTPS) on TCP port
@@ -234,16 +233,16 @@ format="SVG" scale="60"/>
     </note>
     <section xml:id="Authentication-d1e647">
       <title>Authentication</title>
-        <para> Every ReST request for &PROD; requires the
-        inclusion of a specific authorization token, supplied by the
+        <para> Every REST request for &PROD; requires the inclusion of
+        a specific authorization token, supplied by the
           <code>X-Auth-Token</code> HTTP header. Customers obtain this
-        token by first using the Rackspace Cloud Identity
-        Service and supplying a valid username and API access key. </para>
+        token by first using the Rackspace Cloud Identity service and
+        supplying a valid user name and API access key. </para>
       <section xml:id="Geographic_Endpoints">
         <title>Geographic Endpoints</title>
-        <para> The Rackspace Cloud Identity Service
-          serves as the entry point to all Rackspace Cloud
-          APIs and is itself a ReSTful web service. </para>
+        <para> The Rackspace Cloud Identity service serves as the
+          entry point to all Rackspace Cloud APIs and is itself a
+          RESTful web service. </para>
         <para> You can use either of the following endpoints
           to access the Identity Service, regardless
           of US or UK identities: </para>
@@ -258,10 +257,10 @@ format="SVG" scale="60"/>
               >&ENDPOINT-UK-20;</link></para>
           </listitem>
         </itemizedlist>
-        <para> Your account may be based in either the US or
-          the UK; this is not determined by your physical
-          location but by the location of the Rackspace
-          retail site which was used to create your account: </para>
+        <para> Your account might be based in either the US or the UK.
+          This is not determined by your physical location but by the
+          location of the Rackspace retail site that was used to
+          create your account: </para>
         <itemizedlist spacing="compact">
           <listitem>
             <para> If your account was created via <link
@@ -279,7 +278,18 @@ format="SVG" scale="60"/>
       </section>
       <section xml:id="Retrieving_Auth_Token">
         <title>Retrieving the Authentication Token</title>
-        <informaltable rules="all">
+        <para> The authenticate operation provides clients with an
+          authentication token and a list of regional cloud endpoints.
+          The sample requests and responses in this section illustrate
+          a general case. In your authentication request, use your own
+          credentials rather than the sample values shown for
+          <code>username</code> and <code>apiKey</code>. When you
+          authenticate successfully, the response to your
+          authentication request includes a catalog of the
+          services to which you have subscribed rather than the sample
+          values shown. </para> 
+        <table rules="all">
+          <caption>Request for Authentication Token</caption>
           <tbody>
             <tr>
               <td colspan="1">&POST; </td>
@@ -288,7 +298,7 @@ format="SVG" scale="60"/>
                 token and a service catalog. </td>
             </tr>
           </tbody>
-        </informaltable>
+        </table>
         <simpara> Normal Response Code(s):
           <returnvalue>200</returnvalue>,
           <returnvalue>203</returnvalue>
@@ -299,16 +309,7 @@ format="SVG" scale="60"/>
           (<errorcode>400</errorcode>), authFault
           (<errorcode>500</errorcode>),
           serviceUnavailable (<errorcode>503</errorcode>) </simpara>
-        <para> The authenticate operation provides clients with an
-          authentication token and a list of regional cloud endpoints.
-          The sample requests and responses in this section illustrate
-          a general case. In your authentication request, use your own
-          credentials rather than the sample values shown here for
-            <code>username</code> and <code>apiKey</code>. When you
-          authenticate successfully, the response to your
-          authentication request will include a catalog of the
-          services to which you have subscribed rather than the sample
-          values shown here. </para>  
+ 
         <example>
           <title>Authentication Request for US Endpoint: JSON</title>
           <programlistingco>
@@ -325,18 +326,16 @@ format="SVG" scale="60"/>
         </example>
         <calloutlist>
           <callout arearefs="credentials.json.user">
-            <para> The username supplied here is your
-              common Rackspace Cloud username. </para>
+            <para> The <code>username</code> supplied here is your
+              common Rackspace Cloud user name. </para>
           </callout>
           <callout arearefs="credentials.json.key">
-            <para> The key is your API access key. The key
-              can be obtained from the Rackspace Cloud
-              Control Panel in the <guimenu>&lt;Your
+            <para> The key is your API access key. You can obtain the
+              key from the <link
+                xlink:href="http://mycloud.rackspace.com/">Rackspace
+                Cloud Control Panel</link> in the <guimenu>&lt;Your
                 Account></guimenu>/<guimenuitem>API
-                  Access</guimenuitem> section (login
-              here: <link
-                xlink:href="http://mycloud.rackspace.com/"
-                >Control Panel Login</link>). </para>
+                Access</guimenuitem> section. </para>
           </callout>
         </calloutlist>
         
@@ -367,77 +366,80 @@ format="SVG" scale="60"/>
         </example>
         <note>
           <para>The information shown in the authentication response
-            example is for US-based accounts. If you
-            authenticate against the UK endpoint,
-            you will see the service catalog information
-            for UK-based accounts.</para>
+            example is for US-based accounts. If you authenticate
+            against the UK endpoint, the response you receive shows
+            the service catalog information for UK-based
+            accounts.</para>
         </note>
         <calloutlist>
           <callout arearefs="response.json.token">
-            <para> This token can be presented to a service as evidence of authentication.
-              Tokens are valid for a finite duration; a token's default lifespan is twenty-four hours.
+            <para> This token can be presented to a service as
+              evidence of authentication. Tokens are valid for a
+              finite duration; a token's default lifespan is 24 hours. </para>
+            <para> The token's <code>expires</code> attribute denotes
+              the time after which the token automatically becomes
+              invalid. A token can be manually revoked before the time
+              identified by the <code>expires</code> attribute.
+                The<code>expires</code> attribute predicts a token's
+              maximum possible lifespan but does not guarantee that it
+              will reach that lifespan. Clients are encouraged to
+              cache a token until it expires. </para>
+            <para>
+              Authentication tokens are typically valid for 24 hours. 
+              Applications should be designed to re-authenticate after 
+              receiving a 401 (Unauthorized) response from a service endpoint. 
             </para>
-            <para> The token's <code>expires</code> attribute denotes the time
-              after which the token will automatically become
-              invalid. A token may be manually revoked before
-              the time identified by the <code>expires</code>
-              attribute; <code>expires</code> predicts a token's
-              maximum possible lifespan but does not guarantee
-              that it will reach that lifespan. Clients are
-              encouraged to cache a token until it expires. </para>
             <note>
-              <para>The token's expiration time is
-                formatted differently in the US and
-                UK. These response examples show the
-                US format. For examples of the UK
-                format please refer to <link
+              <para>The token's expiration time is formatted
+                differently in the US and UK. These response examples
+                show the US format. For examples of the UK format, see
+                  <link
                   xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html"
                   >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_authenticate_v2.0_tokens_.html</link>.</para>
             </note>
             <para> </para>
           </callout>
           <callout arearefs="response.json.dfltregion">
-            <para> Users can be assigned a default region so that, when there is a
-              choice between multiple endpoints associated with a service in the
-              user's catalog, the endpoint for the user's default region will be
-              selected if it is available. In this example, the user's default
-              region is DFW and several of the services in the user's catalog
-              offer endpoints in that region and the ORD region; this user's work
-              will be directed to the DFW region whenever possible.
-            </para>
+            <para> Users can be assigned a default region. If multiple
+              endpoints are associated with a service in the user's
+              catalog, the endpoint for the user's default region is
+              selected if it is available. In this example, the user's
+              default region is DFW, and several of the services in
+              the user's catalog offer endpoints in that region and
+              the ORD region; whenever possible, the user's work is directed to the
+              DFW region. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.role">
-            <para> Users can be assigned multiple roles,
-              with each role providing specific
-              privileges. In this example,
-              <code>jsmith</code> is the
-              administrative user for the account,
-              holding the fully-privileged
-              <code>identity:admin</code> role.
-              Other users might hold other roles with
-              different privileges. Roles need not be
-              associated with actual job functions such
-              as Administrator, Operator, Developer,
-              Tester, or Trainer. </para>
+            <para> Users can be assigned multiple roles, with each
+              role providing specific privileges. In this example,
+                <code>jsmith</code> is the administrative user for the
+              account and holds the fully-privileged
+                <code>identity:admin</code> role. Other users might
+              hold other roles with different privileges. Roles are
+              not necessarily associated with actual job functions
+              such as Administrator, Operator, Developer, Tester, or
+              Trainer. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.catalog">
             <para> The service catalog lists the services this user
               can access. In this example, the user can access one
-              database service, one loadbalancing service, one compute
-              service (Cloud Servers OpenStack), one object storage
-              service (Cloud Files), one monitoring service (Cloud
-              Monitoring), one autoscale service (&PRODNAME;) and one DNS service.
-              The catalog listing for each service provides at least
-              one endpoint URL for that service. Other information,
-              such as regions, versions, and tenants, is provided if
-              it is relevant to this user's access to this service. </para>
+              database service, one load-balancing service, one
+              compute service (Cloud Servers OpenStack), one object
+              storage service (Cloud Files), one monitoring service
+              (Cloud Monitoring), one autoscale service (&PRODNAME;),
+              and one DNS service. The catalog entry for each service
+              provides at least one endpoint URL for that service.
+              Other information, such as regions, versions, and
+              tenants, is provided if it is relevant to a user's
+              access to a service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-lb">
-            <para> This service catalog entry describes a load
-              balancing service. To use &PRODNAME;, you must have access to a load balancing service. </para>
+            <para> This service catalog entry describes a
+              load-balancing service. To use &PRODNAME;, you must have
+              access to a load-balancing service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-compute">
@@ -453,66 +455,62 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.tenant">
-            <para> Some services recognize specification of a tenant. If a
-              service does recognize tenants, the format of the
-              tenant specification is defined only by the
-              service; for details about whether and how to
-              specify a tenant, check the documentation for the
-              service you are using.</para>
+            <para> Some services recognize the specification of a
+              tenant. If a service does recognize tenants, the format
+              of the tenant specification is defined only by the
+              service. For details about whether and how to specify a
+              tenant, check the documentation for the service that you
+              are using.</para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.url">
-            <para>
-              An endpoint can be assigned public and internal URLs. A
-              public URL is accessible from anywhere. Access to a public
-              URL usually incurs traffic charges. Internal URLs are only
-              accessible to services within the same region. Access to
-              an internal URL is free of charge.
-            </para>
+            <para> An endpoint can be assigned public and internal
+              URLs. A public URL is accessible from anywhere. Access
+              to a public URL usually incurs traffic charges. Internal
+              URLs are accessible only to services within the same
+              region. Access to an internal URL is free of charge. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.region">
-            <para> A service may expose endpoints in different regions.
-              Regional endpoints allow clients to provision
-              resources in a manner that provides high
-              availability. </para>
-            <para> Some services are not region-specific. These services supply a single
-              non-regional endpoint and do not provide access to internal URLs. </para>
+            <para> A service can expose endpoints in different
+              regions. Regional endpoints allow clients to provision
+              resources in a manner that provides high availability. </para>
+            <para> Some services are not region specific. These
+              services supply a single, non-regional endpoint and do
+              not provide access to internal URLs. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicename">
-            <para>
-              The service name attribute identifies each unique service in the catalog.
-              Once a service is created, its name does not change. However, new services of the same service type may be added to the catalog with new names.
-            </para>
+            <para> The service name attribute identifies each unique
+              service in the catalog. After a service is created, its
+              name does not change. However, new services of the same
+              service type can be added to the catalog with new names. </para>
             <important>
               <para> If you are programmatically parsing an
                 authentication response, use service type rather than
-                service name as the basis for determining whether a
-                user has access to a particular kind of service.
-                Service type is stable across all releases; new
-                service types may be developed, but existing service
-                types are not renamed. It it possible to subscribe to
-                multiple services of the same type. Whatever those
-                services are named, you can always recognize them by
-                parsing for service type in the authentication
-                response's service catalog. </para>
+                service name to determine whether a user has access to
+                a particular kind of service. Service type is stable
+                across all releases. New service types might be
+                developed, but existing service types are not renamed.
+                It is possible to subscribe to multiple services of
+                the same type. Whatever those services are named, you
+                can always recognize them by parsing for service type
+                in the authentication response's service catalog. </para>
             </important>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicetype">
             <para> The service type attribute identifies services that
-              perform similar functions, whatever those services might
-              be named. In this example, the service named
-              cloudServersOpenstack is identified as
-                <code>type="compute"</code>, indicating that it is a
-              compute service even though the word "compute" does not
-              appear in its name. </para>
+              perform similar functions, regardless of service names.
+              In this example, the service named cloudFiles is
+              identified as <code>type="store"</code>, indicating that
+              it is a storage service even though the word "storage"
+              does not appear in its name. </para>
             <important>
-              <para>Use service type as the primary value for
-                locating a service. If multiple endpoints of the
-                same service type exist in the same region, use
-                service name as the tiebreaker.</para>
+              <para>Use service type as the primary value for locating
+                a service. If multiple endpoints of the same service
+                type exist in the same region, use service name to
+                locate the appropriate service.</para>
             </important>
             <para> </para>
           </callout>
@@ -524,7 +522,7 @@ format="SVG" scale="60"/>
       </section>  
     </section>
     <section xml:id="serviceEndpoints">
-      <title>Service Access/Endpoints</title>
+      <title>Service Access Endpoints</title>
       <para/>
       <para>&PRODNAME; is a regionalized service. The user of the
         service is therefore responsible for appropriate replication,
