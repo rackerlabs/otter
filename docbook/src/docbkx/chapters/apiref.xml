@@ -5,11 +5,15 @@
 <!ENTITY PROD "Autoscale">               <!-- in body -->
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook"
-         xml:id="apiref"
+         xml:id="API_Operations"
          role="api-reference">
-   <title>API Reference</title>
+   <title>API Operations</title>
+   <para>The operations described in this chapter allow developers to 
+      manage groups, configurations, policies, executions, and webhooks. </para>
    <section xml:id="Groups">
       <title>Groups</title>
+      <para>The operations described in this chapter allow developers to 
+         manage groups. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#groups"/>
          <resource href="../../wadl/autoscale.wadl#group"/>
@@ -20,6 +24,8 @@
    </section>
    <section xml:id="Configurations">
       <title>Configurations</title>
+      <para>The operations described in this chapter allow developers to 
+         manage configurations. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#group_config"/>
          <resource href="../../wadl/autoscale.wadl#launch_configuration"/>
@@ -27,6 +33,8 @@
    </section>
    <section xml:id="Policies">
       <title>Policies</title>
+      <para>The operations described in this chapter allow developers to 
+         manage policies. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#policies"/>
          <resource href="../../wadl/autoscale.wadl#policy"/>
@@ -35,12 +43,16 @@
    </section>
    <section xml:id="Executions">
       <title>Executions</title>
+      <para>The operations described in this chapter allow developers to 
+         manage executions. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#anonymous_execute_webhook"/>
       </resources>
    </section>
    <section xml:id="Webhooks">
       <title>Webhooks</title>
+      <para>The operations described in this chapter allow developers to 
+         manage webhooks. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
          <resource href="../../wadl/autoscale.wadl#webhook"/>
       </resources>
