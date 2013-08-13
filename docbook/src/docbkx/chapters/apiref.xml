@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book [
-<!ENTITY PRODNAME "Rackspace Autoscale"> <!-- in PDF: for line 1 on the cover page -->
-<!ENTITY PRODABBV "Rackspace Autoscale"> <!-- in PDF: for page headers -->
-<!ENTITY PROD "Autoscale">               <!-- in body -->
+<!ENTITY PRODNAME "Rackspace Auto Scale"> <!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODABBV "Rackspace Auto Scale"> <!-- in PDF: for page headers -->
+<!ENTITY PROD "Auto Scale">               <!-- in body -->
 ]>
 <chapter xmlns="http://docbook.org/ns/docbook"
          xml:id="API_Operations"
