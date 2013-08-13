@@ -172,41 +172,41 @@ format="SVG" scale="60"/>
     <!-- -->
     <section xml:id="API_Contract_Changes-d1e363">
         <title>API Contract Changes</title>
-        <para>The API contract is not locked and may change during the
-            Early Access Program.</para>
-        <para>Rackspace will notify customers in Release Notes when and
-            if the contract does change.</para>
+        <para>The API contract is not locked and might change during
+        the Early Access period.</para>
+        <para>Rackspace will notify customers in release notes when
+        and if the contract changes.</para>
     </section>
     <section xml:id="Pricing_SLA-d1e1362">
         <title>Pricing and Service Level</title>
-        <para>For the Early Access period, your use of &PRODNAME; is not billed.
-            However, &PRODNAME; relies on other services which are part of the Rackspace Cloud;
-            your use of those services 
-            through the API will be billed as per the pricing schedule published for each service:
-            <itemizedlist>
-                <listitem>
-                    <para>For Rackspace Next Gen Cloud Servers, pricing is published at 
-                        <link
-                            xlink:href="http://www.rackspace.com/cloud/servers/#pricing"
-                            >http://www.rackspace.com/cloud/servers/#pricing</link>.
-                    </para>
-                </listitem>
-                <listitem>
-                    <para>For Rackspace Cloud Load Balancers, pricing is published at 
-                        <link
-                            xlink:href="http://www.rackspace.com/cloud/load-balancing/pricing/"
-                            >http://www.rackspace.com/cloud/load-balancing/pricing/</link>.
-                    </para>
-                </listitem>
-                <listitem>
-                    <para>For Rackspace Cloud Monitoring, pricing is published at 
-                        <link
-                            xlink:href="http://www.rackspace.com/cloud/monitoring/pricing/"
-                            >http://www.rackspace.com/cloud/monitoring/pricing/</link>.
-                    </para>
-                </listitem>
-            </itemizedlist>
-        </para>
+        <para>For the Early Access period, your use of &PRODNAME; is
+        not billed. However, &PRODNAME; relies on other services that
+        are part of the Rackspace Cloud; your use of those services
+        through the API will be billed as per the pricing schedule
+        published for each service: <itemizedlist>
+          <listitem>
+            <para>For Rackspace Next Gen Cloud Servers, pricing is
+              published at <link
+                xlink:href="http://www.rackspace.com/cloud/servers/#pricing"
+                >http://www.rackspace.com/cloud/servers/#pricing</link>.
+            </para>
+          </listitem>
+          <listitem>
+            <para>For Rackspace Cloud Load Balancers, pricing is
+              published at <link
+                xlink:href="http://www.rackspace.com/cloud/load-balancing/pricing/"
+                >http://www.rackspace.com/cloud/load-balancing/pricing/</link>.
+            </para>
+          </listitem>
+          <listitem>
+            <para>For Rackspace Cloud Monitoring, pricing is published
+              at <link
+                xlink:href="http://www.rackspace.com/cloud/monitoring/pricing/"
+                >http://www.rackspace.com/cloud/monitoring/pricing/</link>.
+            </para>
+          </listitem>
+        </itemizedlist>
+      </para>
         <para>For the Early Access period, there is no Service Level Agreement (SLA) for &PRODNAME;. </para>
     </section>
     </chapter>
