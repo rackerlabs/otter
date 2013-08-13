@@ -66,7 +66,7 @@ class SchedulerTestCase(TestCase):
 
         self.mock_log = mock.MagicMock()
 
-        self.mock_controller = patch(self, 'otter.scheduler.controller')
+        self.maybe_exec_policy = patch(self, 'otter.scheduler.maybe_execute_scaling_policy')
 
         def _mock_with_lock(lock, func, *args, **kwargs):
             return defer.maybeDeferred(func, *args, **kwargs)
@@ -102,7 +102,7 @@ class SchedulerTestCase(TestCase):
         self.assertEqual(self.mock_group.modify_state.call_count, num_events)
         self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
                          [mock.call(mock.ANY, e['tenantId'], e['groupId']) for e in events])
-        self.assertEqual(self.mock_controller.maybe_execute_scaling_policy.mock_calls,
+        self.assertEqual(self.maybe_exec_policy.mock_calls,
                          [mock.call(mock.ANY, 'transaction-id', self.mock_group,
                           self.mock_state, policy_id=event['policyId']) for event in events])
 
@@ -236,7 +236,8 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
-        self.log.msg.assert_called_once_with("Couldn't get lock to process events")
+        self.log.msg.assert_called_once_with("Couldn't get lock to process events",
+                                             reason=mock.ANY)
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
@@ -268,7 +269,8 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
-        self.log.msg.assert_called_once_with("Couldn't get lock to process events")
+        self.log.msg.assert_called_once_with("Couldn't get lock to process events",
+                                             reason=mock.ANY)
 
     def test_cron_updates(self):
         """
