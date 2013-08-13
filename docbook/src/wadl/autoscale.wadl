@@ -28,16 +28,22 @@
 
             <!-- GROUPS resource -->
             <resource id="tenantid" path="/{tenantId}">
-                <param name="tenantId" type="xsd:string" required="true" style="template"/>
+                <param name="tenantId" type="xsd:string" required="true" style="template">
+                    <doc>A subscriber to the autoscaling service</doc>
+                </param>
                 <resource id="groups" path="/groups">
-                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true"/>
+                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
+                        <doc>A valid authentication token</doc>
+                    </param>
 
                     <method href="#getGroups"/>
                     <method href="#createGroup"/>
 
                     <resource id="group" path="/{groupId}">
 
-                        <param name="groupId" type="osapi:UUID" required="true" style="template"/>
+                        <param name="groupId" type="osapi:UUID" required="true" style="template">
+                            <doc>A scaling group</doc>
+                        </param>
                         <method href="#getGroupManifest"/>
                         <method href="#deleteGroup"/>
 
@@ -67,7 +73,9 @@
                             <method href="#createPolicies"/>
 
                             <resource id="policy" path="/{policyId}">
-                                <param name="policyId" type="osapi:UUID" required="true" style="template"/>
+                                <param name="policyId" type="osapi:UUID" required="true" style="template">
+                                    <doc>A scaling policy</doc>
+                                </param>
                                 <method href="#getPolicy"/>
                                 <method href="#putPolicy"/>
                                 <method href="#deletePolicy"/>
@@ -80,7 +88,9 @@
                                     <method href="#getWebhooks"/>
                                     <method href="#createWebhook"/>
                                     <resource id="webhook" path="/{webhookId}">
-                                        <param name="webhookId" type="osapi:UUID" required="true" style="template"/>
+                                        <param name="webhookId" type="osapi:UUID" required="true" style="template">
+                                            <doc>A webhook</doc>
+                                        </param>
                                         <method href="#getWebhook"/>
                                         <method href="#putWebhook"/>
                                         <method href="#deleteWebhook"/>
@@ -123,8 +133,10 @@
             </representation>
         </request>
         <response status="201">
-            <param name="Location" style="header"
-                   required="true" type="xsd:anyURI"/>
+            <param name="location" style="header"
+                   required="true" type="xsd:anyURI">
+            <doc>An autoscaling endpoint</doc>
+            </param>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/resCreateGroup.json"/>
