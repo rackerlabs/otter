@@ -130,7 +130,7 @@ def maybe_execute_scaling_policy(
 
     :raises: :class:`NoSuchScalingGroupError` if this scaling group does not exist
     :raises: :class:`NoSuchPolicyError` if the policy id does not exist
-    :raises: :class:`CannotExecutePolicyError` if the policy cannot be executed
+    :raises: :class:`CannotExecutePolicyException` if the policy cannot be executed
 
     :raises: Some exception about why you don't want to execute the policy. This
         Exception should also have an audit log id
@@ -166,7 +166,10 @@ def maybe_execute_scaling_policy(
             execute_bound_log = bound_log.bind(server_delta=delta)
             if delta == 0:
                 execute_bound_log.msg("cooldowns checked, no change in servers")
-                return
+                error_msg = "No change in servers"
+                raise CannotExecutePolicyError(scaling_group.tenant_id,
+                                               scaling_group.uuid, policy_id,
+                                               error_msg)
             elif delta > 0:
                 execute_bound_log.msg("cooldowns checked, executing launch configs")
                 d = execute_launch_config(execute_bound_log, transaction_id, state,
