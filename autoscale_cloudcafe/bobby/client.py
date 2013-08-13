@@ -198,7 +198,7 @@ class BobbyAPIClient(AutoMarshallingRestClient):
                             response_entity_type=Policies)
 
     def create_groups_policies(self, group_id, entity_id, policy_id,
-                               alarm_template, check_temaplate,
+                               alarm_id, check_id,
                                requestslib_kwargs=None):
         """
         :summary: Create a policy object.
@@ -218,8 +218,8 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         url = '{0}/groups/{1}/policies'.format(self.url, group_id)
         group_policy = BobbyPolicies_Request(entity_id=entity_id,
                                              policy_id=policy_id,
-                                             alarm_template=alarm_template,
-                                             check_template=check_temaplate)
+                                             alarm_id=alarm_id,
+                                             check_id=check_id)
         return self.request('POST', url,
                             request_entity=group_policy,
                             requestslib_kwargs=requestslib_kwargs,
