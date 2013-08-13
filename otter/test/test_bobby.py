@@ -10,8 +10,6 @@ from twisted.internet.defer import succeed
 
 from otter.bobby import BobbyClient
 
-from otter.test.utils import patch
-
 
 class BobbyTests(TestCase):
     """
@@ -21,9 +19,9 @@ class BobbyTests(TestCase):
         """
         set up test dependencies for Bobby.
         """
-        self.treq = patch(self, 'otter.bobby.treq')
+        self.treq = mock.Mock()
 
-        self.client = BobbyClient('url')
+        self.client = BobbyClient('url', self.treq)
 
     def test_create_policy(self):
         """

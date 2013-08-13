@@ -19,7 +19,6 @@ This is the utility stuff for working with Bobby.
 
 """
 
-import treq
 import json
 
 from otter.util.http import (append_segments, check_success,
@@ -31,13 +30,17 @@ class BobbyClient(object):
     Client for Bobby
     """
 
-    def __init__(self, server_endpoint):
+    def __init__(self, server_endpoint, treq_client=None):
         """
         Create a Bobby Client
 
         :param server_endpoint: Endpoint to use
         """
         self.server_endpoint = server_endpoint
+        self.treq_client = treq_client
+        if self.treq_client is None:
+            import treq
+            self.treq_client = treq
 
     def create_policy(self, tenant_id, group_id, policy_id, check_template, alarm_template):
         """
@@ -64,11 +67,12 @@ class BobbyClient(object):
             'checkTemplate': check_template,
             'policyId': policy_id
         }
-        d = treq.post(append_segments(self.server_endpoint, tenant_id, 'groups', group_id, 'policies'),
-                      data=json.dumps(payload))
+        d = self.treq_client.post(append_segments(self.server_endpoint, tenant_id, 'groups',
+                                                  group_id, 'policies'),
+                                  data=json.dumps(payload))
         d.addCallback(check_success, [201])
         d.addErrback(wrap_request_error, self.server_endpoint, 'create_policy')
-        return d.addCallback(treq.json_content)
+        return d.addCallback(self.treq_client.json_content)
 
     def create_server(self, tenant_id, group_id, server_id):
         """
@@ -90,11 +94,12 @@ class BobbyClient(object):
             'serverId': server_id,
             'entityId': 'Damnit, Bobby'  # Bobby is going to create the entity ID.
         }
-        d = treq.post(append_segments(self.server_endpoint, tenant_id, 'groups', group_id, 'servers'),
-                      data=json.dumps(payload))
+        d = self.treq_client.post(append_segments(self.server_endpoint, tenant_id, 'groups',
+                                                  group_id, 'servers'),
+                                  data=json.dumps(payload))
         d.addCallback(check_success, [201])
         d.addErrback(wrap_request_error, self.server_endpoint, 'create_server')
-        return d.addCallback(treq.json_content)
+        return d.addCallback(self.treq_client.json_content)
 
     def create_group(self, tenant_id, group_id):
         """
@@ -114,8 +119,9 @@ class BobbyClient(object):
             'notification': 'Damnit, Bobby',  # these shouldn't be passed to Bobby
             'notificationPlan': 'Damnit, Bobby'
         }
-        d = treq.post(append_segments(self.server_endpoint, tenant_id, 'groups'),
-                      data=json.dumps(payload))
+        d = self.treq_client.post(append_segments(self.server_endpoint,
+                                                  tenant_id, 'groups'),
+                                  data=json.dumps(payload))
         d.addCallback(check_success, [201])
         d.addErrback(wrap_request_error, self.server_endpoint, 'create_group')
-        return d.addCallback(treq.json_content)
+        return d.addCallback(self.treq_client.json_content)
