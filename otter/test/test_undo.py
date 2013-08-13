@@ -119,7 +119,7 @@ class InMemoryUndoStackTests(TestCase):
 
     def test_rewind_stops_on_error(self):
         """
-        rewind should errback it's completion deferred when it encounters an
+        rewind errbacks it's completion deferred when it encounters an
         error.
         """
         called = [0]
