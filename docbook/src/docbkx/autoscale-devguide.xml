@@ -11,9 +11,9 @@
 <!ENTITY POST   '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
 <!ENTITY DELETE '<command xmlns="http://docbook.org/ns/docbook">DELETE</command>'>
 
-<!ENTITY PRODNAME "Rackspace Autoscale"> <!-- in PDF: for line 1 on the cover page -->
-<!ENTITY PRODABBV "Rackspace Autoscale"> <!-- in PDF: for page headers -->
-<!ENTITY PROD "Autoscale">               <!-- in body -->
+<!ENTITY PRODNAME "Rackspace Auto Scale"> <!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODABBV "Rackspace Auto Scale"> <!-- in PDF: for page headers -->
+<!ENTITY PROD "Auto Scale">               <!-- in body -->
 
 <!-- changing authentication endpoints; define entities for US & UK rather than maintaining in text -->
 <!ENTITY ENDPOINT-US "https://identity.api.rackspacecloud.com/v1.1/">

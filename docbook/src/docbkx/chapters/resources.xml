@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section [
 <!-- in PDF: for line 1 on the cover page -->
-<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!ENTITY PRODNAME "Rackspace Auto Scale"> 
 <!-- in PDF: for page headers -->
-<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!ENTITY PRODABBV "Rackspace Auto Scale"> 
 <!-- in body -->
-<!ENTITY PROD "Autoscale">               
+<!ENTITY PROD "Auto Scale">               
 ]>
 <section 
     xmlns="http://docbook.org/ns/docbook"
