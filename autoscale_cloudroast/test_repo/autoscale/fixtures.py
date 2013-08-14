@@ -98,6 +98,13 @@ class AutoscaleFixture(BaseTestFixture):
         cls.max_groups = OtterConstants.MAX_GROUPS
         cls.max_policies = OtterConstants.MAX_POLICIES
         cls.max_webhooks = OtterConstants.MAX_WEBHOOKS
+        cls.limit_value_all = OtterConstants.LIMIT_VALUE_ALL
+        cls.limit_unit_all = OtterConstants.LIMIT_UNIT_ALL
+        cls.limit_value_webhook = OtterConstants.LIMIT_VALUE_WEBHOOK
+        cls.limit_unit_webhook = OtterConstants.LIMIT_UNIT_WEBHOOK
+        cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
+        cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
+        cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
 
     def validate_headers(self, headers):
         """
