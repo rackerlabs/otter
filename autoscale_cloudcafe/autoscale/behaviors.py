@@ -111,7 +111,7 @@ class AutoscaleBehaviors(BaseBehavior):
             name=sp_name, cooldown=sp_cooldown,
             change=sp_change, policy_type=sp_policy_type)
         policy = AutoscaleBehaviors.get_policy_properties(
-            self, create_response.entity)
+            self, create_response.entity, create_response.status_code)
         return policy
 
     def create_policy_given(self, group_id, sp_name=None, sp_cooldown=None,

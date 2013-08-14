@@ -49,8 +49,8 @@ class LaunchConfigTest(AutoscaleFixture):
     def test_system_update_launchconfig_scale_down(self):
         """
         Create a scaling group with a scale up and scale down policy. Execute the scale up
-        policy, update launch config. Then executing the scale down policy deletes servers
-        with older launch config
+        policy, update launch config. Then executing a scale down policy, deletes the oldest
+        server first. (note: there are no servers with latest config on the group)
         """
         minentities = 1
         group = self._create_group(minentities=minentities, policy=True)
@@ -133,10 +133,7 @@ class LaunchConfigTest(AutoscaleFixture):
         Server name is appended by random characters and metadata of servers includes the group id,
         for servers created by autoscale.
         """
-        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=self.gc_min_entities_alt)
-        group = create_group_response.entity
-        self.resources.add(group, self.empty_scaling_group)
+        group = self._create_group(minentities=self.gc_min_entities_alt)
         active_servers_list = self.check_for_expected_number_of_building_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)

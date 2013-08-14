@@ -117,31 +117,21 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
-    def empty_scaling_group(self, group, dont_delete=None):
+    def empty_scaling_group(self, group, delete=True):
         """
         Given the group, updates the group to be of 0 minentities and maxentities.
+        If delete is set to True, the scaling group is deleted.
         """
         servers_on_group = (self.autoscale_client.list_status_entities_sgroups(group.id)).entity
         if servers_on_group.desiredCapacity is not 0:
-            if dont_delete is None:
-                self.autoscale_client.update_group_config(
-                    group_id=group.id,
-                    name="delete_me_please",
-                    cooldown=0,
-                    min_entities=0,
-                    max_entities=0,
-                    metadata={})
-                self.resources.add(group.id,
-                                   self.autoscale_client.delete_scaling_group)
-            elif dont_delete is not None:
-                self.autoscale_client.update_group_config(
-                    group_id=group.id,
-                    name="delete_me_please",
-                    cooldown=0,
-                    min_entities=0,
-                    max_entities=0,
-                    metadata={})
-        elif servers_on_group.desiredCapacity is 0 and dont_delete is None:
+            self.autoscale_client.update_group_config(
+                group_id=group.id,
+                name="delete_me_please",
+                cooldown=0,
+                min_entities=0,
+                max_entities=0,
+                metadata={})
+        if delete:
             self.resources.add(group.id,
                                self.autoscale_client.delete_scaling_group)
 
@@ -268,18 +258,15 @@ class AutoscaleFixture(BaseTestFixture):
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
-
             self.assertNotEquals((group_state.activeCapacity + group_state.pendingCapacity), 0,
                                  msg='Group Id {0} failed to attempt server creation. Group has no'
                                  ' servers'.format(group_id))
-
-            if len(active_list) == expected_servers:
-                return [server.id for server in active_list]
-            time.sleep(interval_time)
-
             self.assertEquals(group_state.desiredCapacity, expected_servers,
                               msg='Group {0} should have {1} servers, but has reduced the build {2}'
                               'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
+            if len(active_list) == expected_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
         else:
             self.fail(
                 "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
@@ -291,7 +278,7 @@ class AutoscaleFixture(BaseTestFixture):
         """
         :summary: verify the desired capacity in group state is equal to expected servers
          and verifies for the specified number of servers with the name specified in the
-         group's launch config exist on the tenant
+         group's current launch config, exist on the tenant
         :param group_id: Group id
         :param expected_servers: Total active servers expected on the group
         :param interval_time: Time to wait during polling group state
@@ -321,7 +308,7 @@ class AutoscaleFixture(BaseTestFixture):
 
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """
-        Given a server name, polls for 15 mins to assert that the tenant id
+        Given a partial server name, polls for 15 mins to assert that the tenant id
         has only specified count of servers containing that name.
         """
         endtime = time.time() + 900

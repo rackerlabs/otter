@@ -215,7 +215,6 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
                           .format(execute_wb_resp.status_code))
         sleep(1)  # time for the webhook to execute
         self.verify_group_state(self.group.id, 0)
-        self.empty_scaling_group(self.group, dont_delete=True)
 
     def test_execute_nonexistant_webhook(self):
         """
