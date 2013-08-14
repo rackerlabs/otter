@@ -11,6 +11,9 @@ from klein import Klein
 from otter.util import timestamp
 
 from otter.models.mock import MockAdmin
+from otter.rest.decorators import (fails_with, succeeds_with,
+                                   with_transaction_id)
+from otter.rest.errors import exception_codes
 
 
 class OtterAdmin(object):
@@ -27,14 +30,20 @@ class OtterAdmin(object):
             self.store = store
 
     @app.route('/', methods=['GET'])
-    def root(self, request):
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def root(self, request, log):
         """
         Root response for admin API.
         """
         return ''
 
     @app.route('/metrics', methods=['GET'])
-    def list_metrics(self, request, log=None):
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def list_metrics(self, request, log):
         """
         Get a list of metrics from cassandra.
 
