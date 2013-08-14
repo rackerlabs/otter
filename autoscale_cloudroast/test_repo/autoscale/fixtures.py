@@ -44,16 +44,16 @@ class AutoscaleFixture(BaseTestFixture):
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
-        cls.otter_endpoint = cls.autoscale_config.server_endpoint
 
         env = os.environ['OSTNG_CONFIG_FILE']
-        if ('prod.ord' in env.lower()) or ('prod.dfw' in env.lower()):
+        if ('preprod' in env.lower()) or ('dev' in env.lower()):
+            cls.otter_endpoint = cls.autoscale_config.server_endpoint
+            cls.url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
+        else:
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
             cls.url = autoscale_service.get_endpoint(
                 cls.autoscale_config.region).public_url
-        else:
-            cls.url = str(cls.otter_endpoint) + '/' + str(cls.tenant_id)
 
         cls.autoscale_client = AutoscalingAPIClient(
             cls.url, access_data.token.id_,
