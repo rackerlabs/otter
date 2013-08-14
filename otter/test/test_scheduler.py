@@ -137,16 +137,17 @@ class SchedulerTestCase(TestCase):
                    'trigger': 'now', 'cron': 'c1'}]
         self.returns = [events]
         self.mock_group.modify_state.side_effect = (
-                lambda *_: defer.fail(CannotExecutePolicyError('t', 'g', 'p', 'w')))
+            lambda *_: defer.fail(CannotExecutePolicyError('t', 'g', 'p', 'w')))
 
         d = self.scheduler_service.check_for_events(100)
 
+        self.assertIsNone(self.successResultOf(d))
         self.log.bind.return_value.bind(tenant_id='1234', scaling_group_id='scal44',
                                         policy_id='pol44')
         self.log.bind.return_value.bind.return_value.msg.assert_has_calls(
-                [mock.call('Executing policy'),
-                 mock.call('Cannot execute policy',
-                           reason=CheckFailure(CannotExecutePolicyError))])
+            [mock.call('Executing policy'),
+             mock.call('Cannot execute policy',
+                       reason=CheckFailure(CannotExecutePolicyError))])
         self.assertFalse(self.log.bind.return_value.bind.return_value.err.called)
 
     def test_many(self):
