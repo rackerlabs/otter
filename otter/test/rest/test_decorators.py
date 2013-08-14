@@ -15,7 +15,7 @@ from twisted.python.failure import Failure
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
     with_transaction_id)
-from otter.test.utils import mock_log
+from otter.test.utils import patch
 
 
 class BlahError(Exception):
@@ -45,16 +45,11 @@ class TransactionIdTestCase(TestCase):
 
         self.mockRequest.getHeader.side_effect = header_side_effect
 
-        self.mockLog = mock_log()
-
         def mockResponseCode(code):
             self.mockRequest.code = code
         self.mockRequest.setResponseCode.side_effect = mockResponseCode
 
-        self.log_patch = mock.patch(
-            'otter.rest.decorators.log')
-        self.mock_log_patch = self.log_patch.start()
-        self.addCleanup(self.log_patch.stop)
+        self.mock_log = patch(self, 'otter.rest.decorators.log')
 
         self.hashkey_patch = mock.patch(
             'otter.rest.decorators.generate_transaction_id')
@@ -75,15 +70,15 @@ class TransactionIdTestCase(TestCase):
         d = doWork(self.mockRequest)
         r = self.successResultOf(d)
 
-        self.mock_log_patch.bind.assert_called_once_with(
+        self.mock_log.bind.assert_called_once_with(
             system='otter.test.rest.test_decorators.doWork',
             transaction_id='12345678')
-        self.mock_log_patch.bind().bind.assert_called_once_with(
-            useragent='Mosaic/1.0',
-            clientproto='HTTP/1.1',
-            referer='referrer(sic)',
-            uri='/',
-            method='PROPFIND')
+        self.assertEqual(self.mock_log.bind().bind.call_args_list[0],
+                         mock.call(useragent='Mosaic/1.0',
+                                   clientproto='HTTP/1.1',
+                                   referer='referrer(sic)',
+                                   uri='/',
+                                   method='PROPFIND'))
         self.mockRequest.setHeader.called_once_with('X-Response-Id', '12345678')
         self.assertEqual('hello', r)
 
@@ -91,28 +86,14 @@ class TransactionIdTestCase(TestCase):
         """
         the returned log is bound with kwargs passed
         """
-        return # TODO
-        mock_log = mock_log()
         @with_transaction_id()
-        def doWork(request, log):
+        def doWork(request, log, arg1, arg2):
             """ Test Work """
             return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
-        r = self.successResultOf(d)
-
-        self.mock_log_patch.bind.assert_called_once_with(
-            system='otter.test.rest.test_decorators.doWork',
-            transaction_id='12345678')
-        self.mock_log_patch.bind().bind.assert_called_once_with(
-            useragent='Mosaic/1.0',
-            clientproto='HTTP/1.1',
-            referer='referrer(sic)',
-            uri='/',
-            method='PROPFIND')
-        self.mockRequest.setHeader.called_once_with('X-Response-Id', '12345678')
-        self.assertEqual('hello', r)
-
+        d = doWork(self.mockRequest, arg1='a1', arg2='a2')
+        self.assertEqual('hello', self.successResultOf(d))
+        self.mock_log.bind().bind.assert_called_with(arg1='a1', arg2='a2')
 
 
 class FaultTestCase(TestCase):
