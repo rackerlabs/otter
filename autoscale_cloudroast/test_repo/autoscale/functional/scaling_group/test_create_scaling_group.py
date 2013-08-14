@@ -55,13 +55,6 @@ class CreateScalingGroupTest(AutoscaleFixture):
         cls.resources.add(cls.scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(CreateScalingGroupTest, cls).tearDownClass()
-
     def test_create_scaling_group_response(self):
         """
         Verify the response code for the create scaling group is 201
