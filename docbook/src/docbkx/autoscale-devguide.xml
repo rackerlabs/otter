@@ -801,7 +801,7 @@ format="SVG" scale="60"/>
         <tbody>
           <tr>
             <td><code>yyyy-MM-dd'T'HH:mm:ss.SSS</code></td>
-            <td><code>2013-05-19T08:07:08</code></td>
+            <td><code>2013-05-19T08:07:08Z</code></td>
             <td>May 19th, 2013 at 8:07:08 AM, GMT</td>
           </tr>
         </tbody>
