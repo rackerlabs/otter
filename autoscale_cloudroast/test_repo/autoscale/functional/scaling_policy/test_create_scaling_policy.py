@@ -10,20 +10,6 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
     Verify create policy.
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create a scaling group with policy with type change.
-        """
-        super(CreateScalingPolicy, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(CreateScalingPolicy, cls).tearDownClass()
-
     def test_create_scaling_policy(self):
         """
         Verify the create policy call for response code 201, headers and data.

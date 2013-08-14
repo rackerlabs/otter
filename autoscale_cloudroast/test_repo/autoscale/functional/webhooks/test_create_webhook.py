@@ -18,13 +18,6 @@ class CreateWebhook(ScalingGroupWebhookFixture):
         cls.wb_metadata = {'key': 'value'}
         super(CreateWebhook, cls).setUpClass(metadata=cls.wb_metadata)
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Deletes the scaling group
-        """
-        super(CreateWebhook, cls).tearDownClass()
-
     def test_create_webhook(self):
         """
         Verify the create webhook call for response code 201, headers and data

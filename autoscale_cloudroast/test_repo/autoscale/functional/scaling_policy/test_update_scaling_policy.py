@@ -9,20 +9,6 @@ class UpdateScalingPolicy(ScalingGroupPolicyFixture):
     Verify update policy
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Creates a scaling group with policy with type change
-        """
-        super(UpdateScalingPolicy, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Deletes the scaling group
-        """
-        super(UpdateScalingPolicy, cls).tearDownClass()
-
     def test_update_change_scaling_policy(self):
         """
         Verify the update policy call by updating the exiting change

@@ -3,6 +3,7 @@ System tests to test execute webhook after the policy is updated
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
@@ -26,17 +27,9 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(UpdatePoliciesExecuteWebhookTest, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='quick')
     def test_system_update_scale_up_execute_webhook(self):
         """
         Update a scale up policy and verify execution of such a policy using its webhook
@@ -50,11 +43,12 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
                           msg='Executing the updated scale up policy using the webhook failed with {0}'
                           'for group {1}'
                           .format(upd_scale_up_execute_webhook, self.group.id))
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities +
             self.policy_up['change'] + change)
 
+    @tags(speed='slow')
     def test_system_update_scale_up_to_scale_down_execute_webhook(self):
         """
         Update a scale up policy to scale down by the same change value and verify execution
@@ -68,10 +62,15 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
         self.assertEquals(upd_to_scale_down_execute_webhook, 202,
                           msg='Executing the updated scale down policy failed with {0} for group {1}'
                           .format(upd_to_scale_down_execute_webhook, self.group.id))
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        sleep(0.1)
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_update_policy_from_change_to_change_percent_scale_down_execute_webhook(self):
         """
         Update the existing scale up policy from change to change percent,such that
@@ -90,9 +89,13 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=upd_change_percent)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        sleep(0.1)
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            servers_from_scale_down)
 
     def _update_policy_cp_execute_webhook(self, group_id, policy_id, policy_data, webhook_url):
         """

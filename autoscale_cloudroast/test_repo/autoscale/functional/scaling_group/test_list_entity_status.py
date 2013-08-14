@@ -26,13 +26,6 @@ class GetListEntityStatusTest(AutoscaleFixture):
             cls.group.id)
         cls.group_state = cls.group_state_response.entity
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(GetListEntityStatusTest, cls).tearDownClass()
-
     def test_entity_status_response(self):
         """
         Verify list status' response code is 200, header.
@@ -55,3 +48,4 @@ class GetListEntityStatusTest(AutoscaleFixture):
                                 msg='Less than required number of servers in desired capacity')
         self.assertLessEqual(self.group_state.desiredCapacity, self.gc_max_entities,
                              msg='Total server count is over maxEntities')
+        self.empty_scaling_group(self.group)

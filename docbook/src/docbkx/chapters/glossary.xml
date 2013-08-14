@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE glossary [
 <!-- in PDF: for line 1 on the cover page -->
-<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!ENTITY PRODNAME "Rackspace Auto Scale"> 
 <!-- in PDF: for page headers -->
-<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!ENTITY PRODABBV "Rackspace Auto Scale"> 
 <!-- in body -->
-<!ENTITY PROD "Autoscale">               
+<!ENTITY PROD "Auto Scale">               
 ]>
 <glossary 
     xmlns="http://docbook.org/ns/docbook"
@@ -24,19 +24,18 @@
     <glossentry xml:id="Authentication-d1e01">
         <glossterm><emphasis role="bold">Authentication</emphasis></glossterm>
         <glossdef>
-            <para>
-                Authentication is the act or process of confirming the identity of a
-                user or the truth of a claim.
-                The authentication service confirms that an incoming request is being made by the user
-                who claims to be making the request.
-                It does this by validating a set of claims that the user makes.
-                These claims are initially in the form of a set of credentials.
-                After initial confirmation based on credentials,
-                the authentication service issues a token to the user;
-                when making subsequent requests,
-                the user can provide the token
-                as evidence that the user's identity has already been authenticated.
-            </para>
+            <para> Authentication is the act or process of confirming
+                the identity of a user or the truth of a claim. The
+                authentication service confirms that an incoming
+                request is being made by the user who claims to be
+                making the request. The service does this by
+                validating a set of claims that the user makes. These
+                claims are initially in the form of a set of
+                credentials. After initial confirmation based on
+                credentials, the authentication service issues a token
+                to the user. When making subsequent requests, the user
+                can provide the token as evidence that the user's
+                identity has already been authenticated. </para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="Cooldown-d1e10">
@@ -66,9 +65,8 @@
     <glossentry xml:id="ScalingGroup-d1e13">
         <glossterm><emphasis role="bold">Scaling Group</emphasis></glossterm>
         <glossdef>
-            <para>
-                A scaling group identifies servers and load balancers to be managed by a scaling policy.
-            </para>
+            <para> A scaling group identifies servers and load
+                balancers that are managed by a scaling policy. </para>
         </glossdef>
     </glossentry>
     <glossentry xml:id="ScalingPolicy-d1e14">
