@@ -21,10 +21,10 @@ class OtterAdmin(object):
     app = Klein()
 
     def __init__(self, store=None):
-        if store is not None:
-            self.store = store
-        else:
+        if store is None:
             self.store = MockAdmin()
+        else:
+            self.store = store
 
     @app.route('/', methods=['GET'])
     def root(self, request):
