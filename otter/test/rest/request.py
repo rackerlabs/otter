@@ -138,6 +138,8 @@ class RequestTestMixin(object):
     Mixin that has utilities for asserting something about the status code,
     getting header info, etc.
     """
+    root = root
+
     def assert_response(self, response_wrapper, expected_status, message=None):
         """
         Asserts that the response wrapper has the provided status code and
@@ -222,7 +224,7 @@ class RequestTestMixin(object):
         :return: the response body as a string
         """
         response_wrapper = self.successResultOf(
-            request(root, method, endpoint or self.endpoint, body=body))
+            request(self.root, method, endpoint or self.endpoint, body=body))
 
         self.assert_response(response_wrapper, expected_status)
         if location is not None:
