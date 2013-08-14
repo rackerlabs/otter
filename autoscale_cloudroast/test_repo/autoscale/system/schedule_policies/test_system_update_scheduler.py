@@ -4,6 +4,7 @@ updates
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class UpdateSchedulerTests(AutoscaleFixture):
@@ -21,16 +22,9 @@ class UpdateSchedulerTests(AutoscaleFixture):
             lc_name="update_scheduler",
             gc_cooldown=0)
         self.group = create_group_response.entity
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Scaling group deleted by the Autoscale fixture's teardown
-        """
-        super(UpdateSchedulerTests, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='slow')
     def test_system_update_at_style_scheduler_to_execute_now(self):
         """
         Create an at style scheduler policy to execute next week,
@@ -48,6 +42,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 at_style_policy['change'])
 
+    @tags(speed='slow')
     def test_system_update_at_style_scheduler_to_execute_in_the_future(self):
         """
         Create an at style scheduler policy to execute in the next few seconds,
@@ -67,6 +62,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 (at_style_policy['change'] * 2))
 
+    @tags(speed='slow')
     def test_system_update_cron_style_scheduler_to_execute_now(self):
         """
         Create an cron style scheduler policy to execute on a future day,
@@ -84,6 +80,7 @@ class UpdateSchedulerTests(AutoscaleFixture):
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities +
                                 cron_style_policy['change'])
 
+    @tags(speed='slow')
     def test_system_update_cron_style_scheduler_to_execute_in_the_future(self):
         """
         Create an cron style scheduler policy to execute the next minute,

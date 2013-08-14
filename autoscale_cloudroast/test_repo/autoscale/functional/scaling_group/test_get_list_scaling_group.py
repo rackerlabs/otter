@@ -28,13 +28,6 @@ class ScalingGroupListTest(AutoscaleFixture):
         cls.resources.add(cls.third_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 
-    @classmethod
-    def teardown(cls):
-        """
-        Delete the scaling group.
-        """
-        super(ScalingGroupListTest, cls).tearDownClass()
-
     def test_get_scaling_group(self):
         """
         Verify the get group for response code 200, headers and data.

@@ -95,6 +95,16 @@ class AutoscaleFixture(BaseTestFixture):
         cls.scheduler_batch = OtterConstants.SCHEDULER_BATCH
         cls.max_maxentities = OtterConstants.MAX_MAXENTITIES
         cls.max_cooldown = OtterConstants.MAX_COOLDOWN
+        cls.max_groups = OtterConstants.MAX_GROUPS
+        cls.max_policies = OtterConstants.MAX_POLICIES
+        cls.max_webhooks = OtterConstants.MAX_WEBHOOKS
+        cls.limit_value_all = OtterConstants.LIMIT_VALUE_ALL
+        cls.limit_unit_all = OtterConstants.LIMIT_UNIT_ALL
+        cls.limit_value_webhook = OtterConstants.LIMIT_VALUE_WEBHOOK
+        cls.limit_unit_webhook = OtterConstants.LIMIT_UNIT_WEBHOOK
+        cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
+        cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
+        cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
 
     def validate_headers(self, headers):
         """
@@ -114,17 +124,23 @@ class AutoscaleFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
-    def empty_scaling_group(self, group):
+    def empty_scaling_group(self, group, delete=True):
         """
         Given the group, updates the group to be of 0 minentities and maxentities.
+        If delete is set to True, the scaling group is deleted.
         """
-        self.autoscale_client.update_group_config(
-            group_id=group.id,
-            name="delete_me_please",
-            cooldown=0,
-            min_entities=0,
-            max_entities=0,
-            metadata={})
+        servers_on_group = (self.autoscale_client.list_status_entities_sgroups(group.id)).entity
+        if servers_on_group.desiredCapacity is not 0:
+            self.autoscale_client.update_group_config(
+                group_id=group.id,
+                name="delete_me_please",
+                cooldown=0,
+                min_entities=0,
+                max_entities=0,
+                metadata={})
+        if delete:
+            self.resources.add(group.id,
+                               self.autoscale_client.delete_scaling_group)
 
     def verify_group_state(self, group_id, desired_capacity):
         """
@@ -203,7 +219,7 @@ class AutoscaleFixture(BaseTestFixture):
             schedule_at=self.autoscale_behaviors.get_time_in_utc(delay))
         time.sleep(self.scheduler_interval + delay)
 
-    def get_servers_containing_given_name_on_tenant(self, server_name=None, group_id=None):
+    def get_servers_containing_given_name_on_tenant(self, group_id=None, server_name=None):
         """
         The group_id or the server_name should be provided.
         Given the group id, the server name is got from the group's launch
@@ -213,9 +229,8 @@ class AutoscaleFixture(BaseTestFixture):
         specified name within the server name.
         """
         if group_id:
-            launch_config_response = self.autoscale_client.view_launch_config(
-                group_id)
-            launch_config = launch_config_response.entity
+            launch_config = self.autoscale_client.view_launch_config(
+                group_id).entity
             params = launch_config.server.name
         elif server_name:
             params = server_name
@@ -223,21 +238,96 @@ class AutoscaleFixture(BaseTestFixture):
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
 
-    def assert_servers_deleted_successfully(self, server_name):
+    def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
+                                                   interval_time=None, timeout=None):
         """
-        Given a server name, polls for 15 mins to assert that the tenant id
-        does not have servers containing that name
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and waits for the specified number of servers to be active on a group
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
+        """
+        interval_time = interval_time or int(
+            self.autoscale_config.interval_time)
+        timeout = timeout or int(self.autoscale_config.timeout)
+        end_time = time.time() + timeout
+
+        group_state_response = self.autoscale_client.list_status_entities_sgroups(
+            group_id)
+        group_state = group_state_response.entity
+        self.assertEquals(group_state.desiredCapacity, expected_servers,
+                          msg='Group {0} should have {1} servers, but is trying to '
+                          'build {2} servers'.format(group_id, expected_servers,
+                                                     group_state.desiredCapacity))
+        while time.time() < end_time:
+            resp = self.autoscale_client.list_status_entities_sgroups(group_id)
+            group_state = resp.entity
+            active_list = group_state.active
+            self.assertNotEquals((group_state.activeCapacity + group_state.pendingCapacity), 0,
+                                 msg='Group Id {0} failed to attempt server creation. Group has no'
+                                 ' servers'.format(group_id))
+            self.assertEquals(group_state.desiredCapacity, expected_servers,
+                              msg='Group {0} should have {1} servers, but has reduced the build {2}'
+                              'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
+            if len(active_list) == expected_servers:
+                return [server.id for server in active_list]
+            time.sleep(interval_time)
+        else:
+            self.fail(
+                "wait_for_active_list_in_group_state ran for {0} seconds for group {1} and did not "
+                "observe the active server list achieving the expected servers count: {2}.".format(
+                    timeout, group_id, expected_servers))
+
+    def check_for_expected_number_of_building_servers(self, group_id, expected_servers,
+                                                      desired_capacity=None, server_name=None):
+        """
+        :summary: verify the desired capacity in group state is equal to expected servers
+         and verifies for the specified number of servers with the name specified in the
+         group's current launch config, exist on the tenant
+        :param group_id: Group id
+        :param expected_servers: Total active servers expected on the group
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        :return: returns the list of active servers in the group
+        """
+        end_time = time.time() + 120
+        desired_capacity = desired_capacity or expected_servers
+        while time.time() < end_time:
+            group_state = self.autoscale_client.list_status_entities_sgroups(
+                group_id).entity
+            if group_state.desiredCapacity == desired_capacity:
+                if server_name:
+                    server_list = self.get_servers_containing_given_name_on_tenant(
+                        server_name=server_name)
+                else:
+                    server_list = self.get_servers_containing_given_name_on_tenant(
+                        group_id=group_id)
+                if (len(server_list) == expected_servers):
+                        return server_list
+        else:
+            self.fail(
+                'Waited 2 mins for desired capacity/active server list to reach the'
+                ' server count of {0}. Has desired capacity {1} on the group {2}'
+                ' and {3} servers on the account' .format(desired_capacity,
+                group_state.desiredCapacity, group_id, len(server_list)))
+
+    def assert_servers_deleted_successfully(self, server_name, count=0):
+        """
+        Given a partial server name, polls for 15 mins to assert that the tenant id
+        has only specified count of servers containing that name.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
             server_list = self.get_servers_containing_given_name_on_tenant(
                 server_name=server_name)
-            if len(server_list) == 0:
+            if len(server_list) == count:
                 break
             time.sleep(self.interval_time)
         else:
             self.fail('Servers on the tenant with name {0} were not deleted even'
-                      'after waiting 15 mins'.format(server_name))
+                      ' after waiting 15 mins'.format(server_name))
 
     @classmethod
     def tearDownClass(cls):

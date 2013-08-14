@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE section [
 <!-- in PDF: for line 1 on the cover page -->
-<!ENTITY PRODNAME "Rackspace Autoscale"> 
+<!ENTITY PRODNAME "Rackspace Auto Scale"> 
 <!-- in PDF: for page headers -->
-<!ENTITY PRODABBV "Rackspace Autoscale"> 
+<!ENTITY PRODABBV "Rackspace Auto Scale"> 
 <!-- in body -->
-<!ENTITY PROD "Autoscale">               
+<!ENTITY PROD "Auto Scale">               
 ]>
 <section 
     xmlns="http://docbook.org/ns/docbook"
@@ -13,10 +13,10 @@
     xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
     xml:id="Resources-000">
     <title>Additional Resources</title>
-    <para>
-        &PRODNAME; is an open-source project. You can see and contribute to source code in our GitHub repository, 
-        <link xlink:href="https://github.com/rackerlabs/otter">https://github.com/rackerlabs/otter</link>.
-    </para>
+    <para> &PRODNAME; is an open-source project. You can see and
+        contribute to source code in the GitHub repository at <link
+            xlink:href="https://github.com/rackerlabs/otter"
+            >https://github.com/rackerlabs/otter</link>. </para>
     <para>
         You can see and experiment with all &PRODNAME; API calls at
         <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
@@ -34,10 +34,10 @@
             </listitem>
             <listitem>
                 <para> To learn about working with Rackspace services
-                    through the Rackspace control panel, visit <link
+                    through the Rackspace Cloud Control Panel, visit
+                        <link
                         xlink:href="http://www.rackspace.com/knowledge_center/"
-                        >http://www.rackspace.com/knowledge_center/</link>.
-                </para>
+                        >http://www.rackspace.com/knowledge_center/</link>. </para>
             </listitem>
         </itemizedlist> 
     </para>

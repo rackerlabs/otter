@@ -2,6 +2,8 @@
 System tests for scaling policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
+from time import sleep
 
 
 class ScalingDownExecuteWebhookTest(AutoscaleFixture):
@@ -24,17 +26,9 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(ScalingDownExecuteWebhookTest, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_change(self):
         """
         Execute a scale down webhook with change as the number
@@ -48,10 +42,15 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        sleep(0.1)
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=self.group.groupConfiguration.minEntities)
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_change_percent(self):
         """
         Execute a webhook with scale down with change percentage 60
@@ -67,10 +66,15 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        sleep(0.1)
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=servers_from_scale_down)
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            servers_from_scale_down)
 
+    @tags(speed='slow')
     def test_system_execute_webhook_scale_down_desired_capacity(self):
         """
         Execute a webhook with scale down with desired capacity as the
@@ -84,6 +88,10 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        sleep(0.1)
+        self.wait_for_expected_number_of_active_servers(
             group_id=self.group.id,
             expected_servers=policy_down['desired_capacity'])
+        self.assert_servers_deleted_successfully(
+            self.group.launchConfiguration.server.name,
+            policy_down['desired_capacity'])

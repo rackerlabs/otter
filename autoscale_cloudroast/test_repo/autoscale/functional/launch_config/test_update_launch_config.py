@@ -18,13 +18,6 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
         """
         super(UpdateLaunchConfigTest, cls).setUpClass()
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(UpdateLaunchConfigTest, cls).tearDownClass()
-
     def test_update_launch_config_response(self):
         """
         Verify the update launch config call for response code, headers and data.
