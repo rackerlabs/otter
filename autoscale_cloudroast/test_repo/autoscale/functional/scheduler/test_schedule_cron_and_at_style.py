@@ -18,8 +18,7 @@ class ScheduleScalingPolicyCronAndAtStyle(AutoscaleFixture):
         super(ScheduleScalingPolicyCronAndAtStyle, self).setUp()
         self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
         self.group = self.create_group_response.entity
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group.id, self.empty_scaling_group)
 
     def test_schedule_cron_style_policy_valid_cron(self):
         """

@@ -23,13 +23,6 @@ class GetWebhook(ScalingGroupWebhookFixture):
             cls.webhook['id'])
         cls.get_webhook = cls.get_webhook_response.entity
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete scaling group.
-        """
-        super(GetWebhook, cls).tearDownClass()
-
     def test_get_webhook(self):
         """
         Get a webhook and verify response code 200, headers and the data.
