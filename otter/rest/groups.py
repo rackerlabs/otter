@@ -14,6 +14,9 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
+from otter.util.config import config_value
+
+from otter.bobby import BobbyClient
 
 
 def format_state_dict(state):
@@ -299,6 +302,15 @@ def create_new_scaling_group(request, log, tenantId, data):
         return d.addCallback(lambda _: result)
 
     deferred.addCallback(_do_obey_config_change)
+
+    def _add_to_bobby(result, bobby_url):
+        client = BobbyClient(bobby_url)
+        d = client.create_group(tenantId, result["id"])
+        return d.addCallback(lambda _: result)
+
+    bobby_url = config_value('bobby_url')
+    if bobby_url is not None:
+        deferred.addCallback(_add_to_bobby, bobby_url)
 
     def _format_output(result):
         uuid = result['id']

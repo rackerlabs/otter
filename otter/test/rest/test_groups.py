@@ -25,6 +25,7 @@ from otter.rest.groups import format_state_dict
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
+from otter.util.config import set_config_data
 
 
 class FormatterHelpers(TestCase):
@@ -380,6 +381,106 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch
         }))
         self.flushLoggedErrors(AssertionError)
+
+
+class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
+    """
+    endpoint = "/v1.0/11111/groups/"
+    invalid_methods = ("DELETE", "PUT")
+
+    def setUp(self):
+        """
+        Mock modify state
+        """
+
+        test_config = {
+            'port': 'tcp:9999',
+            'cassandra': {
+                'seed_hosts': ['tcp:127.0.0.1:9160'],
+                'keyspace': 'otter_test'
+            },
+            "bobby_url": "http://127.0.0.1:9876/",
+            'environment': 'prod'
+        }
+
+        set_config_data(dict(test_config))
+
+        super(AllGroupsBobbyEndpointTestCase, self).setUp()
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        patch(self, 'otter.rest.application.get_url_root', return_value="")
+
+    def tearDown(self):
+        """
+        Set config data back to null
+        """
+        set_config_data({})
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
+    def test_group_create_bobby(self, mock_bobby, mock_url):
+        """
+        A scaling group is created and calls over to Bobby
+        """
+        request_body = {
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 1,
+                "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        }
+
+        config = request_body['groupConfiguration']
+        launch = request_body['launchConfiguration']
+        policies = request_body.get('scalingPolicies', [])
+
+        expected_config = config.copy()
+        expected_config.setdefault('maxEntities', 25)
+        expected_config.setdefault('metadata', {})
+
+        rval = {
+            'groupConfiguration': expected_config,
+            'launchConfiguration': launch,
+            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
+                                        [p.copy() for p in policies])),
+            'id': '1'
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
+
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', expected_config, launch, policies or None)
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_and_manifest_response)
+
+        # compare the policies separately, because they have links and may be
+        # in a different order
+        resp_policies = resp['group'].pop('scalingPolicies')
+
+        self.assertEqual(resp, {
+            'group': {
+                'groupConfiguration': expected_config,
+                'launchConfiguration': launch,
+                'id': '1',
+                'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
+            }
+        })
+
+        resp_policies.sort(key=lambda dictionary: dictionary['id'])
+        for pol in resp_policies:
+            self.assertEqual(pol.pop('links'), [{
+                "href": "/v1.0/11111/groups/1/policies/{0}/".format(pol.pop('id')),
+                "rel": "self"
+            }])
+        self.assertEqual(resp_policies, policies)
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
