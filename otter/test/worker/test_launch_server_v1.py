@@ -26,7 +26,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import CheckFailure, DummyException, mock_log, patch
+from otter.test.utils import DummyException, mock_log, patch
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error

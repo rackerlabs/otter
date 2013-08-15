@@ -20,8 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import CancelledError, Deferred, gatherResults
-from twisted.internet.task import LoopingCall
+from twisted.internet.defer import gatherResults
 
 import treq
 
@@ -30,7 +29,7 @@ from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import (timeout_deferred, retry,
-                                      wrap_transient_error)
+                                      TransientRetryError, wrap_transient_error)
 
 
 class UnexpectedServerStatus(Exception):
@@ -91,51 +90,47 @@ def wait_for_active(log,
     log.msg("Checking instance status every {interval} seconds",
             interval=interval)
 
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
     start_time = clock.seconds()
-
-    def on_timeout(_):
-        time_building = clock.seconds() - start_time
-        log.msg(('Server {instance_id} failed to change from BUILD state to '
-                 'ACTIVE within a {timeout} second timeout (it has been '
-                 '{time_building} seconds).'),
-                timeout=timeout, time_building=time_building)
-
-    d = Deferred(on_timeout)
 
     def poll():
         def check_status(server):
             status = server['server']['status']
-            time_building = clock.seconds() - start_time
 
-            log.msg(
-                "Waiting for 'ACTIVE' got {status} ({time_building} seconds).",
-                status=status, time_building=time_building)
-            if server['server']['status'] == 'ACTIVE':
-                d.callback(server)
-            elif server['server']['status'] != 'BUILD':
-                d.errback(UnexpectedServerStatus(
+            if status == 'ACTIVE':
+                time_building = clock.seconds() - start_time
+                log.msg(("Server changed from 'BUILD' to 'ACTIVE' within "
+                         "{time_building} seconds"),
+                        time_building=time_building)
+                return server
+
+            elif status != 'BUILD':
+                raise UnexpectedServerStatus(
                     server_id,
                     status,
-                    'ACTIVE'))
+                    'ACTIVE')
+            else:
+                raise TransientRetryError(None)
 
         sd = server_details(server_endpoint, auth_token, server_id)
         sd.addCallback(check_status)
         return sd
 
-    lc = LoopingCall(poll)
+    d = retry(poll, interval, clock)
+    timeout_deferred(d, timeout, clock)
 
-    if clock is not None:  # pragma: no cover
-        lc.clock = clock
+    def on_timeout(f):
+        time_building = clock.seconds() - start_time
+        log.msg(('Server {instance_id} failed to change from BUILD state to '
+                 'ACTIVE within a {timeout} second timeout (it has been '
+                 '{time_building} seconds).'),
+                timeout=timeout, time_building=time_building)
+        return f
 
-    timeout_deferred(d, timeout, lc.clock)
-
-    def stop(r):
-        lc.stop()
-        return r
-
-    d.addBoth(stop)
-
-    lc.start(interval)
+    d.addErrback(on_timeout)
 
     return d
 
