@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import Deferred, gatherResults
+from twisted.internet.defer import CancelledError, Deferred, gatherResults
 from twisted.internet.task import LoopingCall
 
 import treq
@@ -29,6 +29,8 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
+from otter.util.deferredutils import (timeout_deferred, retry,
+                                      wrap_transient_error)
 
 
 class UnexpectedServerStatus(Exception):
@@ -478,8 +480,29 @@ def verified_delete(log,
     d.addCallback(check_success, [204])
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
-    def looping_verify_deletion(_):
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
+    def verify(_):
         start_time = clock.seconds()
+
+        def on_success(_):
+            time_delete = clock.seconds() - start_time
+            del_log.msg('Server deleted successfully: {time_delete} seconds.',
+                        time_delete=time_delete)
+
+        def check_status():
+            check_d = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            check_d.addCallback(check_success, [404])
+            check_d.addCallback(on_success)
+            check_d.addErrback(wrap_transient_error)
+            return check_d
+
+        verify_d = retry(check_status, interval, clock)
+        timeout_deferred(verify_d, timeout, clock)
 
         def on_timeout(_):
             time_delete = clock.seconds() - start_time
@@ -488,61 +511,7 @@ def verified_delete(log,
                              'a {timeout} second timeout (it has been '
                              '{time_delete} seconds).'))
 
-        verify = Deferred(on_timeout)
+        verify_d.addErrback(on_timeout)
 
-        def on_success(_):
-            time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
-            verify.callback(None)
-
-        def on_temporary_failure(f):
-            time_delete = clock.seconds() - start_time
-            del_log.msg('Server not yet deleted by {time_delete} seconds',
-                        exc=f, time_delete=time_delete)
-
-        def check_status():
-            vd = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
-            vd.addCallback(check_success, [404])
-            vd.addCallback(on_success)
-            vd.addErrback(on_temporary_failure)
-            return vd
-
-        lc = LoopingCall(check_status)
-
-        if clock is not None:  # pragma: no cover
-            lc.clock = clock
-
-        timeout_deferred(verify, timeout, lc.clock)
-
-        verify.addBoth(lambda _: lc.stop())
-        lc.start(interval)
-
-    d.addCallback(looping_verify_deletion)
+    d.addCallback(verify)
     return d
-
-
-def timeout_deferred(deferred, timeout, clock):
-    """
-    Time out a deferred - schedule for it to be canceling it after ``timeout``
-    seconds from now, as per the clock.  If it gets cancelled, it errbacks with
-    a :class:`twisted.internet.defer.CancelledError`, unless a cancelable
-    function is passed to the Deferred's initialization and it callbacks or
-    errbacks when cancelled.  (see the documentation for
-    :class:`twisted.internet.defer.Deferred`) for more details.
-
-    :param Deferred deferred: Which deferred to time out (cancel)
-    :param int timeout: How long before timing out the deferred (in seconds)
-
-    from:  https://twistedmatrix.com/trac/ticket/990
-    """
-    delayed_call = clock.callLater(timeout, deferred.cancel)
-
-    def cancelTimeout(result):
-        if delayed_call.active():
-            delayed_call.cancel()
-        return result
-
-    deferred.addBoth(cancelTimeout)
