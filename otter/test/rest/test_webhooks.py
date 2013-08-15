@@ -496,7 +496,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         Executing a webhook logs an information message about non-fatal, policy
         execution failures.
         """
-        cap_log = log.bind.return_value.bind.return_value
+        cap_log = log.bind.return_value.bind.return_value.bind.return_value
 
         for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
                     NoSuchPolicyError('tenant', 'group', 'policy'),
