@@ -4,7 +4,7 @@ Tests for `otter.utils.deferredutils`
 import mock
 
 from twisted.internet.task import Clock
-from twisted.internet.defer import CancelledError, Deferred, fail
+from twisted.internet.defer import CancelledError, Deferred, fail, succeed
 from twisted.trial.unittest import TestCase
 
 from otter.util.deferredutils import (
@@ -193,6 +193,20 @@ class RetryTests(TestCase):
 
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
+
+    def test_already_callbacked_deferred_not_canceled(self):
+        """
+        If the ``retry_function``'s deferred has already fired, ``retry``
+        callbacks correctly without canceling the fired deferred.
+        """
+        r = succeed('result!')
+        wrapped = mock.MagicMock(spec=r, wraps=r)
+        retry_function = mock.MagicMock(spec=[], return_value=wrapped)
+
+        d = retry(retry_function, self.interval, self.clock)
+        self.assertEqual(self.successResultOf(d), 'result!')
+
+        self.assertEqual(wrapped.cancel.call_count, 0)
 
 
 class HelperFunctionTests(TestCase):

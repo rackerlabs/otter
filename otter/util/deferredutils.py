@@ -122,11 +122,12 @@ def retry(retry_function, interval, clock=None):
 
     def real_retry_function():
         retry = retry_function()
+        operation_d.append(retry)
+
         retry.addBoth(pop_operation)
         retry.addCallback(deferred.callback)
         retry.addErrback(lambda f: f.trap(TransientRetryError))
         retry.addErrback(deferred.errback)
-        operation_d.append(retry)
         return retry
 
     lc = LoopingCall(real_retry_function)
