@@ -4,6 +4,7 @@ Deferred utilities
 
 from twisted.internet import defer
 from twisted.internet.task import LoopingCall
+from twisted.python.failure import Failure
 
 
 def unwrap_first_error(possible_first_error):
@@ -70,7 +71,7 @@ class TransientRetryError(Exception):
     Transient error that means that retry should continue retrying
     """
     def __init__(self, wrapped):
-        wrapped = wrapped
+        self.wrapped = wrapped
 
     def __repr__(self):
         """
@@ -78,6 +79,18 @@ class TransientRetryError(Exception):
         the wrapped failure
         """
         return "Transient error [{0!s}]".format(self.wrapped)
+
+
+def wrap_transient_error(f):
+    """
+    Wraps a failure with a TransientRetryError failure.  Can be used as an
+    errback handler.
+
+    :param Failure f: failure to wrap
+    :return: a Failure of type TransientRetryError, which wraps the original
+        failure
+    """
+    return Failure(TransientRetryError(f))
 
 
 def retry(retry_function, interval, clock=None):
@@ -88,6 +101,15 @@ def retry(retry_function, interval, clock=None):
     The ``retry_function`` needs to wrap all transient failures (for which the
     desired effect is to retry) with a :class:`TransientRetryError`.  On
     successful callback from ``retry_function ``, the loop will stop.
+
+    :param callable retry_function: function to be retried - should return a
+        Deferred and take no arguments
+    :param int interval: number of seconds between each retry
+    :param clock: clock to be used to retry - used for testing purposes
+
+    :return: a Deferred which fires with the result of the ``retry_function``,
+        if successful, or the failure of the ``retry_function``, if not a
+        :class:`TransientRetryError`
     """
     deferred = defer.Deferred()
 

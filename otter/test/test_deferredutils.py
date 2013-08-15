@@ -4,10 +4,11 @@ Tests for `otter.utils.deferredutils`
 import mock
 
 from twisted.internet.task import Clock
-from twisted.internet.defer import CancelledError, Deferred
+from twisted.internet.defer import CancelledError, Deferred, fail
 from twisted.trial.unittest import TestCase
 
-from otter.util.deferredutils import timeout_deferred, retry, TransientRetryError
+from otter.util.deferredutils import (
+    timeout_deferred, retry, TransientRetryError, wrap_transient_error)
 from otter.test.utils import DummyException
 
 
@@ -192,3 +193,21 @@ class RetryTests(TestCase):
 
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
+
+
+class HelperFunctionTests(TestCase):
+    """
+    Tests for ``wrap_transient_error``
+    """
+
+    def test_wraps_original_failure(self):
+        """
+        ``wrap_transient_error`` wraps the original failure within a failure of
+        type ``TransientRetryError``
+        """
+        d = fail(DummyException('hey'))
+        d.addErrback(wrap_transient_error)
+
+        f = self.failureResultOf(d, TransientRetryError)
+        original = f.value.wrapped
+        self.assertTrue(original.check(DummyException))
