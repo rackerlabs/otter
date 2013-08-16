@@ -3,6 +3,7 @@ Test execution of at and cron style scheduler policies when group has updates
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class UpdateSchedulerScalingPolicy(AutoscaleFixture):
@@ -20,6 +21,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         cls.upd_image_ref = cls.lc_image_ref_alt
         cls.upd_flavor_ref = "3"
 
+    @tags(speed='slow')
     def test_system_min_max_entities_at_style(self):
         """
         Create a scaling group with minentities between 0 and maxentities and
@@ -39,8 +41,8 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             group_id=group.id, change=maxentities,
             scale_down=True)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_min_max_entities_cron_style(self):
         """
         Create a scaling group with minentities between 0 and maxentities and maxentities=change,
@@ -69,9 +71,9 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
-        self.empty_scaling_group(group)
 
-    def test_system_group_cooldown_atstyle(self):
+    @tags(speed='slow')
+    def test_system_group_cooldown_at_style(self):
         """
         Create a scaling group with cooldown>0, create a scheduler at style policy
         and wait for its execution, creating another at style policy scheduled
@@ -86,8 +88,8 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         sleep(60 - self.scheduler_interval)
         self.create_default_at_style_policy_wait_for_execution(group.id)
         self.verify_group_state(group.id, self.sp_change * 2)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_upd_launch_config_at_style_scheduler(self):
         """
         Create a scaling group with minentities>0, update launch config, schedule at style
@@ -96,13 +98,13 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         are of the latest launch config.
         """
         group = self._create_group(minentities=self.sp_change)
-        active_list_b4_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_b4_upd = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         self._update_launch_config(group)
         self.create_default_at_style_policy_wait_for_execution(group.id)
         active_servers = self.sp_change + group.groupConfiguration.minEntities
-        active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=active_servers)
         upd_lc_server = set(
@@ -110,12 +112,12 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         self._verify_server_list_for_launch_config(upd_lc_server)
         self.create_default_at_style_policy_wait_for_execution(
             group.id, scale_down=True)
-        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_on_scale_down = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         self._verify_server_list_for_launch_config(active_list_on_scale_down)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_upd_launch_config_cron_style_scheduler(self):
         """
         Create a scaling group with minentities>0, update launch config, schedule cron style
@@ -124,7 +126,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         are of the latest launch config.
         """
         group = self._create_group(minentities=self.sp_change)
-        active_list_b4_upd = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_b4_upd = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         self._update_launch_config(group)
@@ -135,7 +137,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
         active_servers = self.sp_change + group.groupConfiguration.minEntities
-        active_list_after_scale_up = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=active_servers)
         upd_lc_server = set(
@@ -147,11 +149,10 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             sp_change=-self.sp_change,
             schedule_cron='* * * * *')
         sleep(60 + self.scheduler_interval)
-        active_list_on_scale_down = self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        active_list_on_scale_down = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
         self._verify_server_list_for_launch_config(active_list_on_scale_down)
-        self.empty_scaling_group(group)
 
     def _create_group(self, cooldown=None, minentities=None, maxentities=None):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -160,8 +161,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
             gc_max_entities=maxentities,
             lc_name='upd_grp_scheduled')
         group = create_group_response.entity
-        self.resources.add(group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group, self.empty_scaling_group)
         return group
 
     def _update_launch_config(self, group):

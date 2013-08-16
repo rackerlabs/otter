@@ -8,21 +8,6 @@ class DeleteScalingGroupTest(AutoscaleFixture):
     """
     Verify delete group.
     """
-
-    @classmethod
-    def setUpClass(cls):
-        """
-        Create a scaling group.
-        """
-        super(DeleteScalingGroupTest, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(DeleteScalingGroupTest, cls).tearDownClass()
-
     def test_delete_group_with_0_minentities(self):
         """
         Verify delete group returns response code 204 when group has 0 min entities.

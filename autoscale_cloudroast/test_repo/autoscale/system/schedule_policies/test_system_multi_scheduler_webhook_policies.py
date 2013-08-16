@@ -3,6 +3,7 @@ System tests for multiple scheduler and webhook policies
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
@@ -31,23 +32,24 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             cooldown=self.gc_cooldown, type='schedule', name='multi_cron_style',
             change=self.change)
 
+    @tags(speed='quick')
     def test_system_create_group_with_multiple_webhook_policies_with_same_attributes(self):
         """
         Creating a group with a list of multiple webhook policies, with the same
         attributes, is succcessful
         """
-        group = self._create_multi_policy_group(2, self.wb_policy)
-        self.empty_scaling_group(group)
+        self._create_multi_policy_group(2, self.wb_policy)
 
+    @tags(speed='quick')
     def test_system_create_multiple_scheduler_policies_same_payload(self):
         """
         Creating a group with a list of multiple scheduler policies, (at style and
         cron style) with the same attributes, is succcessful
         """
-        group = self._create_multi_policy_group(
+        self._create_multi_policy_group(
             2, self.at_style_policy, self.cron_style_policy)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_webhook_and_scheduler_policies_same_group(self):
         """
         Create a group with scheduler and webhook policies and verify the
@@ -58,8 +60,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self._execute_webhook_policies_within_group(group)
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group.id, 3 * self.change)
-        self.empty_scaling_group(group)
 
+    @tags(speed='slow')
     def test_system_webhook_and_scheduler_policies_different_groups(self):
         """
         Create 2 groups each with the same type of scheduler and webhook policies and
@@ -73,9 +75,8 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
-        self.empty_scaling_group(group1)
-        self.empty_scaling_group(group2)
 
+    @tags(speed='quick')
     def test_system_all_types_webhook_and_scheduler_policies(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
@@ -97,11 +98,10 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         cron_style_policy_dc = {i: self.cron_style_policy[i] for i in self.cron_style_policy
                                 if i != 'change'}
         cron_style_policy_dc['desiredCapacity'] = 1
-        group = self._create_multi_policy_group(
+        self._create_multi_policy_group(
             1, self.wb_policy, self.at_style_policy, self.cron_style_policy,
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
-        self.empty_scaling_group(group)
 
     def _create_multi_policy_group(self, multi_num, *args):
         """
@@ -119,8 +119,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
                           msg='Creating multiple scaling policies within a group failed with '
                           'response code: {0}'.format(create_group_reponse.status_code))
         group = create_group_reponse.entity
-        self.resources.add(group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(group, self.empty_scaling_group)
         return group
 
     def _execute_webhook_policies_within_group(self, *args):

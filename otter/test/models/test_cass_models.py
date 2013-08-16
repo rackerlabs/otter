@@ -15,6 +15,7 @@ from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
     serialize_json_data,
+    get_consistency_level,
     verified_view)
 
 from otter.models.interface import (
@@ -94,6 +95,39 @@ class SerialJsonDataTestCase(TestCase):
         """
         self.assertEqual(serialize_json_data({}, 'version'),
                          json.dumps({'_ver': 'version'}))
+
+
+class GetConsistencyTests(TestCase):
+    """
+    Tests for `get_consistency_level`
+    """
+    def test_unknown_resource(self):
+        """
+        When called with unknown resource it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('list', 'junk')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_unknown_operation(self):
+        """
+        When called with unknown operation it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('junk', 'event')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_unknown_operation_and_resource(self):
+        """
+        When called with unknown operation and resource it returns ConsistencyLevel.ONE
+        """
+        level = get_consistency_level('junk', 'junk2')
+        self.assertEqual(level, ConsistencyLevel.ONE)
+
+    def test_event_list(self):
+        """
+        Gives QUORUM on event list
+        """
+        level = get_consistency_level('list', 'event')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
 class VerifiedViewTests(TestCase):
@@ -1523,8 +1557,6 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.side_effect = _responses
 
         self.collection = CassScalingGroupCollection(self.connection)
-        patch(self, 'otter.models.cass.get_consistency_level',
-              return_value=ConsistencyLevel.TWO)
 
     def test_fetch(self):
         """
@@ -1544,7 +1576,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.assertEqual(result, fetch_returns)
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
-                                                        ConsistencyLevel.TWO)
+                                                        ConsistencyLevel.QUORUM)
 
     def test_update_delete_events(self):
         """
@@ -1576,8 +1608,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
         self.assertEqual(result, None)
         self.assertEqual(self.connection.execute.mock_calls,
-                         [mock.call(delcql, deldata, ConsistencyLevel.TWO),
-                          mock.call(insertcql, insertdata, ConsistencyLevel.TWO)])
+                         [mock.call(delcql, deldata, ConsistencyLevel.QUORUM),
+                          mock.call(insertcql, insertdata, ConsistencyLevel.QUORUM)])
 
     def test_update_delete_events_no_delete(self):
         """
@@ -1607,8 +1639,8 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
         self.assertEqual(result, None)
         self.assertEqual(self.connection.execute.mock_calls,
-                         [mock.call(delcql, deldata, ConsistencyLevel.TWO),
-                          mock.call(insertcql, insertdata, ConsistencyLevel.TWO)])
+                         [mock.call(delcql, deldata, ConsistencyLevel.QUORUM),
+                          mock.call(insertcql, insertdata, ConsistencyLevel.QUORUM)])
 
     def test_update_delete_events_no_update(self):
         """
@@ -1622,7 +1654,7 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.returns = [None, None]
         result = self.successResultOf(self.collection.update_delete_events(del_ids, up_events))
         self.assertEqual(result, None)
-        self.connection.execute.assert_called_once_with(delcql, deldata, ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(delcql, deldata, ConsistencyLevel.QUORUM)
 
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,

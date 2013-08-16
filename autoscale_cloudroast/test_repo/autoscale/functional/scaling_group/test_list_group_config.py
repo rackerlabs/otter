@@ -33,13 +33,6 @@ class ListGroupConfigTest(AutoscaleFixture):
             cls.group.id)
         cls.group_config = cls.group_config_response.entity
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(ListGroupConfigTest, cls).tearDownClass()
-
     def test_list_group_config_response(self):
         """
         Verify the list group config for response code 200, headers and data

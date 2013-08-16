@@ -11,7 +11,7 @@ class DeleteAll(AutoscaleFixture):
     Get list of groups/servers on account and delete them
     """
 
-    @tags(type='cleanup')
+    @tags(type='group')
     def test_delete_all_groups_on_account(self):
         """
         Delete all groups on the account
@@ -25,7 +25,7 @@ class DeleteAll(AutoscaleFixture):
         print 'Deleting {0} groups, {1} still exist'.format(len(list_groups), len(list_groups_again))\
             if len(list_groups_again) is not 0 else "Deleted {0} groups".format(len(list_groups))
 
-    @tags(type='cleanup', anytag='yes')
+    @tags(type='servers')
     def test_delete_all_servers_on_account(self):
         """
         Deletes all servers on the account

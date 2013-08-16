@@ -17,12 +17,12 @@ from otter import controller
 from otter.rest.errors import InvalidMinEntities
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/config/',
+@app.route('/<string:tenant_id>/groups/<string:group_id>/config/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_config_for_scaling_group(request, log, tenantId, groupId):
+def view_config_for_scaling_group(request, log, tenant_id, group_id):
     """
     Get the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -44,19 +44,19 @@ def view_config_for_scaling_group(request, log, tenantId, groupId):
             }
         }
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
     deferred = rec.view_config()
     deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/config/',
+@app.route('/<string:tenant_id>/groups/<string:group_id>/config/',
            methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.update_config)
-def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
+def edit_config_for_scaling_group(request, log, tenant_id, group_id, data):
     """
     Edit the configuration for a scaling group, which includes the minimum
     number of entities, the maximum number of entities, global cooldown, and
@@ -86,17 +86,17 @@ def edit_config_for_scaling_group(request, log, tenantId, groupId, data):
             partial(controller.obey_config_change, log, transaction_id(request),
                     data))
 
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
     deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/launch/',
+@app.route('/<string:tenant_id>/groups/<string:group_id>/launch/',
            methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def view_launch_config(request, log, tenantId, groupId):
+def view_launch_config(request, log, tenant_id, group_id):
     """
     Get the launch configuration for a scaling group, which includes the
     details of how to create a server, from what image, which load balancers to
@@ -139,19 +139,19 @@ def view_launch_config(request, log, tenantId, groupId):
             }
         }
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
     deferred = rec.view_launch_config()
     deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
     return deferred
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/launch/',
+@app.route('/<string:tenant_id>/groups/<string:group_id>/launch/',
            methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.launch_config)
-def edit_launch_config(request, log, tenantId, groupId, data):
+def edit_launch_config(request, log, tenant_id, group_id, data):
     """
     Edit the launch configuration for a scaling group, which includes the
     details of how to create a server, from what image, which load balancers to
@@ -199,6 +199,6 @@ def edit_launch_config(request, log, tenantId, groupId, data):
     Nova should validate the image before saving the new config.
     Users may have an invalid configuration based on dependencies.
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
     deferred = rec.update_launch_config(data)
     return deferred
