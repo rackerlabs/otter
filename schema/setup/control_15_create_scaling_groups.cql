@@ -33,7 +33,7 @@ USE @@KEYSPACE@@;
 -- policyTouched is a list of timestamps for the policy
 --  {"policyid": date}
 
-CREATE COLUMNFAMILY scaling_config (
+CREATE COLUMNFAMILY scaling_group (
     "tenantId" ascii,
     "groupId" ascii,
     group_config ascii,

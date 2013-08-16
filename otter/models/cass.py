@@ -361,7 +361,7 @@ class CassScalingGroup(object):
         self.tenant_id = tenant_id
         self.uuid = uuid
         self.connection = connection
-        self.config_table = "scaling_config"
+        self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
@@ -385,8 +385,8 @@ class CassScalingGroup(object):
             })
             return d
 
-        view_query = _cql_view_manifest.format(cf=self.config_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.config_table)
+        view_query = _cql_view_manifest.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -399,8 +399,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
-        view_query = _cql_view.format(cf=self.config_table, column='group_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.config_table)
+        view_query = _cql_view.format(cf=self.group_table, column='group_config')
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -413,8 +413,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
-        view_query = _cql_view.format(cf=self.config_table, column='launch_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.config_table)
+        view_query = _cql_view.format(cf=self.group_table, column='launch_config')
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -427,8 +427,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
-        view_query = _cql_view_group_state.format(cf=self.config_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.config_table)
+        view_query = _cql_view_group_state.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -453,7 +453,7 @@ class CassScalingGroup(object):
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
-            return self.connection.execute(_cql_insert_group_state.format(cf=self.config_table),
+            return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
                                            params, get_consistency_level('update', 'state'))
 
         def _modify_state():
@@ -471,7 +471,7 @@ class CassScalingGroup(object):
         self.log.bind(updated_config=data).msg("Updating config")
 
         def _do_update_config(lastRev):
-            queries = [_cql_update.format(cf=self.config_table, column='group_config',
+            queries = [_cql_update.format(cf=self.group_table, column='group_config',
                                           name=":scaling")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -491,7 +491,7 @@ class CassScalingGroup(object):
         self.log.bind(updated_launch_config=data).msg("Updating launch config")
 
         def _do_update_launch(lastRev):
-            queries = [_cql_update.format(cf=self.config_table, column='launch_config',
+            queries = [_cql_update.format(cf=self.group_table, column='launch_config',
                                           name=":launch")]
 
             b = Batch(queries, {"tenantId": self.tenant_id,
@@ -763,7 +763,7 @@ class CassScalingGroup(object):
             }
             queries = [
                 _cql_delete_all_in_group.format(cf=table) for table in
-                (self.config_table, self.policies_table, self.webhooks_table)]
+                (self.group_table, self.policies_table, self.webhooks_table)]
 
             if len(policies) > 0:
                 events_query, events_params = _delete_many_query_and_params(
@@ -818,7 +818,7 @@ class CassScalingGroupCollection:
     The Cassandra schema structure::
 
         Configs:
-        CF = scaling_config
+        CF = scaling_group
         RK = tenantId
         CK = groupID
 
@@ -852,7 +852,7 @@ class CassScalingGroupCollection:
         :param cflist: Column family list
         """
         self.connection = connection
-        self.config_table = "scaling_config"
+        self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
@@ -867,7 +867,7 @@ class CassScalingGroupCollection:
 
         log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
 
-        queries = [_cql_create_group.format(cf=self.config_table)]
+        queries = [_cql_create_group.format(cf=self.group_table)]
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
@@ -919,13 +919,13 @@ class CassScalingGroupCollection:
                 return None
             log.msg('Resurrected rows', rows=groups)
             query, params = _delete_many_query_and_params(
-                self.config_table, '"groupId"',
+                self.group_table, '"groupId"',
                 (group['groupId'] for group in groups))
             return self.connection.execute(query, params,
                                            get_consistency_level('delete', 'group'))
 
         log = log.bind(tenant_id=tenant_id)
-        d = self.connection.execute(_cql_list_states.format(cf=self.config_table),
+        d = self.connection.execute(_cql_list_states.format(cf=self.group_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
         d.addCallback(_filter_resurrected)
@@ -993,7 +993,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
         """
 
-        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        fields = ['scaling_group', 'scaling_policies', 'policy_webhooks']
         deferred = [self.connection.execute(_cql_count_for_tenant.format(cf=field),
                                             {'tenantId': tenant_id},
                                             get_consistency_level('count', 'group'))
