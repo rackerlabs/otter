@@ -20,8 +20,6 @@ class GetListEntityStatusTest(AutoscaleFixture):
             gc_min_entities=cls.gc_min_entities_alt,
             gc_max_entities=cls.gc_max_entities)
         cls.group = group_response.entity
-        cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
         cls.group_state_response = cls.autoscale_client.list_status_entities_sgroups(
             cls.group.id)
         cls.group_state = cls.group_state_response.entity
