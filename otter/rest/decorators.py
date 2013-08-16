@@ -101,6 +101,17 @@ def succeeds_with(success_code):
     return decorator
 
 
+def bind_log(f):
+    """
+    Binds keyword arguments to log
+    """
+    @wraps(f)
+    def _(request, log, *args, **kwargs):
+        bound_log = log.bind(**kwargs)
+        return f(request, bound_log, *args, **kwargs)
+    return _
+
+
 def with_transaction_id():
     """
     Generates a request txnid
@@ -120,7 +131,7 @@ def with_transaction_id():
                 referer=request.getHeader("referer"),
                 useragent=request.getHeader("user-agent")
             ).msg("Received request")
-            return f(request, bound_log, *args, **kwargs)
+            return bind_log(f)(request, bound_log, *args, **kwargs)
         return _
     return decorator
 
