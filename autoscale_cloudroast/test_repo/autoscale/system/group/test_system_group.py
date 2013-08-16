@@ -69,7 +69,7 @@ class GroupFixture(AutoscaleFixture):
             count=upd_maxentities)
 
     @tags(speed='quick')
-    def test_system_update_maxenetities_and_execute_policy(self):
+    def test_system_update_maxentities_and_execute_policy(self):
         """
         Execute policy on scaling group such that the maxentities are met,
         update the maxentities and upon re-executing the scaling policy beyond

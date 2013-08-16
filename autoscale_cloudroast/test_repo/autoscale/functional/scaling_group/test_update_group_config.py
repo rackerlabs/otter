@@ -63,7 +63,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         fails with 400
         """
         # AUTO-302
-        upd_min_entities = 25
+        upd_min_entities = self.max_maxentities + 1
         upd_group_resp = self.autoscale_client.update_group_config(
             self.group.id,
             name=self.group.groupConfiguration.name,
