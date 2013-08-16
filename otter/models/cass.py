@@ -114,6 +114,11 @@ _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} W
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
 
 
+# Store consistency levels
+_consistency_levels = {'event': {'list': ConsistencyLevel.QUORUM, 'insert': ConsistencyLevel.QUORUM,
+                       'delete': ConsistencyLevel.QUORUM}}
+
+
 def get_consistency_level(operation, resource):
     """
     Get the consistency level for a particular operation.
@@ -131,7 +136,11 @@ def get_consistency_level(operation, resource):
     """
     # TODO: configurable consistency level, possibly different for read
     # and write operations
-    return ConsistencyLevel.ONE
+    resource_operations = _consistency_levels.get(resource)
+    if resource_operations:
+        return resource_operations.get(operation, ConsistencyLevel.ONE)
+    else:
+        return ConsistencyLevel.ONE
 
 
 def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
@@ -889,7 +898,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
                                     {"size": size, "now": now},
-                                    get_consistency_level('list', 'events'))
+                                    get_consistency_level('list', 'event'))
         return d
 
     def update_delete_events(self, delete_policy_ids, update_events):
@@ -899,7 +908,7 @@ class CassScalingGroupCollection:
         # First delete all events
         all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
         query, data = _delete_events_query_and_params(all_delete_ids, self.event_table)
-        d = self.connection.execute(query, data, get_consistency_level('delete', 'events'))
+        d = self.connection.execute(query, data, get_consistency_level('delete', 'event'))
 
         # Then insert rows for trigger times to be updated. This is because trigger cannot be
         # updated on an existing row since it is part of primary key
@@ -909,7 +918,7 @@ class CassScalingGroupCollection:
                 polname = 'policy{}'.format(i)
                 queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
                 data.update({polname + key: event[key] for key in event})
-            b = Batch(queries, data, get_consistency_level('update', 'events'))
+            b = Batch(queries, data, get_consistency_level('insert', 'event'))
             return b.execute(self.connection)
 
         return update_events and d.addCallback(_do_update) or d
