@@ -20,7 +20,6 @@ class BobbyFixture(BaseTestFixture):
         """
         super(BobbyFixture, cls).setUpClass()
         cls.resources = ResourcePool()
-        #cls.autoscale_config = AutoscaleConfig()
         cls.url = 'http://127.0.0.1:9876/829409'
         cls.bobby_client = BobbyAPIClient(cls.url, None, 'json', 'json')
 

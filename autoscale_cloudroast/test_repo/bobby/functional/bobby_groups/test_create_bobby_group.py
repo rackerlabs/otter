@@ -18,7 +18,7 @@ class CreateGroupTest(BobbyFixture):
         super(CreateGroupTest, cls).setUpClass()
         cls.scaling_group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
         cls.notification = 'test@test.com'
-        cls.notification_plan = {'label': 'TestNP', 'critical_state': ['test']}
+        cls.notification_plan = 'test'
 
     @classmethod
     def tearDownClass(cls):
@@ -39,9 +39,25 @@ class CreateGroupTest(BobbyFixture):
                           msg='The response code for create  group in bobby '
                           'resulted in {0}'.format(create_group_response.status_code))
         self.resources.add(self.scaling_group_id,
-                           self.autoscale_client.delete_group)
+                           self.bobby_client.delete_group)
 
-    def test_create_group_with_bad_request(self):
+    def test_create_group_without_group_id(self):
+        """
+        Create a group in bobby with a given group_id, notification
+        and notification pals, and verify the response code is 201.
+        """
+        scaling_group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
+        create_group_response = self.bobby_client.create_group(
+            group_id=None,
+            notification=self.notification,
+            notification_plan=self.notification_plan)
+        self.assertEquals(create_group_response.status_code, 201,
+                          msg='The response code for create  group in bobby '
+                          'resulted in {0}'.format(create_group_response.status_code))
+        self.resources.add(scaling_group_id,
+                           self.bobby_client.delete_group)
+
+    def test_create_group_without_notification(self):
         """
         Create a group in bobby with a given group_id, notification
         and notification pals, and verify the response code is 201.
@@ -49,10 +65,42 @@ class CreateGroupTest(BobbyFixture):
         scaling_group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
         create_group_response = self.bobby_client.create_group(
             group_id=scaling_group_id,
-            notification='lekha.jeevan@rackspace.com',
+            notification=None,
+            notification_plan=self.notification_plan)
+        self.assertEquals(create_group_response.status_code, 201,
+                          msg='The response code for create  group in bobby '
+                          'resulted in {0}'.format(create_group_response.status_code))
+        self.resources.add(scaling_group_id,
+                           self.bobby_client.delete_group)
+
+    def test_create_group_without_notification_plan(self):
+        """
+        Create a group in bobby with a given group_id, notification
+        and notification pals, and verify the response code is 201.
+        """
+        scaling_group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
+        create_group_response = self.bobby_client.create_group(
+            group_id=scaling_group_id,
+            notification=self.notification,
             notification_plan=None)
         self.assertEquals(create_group_response.status_code, 201,
                           msg='The response code for create  group in bobby '
                           'resulted in {0}'.format(create_group_response.status_code))
         self.resources.add(scaling_group_id,
-                           self.autoscale_client.delete_group)
+                           self.bobby_client.delete_group)
+
+    def test_create_group_without_notification_plan_as_dict(self):
+        """
+        Create a group in bobby with a given group_id, notification
+        and notification pals, and verify the response code is 201.
+        """
+        scaling_group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
+        create_group_response = self.bobby_client.create_group(
+            group_id=scaling_group_id,
+            notification=self.notification,
+            notification_plan={'label': 'TestNP', 'critical_state': ['test']})
+        self.assertEquals(create_group_response.status_code, 201,
+                          msg='The response code for create  group in bobby '
+                          'resulted in {0}'.format(create_group_response.status_code))
+        self.resources.add(scaling_group_id,
+                           self.bobby_client.delete_group)
