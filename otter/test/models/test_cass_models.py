@@ -22,7 +22,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError)
 
-from otter.test.utils import LockMixin, CheckFailure, DummyException
+from otter.test.utils import LockMixin, DummyException
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
     IScalingGroupCollectionProviderMixin,
@@ -140,25 +140,44 @@ class VerifiedViewTests(TestCase):
         mock connection object
         """
         self.connection = mock.MagicMock(spec=['execute'])
-        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': 23}])
 
     def test_valid_view(self):
         """
         Returns row if it is valid
         """
+        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': 23}])
         r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
         self.assertEqual(self.successResultOf(r), {'c1': 2, 'created_at': 23})
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
 
-    def test_resucrrected_view(self):
+    def test_resurrected_view(self):
         """
-        Raise empty error if recurrected view
+        Raise empty error if resurrected view
         """
-        self.connection.execute.return_value = defer.succeed([{'c1': 2}])
+        self.connection.execute.return_value = defer.succeed([{'c1': 2, 'created_at': None}])
         r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
-        self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
-        self.connection.execute.has_calls([mock.call('vq', {'d': 2}, 6),
-                                           mock.call('dq', {'d': 2}, 6)])
+        self.failureResultOf(r, ValueError)
+        self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
+                                                  mock.call('dq', {'d': 2}, 6)])
+
+    def test_del_does_not_wait(self):
+        """
+        When a resurrected row is encountered it is triggered for deletion and `verified_view`
+        does not wait for its result before returning
+        """
+        first_time = [True]
+
+        def _execute(*args):
+            if first_time[0]:
+                first_time[0] = False
+                return defer.succeed([{'c1': 2, 'created_at': None}])
+            return defer.Deferred()
+
+        self.connection.execute.side_effect = _execute
+        r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
+        self.failureResultOf(r, ValueError)
+        self.connection.execute.assert_has_calls([mock.call('vq', {'d': 2}, 6),
+                                                  mock.call('dq', {'d': 2}, 6)])
 
     def test_empty_view(self):
         """
@@ -166,7 +185,7 @@ class VerifiedViewTests(TestCase):
         """
         self.connection.execute.return_value = defer.succeed([])
         r = verified_view(self.connection, 'vq', 'dq', {'d': 2}, 6, ValueError)
-        self.assertEqual(self.failureResultOf(r), CheckFailure(ValueError))
+        self.failureResultOf(r, ValueError)
         self.connection.execute.assert_called_once_with('vq', {'d': 2}, 6)
 
 
@@ -546,9 +565,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         mock_verfied_view.assert_called_once_with(self.connection, viewCql, delCql,
                                                   expectedData, ConsistencyLevel.TWO,
-                                                  mock.ANY)
-        args, _ = mock_verfied_view.call_args
-        self.assertTrue(isinstance(args[-1], NoSuchScalingGroupError))
+                                                  matches(IsInstance(NoSuchScalingGroupError)))
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))

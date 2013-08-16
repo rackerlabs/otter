@@ -304,18 +304,12 @@ def _unmarshal_state(state_dict):
     )
 
 
-def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty,
-                  timeout=None):
+def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty):
     """
     Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
-    Any resurrected entry is deleted and `exception_if_empty` is raised. If `timeout` is given,
-    the method waits for that many seconds before raising `exception_if_empty`
+    Any resurrected entry is deleted and `exception_if_empty` is raised.
     TODO: Should there be seperate argument for view_consistency and del_consistency
     """
-    # TODO: Implement timeout
-    if timeout:
-        raise NotImplementedError
-
     def _check_resurrection(result):
         if len(result) == 0:
             raise exception_if_empty
@@ -440,7 +434,7 @@ class CassScalingGroup(object):
                           get_consistency_level('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid))
 
-        return d.addCallback(lambda state: _unmarshal_state(state))
+        return d.addCallback(_unmarshal_state)
 
     def modify_state(self, modifier_callable, *args, **kwargs):
         """
