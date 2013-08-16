@@ -52,9 +52,9 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
-                     'pending, "groupTouched", "policyTouched", paused, created_at) '
-                     'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, :pending, '
-                     ':groupTouched, :policyTouched, :paused, :created_at)')
+                     'pending, "policyTouched", paused, created_at) '
+                     'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
+                     ':pending, :policyTouched, :paused, :created_at)')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
 _cql_view_manifest = ('SELECT group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
@@ -872,7 +872,6 @@ class CassScalingGroupCollection:
                 "active": '{}',
                 "pending": '{}',
                 "policyTouched": '{}',
-                "groupTouched": False,
                 "paused": False,
                 "created_at": datetime.utcnow()
                 }
