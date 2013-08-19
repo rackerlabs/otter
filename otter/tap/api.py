@@ -25,6 +25,7 @@ from otter.auth import CachingAuthenticator
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
+from otter.bobby import BobbyClient
 
 
 class Options(usage.Options):

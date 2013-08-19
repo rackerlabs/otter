@@ -14,10 +14,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
-from otter.util.config import config_value
 from otter.rest.application import get_bobby
-
-from otter.bobby import BobbyClient
 
 
 def format_state_dict(state):
