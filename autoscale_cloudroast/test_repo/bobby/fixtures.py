@@ -3,8 +3,10 @@
 """
 from cafe.drivers.unittest.fixtures import BaseTestFixture
 from cloudcafe.common.resources import ResourcePool
-#from autoscale.config import AutoscaleConfig
 from bobby.client import BobbyAPIClient
+from bobby.config import BobbyConfig
+from bobby.behaviors import BobbyBehaviors
+#from autoscale.fixtures import AutoscaleFixture
 
 
 class BobbyFixture(BaseTestFixture):
@@ -20,8 +22,49 @@ class BobbyFixture(BaseTestFixture):
         """
         super(BobbyFixture, cls).setUpClass()
         cls.resources = ResourcePool()
-        cls.url = 'http://127.0.0.1:9876/829409'
+        cls.url = 'http://127.0.0.1:9876/849356'
         cls.bobby_client = BobbyAPIClient(cls.url, None, 'json', 'json')
+        cls.bobby_config = BobbyConfig()
+        cls.bobby_behaviors = BobbyBehaviors(cls.bobby_config,
+                                                     cls.bobby_client)
+        #cls.autoscale_fixt = AutoscaleFixture()
+
+        cls.tenant_id = cls.bobby_config.tenant_id
+        cls.group_id = cls.bobby_config.group_id
+        cls.notification = cls.bobby_config.notification
+        cls.notification_plan = cls.bobby_config.notification_plan
+
+    def validate_headers(self, headers):
+        """
+        Module to validate headers
+        """
+        self.assertTrue(headers is not None,
+                        msg='No headers returned')
+        if headers.get('transfer-encoding'):
+            self.assertEqual(headers['transfer-encoding'], 'chunked',
+                             msg='Response header transfer-encoding is not chunked')
+        self.assertTrue(headers['server'] is not None,
+                        msg='Response header server is not available')
+        self.assertEquals(headers['content-type'], 'application/json',
+                          msg='Response header content-type is None')
+        self.assertTrue(headers['date'] is not None,
+                        msg='Time not included')
+        self.assertTrue(headers['x-response-id'] is not None,
+                        msg='No x-response-id')
+
+    def assert_create_bobby_group_feilds(self, group, group_id=None):
+        """
+        Assert the reponse of a bobby group
+        """
+        group_id = group_id or self.group_id
+        self.assertEquals(group.tenantId, self.tenant_id,
+            msg='The tenant ID in the response did not match')
+        self.assertEquals(group.groupId, group_id,
+            msg='The group ID in the response did not match')
+        self.assertEquals(group.notification, self.notification,
+            msg='The notification in the response did not match')
+        self.assertEquals(group.notificationPlan, self.notification_plan,
+            msg='The notification plan in the response did not match')
 
     @classmethod
     def tearDownClass(cls):
@@ -38,7 +81,6 @@ class BobbyGroupFixture(BobbyFixture):
     :summary: Creates a group using the default from
               the test data
     """
-    pass
 
     @classmethod
     def setUpClass(cls, group_id=None, notification=None,
@@ -47,12 +89,14 @@ class BobbyGroupFixture(BobbyFixture):
         Creates a group with default values
         """
         super(BobbyGroupFixture, cls).setUpClass()
-        group_id = group_id or '90364858-78f3-4543-85bc-e75a407c08d4'
-
+        group_id = group_id or cls.group_id
+        notification = notification or cls.notification
+        notification_plan = notification_plan or cls.notification_plan
         cls.create_group_response = cls.bobby_client.\
-            create_group(group_id=group_id)
+            create_group(group_id=group_id, notification=notification,
+                         notification_plan=notification_plan)
         cls.group = cls.create_group_response.entity
-        cls.resources.add(cls.group.id,
+        cls.resources.add(cls.group_id,
                           cls.bobby_client.delete_group)
 
     @classmethod

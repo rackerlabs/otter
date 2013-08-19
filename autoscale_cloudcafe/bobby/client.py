@@ -5,6 +5,7 @@ from bobby.models.bobby_response import BobbyGroup, ServerGroup, Policies
 from bobby.models.bobby_requests import BobbyGroup_Request, ServerGroup_Request, \
     BobbyPolicies_Request
 from cafe.engine.clients.rest import AutoMarshallingRestClient
+from urlparse import urlparse
 
 
 class BobbyAPIClient(AutoMarshallingRestClient):
@@ -79,7 +80,9 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         GET
         '{tenant_id}/groups/{group_id}'
         """
-        url = '{0}/groups/{1}'.format(self.url, group_id)
+        url_new = str(group_id)
+        url_scheme = urlparse(url_new).scheme
+        url = url_new if url_scheme else '{0}/groups/{1}'.format(self.url, group_id)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=BobbyGroup)

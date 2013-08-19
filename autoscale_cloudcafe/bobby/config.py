@@ -18,9 +18,24 @@ class BobbyConfig(ConfigSectionInterface):
         return self.get('tenant_id')
 
     @property
-    def region(self):
+    def group_id(self):
         """
-        Region to autoscale
+        Group ID to be added to bobby
         """
-        return self.get('region')
+        return self.get('group_id')
+
+    @property
+    def notification(self):
         """
+        Notification for the tenant in bobby
+        """
+        return self.get('notification')
+
+    @property
+    def notification_plan(self):
+        """
+        Notification plan for the tenant in bobby
+        """
+        return self.get('notification_plan')
+
+
