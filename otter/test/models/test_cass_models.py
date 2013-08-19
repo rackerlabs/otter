@@ -1451,8 +1451,23 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         If returned view is resurrected, i.e. that does not contain 'created_at',
         then it is triggered for deletion and NoSuchScalingGroupError is raised
         """
-        # TODO
-        pass
+        # This may not be required since verified_view call is checked in
+        # test_view_manifest_success
+        select_return = [{'group_config': serialize_json_data(self.config, 1.0),
+                          'launch_config': serialize_json_data(self.launch_config, 1.0)}]
+        self.returns = [select_return, None]
+        self.group._naive_list_policies = mock.MagicMock(
+            return_value=defer.succeed({}))
+        r = self.group.view_manifest()
+        self.failureResultOf(r, NoSuchScalingGroupError)
+        view_cql = ('SELECT group_config, launch_config, active, '
+                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+        del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
+        exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+        self.connection.execute.assert_has_calls(
+            [mock.call(view_cql, exp_data, ConsistencyLevel.TWO),
+             mock.call(del_cql, exp_data, ConsistencyLevel.TWO)])
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
     def test_delete_non_empty_scaling_group_fails(self, mock_view_state):
