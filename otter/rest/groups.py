@@ -305,7 +305,7 @@ def create_new_scaling_group(request, log, tenant_id, data):
 
     def _add_to_bobby(result, bobby_url):
         client = BobbyClient(bobby_url)
-        d = client.create_group(tenantId, result["id"])
+        d = client.create_group(tenant_id, result["id"])
         return d.addCallback(lambda _: result)
 
     bobby_url = config_value('bobby_url')
