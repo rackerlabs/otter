@@ -239,6 +239,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
                                       self.connection)
+        self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
+                                                   tenant_id=self.tenant_id,
+                                                   scaling_group_id=self.group_id)
+        self.mock_log = self.mock_log.bind()
 
         self.mock_key = patch(self, 'otter.models.cass.generate_key_str',
                               return_value='12345678')
@@ -570,7 +574,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expectedData = {"tenantId": "11111", "groupId": "12345678g"}
         mock_verfied_view.assert_called_once_with(self.connection, viewCql, delCql,
                                                   expectedData, ConsistencyLevel.TWO,
-                                                  matches(IsInstance(NoSuchScalingGroupError)))
+                                                  matches(IsInstance(NoSuchScalingGroupError)),
+                                                  self.mock_log)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -1424,7 +1429,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
         verified_view.assert_called_once_with(self.connection, view_cql, del_cql,
                                               exp_data, ConsistencyLevel.TWO,
-                                              matches(IsInstance(NoSuchScalingGroupError)))
+                                              matches(IsInstance(NoSuchScalingGroupError)),
+                                              self.mock_log)
 
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
