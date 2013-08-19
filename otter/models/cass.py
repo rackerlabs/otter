@@ -304,7 +304,7 @@ def _unmarshal_state(state_dict):
     )
 
 
-def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty):
+def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty, log):
     """
     Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
     Any resurrected entry is deleted and `exception_if_empty` is raised.
@@ -317,6 +317,7 @@ def verified_view(connection, view_query, del_query, data, consistency, exceptio
             return result[0]
         else:
             # resurrected row, trigger its deletion and raise empty exception
+            log.msg('Resurrected row', row=result[0], row_params=data)
             connection.execute(del_query, data, consistency)
             raise exception_if_empty
 
@@ -390,7 +391,7 @@ class CassScalingGroup(object):
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid))
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_get_policies)
 
@@ -404,7 +405,7 @@ class CassScalingGroup(object):
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid))
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(lambda group: _jsonloads_data(group['group_config']))
 
@@ -418,7 +419,7 @@ class CassScalingGroup(object):
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid))
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
@@ -432,7 +433,7 @@ class CassScalingGroup(object):
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
                           get_consistency_level('view', 'partial'),
-                          NoSuchScalingGroupError(self.tenant_id, self.uuid))
+                          NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_unmarshal_state)
 
@@ -916,12 +917,14 @@ class CassScalingGroupCollection:
         def _delete_resurrected_groups(groups):
             if not groups:
                 return None
+            log.msg('Resurrected rows', rows=groups)
             query, params = _delete_many_query_and_params(
                 self.config_table, '"groupId"',
                 (group['groupId'] for group in groups))
             return self.connection.execute(query, params,
                                            get_consistency_level('delete', 'group'))
 
+        log = log.bind(tenant_id=tenant_id)
         d = self.connection.execute(_cql_list_states.format(cf=self.config_table),
                                     {"tenantId": tenant_id},
                                     get_consistency_level('list', 'group'))
