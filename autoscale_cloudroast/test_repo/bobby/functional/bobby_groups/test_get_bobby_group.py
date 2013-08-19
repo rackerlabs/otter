@@ -40,9 +40,11 @@ class GetGroupTest(BobbyGroupFixture):
         """
         group1 = self.bobby_behaviors.create_bobby_group_min()
         group2 = self.bobby_behaviors.create_bobby_group_min()
-        list_group_response = self.bobby_client.list_groups(self.groupId)
+        list_group_response = self.bobby_client.list_groups(self.group_id)
         self.assertEquals(list_group_response.status_code, 200,
                           msg='List group in bobby resulted in {0}'.format(
                           list_group_response.status_code))
         self.validate_headers(list_group_response.headers)
+        self.assertTrue(group1.groupId in list_group_response.entity)
+        self.assertTrue(group2.groupId in list_group_response.entity)
 

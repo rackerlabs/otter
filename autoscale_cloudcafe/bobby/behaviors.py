@@ -25,7 +25,7 @@ class BobbyBehaviors(BaseBehavior):
         Creates a bobby group with the valus in the config
         """
         bobby_group = self.bobby_client.create_group(
-            group=self.bobby_config.group_Id,
+            group_id=self.bobby_config.group_id,
             notification=self.bobby_config.notification,
             notification_plan=self.bobby_config.notification_plan)
         return bobby_group.entity
