@@ -5,6 +5,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class ScalingGroupListTest(AutoscaleFixture):
+
     """
     Verify get and list group.
     """
@@ -50,6 +51,19 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertEqual(group_info.launchConfiguration,
                          self.first_scaling_group.launchConfiguration,
                          msg="Group's launch configurations did not match")
+
+    def test_default_maxentities_set_on_a_group(self):
+        """
+        Verify the default max entities set on a group when max enetities are
+        not specified by the user, when creating group.
+        """
+        for each_group in [self.first_scaling_group, self.second_scaling_group]:
+            group_info = self.autoscale_client.\
+                view_manifest_config_for_scaling_group(group_id=each_group.id).entity
+            self.assertEquals(group_info.groupConfiguration.maxEntities, self.max_maxentities,
+                              msg='The maxentities set by default on the group should be {0} '
+                              ' but is {1}'.format(self.max_maxentities,
+                                                   group_info.groupConfiguration.maxEntities))
 
     def test_list_scaling_group(self):
         """
