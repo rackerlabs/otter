@@ -88,7 +88,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.assertEquals(execute_webhook.status_code, 202,
                               msg='Policy webhook execution failed for group {0} with {1}'.format(
                               self.first_scaling_group.id, execute_webhook.status_code))
-        time.sleep(5)
+        time.sleep(10)
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 

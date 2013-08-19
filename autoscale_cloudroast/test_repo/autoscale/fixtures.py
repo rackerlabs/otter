@@ -305,7 +305,10 @@ class AutoscaleFixture(BaseTestFixture):
                         group_id=group_id)
                 if (len(server_list) == expected_servers):
                         return server_list
+            time.sleep(5)
         else:
+            server_list = self.get_servers_containing_given_name_on_tenant(
+                group_id=group_id)
             self.fail(
                 'Waited 2 mins for desired capacity/active server list to reach the'
                 ' server count of {0}. Has desired capacity {1} on the group {2}'
