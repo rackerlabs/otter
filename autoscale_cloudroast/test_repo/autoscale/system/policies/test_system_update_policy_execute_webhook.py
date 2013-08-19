@@ -27,6 +27,7 @@ class UpdatePoliciesExecuteWebhookTest(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_up,
             execute_webhook=True)
+        sleep(10)  # time for the webhook to execute
         self.resources.add(self.group, self.empty_scaling_group)
 
     @tags(speed='quick')
