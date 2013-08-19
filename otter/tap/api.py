@@ -13,7 +13,7 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
-from otter.rest.application import root, set_store
+from otter.rest.application import root, set_store, set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassScalingGroupCollection
 from otter.scheduler import SchedulerService
@@ -88,6 +88,10 @@ def makeService(config):
             config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
         set_store(CassScalingGroupCollection(cassandra_cluster))
+
+    bobby_url = config_value('bobby_url')
+    if bobby_url is not None:
+        set_bobby(BobbyClient(bobby_url))
 
     cache_ttl = config_value('identity.cache_ttl')
 
