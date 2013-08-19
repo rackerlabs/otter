@@ -54,7 +54,7 @@ class ScalingGroupListTest(AutoscaleFixture):
 
     def test_default_maxentities_set_on_a_group(self):
         """
-        Verify the default max enetities set on a group when max enetities are
+        Verify the default max entities set on a group when max enetities are
         not specified by the user, when creating group.
         """
         for each_group in [self.first_scaling_group, self.second_scaling_group]:
