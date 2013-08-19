@@ -34,7 +34,7 @@ from jsonschema import ValidationError
 # Launch Schemas
 #
 
-MAX_ENTITIES = 25
+MAX_ENTITIES = 1000
 MAX_COOLDOWN = 86400   # 24 * 60 * 60
 
 metadata = {
