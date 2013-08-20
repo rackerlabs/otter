@@ -1,12 +1,14 @@
 """
 Tests for `otter.utils.deferredutils`
 """
+import mock
+
 from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.trial.unittest import TestCase
 
-from otter.util.deferredutils import timeout_deferred
-from otter.test.utils import DummyException
+from otter.util.deferredutils import timeout_deferred, retry_and_timeout
+from otter.test.utils import DummyException, patch
 
 
 class TimeoutDeferredTests(TestCase):
@@ -58,3 +60,44 @@ class TimeoutDeferredTests(TestCase):
         clock.advance(15)
 
         self.failureResultOf(d, CancelledError)
+
+
+class RetryAndTimeoutTests(TestCase):
+    """
+    Tests for ``retry_and_timeout``.  Since this is just a composition of two
+    already tested functions, just ensure that the arguments passed
+    get propagated correctly to the respective functions.
+    """
+    def setUp(self):
+        """
+        Patch both retry and timeout
+        """
+        self.retry = patch(self, 'otter.util.deferredutils.retry')
+        self.timeout = patch(self, 'otter.util.deferredutils.timeout_deferred')
+
+    def test_both_called_with_all_args(self):
+        """
+        Both ``retry`` and ``timeout`` gets called with the args passed to
+        ``retry_and_timeout``, including the same clock
+        """
+        clock = mock.MagicMock()
+        retry_and_timeout('do_work', 'timeout', can_retry='can_retry',
+                          next_interval='next_interval', clock=clock)
+
+        self.retry.assert_called_once_with('do_work', can_retry='can_retry',
+                                           next_interval='next_interval',
+                                           clock=clock)
+        self.timeout.assert_called_once_with(self.retry.return_value,
+                                             'timeout', clock=clock)
+
+    def test_retry_and_timeout_get_the_same_default_clock(self):
+        """
+        If no clock is passed to ``retry_and_timeout``, both ``retry`` and
+        ``timeout`` nevertheless get the same clock.
+        """
+        retry_and_timeout('do_work', 'timeout')
+
+        retry_clock = self.retry.call_args[1]['clock']
+        timeout_clock = self.timeout.call_args[1]['clock']
+
+        self.assertIs(retry_clock, timeout_clock)

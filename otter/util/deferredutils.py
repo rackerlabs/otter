@@ -4,6 +4,8 @@ Deferred utilities
 
 from twisted.internet import defer
 
+from otter.util.retry import retry
+
 
 def unwrap_first_error(possible_first_error):
     """
@@ -62,3 +64,20 @@ def timeout_deferred(deferred, timeout, clock):
         return result
 
     deferred.addBoth(cancelTimeout)
+
+
+def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
+                      clock=None):
+    """
+    Retry a function until the function succeeds or timeout has been reached.
+    This is just a composition of :func:`timeout_deferred` and :func:`retry`
+    for convenience.  Please see their respective arguments.
+    """
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
+    d = retry(do_work, can_retry=can_retry, next_interval=next_interval,
+              clock=clock)
+    timeout_deferred(d, timeout, clock=clock)
+    return d

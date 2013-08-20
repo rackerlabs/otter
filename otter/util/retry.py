@@ -77,6 +77,10 @@ class _Retrier(object):
         needs to be cancelled.
 
         The result is also propagated.
+
+        If this is called as a result of the ``do_work``'s Deferred firing,
+        then ``self.delayed_call`` and ``self.current_work`` should be None,
+        and nothing needs to be cancelled.
         """
         if self.delayed_call is not None:
             self.delayed_call.cancel()
@@ -179,6 +183,10 @@ def retry(do_work, can_retry=None, next_interval=None, clock=None):
 
     if next_interval is None:
         next_interval = repeating_interval(5)
+
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
 
     retrier = _Retrier(do_work, can_retry, next_interval, clock)
     return retrier.start()
