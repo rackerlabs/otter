@@ -42,8 +42,7 @@ class _Retrier(object):
         self.next_interval = next_interval
         self.clock = clock
 
-        self.deferred = defer.Deferred()
-        self.deferred.addBoth(self.handle_early_termination)
+        self.deferred = defer.Deferred(self.handle_early_termination)
 
         self.current_work = None
         self.delayed_call = None
@@ -63,24 +62,19 @@ class _Retrier(object):
         ``self.can_retry`` has to say about it), or schedule the next retry
         of ``self.do_work``
         """
-        if self.terminated or not self.can_retry(f):
+        if self.terminated:
+            return
+
+        if not self.can_retry(f):
             return f
 
         self.delayed_call = self.clock.callLater(self.next_interval(f),
                                                  self.do_real_work)
 
-    def handle_early_termination(self, anything):
+    def handle_early_termination(self, _deferred):
         """
-        If ``self.deferred`` is cancelled, or for some reason (no one should
-        do this) callbacked outside of the context of ``do_work`` succeeding or
-        terminally failing, then the work already in progress and scheduled
-        needs to be cancelled.
-
-        The result is also propagated.
-
-        If this is called as a result of the ``do_work``'s Deferred firing,
-        then ``self.delayed_call`` and ``self.current_work`` should be None,
-        and nothing needs to be cancelled.
+        If ``self.deferred`` is cancelled, then the work already in progress
+        and scheduled needs to be cancelled.
         """
         if self.delayed_call is not None:
             self.delayed_call.cancel()
@@ -89,10 +83,7 @@ class _Retrier(object):
             self.terminated = True
             # make sure to eat the cancelled error, so it doesn't get gc-ed and
             # logged
-            self.current_work.addErrback(lambda f: f.trap(defer.CancelledError))
             self.current_work.cancel()
-
-        return anything
 
     def do_real_work(self):
         """

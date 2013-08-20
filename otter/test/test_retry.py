@@ -34,10 +34,10 @@ class RetryTests(TestCase):
         self.retry_function = lambda *args: True
         self.work_function = work_function
 
-    def test_propagates_result_and_stops_retries_on_callback(self):
+    def test_async_propagates_result_and_stops_retries_on_callback(self):
         """
-        The deferred callbacks with the result as soon as the ``do_work``
-        function succeeds.  No retries happen
+        The deferred callbacks with the result as soon as the asynchronous
+        ``do_work`` function succeeds.  No retries happen
         """
         d = retry(self.work_function, self.retry_function,
                   self.interval_function, self.clock)
@@ -52,6 +52,21 @@ class RetryTests(TestCase):
         # work_function not called again.
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
+
+    def test_sync_propagates_result_and_stops_retries_on_callback(self):
+        """
+        The deferred callbacks with the result as soon as the synchronous
+        ``do_work`` function succeeds.  No retries happen
+        """
+        self.work_function = mock.MagicMock(spec=[], return_value='result!')
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
+        self.assertEqual(self.successResultOf(d), 'result!')
+        self.work_function.assert_called_once_with()
+
+        # work_function not called again.
+        self.clock.advance(self.interval)
+        self.work_function.assert_called_once_with()
 
     def test_ignores_transient_failures_and_retries(self):
         """
@@ -136,6 +151,29 @@ class RetryTests(TestCase):
         # work_function not called again
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
+
+    def test_handles_synchronous_do_work_function_errors(self):
+        """
+        Transient/terminal error handling works the same with a synchronous
+        ``do_work`` function that raises instead of errbacks.
+        """
+        self.work_function = mock.MagicMock(spec=[])
+        self.work_function.side_effect = DummyException
+
+        # DummyExceptions are transient, all else are terminal
+        d = retry(self.work_function, (lambda f: f.check(DummyException)),
+                  self.interval_function, self.clock)
+
+        # no result
+        self.assertNoResult(d)
+        self.work_function.assert_called_once_with()
+
+        self.work_function.side_effect = NotImplementedError
+        self.clock.advance(self.interval)
+
+        # terminal error
+        self.failureResultOf(d, NotImplementedError)
+        self.assertEqual(self.work_function.call_count, 2)
 
     def test_cancelling_deferred_cancels_work_in_progress(self):
         """
