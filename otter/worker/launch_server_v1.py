@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import CancelledError, gatherResults
 
 import treq
 
@@ -28,8 +28,9 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
-from otter.util.deferredutils import (timeout_deferred, retry,
-                                      TransientRetryError, wrap_transient_error)
+from otter.util.deferredutils import retry_and_timeout
+from otter.util.retry import (repeating_interval, transient_errors_except,
+                              TransientRetryError)
 
 
 class UnexpectedServerStatus(Exception):
@@ -112,25 +113,30 @@ def wait_for_active(log,
                     server_id,
                     status,
                     'ACTIVE')
+
             else:
-                raise TransientRetryError(None)
+                raise TransientRetryError()  # just poll again
 
         sd = server_details(server_endpoint, auth_token, server_id)
         sd.addCallback(check_status)
         return sd
 
-    d = retry(poll, interval, clock)
-    timeout_deferred(d, timeout, clock)
+    d = retry_and_timeout(
+        poll, timeout,
+        can_retry=transient_errors_except(UnexpectedServerStatus),
+        next_interval=repeating_interval(interval),
+        clock=clock)
 
-    def on_timeout(f):
-        time_building = clock.seconds() - start_time
-        log.msg(('Server {instance_id} failed to change from BUILD state to '
-                 'ACTIVE within a {timeout} second timeout (it has been '
-                 '{time_building} seconds).'),
-                timeout=timeout, time_building=time_building)
+    def on_error(f):
+        if f.check(CancelledError):
+            time_building = clock.seconds() - start_time
+            log.msg(('Server {instance_id} failed to change from BUILD state '
+                     'to ACTIVE within a {timeout} second timeout (it has been '
+                     '{time_building} seconds).'),
+                    timeout=timeout, time_building=time_building)
         return f
 
-    d.addErrback(on_timeout)
+    d.addErrback(on_error)
 
     return d
 
@@ -480,24 +486,27 @@ def verified_delete(log,
         clock = reactor
 
     def verify(_):
+        def check_status():
+            check_d = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            check_d.addCallback(check_success, [404])
+            return check_d
+
         start_time = clock.seconds()
+
+        # this is treating all errors as transient, so the only error that can
+        # occur is a CancelledError from timing out
+        verify_d = retry_and_timeout(check_status, timeout,
+                                     next_interval=repeating_interval(interval),
+                                     clock=clock)
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
             del_log.msg('Server deleted successfully: {time_delete} seconds.',
                         time_delete=time_delete)
 
-        def check_status():
-            check_d = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
-            check_d.addCallback(check_success, [404])
-            check_d.addCallback(on_success)
-            check_d.addErrback(wrap_transient_error)
-            return check_d
-
-        verify_d = retry(check_status, interval, clock)
-        timeout_deferred(verify_d, timeout, clock)
+        verify_d.addCallback(on_success)
 
         def on_timeout(_):
             time_delete = clock.seconds() - start_time

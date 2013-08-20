@@ -916,7 +916,7 @@ class DeleteServerTests(TestCase):
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
 
-        self.log.msg.assert_called_once_with(mock.ANY, instance_id='serverId')
+        self.log.msg.assert_called_with(mock.ANY, instance_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
         """
@@ -957,8 +957,8 @@ class DeleteServerTests(TestCase):
         clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
-        self.treq.head.return_value = Deferred()
         self.treq.content.side_effect = lambda *args: succeed("")
+        self.treq.head.return_value = Deferred()
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, clock=clock)

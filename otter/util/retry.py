@@ -180,3 +180,10 @@ def retry(do_work, can_retry=None, next_interval=None, clock=None):
 
     retrier = _Retrier(do_work, can_retry, next_interval, clock)
     return retrier.start()
+
+
+class TransientRetryError(Exception):
+    """
+    Exception that can be used to represent retry-able status in a
+    retry-function.
+    """
