@@ -25,7 +25,9 @@ from otter.rest.groups import format_state_dict
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
-from otter.util.config import set_config_data
+
+from otter.rest.application import set_bobby
+from otter.bobby import BobbyClient
 
 
 class FormatterHelpers(TestCase):
@@ -392,20 +394,9 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
     def setUp(self):
         """
-        Mock modify state
+        Set up mock Bobby client
         """
-
-        test_config = {
-            'port': 'tcp:9999',
-            'cassandra': {
-                'seed_hosts': ['tcp:127.0.0.1:9160'],
-                'keyspace': 'otter_test'
-            },
-            "bobby_url": "http://127.0.0.1:9876/",
-            'environment': 'prod'
-        }
-
-        set_config_data(dict(test_config))
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
 
         super(AllGroupsBobbyEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
@@ -413,9 +404,9 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
     def tearDown(self):
         """
-        Set config data back to null
+        Revert mock Bobby client
         """
-        set_config_data({})
+        set_bobby(None)
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
