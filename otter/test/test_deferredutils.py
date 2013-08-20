@@ -8,7 +8,7 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.trial.unittest import TestCase
 
 from otter.util.deferredutils import timeout_deferred, retry
-from otter.test.utils import DummyException
+from otter.test.utils import CheckFailure, DummyException
 
 
 class TimeoutDeferredTests(TestCase):
@@ -109,7 +109,8 @@ class RetryTests(TestCase):
         error that is ignored by the ``can_retry`` function.  The error is
         not propagated.
         """
-        d = retry(self.work_function, self.retry_function,
+        wrapped_retry = mock.MagicMock(wraps=self.retry_function, spec=[])
+        d = retry(self.work_function, wrapped_retry,
                   self.interval_function, self.clock)
 
         self.assertNoResult(d)
@@ -119,6 +120,7 @@ class RetryTests(TestCase):
         self.retries[-1].errback(DummyException('hey!'))
         self.assertIsNone(self.successResultOf(self.retries[-1]))
         self.assertNoResult(d)
+        wrapped_retry.assert_called_once_with(CheckFailure(DummyException))
 
         self.clock.advance(self.interval)
 
@@ -128,6 +130,44 @@ class RetryTests(TestCase):
 
         # stop loop
         self.retries[-1].callback('result!')
+
+    def test_retries_at_intervals_specified_by_interval_function(self):
+        """
+        ``do_work``, if it experiences transient failures, will be retried at
+        intervals returned by the ``next_interval`` function
+        """
+        changing_interval = mock.MagicMock(spec=[])
+        d = retry(self.work_function, self.retry_function,
+                  changing_interval, self.clock)
+
+        changing_interval.return_value = 1
+        self.assertEqual(len(self.retries), 1)
+        self.retries[-1].errback(DummyException('hey!'))
+        self.assertNoResult(d)
+        changing_interval.assert_called_once_with(CheckFailure(DummyException))
+
+        self.clock.advance(1)
+        changing_interval.return_value = 2
+        self.assertEqual(len(self.retries), 2)
+        self.retries[-1].errback(DummyException('hey!'))
+        self.assertNoResult(d)
+        changing_interval.assert_has_calls(
+            [mock.call(CheckFailure(DummyException))] * 2)
+
+        # the next interval has changed - after 1 second, it is still not
+        # retried
+        self.clock.advance(1)
+        self.assertEqual(len(self.retries), 2)
+        self.assertNoResult(d)
+        changing_interval.assert_has_calls(
+            [mock.call(CheckFailure(DummyException))] * 2)
+
+        # after 2 seconds, the function is retried
+        self.clock.advance(1)
+        self.assertEqual(len(self.retries), 3)
+
+        # stop retrying
+        self.retries[-1].callback('hey')
 
     def test_stops_on_non_transient_error(self):
         """
