@@ -55,8 +55,8 @@ _table_regex = re.compile(
 
 _drop_regex = re.compile('^\s*(alter|drop|truncate|delete)\s', re.I | re.M)
 
-cassandra_host = os.environ.get('CASSANDRA_HOST')
-cassandra_port = os.environ.get('CASSANDRA_PORT')
+cassandra_host = os.environ.get('CASSANDRA_HOST', 'localhost')
+cassandra_port = os.environ.get('CASSANDRA_PORT', 9160)
 
 class RunningCassandraCluster(object):
     """
