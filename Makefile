@@ -8,7 +8,9 @@ CQLSH ?= $(shell which cqlsh)
 DOCDIR=doc
 UNITTESTS ?= ${CODEDIR}
 CASSANDRA_HOST ?= localhost
+export CASSANDRA_HOST
 CASSANDRA_PORT ?= 9160
+export CASSANDRA_PORT
 CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
