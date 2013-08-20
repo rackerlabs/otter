@@ -16,6 +16,7 @@ from otter.json_schema.group_examples import (
     policy as policy_examples)
 
 from otter.json_schema import rest_schemas, validate
+from otter.json_schema.group_schemas import MAX_ENTITIES
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
@@ -251,7 +252,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         policies = request_body.get('scalingPolicies', [])
 
         expected_config = config.copy()
-        expected_config.setdefault('maxEntities', 25)
+        expected_config.setdefault('maxEntities', MAX_ENTITIES)
         expected_config.setdefault('metadata', {})
 
         rval = {
@@ -303,6 +304,20 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 "name": "group",
                 "minEntities": 10,
                 "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        })
+
+    def test_group_create_default_maxentities(self):
+        """
+        A scaling group without maxentities defaults to configured maxEntities
+        """
+        self._test_successful_create({
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 10,
                 "cooldown": 10,
                 "metadata": {}
             },

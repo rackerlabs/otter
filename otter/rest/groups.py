@@ -8,6 +8,7 @@ import json
 from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
+from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.rest.application import app, get_autoscale_links, get_store, transaction_id
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
@@ -281,7 +282,7 @@ def create_new_scaling_group(request, log, tenant_id, data):
         }
 
     """
-    data['groupConfiguration'].setdefault('maxEntities', 25)
+    data['groupConfiguration'].setdefault('maxEntities', MAX_ENTITIES)
     data['groupConfiguration'].setdefault('metadata', {})
 
     if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
