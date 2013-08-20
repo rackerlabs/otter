@@ -5,9 +5,10 @@ import mock
 
 from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred, succeed
+from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
-from otter.util.retry import retry
+from otter.util.retry import retry, transient_errors_except
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -204,3 +205,44 @@ class RetryTests(TestCase):
         self.assertEqual(self.successResultOf(d), 'result!')
 
         self.assertEqual(wrapped.cancel.call_count, 0)
+
+    def test_default_can_retry_function(self):
+        """
+        If no ``can_retry`` function is provided, a default function treats
+        any failure as transient
+        """
+        d = retry(self.work_function, None, self.interval_function, self.clock)
+
+        self.assertEqual(len(self.retries), 1)
+        self.retries[-1].errback(DummyException('temp'))
+
+        self.clock.advance(self.interval)
+
+        self.assertEqual(len(self.retries), 2)
+        self.retries[-1].errback(NotImplementedError())
+
+        d.callback('Done')
+
+
+class CanRetryHelperTests(TestCase):
+    """
+    Tests for ``can_retry`` implementations such as ``transient_errors_except``
+    """
+
+    def test_transient_errors_except_defaults_to_all_transient(self):
+        """
+        If no args are provided to :func:`transient_errors_except`, the
+        function it returns treats all errors as transient (returns True)
+        """
+        can_retry = transient_errors_except()
+
+        for exception in (DummyException(), NotImplementedError()):
+            self.assertTrue(can_retry(Failure(exception)))
+
+    def test_transient_errors_except_terminates_on_provided_exceptions(self):
+        """
+        If the failure is of a type provided to :func:`transient_errors_except`,
+        the function it returns will treat it as terminal (returns False)
+        """
+        can_retry = transient_errors_except(DummyException)
+        self.assertFalse(can_retry(Failure(DummyException())))

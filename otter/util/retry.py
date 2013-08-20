@@ -120,6 +120,21 @@ class _Retrier(object):
         return self.deferred
 
 
+def transient_errors_except(*args):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that ignores all
+    errors as transient except the ``Exception`` types specified.
+
+    :return: a function that accepts a :class:`Failure` and returns ``True``
+        only if the :class:`Failure` does not wrap an Exception passed in the
+        args.  If no args are passed, all Exceptions are treated as transient.
+    """
+    def can_retry(f):
+        return not f.check(*args)
+
+    return can_retry
+
+
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
     """
     Retries the `do_work` function if it does not succeed and the ``can_retry``
@@ -135,7 +150,8 @@ def retry(do_work, can_retry=None, next_interval=None, clock=None):
 
     :param callable can_retry: function that takes a failure and returns a
         boolean representing whether or not the next attempt should be made, or
-        if all retries should be aborted.  Should be synchronous.
+        if all retries should be aborted.  Should be synchronous.  If None,
+        defaults to the return value of :py:func:`transient_errors_except()`.
 
     :param callable next_interval: function that takes a failure and returns
         the number of seconds until the next attempt as a float.  Should be
@@ -144,5 +160,8 @@ def retry(do_work, can_retry=None, next_interval=None, clock=None):
     :return: a Deferred which fires with the result of the ``do_work``,
         if successful, or the failure of the ``do_work``, if cannot be retried
     """
+    if can_retry is None:
+        can_retry = transient_errors_except()
+
     retrier = _Retrier(do_work, can_retry, next_interval, clock)
     return retrier.start()
