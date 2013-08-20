@@ -4,7 +4,8 @@ Tests for `otter.utils.deferredutils`
 import mock
 
 from twisted.internet.task import Clock
-from twisted.internet.defer import CancelledError, Deferred, succeed
+from twisted.internet.defer import (AlreadyCalledError, CancelledError,
+                                    Deferred, succeed)
 from twisted.trial.unittest import TestCase
 
 from otter.util.deferredutils import timeout_deferred, retry
