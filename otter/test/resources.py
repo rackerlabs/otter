@@ -55,8 +55,6 @@ _table_regex = re.compile(
 
 _drop_regex = re.compile('^\s*(alter|drop|truncate|delete)\s', re.I | re.M)
 
-cassandra_host = os.environ.get('CASSANDRA_HOST', 'localhost')
-cassandra_port = int(os.environ.get('CASSANDRA_PORT', 9160))
 
 class RunningCassandraCluster(object):
     """
@@ -98,9 +96,8 @@ class RunningCassandraCluster(object):
     existing cassandra processes what ports they are listening on and what data
     dir they are using?
     """
-    def __init__(self, host=cassandra_host, port=cassandra_port,
-                 cql_version="3.0.4", setup_cql=None,
-                 teardown_cql=None, overwrite_keyspaces=True):
+    def __init__(self, host="localhost", port=9160, cql_version="3.0.4",
+                 setup_cql=None, teardown_cql=None, overwrite_keyspaces=True):
         self.host = host
         self.port = port
         self.cql_version = cql_version
@@ -360,13 +357,13 @@ class KeyspaceWithClient(object):
 
 schema_dir = os.path.abspath(os.path.join(__file__, '../../../schema'))
 
+
 class OtterKeymaster(object):
     """
     Object that keeps track of created keyspaces, PauseableSilverbergClients,
     and is a factory for PausableSilverbergClients
     """
-    def __init__(self, host=cassandra_host, port=cassandra_port,
-                 setup_generator=None):
+    def __init__(self, host="localhost", port=9160, setup_generator=None):
         self.host = host
         self.port = port
         self.setup_generator = (
