@@ -38,12 +38,12 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         '{tenant_id}/groups/'
         """
 
-        url = '{0}/groups/'.format(self.url)
+        url = '{0}/groups'.format(self.url)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=BobbyGroup)
 
-    def create_group(self, group_id, notification, notification_plan,
+    def create_group(self, group_id, notification=None, notification_plan=None,
                      requestslib_kwargs=None):
         """
         :summary: Create a group
@@ -100,7 +100,7 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups/{groupId}'
         """
 
-        url = '{0}/groups/{1}/'.format(self.url, group_id)
+        url = '{0}/groups/{1}'.format(self.url, group_id)
         return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)
 

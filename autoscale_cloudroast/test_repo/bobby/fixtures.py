@@ -6,7 +6,7 @@ from cloudcafe.common.resources import ResourcePool
 from bobby.client import BobbyAPIClient
 from bobby.config import BobbyConfig
 from bobby.behaviors import BobbyBehaviors
-#from autoscale.fixtures import AutoscaleFixture
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class BobbyFixture(BaseTestFixture):
@@ -89,14 +89,14 @@ class BobbyGroupFixture(BobbyFixture):
         Creates a group with default values
         """
         super(BobbyGroupFixture, cls).setUpClass()
-        group_id = group_id or cls.group_id
+        cls.group_id = rand_name('012345678-RAND-4543-85bc')
         notification = notification or cls.notification
         notification_plan = notification_plan or cls.notification_plan
         cls.create_group_response = cls.bobby_client.\
-            create_group(group_id=group_id, notification=notification,
+            create_group(group_id=cls.group_id, notification=notification,
                          notification_plan=notification_plan)
         cls.group = cls.create_group_response.entity
-        cls.resources.add(cls.group_id,
+        cls.resources.add(group_id,
                           cls.bobby_client.delete_group)
 
     @classmethod

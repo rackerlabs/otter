@@ -1,5 +1,5 @@
 """
-Test get and list groups in bobby
+Test get groups in bobby
 """
 from test_repo.bobby.fixtures import BobbyGroupFixture
 from cloudcafe.common.tools.datagen import rand_name
@@ -8,9 +8,7 @@ from cloudcafe.common.tools.datagen import rand_name
 class GetGroupTest(BobbyGroupFixture):
 
     """
-    Verify get a newly created group in bobby. Delete the group.
-    Verify the delete was successful by doing a GET on the group
-    that results in 404.
+    Get group tests
     """
 
     @classmethod
@@ -25,7 +23,8 @@ class GetGroupTest(BobbyGroupFixture):
 
     def test_get_group_response(self):
         """
-        Get a group, and verify the response code is 200.
+        Get a group, and verify the response code is 200 and validate
+        the response object.
         """
         self.assertEquals(self.get_group_response.status_code, 200,
                           msg='Get group in bobby resulted in {0}'.format(
@@ -34,17 +33,13 @@ class GetGroupTest(BobbyGroupFixture):
         get_group = self.get_group_response.entity
         self.assert_create_bobby_group_feilds(get_group, self.group_id_temp)
 
-    def test_list_group_response(self):
+    def test_get_invalid_group(self):
         """
-        Create multiple groups. List group, and verify the response code is 200.
+        Get a non existant group, and verify the response code is 404.
         """
-        group1 = self.bobby_behaviors.create_bobby_group_min()
-        group2 = self.bobby_behaviors.create_bobby_group_min()
-        list_group_response = self.bobby_client.list_groups(self.group_id)
-        self.assertEquals(list_group_response.status_code, 200,
-                          msg='List group in bobby resulted in {0}'.format(
-                          list_group_response.status_code))
-        self.validate_headers(list_group_response.headers)
-        self.assertTrue(group1.groupId in list_group_response.entity)
-        self.assertTrue(group2.groupId in list_group_response.entity)
+        get_group_response = self.bobby_client.get_group('BUT-I-DONT-EXIST')
+        self.assertEquals(get_group_response.status_code, 404,
+                          msg='Get for non existant group in bobby resulted in '
+                          '{0}'.format(get_group_response.status_code))
+
 

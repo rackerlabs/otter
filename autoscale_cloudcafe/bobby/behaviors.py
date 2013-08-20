@@ -20,12 +20,16 @@ class BobbyBehaviors(BaseBehavior):
         self.bobby_config = bobby_config
         self.bobby_client = bobby_client
 
-    def create_bobby_group_min(self):
+    def create_bobby_group_given(self, group_id=None, notification=None,
+                                 notification_plan=None):
         """
-        Creates a bobby group with the valus in the config
+        Creates a bobby group with teh given values
         """
+        group_id = group_id or rand_name('012345DIFF-78f3-4543-85bc1-')
+        notification = notification or self.bobby_config.notification
+        notification_plan = notification_plan or self.bobby_config.notification_plan
         bobby_group = self.bobby_client.create_group(
-            group_id=self.bobby_config.group_id,
-            notification=self.bobby_config.notification,
-            notification_plan=self.bobby_config.notification_plan)
+            group_id=group_id,
+            notification=notification,
+            notification_plan=notification_plan)
         return bobby_group.entity
