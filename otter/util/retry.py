@@ -135,6 +135,16 @@ def transient_errors_except(*args):
     return can_retry
 
 
+def repeating_interval(interval):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that returns the
+    specified interval all the time.
+
+    :return: a function that accepts a :class:`Failure` and returns ``interval``
+    """
+    return lambda f: interval
+
+
 def retry(do_work, can_retry=None, next_interval=None, clock=None):
     """
     Retries the `do_work` function if it does not succeed and the ``can_retry``
@@ -151,17 +161,24 @@ def retry(do_work, can_retry=None, next_interval=None, clock=None):
     :param callable can_retry: function that takes a failure and returns a
         boolean representing whether or not the next attempt should be made, or
         if all retries should be aborted.  Should be synchronous.  If None,
-        defaults to the return value of :py:func:`transient_errors_except()`.
+        defaults to something that treats all errors as transient.  Some
+        default functions that can be used are, for instance,
+        :func:`transient_errors_except`.
 
     :param callable next_interval: function that takes a failure and returns
         the number of seconds until the next attempt as a float.  Should be
-        synchronous.
+        synchronous.  If None, defaults to something that always returns a 5
+        second interval.  Some default functions that can be used are, for
+        instance, :func:`repeating_interval`.
 
     :return: a Deferred which fires with the result of the ``do_work``,
         if successful, or the failure of the ``do_work``, if cannot be retried
     """
     if can_retry is None:
         can_retry = transient_errors_except()
+
+    if next_interval is None:
+        next_interval = repeating_interval(5)
 
     retrier = _Retrier(do_work, can_retry, next_interval, clock)
     return retrier.start()

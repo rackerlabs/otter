@@ -8,7 +8,7 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
-from otter.util.retry import retry, transient_errors_except
+from otter.util.retry import retry, repeating_interval, transient_errors_except
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -29,7 +29,7 @@ class RetryTests(TestCase):
             return wrapped
 
         self.clock = Clock()
-        self.interval = 5
+        self.interval = 1
         self.interval_function = lambda *args: self.interval
         self.retry_function = lambda *args: True
         self.work_function = work_function
@@ -211,7 +211,7 @@ class RetryTests(TestCase):
         If no ``can_retry`` function is provided, a default function treats
         any failure as transient
         """
-        d = retry(self.work_function, None, self.interval_function, self.clock)
+        retry(self.work_function, None, self.interval_function, self.clock)
 
         self.assertEqual(len(self.retries), 1)
         self.retries[-1].errback(DummyException('temp'))
@@ -221,7 +221,24 @@ class RetryTests(TestCase):
         self.assertEqual(len(self.retries), 2)
         self.retries[-1].errback(NotImplementedError())
 
-        d.callback('Done')
+    def test_default_next_interval_function(self):
+        """
+        If no ``next_interval`` function is provided, a default function returns
+        5 no matter what the failure.
+        """
+        retry(self.work_function, self.retry_function, None, self.clock)
+
+        self.assertEqual(len(self.retries), 1)
+        self.retries[-1].errback(DummyException('temp'))
+
+        self.clock.advance(5)
+
+        self.assertEqual(len(self.retries), 2)
+        self.retries[-1].errback(NotImplementedError())
+
+        self.clock.advance(5)
+
+        self.assertEqual(len(self.retries), 3)
 
 
 class CanRetryHelperTests(TestCase):
@@ -246,3 +263,18 @@ class CanRetryHelperTests(TestCase):
         """
         can_retry = transient_errors_except(DummyException)
         self.assertFalse(can_retry(Failure(DummyException())))
+
+
+class NextIntervalHelperTests(TestCase):
+    """
+    Tests for ``next_interval`` implementations such as ``repeating_interval``
+    """
+
+    def test_repeating_interval_always_returns_interval(self):
+        """
+        ``repeating_interval`` returns the same interval no matter what the
+        failure
+        """
+        next_interval = repeating_interval(3)
+        for exception in (DummyException(), NotImplementedError()):
+            self.assertEqual(next_interval(Failure(exception)), 3)
