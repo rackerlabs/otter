@@ -310,9 +310,6 @@ def execute_webhook(request, log, capability_version, capability_hash):
     """
     store = get_store()
 
-    cap_log = log.bind(capability_hash=capability_hash,
-                       capability_version=capability_version)
-
     d = store.webhook_info_by_hash(log, capability_hash)
 
     def log_informational_webhook_failure(failure):
@@ -320,15 +317,16 @@ def execute_webhook(request, log, capability_version, capability_hash):
                      CannotExecutePolicyError,
                      NoSuchPolicyError,
                      NoSuchScalingGroupError)
-        cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
-                    exc=failure.value)
+        log.msg("Non-fatal error during webhook execution: {exc!r}",
+                exc=failure.value)
 
     def execute_policy((tenant_id, group_id, policy_id)):
+        bound_log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
         group = store.get_scaling_group(log, tenant_id, group_id)
         return group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                          cap_log, transaction_id(request),
+                                          bound_log, transaction_id(request),
                                           policy_id=policy_id))
 
     d.addCallback(execute_policy)
     d.addErrback(log_informational_webhook_failure)
-    d.addErrback(lambda f: cap_log.err(f, "Unhandled exception executing webhook."))
+    d.addErrback(lambda f: log.err(f, "Unhandled exception executing webhook."))
