@@ -4,11 +4,10 @@ Tests for `otter.utils.deferredutils`
 import mock
 
 from twisted.internet.task import Clock
-from twisted.internet.defer import CancelledError, Deferred, fail, succeed
+from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.trial.unittest import TestCase
 
-from otter.util.deferredutils import (
-    timeout_deferred, retry, TransientRetryError, wrap_transient_error)
+from otter.util.deferredutils import timeout_deferred, retry
 from otter.test.utils import DummyException
 
 
@@ -73,7 +72,7 @@ class RetryTests(TestCase):
         """
         self.retries = []
 
-        def retry_function():
+        def work_function():
             d = Deferred()
             wrapped = mock.MagicMock(spec=d, wraps=d)
             self.retries.append(wrapped)
@@ -81,38 +80,43 @@ class RetryTests(TestCase):
 
         self.clock = Clock()
         self.interval = 5
-        self.retry_function = retry_function
+        self.interval_function = lambda *args: self.interval
+        self.retry_function = lambda *args: True
+        self.work_function = work_function
 
-    def test_propagates_result_and_stops_loop_on_callback(self):
+    def test_propagates_result_and_stops_retries_on_callback(self):
         """
-        The deferred callbacks with the result as soon as the ``retry_function``
-        succeeds.  Looping also stops.
+        The deferred callbacks with the result as soon as the ``do_work``
+        function succeeds.  No retries happen
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
 
-        # no result until the retry_function's deferred fires
+        # no result until the work_function's deferred fires
         self.assertNoResult(d)
         self.assertEqual(len(self.retries), 1)
 
         self.retries[-1].callback('result!')
         self.assertEqual(self.successResultOf(d), 'result!')
 
-        # loop is stopped - retry_function not called again.
+        # work_function not called again.
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
 
     def test_ignores_transient_failures_and_retries(self):
         """
-        Retries after interval if ``retry_function`` errbacks with a
-        TransientRetryError, and said TransientRetryError is eaten.
+        Retries after interval if the ``do_work`` function errbacks with an
+        error that is ignored by the ``can_retry`` function.  The error is
+        not propagated.
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
 
         self.assertNoResult(d)
         self.assertEqual(len(self.retries), 1)
 
         # no result on errback
-        self.retries[-1].errback(TransientRetryError('hey'))
+        self.retries[-1].errback(DummyException('hey!'))
         self.assertIsNone(self.successResultOf(self.retries[-1]))
         self.assertNoResult(d)
 
@@ -127,11 +131,11 @@ class RetryTests(TestCase):
 
     def test_stops_on_non_transient_error(self):
         """
-        The deferred errbacks with whatever error the ``retry_function``
-        errbacks with, if it is not a :class:`TransientRetryError`.  Looping
-        also stops.
+        If ``do_work`` errbacks with something the ``can_retry`` function does
+        not ignore, the error is propagated up.  ``do_work`` is not retried.
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, lambda *args: False,
+                  self.interval_function, self.clock)
 
         self.assertNoResult(d)
         self.assertEqual(len(self.retries), 1)
@@ -139,18 +143,19 @@ class RetryTests(TestCase):
         self.retries[-1].errback(DummyException('fail!'))
         self.failureResultOf(d, DummyException)
 
-        # loop is stopped - retry_function not called again.
+        # work_function not called again
         self.clock.advance(self.interval)
         self.assertEqual(len(self.retries), 1)
 
     def test_cancelling_deferred_cancels_work_in_progress(self):
         """
         Cancelling the deferred cancels the deferred returned by
-        ``retry_function`` if it is still in progress, but eats the
+        ``do_work`` if it is still in progress, but eats the
         :class:`CancelledError` (but the overall retry deferred still
         errbacks with a :class:`CancelledError`)
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
         self.assertEqual(len(self.retries), 1)
         self.assertNoResult(self.retries[-1])
 
@@ -158,34 +163,36 @@ class RetryTests(TestCase):
         d.cancel()
         self.failureResultOf(d, CancelledError)
 
-        # retry_function's deferred is cancelled, and error eaten
+        # work_function's deferred is cancelled, and error eaten
         self.retries[-1].cancel.assert_called_once_with()
         self.assertIsNone(self.successResultOf(self.retries[-1]))
 
     def test_cancelling_deferred_does_not_cancel_completed_work(self):
         """
         Cancelling the deferred does not attempt to cancel previously
-        callbacked results from ``retry_function``
+        callbacked results from ``do_work``
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
 
         self.assertEqual(len(self.retries), 1)
-        self.retries[-1].errback(TransientRetryError('temp'))
+        self.retries[-1].errback(DummyException('temp'))
 
         # cancel main deferred
         d.cancel()
         self.failureResultOf(d, CancelledError)
 
-        # retry_function's deferred is not cancelled
+        # work_function's deferred is not cancelled
         self.assertEqual(self.retries[-1].cancel.call_count, 0)
         self.assertIsNone(self.successResultOf(self.retries[-1]))
 
-    def test_cancelling_deferred_stops_loop(self):
+    def test_cancelling_deferred_stops_retries(self):
         """
-        Cancelling the deferred prevents the loop from retrying the function
+        Cancelling the deferred prevents ``retry`` from retrying ``do_work``
         again.
         """
-        d = retry(self.retry_function, self.interval, self.clock)
+        d = retry(self.work_function, self.retry_function,
+                  self.interval_function, self.clock)
         self.assertEqual(len(self.retries), 1)
 
         d.cancel()
@@ -196,32 +203,15 @@ class RetryTests(TestCase):
 
     def test_already_callbacked_deferred_not_canceled(self):
         """
-        If the ``retry_function``'s deferred has already fired, ``retry``
+        If ``do_work``'s deferred has already fired, ``retry``
         callbacks correctly without canceling the fired deferred.
         """
         r = succeed('result!')
         wrapped = mock.MagicMock(spec=r, wraps=r)
-        retry_function = mock.MagicMock(spec=[], return_value=wrapped)
+        work_function = mock.MagicMock(spec=[], return_value=wrapped)
 
-        d = retry(retry_function, self.interval, self.clock)
+        d = retry(work_function, self.retry_function,
+                  self.interval_function, self.clock)
         self.assertEqual(self.successResultOf(d), 'result!')
 
         self.assertEqual(wrapped.cancel.call_count, 0)
-
-
-class HelperFunctionTests(TestCase):
-    """
-    Tests for ``wrap_transient_error``
-    """
-
-    def test_wraps_original_failure(self):
-        """
-        ``wrap_transient_error`` wraps the original failure within a failure of
-        type ``TransientRetryError``
-        """
-        d = fail(DummyException('hey'))
-        d.addErrback(wrap_transient_error)
-
-        f = self.failureResultOf(d, TransientRetryError)
-        original = f.value.wrapped
-        self.assertTrue(original.check(DummyException))

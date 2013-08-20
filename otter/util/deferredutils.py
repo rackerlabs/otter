@@ -3,8 +3,6 @@ Deferred utilities
 """
 
 from twisted.internet import defer
-from twisted.internet.task import LoopingCall
-from twisted.python.failure import Failure
 
 
 def unwrap_first_error(possible_first_error):
@@ -66,83 +64,72 @@ def timeout_deferred(deferred, timeout, clock):
     deferred.addBoth(cancelTimeout)
 
 
-class TransientRetryError(Exception):
+def retry(do_work, can_retry=None, next_interval=None, clock=None):
     """
-    Transient error that means that retry should continue retrying
-    """
-    def __init__(self, wrapped):
-        self.wrapped = wrapped
+    Retries the `do_work` function if it does not succeed and the ``can_retry``
+    callable returns ``True``.  The next time the `do_work` function is retried
+    is dependent upon the return value of the function ``next_interval``, which
+    should return the number of seconds before the next attempt.
 
-    def __repr__(self):
-        """
-        The ``repr`` of :class:`TransientRetryError` includes the ``repr`` of
-        the wrapped failure
-        """
-        return "Transient error [{0!s}]".format(self.wrapped)
+    The ``can_retry`` function will only be called upon ``do_work`` error, and
+    should accept a failure and return a boolean.
 
-
-def wrap_transient_error(f):
-    """
-    Wraps a failure with a TransientRetryError failure.  Can be used as an
-    errback handler.
-
-    :param Failure f: failure to wrap
-    :return: a Failure of type TransientRetryError, which wraps the original
-        failure
-    """
-    return Failure(TransientRetryError(f))
-
-
-def retry(retry_function, interval, clock=None):
-    """
-    Retries a function every ``interval`` until it succeeds or errbacks with
-    something other than :class:`TransientRetryError`
-
-    The ``retry_function`` needs to wrap all transient failures (for which the
-    desired effect is to retry) with a :class:`TransientRetryError`.  On
-    successful callback from ``retry_function ``, the loop will stop.
-
-    :param callable retry_function: function to be retried - should return a
-        Deferred and take no arguments
-    :param int interval: number of seconds between each retry
+    :param callable do_work: function to be retried - should take no arguments
+        and can be either synchronous or return a deferred
+    :param callable can_retry: function that takes a failure and returns a
+        boolean representing whether or not the next attempt should be made, or
+        if all retries should be aborted.  Should be synchronous.
+    :param callable next_interval: function that takes a failure and returns
+        the number of seconds until the next attempt as a float.  Should be synchronous.
     :param clock: clock to be used to retry - used for testing purposes
 
-    :return: a Deferred which fires with the result of the ``retry_function``,
-        if successful, or the failure of the ``retry_function``, if not a
-        :class:`TransientRetryError`
+    :return: a Deferred which fires with the result of the ``do_work``,
+        if successful, or the failure of the ``do_work``, if cannot be retried
     """
     deferred = defer.Deferred()
 
     # this is needed to cancel an existing operation if one is in progress
     operation_d = []
+    delayed_call = [None]
+    canceled = [False]
 
     def pop_operation(anything):
         operation_d.pop()
         return anything
 
-    def real_retry_function():
-        retry = retry_function()
-        operation_d.append(retry)
+    def handle_failure(f):
+        # if the overall deferred is cancelled, this will be cancelled too.
+        # if so, do not retry.
+        if canceled[0] or not can_retry(f):
+            return f
 
-        retry.addBoth(pop_operation)
-        retry.addCallback(deferred.callback)
-        retry.addErrback(lambda f: f.trap(TransientRetryError))
-        retry.addErrback(deferred.errback)
-        return retry
+        next_delay = next_interval(f)
+        delayed_call.append(clock.callLater(next_delay, real_do_work))
 
-    lc = LoopingCall(real_retry_function)
+    def real_do_work():
+        delayed_call.pop()
+        work_d = defer.maybeDeferred(do_work)
+        operation_d.append(work_d)
 
-    if clock is not None:  # pragma: no cover
-        lc.clock = clock
+        work_d.addBoth(pop_operation)
+        work_d.addCallback(deferred.callback)
+        work_d.addErrback(handle_failure)
+        work_d.addErrback(deferred.errback)
+        return work_d
 
-    def stop_loop(anything):
+    def stop_in_progress(anything):
+        canceled[0] = True
+
+        if len(delayed_call) > 0 and delayed_call[0] is not None:
+            delayed_call[0].cancel()
+
         if len(operation_d) > 0:
             operation_d[0].addErrback(lambda f: f.trap(defer.CancelledError))
             operation_d[0].cancel()
-        lc.stop()
+
         return anything
 
-    deferred.addBoth(stop_loop)
-    lc.start(interval)
+    deferred.addBoth(stop_in_progress)
+    real_do_work()
 
     return deferred
