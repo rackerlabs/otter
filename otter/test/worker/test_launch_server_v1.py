@@ -789,6 +789,32 @@ class ServerTests(TestCase):
             'my-auth-token',
             '1')
 
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    def test_launch_server_doesnt_push_undo_op_on_create_server_failure(
+        self, create_server):
+        """
+        launch_server won't push anything onto the undo stack if create_server
+        fails.
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        create_server.return_value = fail(APIError(500, ''))
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        self.failureResultOf(d, APIError)
+
+        # Check that the push hasn't happened because create_server hasn't
+        # succeeded yet.
+        self.assertEqual(self.undo.push.call_count, 0)
+
 
 class ConfigPreparationTests(TestCase):
     """
