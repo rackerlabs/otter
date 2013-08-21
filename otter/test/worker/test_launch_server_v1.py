@@ -315,6 +315,19 @@ class LoadBalancersTests(TestCase):
 
         self.successResultOf(d)
 
+    def test_add_to_load_balancers_no_lb_configs(self):
+        """
+        add_to_load_balancers returns a Deferred that fires with an empty list
+        when no load balancers are configured.
+        """
+
+        d = add_to_load_balancers('http://url/', 'my-auth-token',
+                                  [],
+                                  '192.168.1.1',
+                                  self.undo)
+
+        self.assertEqual(self.successResultOf(d), [])
+
     def test_remove_from_load_balancer(self):
         """
         remove_from_load_balancer makes a DELETE request against the

@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import CancelledError, gatherResults
+from twisted.internet.defer import CancelledError, gatherResults, maybeDeferred
 
 import treq
 
@@ -229,7 +229,7 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
         except StopIteration:
             return results
 
-    return add_next(None)
+    return maybeDeferred(add_next, None)
 
 
 def endpoints(service_catalog, service_name, region):
