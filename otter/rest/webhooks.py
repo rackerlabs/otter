@@ -45,274 +45,261 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
     return webhook_model
 
 
-@app.route(
-    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>/webhooks/',
-    methods=['GET'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(200)
-def list_webhooks(request, log, tenant_id, group_id, policy_id):
+class OtterWebhooks(BaseApp):
     """
-    Get a list of all webhooks (capability URL) associated with a particular
-    scaling policy. This data is returned in the body of the response in JSON
-    format.
+    """
+    app = Klein()
 
-    Example response::
+    def __init__(self, tenant_id, scaling_group_id, policy_id, *args, **kwargs):
+        self.tenant_id = tenant_id
+        self.scaling_group_id = scaling_group_id
+        self.policy_id = policy_id
+        super(OtterWebhooks, self).__init__(*args, **kwargs)
 
-        {
-            "webhooks": [
+    @app.route('/', methods=['GET'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def list_webhooks(self, request, log):
+        """
+        Get a list of all webhooks (capability URL) associated with a particular
+        scaling policy. This data is returned in the body of the response in JSON
+        format.
+
+        Example response::
+
+            {
+                "webhooks": [
+                    {
+                        "id":"{webhookId1}",
+                        "name": "alice",
+                        "metadata": {
+                            "notes": "this is for Alice"
+                        },
+                        "links": [
+                            {
+                                "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": ".../execute/1/{capability_hash1}/,
+                                "rel": "capability"
+                            }
+                        ]
+                    },
+                    {
+                        "id":"{webhookId2}",
+                        "name": "alice",
+                        "metadata": {
+                            "notes": "this is for Bob"
+                        },
+                        "links": [
+                            {
+                                "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": ".../execute/1/{capability_hash2}/,
+                                "rel": "capability"
+                            }
+                        ]
+                    }
+                ],
+                "webhooks_links": []
+            }
+        """
+        def format_webhooks(webhook_dict):
+            webhook_list = []
+            for webhook_id, webhook_model in webhook_dict.iteritems():
+                webhook_list.append(
+                    _format_webhook(webhook_id, webhook_model, self.tenant_id,
+                                    self.group_id, self.policy_id))
+
+            return {
+                'webhooks': webhook_list,
+                "webhooks_links": []
+            }
+
+        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        deferred = rec.list_webhooks(self.policy_id)
+        deferred.addCallback(format_webhooks)
+        deferred.addCallback(json.dumps)
+        return deferred
+
+    @app.route('/', methods=['POST'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(201)
+    @validate_body(rest_schemas.create_webhooks_request)
+    def create_webhooks(self, request, log, data):
+        """
+        Create one or many new webhooks associated with a particular scaling policy.
+        Webhooks may (but do not need to) include some arbitrary medata, and must
+        include a name.
+
+        The response header will point to the list webhooks endpoint.
+        An array of webhooks is provided in the request body in JSON format.
+
+        Example request::
+
+            [
                 {
-                    "id":"{webhookId1}",
                     "name": "alice",
                     "metadata": {
                         "notes": "this is for Alice"
-                    },
-                    "links": [
-                        {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
-                            "rel": "self"
-                        },
-                        {
-                            "href": ".../execute/1/{capability_hash1}/,
-                            "rel": "capability"
-                        }
-                    ]
+                    }
                 },
                 {
-                    "id":"{webhookId2}",
-                    "name": "alice",
-                    "metadata": {
-                        "notes": "this is for Bob"
+                    "name": "bob"
+                }
+            ]
+
+
+        Example response::
+
+            {
+                "webhooks": [
+                    {
+                        "id":"{webhookId1}",
+                        "alice",
+                        "metadata": {
+                            "notes": "this is for Alice"
+                        },
+                        "links": [
+                            {
+                                "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": ".../execute/1/{capability_hash1}/,
+                                "rel": "capability"
+                            }
+                        ]
                     },
+                    {
+                        "id":"{webhookId2}",
+                        "name": "bob",
+                        "metadata": {},
+                        "links": [
+                            {
+                                "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": ".../execute/1/{capability_hash2}/,
+                                "rel": "capability"
+                            }
+                        ]
+                    }
+                ]
+            }
+        """
+        def format_webhooks_and_send_redirect(webhook_dict):
+            request.setHeader(
+                "Location",
+                get_autoscale_links(self.tenant_id, self.group_id, self.policy_id, "", format=None)
+            )
+
+            webhook_list = []
+            for webhook_id, webhook_model in webhook_dict.iteritems():
+                webhook_list.append(
+                    _format_webhook(webhook_id, webhook_model, self.tenant_id,
+                                    self.group_id, self.policy_id))
+
+            return {'webhooks': webhook_list}
+
+        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        deferred = rec.create_webhooks(self.policy_id, data)
+        deferred.addCallback(format_webhooks_and_send_redirect)
+        deferred.addCallback(json.dumps)
+        return deferred
+
+    @app.route('/<string:webhook_id>/', methods=['GET'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def get_webhook(self, request, log, webhook_id):
+        """
+        Get a webhook which has a name, some arbitrary metdata, and a capability
+        URL.  This data is returned in the body of the response in JSON format.
+
+        Example response::
+
+            {
+                "webhook": {
+                    "id":"{webhookId}",
+                    "name": "webhook name",
+                    "metadata": {},
                     "links": [
                         {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
+                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/",
                             "rel": "self"
                         },
                         {
-                            "href": ".../execute/1/{capability_hash2}/,
+                            "href": ".../execute/1/{capability_hash2},
                             "rel": "capability"
                         }
                     ]
                 }
-            ],
-            "webhooks_links": []
-        }
-    """
-    def format_webhooks(webhook_dict):
-        webhook_list = []
-        for webhook_id, webhook_model in webhook_dict.iteritems():
-            webhook_list.append(
-                _format_webhook(webhook_id, webhook_model, tenant_id, group_id,
-                                policy_id))
+            }
+        """
+        def format_one_webhook(webhook_model):
+            result = _format_webhook(webhook_id, webhook_model,
+                                     self.tenant_id, self.group_id,
+                                     self.policy_id)
+            return {'webhook': result}
 
-        return {
-            'webhooks': webhook_list,
-            "webhooks_links": []
-        }
+        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        deferred = rec.get_webhook(self.policy_id, webhook_id)
+        deferred.addCallback(format_one_webhook)
+        deferred.addCallback(json.dumps)
+        return deferred
 
-    rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.list_webhooks(policy_id)
-    deferred.addCallback(format_webhooks)
-    deferred.addCallback(json.dumps)
-    return deferred
+    @app.route('/<string:webhook_id>/', methods=['PUT'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    @validate_body(group_schemas.update_webhook)
+    def update_webhook(self, request, log, webhook_id, data):
+        """
+        Update a particular webhook.
+        A webhook may (but do not need to) include some arbitrary medata, and must
+        include a name.
+        If successful, no response body will be returned.
 
+        Example request::
 
-@app.route(
-    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>/webhooks/',
-    methods=['POST'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(201)
-@validate_body(rest_schemas.create_webhooks_request)
-def create_webhooks(request, log, tenant_id, group_id, policy_id, data):
-    """
-    Create one or many new webhooks associated with a particular scaling policy.
-    Webhooks may (but do not need to) include some arbitrary medata, and must
-    include a name.
-
-    The response header will point to the list webhooks endpoint.
-    An array of webhooks is provided in the request body in JSON format.
-
-    Example request::
-
-        [
             {
                 "name": "alice",
                 "metadata": {
                     "notes": "this is for Alice"
                 }
-            },
-            {
-                "name": "bob"
             }
-        ]
+        """
+        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        deferred = rec.update_webhook(self.policy_id, webhook_id, data)
+        return deferred
 
+    @app.route('/<string:webhook_id>/', methods=['DELETE'])
+    @with_transaction_id()
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    def delete_webhook(self, request, log, webhook_id):
+        """
+        Deletes a particular webhook.
+        If successful, no response body will be returned.
+        """
+        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        deferred = rec.delete_webhook(self.policy_id, webhook_id)
+        return deferred
 
-    Example response::
-
-        {
-            "webhooks": [
-                {
-                    "id":"{webhookId1}",
-                    "alice",
-                    "metadata": {
-                        "notes": "this is for Alice"
-                    },
-                    "links": [
-                        {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId1}/",
-                            "rel": "self"
-                        },
-                        {
-                            "href": ".../execute/1/{capability_hash1}/,
-                            "rel": "capability"
-                        }
-                    ]
-                },
-                {
-                    "id":"{webhookId2}",
-                    "name": "bob",
-                    "metadata": {},
-                    "links": [
-                        {
-                            "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId2}/",
-                            "rel": "self"
-                        },
-                        {
-                            "href": ".../execute/1/{capability_hash2}/,
-                            "rel": "capability"
-                        }
-                    ]
-                }
-            ]
-        }
-    """
-    def format_webhooks_and_send_redirect(webhook_dict):
-        request.setHeader(
-            "Location",
-            get_autoscale_links(tenant_id, group_id, policy_id, "", format=None)
-        )
-
-        webhook_list = []
-        for webhook_id, webhook_model in webhook_dict.iteritems():
-            webhook_list.append(
-                _format_webhook(webhook_id, webhook_model, tenant_id, group_id,
-                                policy_id))
-
-        return {'webhooks': webhook_list}
-
-    rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.create_webhooks(policy_id, data)
-    deferred.addCallback(format_webhooks_and_send_redirect)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@app.route(
-    ('/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
-     '/webhooks/<string:webhook_id>/'),
-    methods=['GET'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(200)
-def get_webhook(request, log, tenant_id, group_id, policy_id, webhook_id):
-    """
-    Get a webhook which has a name, some arbitrary metdata, and a capability
-    URL.  This data is returned in the body of the response in JSON format.
-
-    Example response::
-
-        {
-            "webhook": {
-                "id":"{webhookId}",
-                "name": "webhook name",
-                "metadata": {},
-                "links": [
-                    {
-                        "href": ".../{groupId1}/policies/{policyId1}/webhooks/{webhookId}/",
-                        "rel": "self"
-                    },
-                    {
-                        "href": ".../execute/1/{capability_hash2},
-                        "rel": "capability"
-                    }
-                ]
-            }
-        }
-    """
-    def format_one_webhook(webhook_model):
-        result = _format_webhook(webhook_id, webhook_model,
-                                 tenant_id, group_id, policy_id)
-        return {'webhook': result}
-
-    rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.get_webhook(policy_id, webhook_id)
-    deferred.addCallback(format_one_webhook)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@app.route(
-    ('/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
-     '/webhooks/<string:webhook_id>/'),
-    methods=['PUT'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(204)
-@validate_body(group_schemas.update_webhook)
-def update_webhook(request, log, tenant_id, group_id, policy_id, webhook_id, data):
-    """
-    Update a particular webhook.
-    A webhook may (but do not need to) include some arbitrary medata, and must
-    include a name.
-    If successful, no response body will be returned.
-
-    Example request::
-
-        {
-            "name": "alice",
-            "metadata": {
-                "notes": "this is for Alice"
-            }
-        }
-    """
-    rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.update_webhook(policy_id, webhook_id, data)
-    return deferred
-
-
-@app.route(
-    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
-    '/webhooks/<string:webhook_id>/',
-    methods=['DELETE'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(204)
-def delete_webhook(request, log, tenant_id, group_id, policy_id, webhook_id):
-    """
-    Deletes a particular webhook.
-    If successful, no response body will be returned.
-    """
-    rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.delete_webhook(policy_id, webhook_id)
-    return deferred
-
-
-@app.route(
-    '/execute/<string:capability_version>/<string:capability_hash>/',
-    methods=['POST'])
-@with_transaction_id()
-@fails_with({})  # This will allow us to surface internal server error only.
-@succeeds_with(202)
-def execute_webhook(request, log, capability_version, capability_hash):
 
 class OtterExecute(BaseApp):
     """
     """
     app = Klein()
 
-    def __init__(self, capability_version, capability_hash, *args, **kwarsg):
+    def __init__(self, capability_version, capability_hash, *args, **kwargs):
         self.capability_version = capability_version
         self.capability_hash = capability_hash
         super(OtterExecute, self).__init__(*args, **kwargs)
