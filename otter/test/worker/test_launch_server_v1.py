@@ -1,12 +1,11 @@
 """
 Unittests for the launch_server_v1 launch config.
 """
-
 import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail, Deferred
+from twisted.internet.defer import CancelledError, Deferred, fail, succeed
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -259,7 +258,7 @@ class ServerTests(TestCase):
         """
         Set up test dependencies.
         """
-        self.log = mock.Mock()
+        self.log = mock_log()
         set_config_data(fake_config)
         self.addCleanup(set_config_data, {})
 
@@ -478,6 +477,34 @@ class ServerTests(TestCase):
         self.assertEqual(server_details.call_count, 2)
 
         self.successResultOf(d)
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_timeout(self, server_details):
+        """
+        wait_for_active stops looping when the timeout passes
+        """
+        clock = Clock()
+        server_details.side_effect = lambda *args, **kwargs: succeed(
+            {'server': {'status': 'BUILD'}})
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, timeout=6, clock=clock)
+
+        # This gets called once immediately then every 5 seconds.
+        self.assertEqual(server_details.call_count, 1)
+        clock.advance(5)
+        self.assertEqual(server_details.call_count, 2)
+        self.assertNoResult(d)
+
+        clock.advance(1)
+        self.failureResultOf(d, CancelledError)
+        # instance id was previously bound by launch_server
+        self.log.msg.assert_called_with(mock.ANY, timeout=6, time_building=6)
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(server_details.call_count, 2)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -889,7 +916,7 @@ class DeleteServerTests(TestCase):
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
 
-        self.log.msg.assert_called_once_with(mock.ANY, server_id='serverId')
+        self.log.msg.assert_called_with(mock.ANY, instance_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
         """
@@ -914,6 +941,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.head.return_value = fail(DummyException('failure'))
+        self.treq.content.side_effect = lambda *args: succeed("")
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
@@ -929,8 +957,8 @@ class DeleteServerTests(TestCase):
         clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
+        self.treq.content.side_effect = lambda *args: succeed("")
         self.treq.head.return_value = Deferred()
-        self.treq.content.return_value = succeed("")
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, clock=clock)
@@ -940,7 +968,6 @@ class DeleteServerTests(TestCase):
 
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
-        self.assertEqual(self.log.msg.call_count, 2)
 
         self.treq.head.return_value = succeed(
             mock.Mock(spec=['code'], code=404))
@@ -950,9 +977,36 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.assertEqual(self.log.msg.call_count, 3)
+        self.assertEqual(self.log.msg.call_count, 2)
 
         # the loop has stopped
         clock.advance(5)
         self.assertEqual(self.treq.head.call_count, 2)
-        self.assertEqual(self.log.msg.call_count, 3)
+
+    def test_verified_delete_retries_verification_until_timeout(self):
+        """
+        If the verification fails until the timeout, log a failure and do not
+        keep trying to verify.
+        """
+        clock = Clock()
+        self.treq.delete.return_value = succeed(
+            mock.Mock(spec=['code'], code=204))
+        self.treq.content.side_effect = lambda *args: succeed("")
+        self.treq.head.side_effect = lambda *args, **kwargs: succeed(
+            mock.Mock(spec=['code'], code=204))
+
+        verified_delete(self.log, 'http://url/', 'my-auth-token',
+                        'serverId', interval=5, timeout=11, clock=clock)
+
+        clock.advance(11)
+        self.treq.head.assert_has_calls([
+            mock.call('http://url/servers/serverId', headers=expected_headers),
+            mock.call('http://url/servers/serverId', headers=expected_headers)
+        ])
+        self.log.err.assert_called_once_with(
+            None, instance_id="serverId", why=mock.ANY, timeout=11,
+            time_delete=11)
+
+        # the loop has stopped
+        clock.advance(5)
+        self.assertEqual(self.treq.head.call_count, 2)
