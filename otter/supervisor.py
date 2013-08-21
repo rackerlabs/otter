@@ -46,7 +46,8 @@ class Supervisor(object):
         undo = InMemoryUndoStack(self.coiterate)
 
         def when_fails(result):
-            log.msg("Encountered an error, rewinding {worker!r} job undo stack.")
+            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
+                    exc=result.value)
             ud = undo.rewind()
             ud.addCallback(lambda _: result)
             return ud
