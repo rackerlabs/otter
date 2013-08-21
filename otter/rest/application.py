@@ -39,7 +39,7 @@ class Otter(BaseApp):
         """
         return self.app.resource()
 
-    @app.routes('/<string:tenant_id>/groups', branch=True)
+    @app.route('/<string:tenant_id>/groups', branch=True)
     def groups(self, request, tenant_id):
         """
         /v1.0/<tenantId>/groups and subroutes delegated to OtterGroups.
