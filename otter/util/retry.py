@@ -42,11 +42,11 @@ class _Retrier(object):
         self.next_interval = next_interval
         self.clock = clock
 
-        self.deferred = defer.Deferred(self.handle_early_termination)
+        self.deferred = defer.Deferred(self.handle_cancellation)
 
         self.current_work = None
         self.delayed_call = None
-        self.terminated = False
+        self.cancelled = False
 
     def clear_current_work(self, anything):
         """
@@ -62,7 +62,7 @@ class _Retrier(object):
         ``self.can_retry`` has to say about it), or schedule the next retry
         of ``self.do_work``
         """
-        if self.terminated:
+        if self.cancelled:
             return
 
         if not self.can_retry(f):
@@ -71,18 +71,17 @@ class _Retrier(object):
         self.delayed_call = self.clock.callLater(self.next_interval(f),
                                                  self.do_real_work)
 
-    def handle_early_termination(self, _deferred):
+    def handle_cancellation(self, _deferred):
         """
         If ``self.deferred`` is cancelled, then the work already in progress
         and scheduled needs to be cancelled.
         """
+        self.cancelled = True
+
         if self.delayed_call is not None:
             self.delayed_call.cancel()
 
         if self.current_work is not None:
-            self.terminated = True
-            # make sure to eat the cancelled error, so it doesn't get gc-ed and
-            # logged
             self.current_work.cancel()
 
     def do_real_work(self):
