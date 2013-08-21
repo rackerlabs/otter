@@ -212,6 +212,27 @@ class LoadBalancersTests(TestCase):
             12345,
             1)
 
+    def test_add_to_load_balancer_doesnt_push_onto_undo_stack_on_failure(self):
+        """
+        add_to_load_balancer doesn't push an operation onto the undo stack
+        if it fails.
+        """
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.post.return_value = succeed(response)
+        self.treq.content.return_value = succeed("{'nodes': [{'id': 1}]}")
+
+        d = add_to_load_balancer('http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo)
+
+        self.failureResultOf(d, RequestError)
+
+        self.assertEqual(self.undo.push.call_count, 0)
+
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
         """
@@ -811,8 +832,6 @@ class ServerTests(TestCase):
 
         self.failureResultOf(d, APIError)
 
-        # Check that the push hasn't happened because create_server hasn't
-        # succeeded yet.
         self.assertEqual(self.undo.push.call_count, 0)
 
 
