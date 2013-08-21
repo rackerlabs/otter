@@ -15,10 +15,35 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
-CREATE COLUMNFAMILY scaling_config (
+-- group_config is json blob
+--
+-- launch_config is json blob
+--
+-- active is the active list.
+-- format:
+--   {"instanceid: {"name": "servername", "links": json_links_obj, "created": date}}
+--
+-- pending is the pending list.
+-- format:
+--  {"jobid": {"created": date}}
+--
+-- groupTouched is a timestamp of the last time a scaling policy
+--  was executed in the group
+--
+-- policyTouched is a list of timestamps for the policy
+--  {"policyid": date}
+
+CREATE COLUMNFAMILY scaling_group (
     "tenantId" ascii,
     "groupId" ascii,
-    data ascii,
+    group_config ascii,
+    launch_config ascii,
+    active ascii,
+    pending ascii,
+    "groupTouched" ascii,
+    "policyTouched" ascii,
+    paused boolean,
+    created_at timestamp,
     PRIMARY KEY("tenantId", "groupId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',

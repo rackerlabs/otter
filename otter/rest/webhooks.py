@@ -43,12 +43,12 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/',
+    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>/webhooks/',
     methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def list_webhooks(request, log, tenantId, groupId, policyId):
+def list_webhooks(request, log, tenant_id, group_id, policy_id):
     """
     Get a list of all webhooks (capability URL) associated with a particular
     scaling policy. This data is returned in the body of the response in JSON
@@ -100,29 +100,29 @@ def list_webhooks(request, log, tenantId, groupId, policyId):
         webhook_list = []
         for webhook_id, webhook_model in webhook_dict.iteritems():
             webhook_list.append(
-                _format_webhook(webhook_id, webhook_model, tenantId, groupId,
-                                policyId))
+                _format_webhook(webhook_id, webhook_model, tenant_id, group_id,
+                                policy_id))
 
         return {
             'webhooks': webhook_list,
             "webhooks_links": []
         }
 
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.list_webhooks(policyId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.list_webhooks(policy_id)
     deferred.addCallback(format_webhooks)
     deferred.addCallback(json.dumps)
     return deferred
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/',
+    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>/webhooks/',
     methods=['POST'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(201)
 @validate_body(rest_schemas.create_webhooks_request)
-def create_webhooks(request, log, tenantId, groupId, policyId, data):
+def create_webhooks(request, log, tenant_id, group_id, policy_id, data):
     """
     Create one or many new webhooks associated with a particular scaling policy.
     Webhooks may (but do not need to) include some arbitrary medata, and must
@@ -188,31 +188,32 @@ def create_webhooks(request, log, tenantId, groupId, policyId, data):
     def format_webhooks_and_send_redirect(webhook_dict):
         request.setHeader(
             "Location",
-            get_autoscale_links(tenantId, groupId, policyId, "", format=None)
+            get_autoscale_links(tenant_id, group_id, policy_id, "", format=None)
         )
 
         webhook_list = []
         for webhook_id, webhook_model in webhook_dict.iteritems():
             webhook_list.append(
-                _format_webhook(webhook_id, webhook_model, tenantId, groupId,
-                                policyId))
+                _format_webhook(webhook_id, webhook_model, tenant_id, group_id,
+                                policy_id))
 
         return {'webhooks': webhook_list}
 
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.create_webhooks(policyId, data)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.create_webhooks(policy_id, data)
     deferred.addCallback(format_webhooks_and_send_redirect)
     deferred.addCallback(json.dumps)
     return deferred
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
+    ('/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
+     '/webhooks/<string:webhook_id>/'),
     methods=['GET'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(200)
-def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
+def get_webhook(request, log, tenant_id, group_id, policy_id, webhook_id):
     """
     Get a webhook which has a name, some arbitrary metdata, and a capability
     URL.  This data is returned in the body of the response in JSON format.
@@ -238,25 +239,26 @@ def get_webhook(request, log, tenantId, groupId, policyId, webhookId):
         }
     """
     def format_one_webhook(webhook_model):
-        result = _format_webhook(webhookId, webhook_model,
-                                 tenantId, groupId, policyId)
+        result = _format_webhook(webhook_id, webhook_model,
+                                 tenant_id, group_id, policy_id)
         return {'webhook': result}
 
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.get_webhook(policyId, webhookId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.get_webhook(policy_id, webhook_id)
     deferred.addCallback(format_one_webhook)
     deferred.addCallback(json.dumps)
     return deferred
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
+    ('/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
+     '/webhooks/<string:webhook_id>/'),
     methods=['PUT'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
 @validate_body(group_schemas.update_webhook)
-def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
+def update_webhook(request, log, tenant_id, group_id, policy_id, webhook_id, data):
     """
     Update a particular webhook.
     A webhook may (but do not need to) include some arbitrary medata, and must
@@ -272,24 +274,25 @@ def update_webhook(request, log, tenantId, groupId, policyId, webhookId, data):
             }
         }
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.update_webhook(policyId, webhookId, data)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.update_webhook(policy_id, webhook_id, data)
     return deferred
 
 
 @app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/webhooks/<string:webhookId>/',
+    '/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>'
+    '/webhooks/<string:webhook_id>/',
     methods=['DELETE'])
 @with_transaction_id()
 @fails_with(exception_codes)
 @succeeds_with(204)
-def delete_webhook(request, log, tenantId, groupId, policyId, webhookId):
+def delete_webhook(request, log, tenant_id, group_id, policy_id, webhook_id):
     """
     Deletes a particular webhook.
     If successful, no response body will be returned.
     """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.delete_webhook(policyId, webhookId)
+    rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.delete_webhook(policy_id, webhook_id)
     return deferred
 
 
@@ -306,9 +309,7 @@ def execute_webhook(request, log, capability_version, capability_hash):
     and does not wait for execution to finish.
     """
     store = get_store()
-
-    cap_log = log.bind(capability_hash=capability_hash,
-                       capability_version=capability_version)
+    logl = [log]
 
     d = store.webhook_info_by_hash(log, capability_hash)
 
@@ -317,15 +318,17 @@ def execute_webhook(request, log, capability_version, capability_hash):
                      CannotExecutePolicyError,
                      NoSuchPolicyError,
                      NoSuchScalingGroupError)
-        cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
+        logl[0].msg("Non-fatal error during webhook execution: {exc!r}",
                     exc=failure.value)
 
     def execute_policy((tenant_id, group_id, policy_id)):
-        group = store.get_scaling_group(log, tenant_id, group_id)
+        bound_log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
+        logl[0] = bound_log
+        group = store.get_scaling_group(bound_log, tenant_id, group_id)
         return group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                          cap_log, transaction_id(request),
+                                          bound_log, transaction_id(request),
                                           policy_id=policy_id))
 
     d.addCallback(execute_policy)
     d.addErrback(log_informational_webhook_failure)
-    d.addErrback(lambda f: cap_log.err(f, "Unhandled exception executing webhook."))
+    d.addErrback(lambda f: logl[0].err(f, "Unhandled exception executing webhook."))

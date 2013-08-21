@@ -20,18 +20,9 @@ class GetListEntityStatusTest(AutoscaleFixture):
             gc_min_entities=cls.gc_min_entities_alt,
             gc_max_entities=cls.gc_max_entities)
         cls.group = group_response.entity
-        cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
         cls.group_state_response = cls.autoscale_client.list_status_entities_sgroups(
             cls.group.id)
         cls.group_state = cls.group_state_response.entity
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(GetListEntityStatusTest, cls).tearDownClass()
 
     def test_entity_status_response(self):
         """
@@ -55,3 +46,4 @@ class GetListEntityStatusTest(AutoscaleFixture):
                                 msg='Less than required number of servers in desired capacity')
         self.assertLessEqual(self.group_state.desiredCapacity, self.gc_max_entities,
                              msg='Total server count is over maxEntities')
+        self.empty_scaling_group(self.group)

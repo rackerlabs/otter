@@ -15,9 +15,10 @@ from silverberg.lock import BasicLock, BusyLockError, with_lock
 
 from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
-from otter import controller
+from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
 from otter.log import log as otter_log
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
+from otter.util.deferredutils import ignore_and_log
 
 
 def next_cron_occurrence(cron):
@@ -60,15 +61,11 @@ class SchedulerService(TimerService):
                 return _do_check()
             return None
 
-        def check_fetch_error(failure):
-            # Return if we do not get lock as other process might be processing current events
-            failure.trap(BusyLockError)
-            self.log.msg("Couldn't get lock to process events")
-
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            d.addErrback(check_fetch_error)
+            d.addErrback(ignore_and_log, BusyLockError, self.log,
+                         "Couldn't get lock to process events")
             d.addErrback(self.log.err)
             return d
 
@@ -140,10 +137,12 @@ class SchedulerService(TimerService):
         :param log: A bound log for logging
         :return: a deferred with the results of execution
         """
-        log.msg('Executing policy', group_id=event['groupId'], policy_id=event['policyId'])
-        group = get_store().get_scaling_group(log, event['tenantId'], event['groupId'])
-        policy_id = event['policyId']
-        d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
+        tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
+        log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
+        log.msg('Executing policy')
+        group = get_store().get_scaling_group(log, tenant_id, group_id)
+        d = group.modify_state(partial(maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
+        d.addErrback(ignore_and_log, CannotExecutePolicyError, log, 'Cannot execute policy')
         return d

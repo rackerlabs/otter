@@ -26,13 +26,6 @@ class ListScalingPolicies(ScalingGroupPolicyFixture):
         cls.policy4 = cls.autoscale_behaviors.create_policy_webhook(
             cls.group.id, policy4_data)
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Deletes the scaling group
-        """
-        super(ListScalingPolicies, cls).tearDownClass()
-
     def test_list_scaling_policies(self):
         """
         Verify the list policies call for response code 201, headers and data

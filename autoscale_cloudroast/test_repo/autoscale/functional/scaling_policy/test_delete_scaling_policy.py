@@ -9,20 +9,6 @@ class DeleteScalingPolicy(ScalingGroupPolicyFixture):
     Verify delete policy
     """
 
-    @classmethod
-    def setUpClass(cls):
-        """
-        Creates a scaling group with policy with type change
-        """
-        super(DeleteScalingPolicy, cls).setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Deletes the scaling group
-        """
-        super(DeleteScalingPolicy, cls).tearDownClass()
-
     def test_delete_scaling_policy(self):
         """
         Verify the delete policy call for response code 204, headers.
