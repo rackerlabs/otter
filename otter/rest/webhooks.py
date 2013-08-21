@@ -9,12 +9,15 @@ policy.
 from functools import partial
 import json
 
+from klein import Klein
+
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
+from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.application import app, get_store, get_autoscale_links, transaction_id
+from otter.util.http import get_autoscale_links, transaction_id
 
 from otter.models.interface import (
     UnrecognizedCapabilityError,
@@ -303,32 +306,46 @@ def delete_webhook(request, log, tenant_id, group_id, policy_id, webhook_id):
 @fails_with({})  # This will allow us to surface internal server error only.
 @succeeds_with(202)
 def execute_webhook(request, log, capability_version, capability_hash):
+
+class OtterExecute(BaseApp):
     """
-    Execute a scaling policy based the capability hash.
-    This returns a 202 in all cases except internal server error,
-    and does not wait for execution to finish.
     """
-    store = get_store()
+    app = Klein()
 
-    cap_log = log.bind(capability_hash=capability_hash,
-                       capability_version=capability_version)
+    def __init__(self, capability_version, capability_hash, *args, **kwarsg):
+        self.capability_version = capability_version
+        self.capability_hash = capability_hash
+        super(OtterExecute, self).__init__(*args, **kwargs)
 
-    d = store.webhook_info_by_hash(log, capability_hash)
+    @app.route('/', methods=['POST'])
+    @with_transaction_id()
+    @fails_with({})  # This will allow us to surface internal server error only.
+    @succeeds_with(202)
+    def execute_webhook(self, request, log):
+        """
+        Execute a scaling policy based the capability hash.
+        This returns a 202 in all cases except internal server error,
+        and does not wait for execution to finish.
+        """
+        cap_log = log.bind(capability_hash=self.capability_hash,
+                           capability_version=self.capability_version)
 
-    def log_informational_webhook_failure(failure):
-        failure.trap(UnrecognizedCapabilityError,
-                     CannotExecutePolicyError,
-                     NoSuchPolicyError,
-                     NoSuchScalingGroupError)
-        cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
-                    exc=failure.value)
+        d = self.store.webhook_info_by_hash(log, self.capability_hash)
 
-    def execute_policy((tenant_id, group_id, policy_id)):
-        group = store.get_scaling_group(log, tenant_id, group_id)
-        return group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                          cap_log, transaction_id(request),
-                                          policy_id=policy_id))
+        def log_informational_webhook_failure(failure):
+            failure.trap(UnrecognizedCapabilityError,
+                         CannotExecutePolicyError,
+                         NoSuchPolicyError,
+                         NoSuchScalingGroupError)
+            cap_log.msg("Non-fatal error during webhook execution: {exc!r}",
+                        exc=failure.value)
 
-    d.addCallback(execute_policy)
-    d.addErrback(log_informational_webhook_failure)
-    d.addErrback(lambda f: cap_log.err(f, "Unhandled exception executing webhook."))
+        def execute_policy((tenant_id, group_id, policy_id)):
+            group = self.store.get_scaling_group(log, tenant_id, group_id)
+            return group.modify_state(partial(controller.maybe_execute_scaling_policy,
+                                              cap_log, transaction_id(request),
+                                              policy_id=policy_id))
+
+        d.addCallback(execute_policy)
+        d.addErrback(log_informational_webhook_failure)
+        d.addErrback(lambda f: cap_log.err(f, "Unhandled exception executing webhook."))

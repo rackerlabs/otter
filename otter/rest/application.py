@@ -6,6 +6,7 @@ from functools import partial
 from klein import Klein
 
 from otter.rest.groups import OtterGroups
+from otter.rest.webhooks import OtterExecute
 from otter.rest.base import BaseApp
 
 
@@ -45,3 +46,10 @@ class Otter(BaseApp):
         /v1.0/<tenantId>/groups and subroutes delegated to OtterGroups.
         """
         return OtterGroups(tenant_id, self.store).app.resource()
+
+    @app.route('/execute/<string:capability_version>/<string:capability_hash>/')
+    def execute(self, request, capability_version, capability_hash):
+        """
+        """
+        return OtterExecute(capability_version, capability_hash,
+                            self.store).app.resource()
