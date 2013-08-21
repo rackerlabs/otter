@@ -429,10 +429,12 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
 
-    def test_execute_webhook(self):
+    @mock.patch('otter.rest.decorators.log')
+    def test_execute_webhook(self, log):
         """
         Execute a webhook by hash returns a 202
         """
+        log = log.bind().bind()
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
 
@@ -440,10 +442,14 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             202, '/v1.0/execute/1/11111/', 'POST')
 
         self.mock_store.get_scaling_group.assert_called_once_with(
-            mock.ANY, self.tenant_id, self.group_id)
+            log.bind(), self.tenant_id, self.group_id)
+
+        self.assertEqual(log.bind.call_args_list[0],
+                         mock.call(tenant_id=self.tenant_id, scaling_group_id=self.group_id,
+                                   policy_id=self.policy_id))
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            mock.ANY,
+            log.bind(),
             'transaction-id',
             self.mock_group,
             self.mock_state,
@@ -496,7 +502,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         Executing a webhook logs an information message about non-fatal, policy
         execution failures.
         """
-        cap_log = log.bind.return_value.bind.return_value.bind.return_value
+        cap_log = log.bind.return_value.bind.return_value
 
         for exc in [CannotExecutePolicyError('tenant', 'group', 'policy', 'test'),
                     NoSuchPolicyError('tenant', 'group', 'policy'),
@@ -507,7 +513,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
             self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
 
-            cap_log.msg.assert_any_call(
+            cap_log.bind().msg.assert_any_call(
                 'Non-fatal error during webhook execution: {exc!r}', exc=exc)
 
             self.assertEqual(0, cap_log.err.call_count)
+            self.assertEqual(0, cap_log.bind().err.call_count)
