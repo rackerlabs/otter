@@ -331,7 +331,6 @@ class OtterGroups(BaseApp):
         deferred.addCallback(json.dumps)
         return deferred
 
-
     @app.route('/<string:scaling_group_id>', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)

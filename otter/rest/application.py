@@ -22,7 +22,7 @@ class Otter(BaseApp):
     def base(self, request):
         """
         base root route.
-        
+
         :returns: Empty string
         """
         request.setHeaders('Content-Type', 'application/json')
