@@ -49,7 +49,6 @@ class SupervisorTests(TestCase):
         self.undo.rewind.return_value = succeed(None)
 
 
-
 class LaunchConfigTests(SupervisorTests):
     """
     Test supervisor worker execution.

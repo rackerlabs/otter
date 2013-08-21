@@ -839,7 +839,7 @@ class ServerTests(TestCase):
 
     @mock.patch('otter.worker.launch_server_v1.create_server')
     def test_launch_server_doesnt_push_undo_op_on_create_server_failure(
-        self, create_server):
+            self, create_server):
         """
         launch_server won't push anything onto the undo stack if create_server
         fails.
