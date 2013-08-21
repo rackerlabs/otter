@@ -28,7 +28,7 @@ class Otter(BaseApp):
 
         :returns: Empty string
         """
-        request.setHeaders('Content-Type', 'application/json')
+        request.setHeader('Content-Type', 'application/json')
         return ''
 
     @root.route('/v1.0', branch=True)
