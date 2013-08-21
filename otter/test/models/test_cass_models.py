@@ -1438,7 +1438,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                      max_retry=5, retry_wait=3.56)
 
 
-
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
 # with this
 _S = namedtuple('_S', ['thing'])
