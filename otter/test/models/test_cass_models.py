@@ -1434,6 +1434,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.group.delete_group()
 
+        mock_rand_uniform.assert_called_once_with(3, 5)
         self.basic_lock_mock.assert_called_once_with(self.connection, 'locks', self.group.uuid,
                                                      max_retry=5, retry_wait=3.56)
 
