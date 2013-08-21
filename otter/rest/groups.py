@@ -16,7 +16,7 @@ from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.policies import policy_dict_to_list
+from otter.rest.policies import OtterPolicies, policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
 from otter.util.http import get_autoscale_links, transaction_id
 
@@ -64,6 +64,10 @@ class OtterGroups(BaseApp):
     @app.route('/<string:group_id>/launch')
     def launch(self, request, group_id):
         return OtterLaunch(self.tenant_id, group_id, self.store).app.resource()
+
+    @app.route('/<string:group_id>/policies', branch=True)
+    def policies(self, request, group_id):
+        return OtterPolicies(self.tenant_id, group_id, self.store).app.resource()
 
     @app.route('/',  methods=['GET'])
     @with_transaction_id()
