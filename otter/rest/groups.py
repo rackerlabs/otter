@@ -44,13 +44,13 @@ def format_state_dict(state):
     }
 
 
-class OtterGroup(BaseApp):
+class OtterGroups(BaseApp):
     """
     Routes to handle requests related to scaling groups.
     """
     def __init__(self, tenant_id, *args, **kwargs):
         self.tenant_id = tenant_id
-        super(OtterGroup, self).__init__(*args, **kwargs)
+        super(OtterGroups, self).__init__(*args, **kwargs)
 
     @app.route('/',  methods=['GET'])
     @with_transaction_id()

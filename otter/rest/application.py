@@ -5,7 +5,7 @@ from functools import partial
 
 from klein import Klein
 
-from otter.rest.groups import OtterGroup
+from otter.rest.groups import OtterGroups
 from otter.rest.base import BaseApp
 
 
@@ -40,6 +40,6 @@ class Otter(BaseApp):
     @app.routes('/<string:tenant_id>/groups', branch=True)
     def groups(self, request, tenant_id):
         """
-        /v1.0/<tenantId>/groups and subroutes delegated to OtterGroup.
+        /v1.0/<tenantId>/groups and subroutes delegated to OtterGroups.
         """
-        return OtterGroup(tenant_id, self.store).app.resource()
+        return OtterGroups(tenant_id, self.store).app.resource()
