@@ -49,6 +49,12 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
+class WorkerTimeoutError(Exception):
+    """
+    Exception to be used when a worker times out
+    """
+
+
 def server_details(server_endpoint, auth_token, server_id):
     """
     Fetch the details of a server as specified by id.
@@ -128,13 +134,14 @@ def wait_for_active(log,
         clock=clock)
 
     def on_error(f):
-        if f.check(CancelledError):
-            time_building = clock.seconds() - start_time
-            log.msg(('Server {instance_id} failed to change from BUILD state '
-                     'to ACTIVE within a {timeout} second timeout (it has been '
-                     '{time_building} seconds).'),
-                    timeout=timeout, time_building=time_building)
-        return f
+        f.trap(CancelledError)
+        time_building = clock.seconds() - start_time
+        raise WorkerTimeoutError(
+            ('Server {instance_id} failed to change from BUILD state '
+             'to ACTIVE within a {timeout} second timeout (it has been '
+             '{time_building} seconds).').format(timeout=timeout,
+                                                 time_building=time_building,
+                                                 instance_id=server_id))
 
     d.addErrback(on_error)
 

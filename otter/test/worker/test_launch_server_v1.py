@@ -5,7 +5,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import CancelledError, Deferred, fail, succeed
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -22,7 +22,8 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
-    verified_delete
+    verified_delete,
+    WorkerTimeoutError
 )
 
 
@@ -498,9 +499,7 @@ class ServerTests(TestCase):
         self.assertNoResult(d)
 
         clock.advance(1)
-        self.failureResultOf(d, CancelledError)
-        # instance id was previously bound by launch_server
-        self.log.msg.assert_called_with(mock.ANY, timeout=6, time_building=6)
+        self.failureResultOf(d, WorkerTimeoutError)
 
         # the loop has stopped
         clock.advance(5)
