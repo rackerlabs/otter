@@ -20,8 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import Deferred, gatherResults
-from twisted.internet.task import LoopingCall
+from twisted.internet.defer import CancelledError, gatherResults
 
 import treq
 
@@ -29,6 +28,9 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
+from otter.util.deferredutils import retry_and_timeout
+from otter.util.retry import (repeating_interval, transient_errors_except,
+                              TransientRetryError)
 
 
 class UnexpectedServerStatus(Exception):
@@ -71,55 +73,72 @@ def wait_for_active(log,
                     auth_token,
                     server_id,
                     interval=5,
+                    timeout=3600,
                     clock=None):
     """
     Wait until the server specified by server_id's status is 'ACTIVE'
-
-    @TODO: Timeouts
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Polling interval.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int timeout: timeout to poll for the server status in seconds.
+        Default 3600 (1 hour)
 
     :return: Deferred that fires when the expected status has been seen.
     """
     log.msg("Checking instance status every {interval} seconds",
             interval=interval)
 
-    d = Deferred()
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
+    start_time = clock.seconds()
 
     def poll():
         def check_status(server):
             status = server['server']['status']
 
-            log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
-            if server['server']['status'] == 'ACTIVE':
-                d.callback(server)
-            elif server['server']['status'] != 'BUILD':
-                d.errback(UnexpectedServerStatus(
+            if status == 'ACTIVE':
+                time_building = clock.seconds() - start_time
+                log.msg(("Server changed from 'BUILD' to 'ACTIVE' within "
+                         "{time_building} seconds"),
+                        time_building=time_building)
+                return server
+
+            elif status != 'BUILD':
+                raise UnexpectedServerStatus(
                     server_id,
                     status,
-                    'ACTIVE'))
+                    'ACTIVE')
+
+            else:
+                raise TransientRetryError()  # just poll again
 
         sd = server_details(server_endpoint, auth_token, server_id)
         sd.addCallback(check_status)
-
         return sd
 
-    lc = LoopingCall(poll)
+    d = retry_and_timeout(
+        poll, timeout,
+        can_retry=transient_errors_except(UnexpectedServerStatus),
+        next_interval=repeating_interval(interval),
+        clock=clock)
 
-    if clock is not None:  # pragma: no cover
-        lc.clock = clock
+    def on_error(f):
+        if f.check(CancelledError):
+            time_building = clock.seconds() - start_time
+            log.msg(('Server {instance_id} failed to change from BUILD state '
+                     'to ACTIVE within a {timeout} second timeout (it has been '
+                     '{time_building} seconds).'),
+                    timeout=timeout, time_building=time_building)
+        return f
 
-    def stop(r):
-        lc.stop()
-        return r
+    d.addErrback(on_error)
 
-    d.addBoth(stop)
-
-    return lc.start(interval).addCallback(lambda _: d)
+    return d
 
 
 def create_server(server_endpoint, auth_token, server_config):
@@ -431,6 +450,7 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
+                    timeout=120,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -439,18 +459,21 @@ def verified_delete(log,
     There is a possibility Nova sometimes fails to delete servers.  Log if this
     happens, and if so, re-evaluate workarounds.
 
-    @TODO: Timeouts
+    Time out attempting to verify deletes after a period of time and log an
+    error.
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param int interval: Deletion interval - how long until a delete is retried.
-        Default: 2.
+    :param int interval: Deletion interval in seconds - how long until
+        verifying a delete is retried. Default: 2.
+    :param int timeout: Seconds after which the deletion will be logged as a
+        failure, if Nova fails to return a 404,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    del_log = log.bind(server_id=server_id)
+    del_log = log.bind(instance_id=server_id)
     del_log.msg('Deleting server')
 
     d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
@@ -458,32 +481,41 @@ def verified_delete(log,
     d.addCallback(check_success, [204])
     d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
 
-    def looping_verify_deletion(_):
-        verify = Deferred()
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
 
-        def on_success(_):
-            del_log.msg('Server deleted successfully')
-            verify.callback(None)
-
-        def on_failure(f):
-            del_log.msg('Server not yet deleted', exc=f)
-
+    def verify(_):
         def check_status():
-            vd = treq.head(
+            check_d = treq.head(
                 append_segments(server_endpoint, 'servers', server_id),
                 headers=headers(auth_token))
-            vd.addCallback(check_success, [404])
-            vd.addCallback(on_success)
-            vd.addErrback(on_failure)
-            return vd
+            check_d.addCallback(check_success, [404])
+            return check_d
 
-        lc = LoopingCall(check_status)
+        start_time = clock.seconds()
 
-        if clock is not None:  # pragma: no cover
-            lc.clock = clock
+        # this is treating all errors as transient, so the only error that can
+        # occur is a CancelledError from timing out
+        verify_d = retry_and_timeout(check_status, timeout,
+                                     next_interval=repeating_interval(interval),
+                                     clock=clock)
 
-        verify.addBoth(lambda _: lc.stop())
-        lc.start(interval)
+        def on_success(_):
+            time_delete = clock.seconds() - start_time
+            del_log.msg('Server deleted successfully: {time_delete} seconds.',
+                        time_delete=time_delete)
 
-    d.addCallback(looping_verify_deletion)
+        verify_d.addCallback(on_success)
+
+        def on_timeout(_):
+            time_delete = clock.seconds() - start_time
+            del_log.err(None, timeout=timeout, time_delete=time_delete,
+                        why=('Server {instance_id} failed to be deleted within '
+                             'a {timeout} second timeout (it has been '
+                             '{time_delete} seconds).'))
+
+        verify_d.addErrback(on_timeout)
+
+    d.addCallback(verify)
     return d
