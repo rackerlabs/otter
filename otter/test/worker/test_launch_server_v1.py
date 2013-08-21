@@ -750,8 +750,8 @@ class ServerTests(TestCase):
             self, wait_for_active, create_server, add_to_load_balancers,
             verified_delete):
         """
-        launch_server will delete any servers if it encounters an error
-        adding a node to the load_balancer.
+        launch_server will push verified_delete onto the undo stack
+        after the server is successfully created.
         """
         launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
                          'loadBalancers': []}
@@ -762,12 +762,9 @@ class ServerTests(TestCase):
                 'addresses': {'private': [
                     {'version': 4, 'addr': '10.0.0.1'}]}}}
 
-        create_server.return_value = succeed(server_details)
+        create_server.return_value = Deferred()
 
         wait_for_active.return_value = succeed(server_details)
-
-        add_to_load_balancers.return_value = fail(
-            APIError(500, "Oh noes")).addErrback(wrap_request_error, 'url')
 
         d = launch_server(self.log,
                           'DFW',
@@ -777,14 +774,20 @@ class ServerTests(TestCase):
                           launch_config,
                           self.undo)
 
+        # Check that the push hasn't happened because create_server hasn't
+        # succeeded yet.
+        self.assertEqual(self.undo.push.call_count, 0)
+
+        create_server.return_value.callback(server_details)
+
+        self.successResultOf(d)
+
         self.undo.push.assert_called_once_with(
             verified_delete,
             self.log.bind.return_value,
             'http://dfw.openstack/',
             'my-auth-token',
             '1')
-
-        self.failureResultOf(d, RequestError)
 
 
 class ConfigPreparationTests(TestCase):
