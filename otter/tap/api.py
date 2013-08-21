@@ -13,9 +13,10 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassScalingGroupCollection
+from otter.models.mock import MockScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
@@ -87,7 +88,9 @@ def makeService(config):
             seed_endpoints,
             config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
-        set_store(CassScalingGroupCollection(cassandra_cluster))
+        store = CassScalingGroupCollection(cassandra_cluster)
+    else:
+        store = MockScalingGroupCollection()
 
     cache_ttl = config_value('identity.cache_ttl')
 
@@ -111,7 +114,8 @@ def makeService(config):
 
     s = MultiService()
 
-    site = Site(root)
+    otter = Otter(store)
+    site = Site(otter.app.resource())
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
