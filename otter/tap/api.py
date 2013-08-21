@@ -124,7 +124,7 @@ def makeService(config):
     if config_value('scheduler') and not config_value('mock'):
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                              int(config_value('scheduler.interval')),
-                                             cassandra_cluster)
+                                             cassandra_cluster, store)
         scheduler_service.setServiceParent(s)
 
     return s
