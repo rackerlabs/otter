@@ -40,20 +40,14 @@ class SupervisorTests(TestCase):
         set_config_data({'region': 'ORD'})
         self.addCleanup(set_config_data, {})
 
-        def termination():
-            return lambda: True
-
-        def run_immediately(f):
-            f()
-
-        self.cooperator = Cooperator(
-            terminationPredicateFactory=termination,
-            scheduler=run_immediately)
+        self.cooperator = mock.Mock(spec=Cooperator)
 
         self.supervisor = Supervisor(self.auth_function, self.cooperator.coiterate)
 
-        self.undo = patch(self, 'otter.supervisor.InMemoryUndoStack').return_value
+        self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
+        self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
+
 
 
 class LaunchConfigTests(SupervisorTests):
@@ -134,7 +128,7 @@ class LaunchConfigTests(SupervisorTests):
             {'server': {}},
             self.undo)
 
-    def test_execute_config_winds_undo_stack_on_failure(self):
+    def test_execute_config_rewinds_undo_stack_on_failure(self):
         """
         execute_config rewinds the undo stack passed to launch_server,
         when launch_server fails.
@@ -149,6 +143,16 @@ class LaunchConfigTests(SupervisorTests):
 
         self.failureResultOf(completed_d)
         self.undo.rewind.assert_called_once_with()
+
+    def test_coiterate_passed_to_undo_stack(self):
+        """
+        execute_config passes Supervisor's coiterate function is to
+        InMemoryUndoStack.
+        """
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
+
+        self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
 
 
 class DeleteServerTests(SupervisorTests):
