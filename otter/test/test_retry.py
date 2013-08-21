@@ -95,6 +95,7 @@ class RetryTests(TestCase):
 
         # stop loop
         self.retries[-1].callback('result!')
+        self.assertEqual(self.successResultOf(d), 'result!')
 
     def test_retries_at_intervals_specified_by_interval_function(self):
         """
@@ -249,7 +250,7 @@ class RetryTests(TestCase):
         If no ``can_retry`` function is provided, a default function treats
         any failure as transient
         """
-        retry(self.work_function, None, self.interval_function, self.clock)
+        d = retry(self.work_function, None, self.interval_function, self.clock)
 
         self.assertEqual(len(self.retries), 1)
         self.retries[-1].errback(DummyException('temp'))
@@ -259,12 +260,14 @@ class RetryTests(TestCase):
         self.assertEqual(len(self.retries), 2)
         self.retries[-1].errback(NotImplementedError())
 
+        self.assertNoResult(d)
+
     def test_default_next_interval_function(self):
         """
         If no ``next_interval`` function is provided, a default function returns
         5 no matter what the failure.
         """
-        retry(self.work_function, self.retry_function, None, self.clock)
+        d = retry(self.work_function, self.retry_function, None, self.clock)
 
         self.assertEqual(len(self.retries), 1)
         self.retries[-1].errback(DummyException('temp'))
@@ -277,6 +280,7 @@ class RetryTests(TestCase):
         self.clock.advance(5)
 
         self.assertEqual(len(self.retries), 3)
+        self.assertNoResult(d)
 
 
 class CanRetryHelperTests(TestCase):
