@@ -1573,6 +1573,20 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(self.connection.execute.call_count, 0)
         self.lock.acquire.assert_called_once_with()
 
+    @mock.patch('otter.models.cass.random.uniform')
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    def test_delete_lock_with_random_retry(self, mock_view_state, mock_rand_uniform):
+        """
+        The lock is created with random retry wait
+        """
+        mock_rand_uniform.return_value = 3.56
+
+        self.group.delete_group()
+
+        mock_rand_uniform.assert_called_once_with(3, 5)
+        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks', self.group.uuid,
+                                                     max_retry=5, retry_wait=3.56)
+
 
 # wrapper for serialization mocking - 'serialized' things will just be wrapped
 # with this
