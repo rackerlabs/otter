@@ -4,8 +4,6 @@ Contains the BaseApp all Otter klein apps inherit from.
 
 from functools import partial
 
-from klein import Klein
-
 
 class BaseApp(object):
     """
