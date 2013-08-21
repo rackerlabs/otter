@@ -62,12 +62,14 @@ class TransactionIdTestCase(TestCase):
         Test to make sure it works in the success case
         :return nothing
         """
-        @with_transaction_id()
-        def doWork(request, log):
-            """ Test Work """
-            return defer.succeed('hello')
 
-        d = doWork(self.mockRequest)
+        class FakeApp(object):
+            @with_transaction_id()
+            def doWork(self, request, log):
+                """ Test Work """
+                return defer.succeed('hello')
+
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
 
         self.mock_log.bind.assert_called_once_with(
@@ -86,12 +88,13 @@ class TransactionIdTestCase(TestCase):
         """
         the returned log is bound with kwargs passed
         """
-        @with_transaction_id()
-        def doWork(request, log, arg1, arg2):
-            """ Test Work """
-            return defer.succeed('hello')
+        class FakeApp(object):
+            @with_transaction_id()
+            def doWork(self, request, log, arg1, arg2):
+                """ Test Work """
+                return defer.succeed('hello')
 
-        d = doWork(self.mockRequest, arg1='a1', arg2='a2')
+        d = FakeApp().doWork(self.mockRequest, arg1='a1', arg2='a2')
         self.assertEqual('hello', self.successResultOf(d))
         self.mock_log.bind().bind.assert_called_with(arg1='a1', arg2='a2')
 
@@ -115,13 +118,14 @@ class FaultTestCase(TestCase):
         Test to make sure it works in the success case
         :return nothing
         """
-        @fails_with({})
-        @succeeds_with(204)
-        def doWork(request, log):
-            """ Test Work """
-            return defer.succeed('hello')
+        class FakeApp(object):
+            @fails_with({})
+            @succeeds_with(204)
+            def doWork(self, request, log):
+                """ Test Work """
+                return defer.succeed('hello')
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
 
@@ -135,13 +139,14 @@ class FaultTestCase(TestCase):
         Test to make sure it works in the success case
         :return nothing
         """
-        @succeeds_with(204)
-        @fails_with({})
-        def doWork(request, log):
-            """ Test Work """
-            return defer.succeed('hello')
+        class FakeApp(object):
+            @succeeds_with(204)
+            @fails_with({})
+            def doWork(self, request, log):
+                """ Test Work """
+                return defer.succeed('hello')
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.mockLog.bind.assert_called_once_with(code=204, uri='/')
@@ -154,12 +159,13 @@ class FaultTestCase(TestCase):
         Test simple failure case
         :return nothing
         """
-        @fails_with({BlahError: 404})
-        @succeeds_with(204)
-        def doWork(request, log):
-            return defer.fail(BlahError('fail'))
+        class FakeApp(object):
+            @fails_with({BlahError: 404})
+            @succeeds_with(204)
+            def doWork(self, request, log):
+                return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -182,12 +188,13 @@ class FaultTestCase(TestCase):
         Test that detailed failures work
         :return nothing
         """
-        @fails_with({DetailsError: 404})
-        @succeeds_with(204)
-        def doWork(request, log):
-            return defer.fail(DetailsError('fail'))
+        class FakeApp(object):
+            @fails_with({DetailsError: 404})
+            @succeeds_with(204)
+            def doWork(self, request, log):
+                return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -211,12 +218,13 @@ class FaultTestCase(TestCase):
         Test that detailed failures work
         :return nothing
         """
-        @succeeds_with(204)
-        @fails_with({DetailsError: 404})
-        def doWork(request, log):
-            return defer.fail(DetailsError('fail'))
+        class FakeApp(object):
+            @succeeds_with(204)
+            @fails_with({DetailsError: 404})
+            def doWork(self, request, log):
+                return defer.fail(DetailsError('fail'))
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -249,12 +257,13 @@ class FaultTestCase(TestCase):
         """
         mapping = {KeyError: 404, BlahError: 400}
 
-        @fails_with(select_dict([BlahError], mapping))
-        @succeeds_with(204)
-        def doWork(request, log):
-            return defer.fail(BlahError('fail'))
+        class FakeApp(object):
+            @fails_with(select_dict([BlahError], mapping))
+            @succeeds_with(204)
+            def doWork(self, request, log):
+                return defer.fail(BlahError('fail'))
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
@@ -280,12 +289,13 @@ class FaultTestCase(TestCase):
         mapping = {KeyError: 404, BlahError: 400}
         blah = BlahError('fail')
 
-        @fails_with(select_dict([KeyError], mapping))
-        @succeeds_with(204)
-        def doWork(request, log):
-            return defer.fail(blah)
+        class FakeApp(object):
+            @fails_with(select_dict([KeyError], mapping))
+            @succeeds_with(204)
+            def doWork(self, request, log):
+                return defer.fail(blah)
 
-        d = doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest, self.mockLog)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 
@@ -343,14 +353,15 @@ class ValidateBodyTestCase(TestCase):
         self.request_content.seek(4)  # do not start at the begining
         self.mock_validate.return_value = None  # validation should pass
 
-        @validate_body(schema)
-        def handle_body(request, *args, **kwargs):
-            return defer.succeed((args, kwargs))
+        class FakeApp(object):
+            @validate_body(schema)
+            def handle_body(self, request, *args, **kwargs):
+                return defer.succeed((args, kwargs))
 
         args = (1, 2, 3)
         kwargs = {'one': 'two'}
 
-        d = handle_body(self.request, *args, **kwargs)
+        d = FakeApp().handle_body(self.request, *args, **kwargs)
         result = self.successResultOf(d)
 
         # assert that it was validated
@@ -369,11 +380,12 @@ class ValidateBodyTestCase(TestCase):
         self.request_content.write('not actually json')
         self.mock_validate.return_value = None  # would otherwise pass
 
-        @validate_body({})
-        def handle_body(request, *args, **kwargs):
-            return defer.succeed((args, kwargs))
+        class FakeApp(object):
+            @validate_body({})
+            def handle_body(self, request, *args, **kwargs):
+                return defer.succeed((args, kwargs))
 
-        self.failureResultOf(handle_body(self.request), InvalidJsonError)
+        self.failureResultOf(FakeApp().handle_body(self.request), InvalidJsonError)
 
     def test_validation_error(self):
         """
@@ -386,8 +398,9 @@ class ValidateBodyTestCase(TestCase):
         self.request.content.write('{}')
         self.mock_validate.side_effect = fail_to_validate
 
-        @validate_body({})
-        def handle_body(request, *args, **kwargs):
-            return defer.succeed((args, kwargs))
+        class FakeApp(object):
+            @validate_body({})
+            def handle_body(self, request, *args, **kwargs):
+                return defer.succeed((args, kwargs))
 
-        self.failureResultOf(handle_body(self.request), ValidationError)
+        self.failureResultOf(FakeApp().handle_body(self.request), ValidationError)
