@@ -445,8 +445,6 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         policies = request_body.get('scalingPolicies', [])
 
         expected_config = config.copy()
-        expected_config.setdefault('maxEntities', 25)
-        expected_config.setdefault('metadata', {})
 
         rval = {
             'groupConfiguration': expected_config,
@@ -479,6 +477,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
                 'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
             }
         })
+
+        mock_bobby.assert_called_once_with('11111', '1')
 
         resp_policies.sort(key=lambda dictionary: dictionary['id'])
         for pol in resp_policies:
