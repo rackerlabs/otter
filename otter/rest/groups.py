@@ -10,6 +10,7 @@ from otter import controller
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.rest.base import BaseApp
+from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -51,6 +52,14 @@ class OtterGroups(BaseApp):
     def __init__(self, tenant_id, *args, **kwargs):
         self.tenant_id = tenant_id
         super(OtterGroups, self).__init__(*args, **kwargs)
+
+    @app.route('/<string:group_id>/config')
+    def config(self, request, group_id):
+        return OtterConfig(self.tenant_id, group_id, self.store).app.resource()
+
+    @app.route('/<string:group_id>/launch')
+    def launch(self, request, group_id):
+        return OtterLaunch(self.tenant_id, group_id, self.store).app.resource()
 
     @app.route('/',  methods=['GET'])
     @with_transaction_id()
