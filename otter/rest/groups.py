@@ -5,6 +5,8 @@ Autoscale REST endpoints having to do with a group or collection of groups
 from functools import partial
 import json
 
+from klein import Klein
+
 from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
@@ -49,6 +51,8 @@ class OtterGroups(BaseApp):
     """
     Routes to handle requests related to scaling groups.
     """
+    app = Klein()
+
     def __init__(self, tenant_id, *args, **kwargs):
         self.tenant_id = tenant_id
         super(OtterGroups, self).__init__(*args, **kwargs)

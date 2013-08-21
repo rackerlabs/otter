@@ -13,8 +13,10 @@ class Otter(BaseApp):
     """
     Otter holds the Klein app and routes for the REST service.
     """
+    root = Klein()
+    app = Klein()
+
     def __init__(self, store, *args, **kwargs):
-        self.root = Klein()
         self.root.route = partial(self.root.route, strict_slashes=False)
         super(Otter, self).__init__(store, *args, **kwargs)
 

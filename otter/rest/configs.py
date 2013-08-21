@@ -7,6 +7,8 @@ or launch configuration for a scaling group.
 from functools import partial
 import json
 
+from klein import Klein
+
 from otter.json_schema import group_schemas
 from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
@@ -21,6 +23,8 @@ from otter.rest.errors import InvalidMinEntities
 class OtterConfig(BaseApp):
     """
     """
+    app = Klein()
+
     def __init__(self, tenant_id, group_id, *args, **kwargs):
         self.tenant_id = tenant_id
         self.group_id = group_id
@@ -100,6 +104,8 @@ class OtterConfig(BaseApp):
 class OtterLaunch(BaseApp):
     """
     """
+    app = Klein()
+
     def __init__(self, tenant_id, group_id, *args, **kwargs):
         self.tenant_id = tenant_id
         self.group_id = group_id

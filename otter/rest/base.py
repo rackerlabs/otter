@@ -16,8 +16,9 @@ class BaseApp(object):
         """
         :param store: The application data store.
         """
-        self.app = Klein()
         self.store = store
+
+        # BaseApp inheriters will be required to have a class variable app.
         self.app.route = partial(self.app.route, strict_slashes=False)
 
         # everything should be json
