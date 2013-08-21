@@ -832,7 +832,7 @@ class ServerTests(TestCase):
 
         self.undo.push.assert_called_once_with(
             verified_delete,
-            self.log.bind.return_value,
+            mock.ANY,
             'http://dfw.openstack/',
             'my-auth-token',
             '1')
