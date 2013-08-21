@@ -768,7 +768,8 @@ class CassScalingGroup(object):
             d.addCallback(_maybe_delete)
             return d
 
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
+                         max_retry=5, retry_wait=random.uniform(3, 5))
         return with_lock(lock, _delete_group)
 
 
