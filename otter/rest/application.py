@@ -21,8 +21,9 @@ class Otter(BaseApp):
     root = Klein()
     app = Klein()
 
-    def __init__(self, store, *args, **kwargs):
+    def __init__(self, store=None, *args, **kwargs):
         self.root.route = partial(self.root.route, strict_slashes=False)
+        self.app.route = partial(self.app.route, strict_slashes=False)
         super(Otter, self).__init__(store, *args, **kwargs)
 
     @root.route('/')
