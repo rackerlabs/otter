@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE section [
+<!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PRODNAME "Rackspace Auto Scale"> 
+<!-- in PDF: for page headers -->
+<!ENTITY PRODABBV "Rackspace Auto Scale"> 
+<!-- in body -->
+<!ENTITY PROD "Auto Scale">               
+]>
+<section 
+    security="writeronly"
+    xml:id="RBAC"
+    xmlns="http://docbook.org/ns/docbook"
+    xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0">
+<title>Role Based Access Control (RBAC)</title>
+<para>Role Based Access Control (RBAC) restricts access to the
+capabilities of Rackspace Cloud services, including the Cloud
+&PRODNAME; API, to authorized users only. RBAC enables Rackspace
+Cloud customers to specify which account users of their Cloud
+account have access to which &PRODNAME; API service
+capabilities, based on roles defined by Rackspace (see <xref
+linkend="RBAC_product_roles_table"/>). The permissions to
+perform certain operations in &PRODNAME; API – create, read,
+update, delete – are assigned to specific roles, and these
+roles can be assigned by the Cloud account admin user to
+account users of the account. </para>
+<section xml:id="assigningRoles">
+<title>Assigning Roles to Account Users</title>
+<para>The account admin user (<code>identity:user-admin</code>) can
+            create account users on the account and then assign roles
+            to the account users. The roles grant the account users
+            specific permissions for accessing the capabilities of the
+            &PROD; service. Only one Cloud account admin user is
+            allowed per account, and it is assigned by default to any
+            Rackspace Cloud account when the account is created. </para>
+<para>See the <citetitle>Cloud Identity Client Developer
+Guide</citetitle> for information about how to perform the
+following tasks:</para>
+<itemizedlist>
+<listitem>
+<para>
+    Create account users (refer to 
+    <link xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_.html"
+>
+http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addUser_v2.0_users_.html</link>)
+</para>
+</listitem>
+<listitem>
+<para>Assign roles to account users (refer to <link
+xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addRole_v2.0_OS-KSADM_roles_.html"
+>
+http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addRole_v2.0_OS-KSADM_roles_.html</link>)</para>
+</listitem>
+</itemizedlist>
+<note>
+<para>The account admin user (<code>identity:user-admin</code>) role
+                cannot hold any additional roles because it already
+                has full access to all capabilities by default.</para>
+</note>
+</section>
+<section xml:id="rolesAvailable">
+<title>Roles Available to &PROD; </title>
+    <para>
+      Currently, three roles can be used to access the &PROD; API. These roles, admin, creator, and observer,
+        apply to this specific product. The following table
+        describes these roles and their permissions.
+    </para>
+<table rules="all" xml:id="RBAC_product_roles_table">
+    <caption>&PROD; Product Roles and Capabilities</caption>
+<col width="50%"/>
+<col width="50%"/>
+<thead>
+<tr>
+<th>Role Name</th>
+<th>Role Permissions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>autoscale:admin</code>
+</td>
+<td>Create, Read, Update, and Delete permissions
+across a specific product, where access is
+granted</td>
+</tr>
+<tr>
+<td>
+<code>autoscale:creator</code></td>
+<td>Create, Read, and Update permissions across a
+specific product, where access is granted</td>
+</tr>
+<tr>
+<td>
+<code>autoscale:observer</code></td>
+<td>Read permission across a specific product, where
+access is granted</td>
+</tr>
+</tbody>
+</table>
+<para>
+    In addition, there are global roles which apply to all
+    products. The following table describes these roles and
+    their permissions.</para>
+<table rules="all" xml:id="RBAC_global_roles_table">
+<caption>&PROD; Global Roles and
+Capabilities</caption>
+<col width="50%"/>
+<col width="50%"/>
+<thead>
+<tr>
+<th>Role Name</th>
+<th>Role Permissions</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>admin</code></td>
+<td>Create, Read, Update, and Delete permissions across
+multiple products, where access is granted</td>
+</tr>
+<tr>
+<td><code>observer</code></td>
+<td>Read permission across multiple products, where
+access is granted </td>
+</tr>
+</tbody>
+</table>
+</section>
+    <section xml:id="roleConflicts">
+        <title>RBAC Global versus Product Roles</title>
+        <!-- this section is new and maybe needs review by the editor -->
+        <para>
+            The API user may set global and product-specific roles that on the surface, 
+            appear to conflict. 
+            When this happens, the more permissive role wins. 
+            For example, if a user has both global observer role and product-specific admin role, the product admin role overrides the global observer role for the specified product. 
+            All other products stay observer-only. 
+            The admin role is the more permissive one, 
+            providing more authority, so it takes precedence.
+        </para>
+        <para>
+            The following table shows two examples of the resolution of apparently-conflicting user roles:
+        </para>
+        <table rules="all" xml:id="RBAC_role_conflicts_table"
+            width="1017">
+            <caption>Conflict Resolution for Global Roles and &PROD;
+                Product Roles</caption>
+            <thead>
+                <tr>
+                    <th>Permission Configuration</th>
+                    <th>Control Panel View of Permission</th>
+                    <th>Can user perform product admin functions?</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Global <code>observer</code> and &PROD;
+                            <code>admin</code>
+                    </td>
+                    <td> Looks like user has only global observer
+                        role. </td>
+                    <td>  Yes, but only for &PROD;. Other products are observer only.
+                    </td>
+                </tr>
+                <tr>
+                    <td>Global <code>admin</code> and &PROD;
+                            <code>observer</code></td>
+                    <td> Looks like user has only global admin role. </td>
+                    <td> Yes, for all. The &PROD; observer role is ignored.</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+    <section xml:id="operationsRoles">
+    <title>&PROD; Operations and Their Roles</title>
+       <para> Some &PROD; operations can be performed only by users
+            with a specific role.
+            <!-- This KC page does not exist yet; check with Renee Rendon and be sure to match the name she gives it. 
+                 Later, we expect to be able to mark each operations' capabilitites in the WADL and then report it along with the other 
+                 details about that operation. Check with David Cramer about when that can replace this.
+            -->
+            At <link
+                xlink:href="http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale"
+                >
+                http://www.rackspace.com/knowledge_center/article/permissions-matrix-for-auto-scale</link>,
+            you can see a table showing the roles that can perform
+            each &PROD; operation. </para>
+    </section>
+</section> 
