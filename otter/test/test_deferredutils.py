@@ -7,7 +7,8 @@ from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.trial.unittest import TestCase
 
-from otter.util.deferredutils import timeout_deferred, retry_and_timeout
+from otter.util.deferredutils import (
+    timeout_deferred, retry_and_timeout, TimedOutError)
 from otter.test.utils import DummyException, patch
 
 
@@ -47,9 +48,9 @@ class TimeoutDeferredTests(TestCase):
         clock.advance(15)
         self.assertIsNone(self.successResultOf(d))
 
-    def test_cancels_if_past_timeout(self):
+    def test_times_out_if_past_timeout(self):
         """
-        The deferred errbacks with an CancelledError if the timeout occurs
+        The deferred errbacks with a TimedOutError if the timeout occurs
         before it either callbacks or errbacks.
         """
         clock = Clock()
@@ -59,7 +60,66 @@ class TimeoutDeferredTests(TestCase):
 
         clock.advance(15)
 
+        self.failureResultOf(d, TimedOutError)
+
+    def test_preserves_cancellation_function_callback(self):
+        """
+        If a cancellation function that callbacks is provided to the deferred
+        being cancelled, its effects will not be overriden with a TimedOutError.
+        """
+        clock = Clock()
+        d = Deferred(lambda c: c.callback('I was cancelled!'))
+        timeout_deferred(d, 10, clock)
+        self.assertNoResult(d)
+
+        clock.advance(15)
+
+        self.assertEqual(self.successResultOf(d), 'I was cancelled!')
+
+    def test_preserves_cancellation_function_errback(self):
+        """
+        If a cancellation function that errbacks (with a non-CancelledError) is
+        provided to the deferred being cancelled, this other error will not be
+        converted to a TimedOutError.
+        """
+        clock = Clock()
+        d = Deferred(lambda c: c.errback(DummyException('what!')))
+        timeout_deferred(d, 10, clock)
+        self.assertNoResult(d)
+
+        clock.advance(15)
+
+        self.failureResultOf(d, DummyException)
+
+    def test_preserves_early_cancellation_error(self):
+        """
+        If the Deferred is manually cancelled before the timeout, it is not
+        re-cancelled (no AlreadyCancelledError), and the CancelledError is not
+        obscured
+        """
+        clock = Clock()
+        d = Deferred()
+        timeout_deferred(d, 10, clock)
+        self.assertNoResult(d)
+
+        d.cancel()
         self.failureResultOf(d, CancelledError)
+
+        clock.advance(15)
+        # no AlreadyCancelledError raised?  Good.
+
+    def test_deferred_description_passed_to_TimedOutError(self):
+        """
+        If a deferred_description is passed, the TimedOutError will have that
+        string as part of it's string representation.
+        """
+        clock = Clock()
+        d = Deferred()
+        timeout_deferred(d, 5.3, clock, deferred_description="It'sa ME!")
+        clock.advance(6)
+
+        f = self.failureResultOf(d, TimedOutError)
+        self.assertIn("It'sa ME! timed out after 5.3 seconds", str(f))
 
 
 class RetryAndTimeoutTests(TestCase):
