@@ -39,7 +39,7 @@ def ignore_and_log(failure, exception_type, log, msg):
     :return: None if exception is trapped. Otherwise, raises other error
     """
     failure.trap(exception_type)
-    log.msg(msg, reason=failure)
+    log.msg(msg, reason=str(failure))
 
 
 def timeout_deferred(deferred, timeout, clock):

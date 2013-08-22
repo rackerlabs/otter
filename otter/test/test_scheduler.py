@@ -7,12 +7,13 @@ from twisted.internet import defer
 from twisted.internet.task import Clock
 
 import mock
+from testtools.matchers import Contains
 
 from silverberg.lock import BusyLockError
 from silverberg.cassandra.ttypes import TimedOutException
 
 from otter.scheduler import SchedulerService
-from otter.test.utils import iMock, patch, CheckFailure
+from otter.test.utils import iMock, patch, matches
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.rest.application import set_store
@@ -147,7 +148,7 @@ class SchedulerTestCase(TestCase):
         self.log.bind.return_value.bind.return_value.msg.assert_has_calls(
             [mock.call('Executing policy'),
              mock.call('Cannot execute policy',
-                       reason=CheckFailure(CannotExecutePolicyError))])
+                       reason=matches(Contains('CannotExecutePolicyError')))])
         self.assertFalse(self.log.bind.return_value.bind.return_value.err.called)
 
     def test_many(self):
@@ -257,7 +258,7 @@ class SchedulerTestCase(TestCase):
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
         self.log.msg.assert_called_once_with("Couldn't get lock to process events",
-                                             reason=CheckFailure(BusyLockError))
+                                             reason=matches(Contains('BusyLockError')))
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
@@ -290,7 +291,7 @@ class SchedulerTestCase(TestCase):
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
         self.log.msg.assert_called_once_with("Couldn't get lock to process events",
-                                             reason=CheckFailure(BusyLockError))
+                                             reason=matches(Contains('BusyLockError')))
 
     def test_cron_updates(self):
         """
