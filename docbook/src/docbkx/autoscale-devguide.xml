@@ -60,7 +60,7 @@ format="SVG" scale="60"/>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-13</pubdate>
+        <pubdate>2013-08-21</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -71,6 +71,16 @@ format="SVG" scale="60"/>
             </annotation>
         </legalnotice>
         <revhistory>
+          <revision>
+            <date>2013-08-21</date>
+            <revdescription>
+              <itemizedlist spacing="compact">
+                <listitem>
+                  <para>Improved code sample for List All Group Details.</para>
+                </listitem>
+              </itemizedlist>
+            </revdescription>
+          </revision>
           <revision>
               <date>2013-08-13</date>
               <revdescription>

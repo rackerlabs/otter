@@ -2,10 +2,10 @@
     "group": {
         "id": "{groupId}",
         "links": [
-          {
-            "href": "{urlRoot}/v1.0/010101/groups/{groupId}"
-            "rel": "self"
-          }
+            {
+                "href": "{urlRoot}/v1.0/010101/groups/{groupId}",
+                "rel": "self"
+            }
         ],
         "groupConfiguration": {
             "name": "workers",
@@ -14,7 +14,7 @@
             "maxEntities": 100,
             "metadata": {
                 "firstkey": "this is a string",
-                "secondkey": "1",
+                "secondkey": "1"
             }
         },
         "launchConfiguration": {
@@ -38,7 +38,7 @@
                         {
                             "uuid": "11111111-1111-1111-1111-111111111111"
                         }
-                    ],
+                    ]
                 },
                 "loadBalancers": [
                     {
@@ -52,23 +52,23 @@
             {
                 "id": "{policyId1}",
                 "links": [
-                  {
-                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId1}"
-                    "rel": "self"
-                  }
+                    {
+                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId1}",
+                        "rel": "self"
+                    }
                 ],
                 "name": "scale up by 10",
                 "change": 10,
                 "cooldown": 5,
                 "type": "webhook"
-            }
+            },
             {
                 "id": "{policyId2}",
                 "links": [
-                  {
-                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId2}"
-                    "rel": "self"
-                  }
+                    {
+                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId2}",
+                        "rel": "self"
+                    }
                 ],
                 "name": "scale down by 5.5 percent",
                 "changePercent": -5.5,
@@ -78,10 +78,10 @@
             {
                 "id": "{policyId3}",
                 "links": [
-                  {
-                    "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId3}"
-                    "rel": "self"
-                  }
+                    {
+                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId3}",
+                        "rel": "self"
+                    }
                 ],
                 "name": "set number of servers to 10",
                 "desiredCapacity": 10,
