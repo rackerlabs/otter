@@ -8,7 +8,7 @@ from twisted.internet.defer import CancelledError, Deferred
 from twisted.trial.unittest import TestCase
 
 from otter.util.deferredutils import (
-    timeout_deferred, retry_and_timeout, TimedOutError)
+    timeout_deferred, retry_and_timeout, TimedOutError, DeferredPool)
 from otter.test.utils import DummyException, patch
 
 
@@ -165,3 +165,102 @@ class RetryAndTimeoutTests(TestCase):
         timeout_clock = self.timeout.call_args[1]['clock']
 
         self.assertIs(retry_clock, timeout_clock)
+
+
+class DeferredPoolTests(TestCase):
+    """
+    Tests for :class:`DeferredPool`
+    """
+    def setUp(self):
+        """
+        Default DeferredPool for each case
+        """
+        self.pool = DeferredPool()
+
+    def test_notify_when_empty_happens_immediately(self):
+        """
+        When ``notify_when_empty`` is called, if the pool is empty, the
+        deferred returned callbacks immediately.
+        """
+        d = self.pool.notify_when_empty()
+        self.successResultOf(d)
+
+    def test_notify_when_empty_does_not_callback_previous_waiting(self):
+        """
+        The second time ``notify_when_empty`` is called, it only callback the
+        deferreds that were created after the first call.
+        """
+        d1 = self.pool.notify_when_empty()
+        self.successResultOf(d1)
+
+        d2 = self.pool.notify_when_empty()
+        self.successResultOf(d2)
+        # no AlreadyCalledError?
+
+    def test_notify_does_not_notify_until_pooled_deferreds_callback(self):
+        """
+        If there are one or more deferreds in the pool, ``notify_when_empty``
+        does not notify until they are callbacked.
+        """
+        holdup = Deferred()
+        self.pool.add(holdup)
+
+        d = self.pool.notify_when_empty()
+        self.assertNoResult(d)
+
+        holdup.callback('done')
+        self.successResultOf(d)
+
+    def test_notify_does_not_notify_until_pooled_deferreds_errbacks(self):
+        """
+        If there are one or more deferreds in the pool, ``notify_when_empty``
+        does not notify until they are fired - works with errbacks too.
+        """
+        holdup = Deferred()
+        self.pool.add(holdup)
+
+        d = self.pool.notify_when_empty()
+        self.assertNoResult(d)
+
+        holdup.errback(DummyException('hey'))
+        self.successResultOf(d)
+
+        # don't leave unhandled Deferred lying around
+        self.failureResultOf(holdup)
+
+    def test_notify_when_empty_notifies_all_waiting(self):
+        """
+        All waiting Deferreds resulting from previous calls to
+        ``notify_when_empty`` will callback as soon as the pool is empty.
+        """
+        holdup = Deferred()
+        self.pool.add(holdup)
+
+        previous = [self.pool.notify_when_empty() for i in range(5)]
+        for d in previous:
+            self.assertNoResult(d)
+
+        holdup.callback('done')
+
+        for d in previous:
+            self.successResultOf(d)
+
+    def test_pooled_deferred_callbacks_not_obscured(self):
+        """
+        The callbacks of pooled deferreds are not obscured by removing them
+        from the pool.
+        """
+        holdup = Deferred()
+        self.pool.add(holdup)
+        holdup.callback('done')
+        self.assertEqual(self.successResultOf(holdup), 'done')
+
+    def test_pooled_deferred_errbbacks_not_obscured(self):
+        """
+        The errbacks of pooled deferreds are not obscured by removing them
+        from the pool.
+        """
+        holdup = Deferred()
+        self.pool.add(holdup)
+        holdup.errback(DummyException('hey'))
+        self.failureResultOf(holdup, DummyException)
