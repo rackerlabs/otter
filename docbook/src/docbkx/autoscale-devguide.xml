@@ -677,17 +677,16 @@ format="SVG" scale="60"/>
           </thead>
           <tbody>
             <tr>
-              <td colspan="1">&POST;
-                {capability_version}/{capability_hash}</td>
+              <td colspan="1">&GET; &PUT; &POST; &DELETE;</td>
               <td colspan="2"><code>/v1.0/execute/*</code></td>
               <td colspan="2"><code>/v1\\.0/execute/(.*)</code></td>
-              <td colspan="1">1 per second</td>
+              <td colspan="1">10 per second</td>
             </tr>
             <tr>
-              <td colspan="1">POST</td>
-              <td colspan="2"/>
-              <td colspan="2"/>
-              <td colspan="1"/>
+              <td colspan="1">&GET; &PUT; &POST; &DELETE;</td>
+              <td colspan="2"><code>/v1.0/tenantId/*</code></td>
+              <td colspan="2"><code>/v1\\.0/([0-9]+)/.+</code></td>
+              <td colspan="1">1000 per minute</td>
             </tr>
           </tbody>
         </table>
@@ -706,8 +705,7 @@ format="SVG" scale="60"/>
         <title>Absolute Limits</title>
         <para>&PRODNAME; does not use absolute limits. It does use 
           <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
-        <!-- build this table if absolute limits are needed in addition to rate limits -->
-        <table rules="all" security="writeronly">
+        <table rules="all">
           <caption>Absolute Limits</caption>
           <thead>
             <tr>
@@ -718,16 +716,20 @@ format="SVG" scale="60"/>
           </thead>
           <tbody>
             <tr>
-              <td colspan="1"/>
-              <td colspan="3">Maximum number of ??? allowed for your
+              <td colspan="1">Groups</td>
+              <td colspan="3">Maximum number of groups allowed for your
                 account</td>
-              <td colspan="1"/>
+              <td colspan="1">1000</td>
             </tr>
             <tr>
-              <td colspan="1"/>
-              <td colspan="3">Maximum volume of ??? size per instance
-                in gigabytes (GB) for your account</td>
-              <td colspan="1"/>
+              <td colspan="1">Policies</td>
+              <td colspan="3">Maximum volume of Policies per Group</td>
+              <td colspan="1">1000</td>
+            </tr>
+            <tr>
+              <td colspan="1">Webhooks</td>
+              <td colspan="3">Maximum volume of Webhooks per Policy</td>
+              <td colspan="1">1000</td>
             </tr>
           </tbody>
         </table>
