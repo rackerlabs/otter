@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import CancelledError, gatherResults
+from twisted.internet.defer import gatherResults
 
 import treq
 
@@ -47,12 +47,6 @@ class UnexpectedServerStatus(Exception):
         self.server_id = server_id
         self.status = status
         self.expected_status = expected_status
-
-
-class WorkerTimeoutError(Exception):
-    """
-    Exception to be used when a worker times out
-    """
 
 
 def server_details(server_endpoint, auth_token, server_id):
@@ -127,25 +121,15 @@ def wait_for_active(log,
         sd.addCallback(check_status)
         return sd
 
-    d = retry_and_timeout(
+    timeout_description = ("Waiting for server <{0}> to change from BUILD "
+                           "state to ACTIVE state").format(server_id)
+
+    return retry_and_timeout(
         poll, timeout,
         can_retry=transient_errors_except(UnexpectedServerStatus),
         next_interval=repeating_interval(interval),
-        clock=clock)
-
-    def on_error(f):
-        f.trap(CancelledError)
-        time_building = clock.seconds() - start_time
-        raise WorkerTimeoutError(
-            ('Server {instance_id} failed to change from BUILD state '
-             'to ACTIVE within a {timeout} second timeout (it has been '
-             '{time_building} seconds).').format(timeout=timeout,
-                                                 time_building=time_building,
-                                                 instance_id=server_id))
-
-    d.addErrback(on_error)
-
-    return d
+        clock=clock,
+        deferred_description=timeout_description)
 
 
 def create_server(server_endpoint, auth_token, server_config):
@@ -502,11 +486,13 @@ def verified_delete(log,
 
         start_time = clock.seconds()
 
-        # this is treating all errors as transient, so the only error that can
-        # occur is a CancelledError from timing out
+        timeout_description = (
+            "Waiting for Nova to actually delete server {0}".format(server_id))
+
         verify_d = retry_and_timeout(check_status, timeout,
                                      next_interval=repeating_interval(interval),
-                                     clock=clock)
+                                     clock=clock,
+                                     deferred_description=timeout_description)
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
@@ -514,15 +500,7 @@ def verified_delete(log,
                         time_delete=time_delete)
 
         verify_d.addCallback(on_success)
-
-        def on_timeout(_):
-            time_delete = clock.seconds() - start_time
-            del_log.err(None, timeout=timeout, time_delete=time_delete,
-                        why=('Server {instance_id} failed to be deleted within '
-                             'a {timeout} second timeout (it has been '
-                             '{time_delete} seconds).'))
-
-        verify_d.addErrback(on_timeout)
+        verify_d.addErrback(del_log.err)
 
     d.addCallback(verify)
     return d

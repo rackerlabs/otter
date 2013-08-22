@@ -22,15 +22,14 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
-    verified_delete,
-    WorkerTimeoutError
+    verified_delete
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch
+from otter.test.utils import DummyException, mock_log, patch, CheckFailure
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
-from otter.util.deferredutils import unwrap_first_error
+from otter.util.deferredutils import unwrap_first_error, TimedOutError
 
 fake_config = {
     'regionOverrides': {},
@@ -499,7 +498,7 @@ class ServerTests(TestCase):
         self.assertNoResult(d)
 
         clock.advance(1)
-        self.failureResultOf(d, WorkerTimeoutError)
+        self.failureResultOf(d, TimedOutError)
 
         # the loop has stopped
         clock.advance(5)
@@ -1002,9 +1001,8 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.log.err.assert_called_once_with(
-            None, instance_id="serverId", why=mock.ANY, timeout=11,
-            time_delete=11)
+        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
+                                             instance_id='serverId')
 
         # the loop has stopped
         clock.advance(5)
