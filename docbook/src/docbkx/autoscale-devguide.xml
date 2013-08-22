@@ -876,6 +876,7 @@ Content-Type: application/json
         the description of that operation in <xref linkend="API_Operations"
         />.</para>
     </section> 
+        <xi:include href="./chapters/rbac.xml"/>
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
 </book>
