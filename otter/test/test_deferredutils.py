@@ -16,6 +16,13 @@ class TimeoutDeferredTests(TestCase):
     """
     Tests for the method method ``timeout_deferred``
     """
+    def setUp(self):
+        """
+        Create a clock and a deferred to be cancelled
+        """
+        self.clock = Clock()
+        self.deferred = Deferred()
+
     def test_propagates_result_if_success_before_timeout(self):
         """
         The deferred callbacks with the result if it succeeds before the
@@ -67,12 +74,11 @@ class TimeoutDeferredTests(TestCase):
         If a cancellation function that callbacks is provided to the deferred
         being cancelled, its effects will not be overriden with a TimedOutError.
         """
-        clock = Clock()
         d = Deferred(lambda c: c.callback('I was cancelled!'))
-        timeout_deferred(d, 10, clock)
+        timeout_deferred(d, 10, self.clock)
         self.assertNoResult(d)
 
-        clock.advance(15)
+        self.clock.advance(15)
 
         self.assertEqual(self.successResultOf(d), 'I was cancelled!')
 
@@ -82,12 +88,11 @@ class TimeoutDeferredTests(TestCase):
         provided to the deferred being cancelled, this other error will not be
         converted to a TimedOutError.
         """
-        clock = Clock()
         d = Deferred(lambda c: c.errback(DummyException('what!')))
-        timeout_deferred(d, 10, clock)
+        timeout_deferred(d, 10, self.clock)
         self.assertNoResult(d)
 
-        clock.advance(15)
+        self.clock.advance(15)
 
         self.failureResultOf(d, DummyException)
 
@@ -97,15 +102,13 @@ class TimeoutDeferredTests(TestCase):
         re-cancelled (no AlreadyCancelledError), and the CancelledError is not
         obscured
         """
-        clock = Clock()
-        d = Deferred()
-        timeout_deferred(d, 10, clock)
-        self.assertNoResult(d)
+        timeout_deferred(self.deferred, 10, self.clock)
+        self.assertNoResult(self.deferred)
 
-        d.cancel()
-        self.failureResultOf(d, CancelledError)
+        self.deferred.cancel()
+        self.failureResultOf(self.deferred, CancelledError)
 
-        clock.advance(15)
+        self.clock.advance(15)
         # no AlreadyCancelledError raised?  Good.
 
     def test_deferred_description_passed_to_TimedOutError(self):
@@ -113,12 +116,11 @@ class TimeoutDeferredTests(TestCase):
         If a deferred_description is passed, the TimedOutError will have that
         string as part of it's string representation.
         """
-        clock = Clock()
-        d = Deferred()
-        timeout_deferred(d, 5.3, clock, deferred_description="It'sa ME!")
-        clock.advance(6)
+        timeout_deferred(self.deferred, 5.3, self.clock,
+                         deferred_description="It'sa ME!")
+        self.clock.advance(6)
 
-        f = self.failureResultOf(d, TimedOutError)
+        f = self.failureResultOf(self.deferred, TimedOutError)
         self.assertIn("It'sa ME! timed out after 5.3 seconds", str(f))
 
 
