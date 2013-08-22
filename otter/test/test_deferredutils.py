@@ -142,13 +142,15 @@ class RetryAndTimeoutTests(TestCase):
         """
         clock = mock.MagicMock()
         retry_and_timeout('do_work', 'timeout', can_retry='can_retry',
-                          next_interval='next_interval', clock=clock)
+                          next_interval='next_interval', clock=clock,
+                          deferred_description='description')
 
         self.retry.assert_called_once_with('do_work', can_retry='can_retry',
                                            next_interval='next_interval',
                                            clock=clock)
         self.timeout.assert_called_once_with(self.retry.return_value,
-                                             'timeout', clock=clock)
+                                             'timeout', clock=clock,
+                                             deferred_description='description')
 
     def test_retry_and_timeout_get_the_same_default_clock(self):
         """
