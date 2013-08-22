@@ -89,7 +89,10 @@ class APIMakeServiceTests(TestCase):
         self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
-        self.set_store = patch(self, 'otter.tap.api.set_store')
+        Otter_patcher = mock.patch('otter.tap.api.Otter')
+        self.Otter = Otter_patcher.start()
+        self.addCleanup(Otter_patcher.stop)
+
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
 
         SchedulerService_patcher = mock.patch('otter.tap.api.SchedulerService')
@@ -174,7 +177,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.set_store.assert_called_once_with(self.CassScalingGroupCollection.return_value)
+        self.Otter.assert_called_once_with(self.CassScalingGroupCollection.return_value)
 
     def test_mock_store(self):
         """
@@ -188,7 +191,7 @@ class APIMakeServiceTests(TestCase):
 
         for mocked in (self.RoundRobinCassandraCluster,
                        self.CassScalingGroupCollection,
-                       self.set_store, self.clientFromString):
+                       self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
@@ -208,7 +211,7 @@ class APIMakeServiceTests(TestCase):
                        self.LoggingCQLClient,
                        self.CassScalingGroupCollection,
                        self.SchedulerService,
-                       self.set_store, self.clientFromString):
+                       self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
@@ -223,5 +226,6 @@ class APIMakeServiceTests(TestCase):
 
         expected_parent = makeService(mock_config)
         scheduler_service.assert_called_once_with(100, 10,
-                                                  self.LoggingCQLClient.return_value)
+                                                  self.LoggingCQLClient.return_value,
+                                                  self.CassScalingGroupCollection.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
