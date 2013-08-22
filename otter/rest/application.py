@@ -3,12 +3,16 @@ Contains the actual Klein app and base route handlers for the REST service.
 """
 from functools import partial
 
+from twisted.web.server import Request
+
 from klein import Klein
 
 from otter.rest.groups import OtterGroups
 from otter.rest.webhooks import OtterExecute
 from otter.rest.base import BaseApp
 
+
+Request.defaultContentType = 'application/json'
 
 class Otter(BaseApp):
     """
@@ -28,7 +32,6 @@ class Otter(BaseApp):
 
         :returns: Empty string
         """
-        request.setHeader('Content-Type', 'application/json')
         return ''
 
     @root.route('/v1.0', branch=True)
