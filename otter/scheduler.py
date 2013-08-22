@@ -19,6 +19,7 @@ from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyEr
 from otter.log import log as otter_log
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.util.deferredutils import ignore_and_log
+from otter.util.timestamp import utcisoformat
 
 
 def next_cron_occurrence(cron):
@@ -122,7 +123,8 @@ class SchedulerService(TimerService):
 
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
-        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
+        log = self.log.bind(scheduler_run_id=generate_transaction_id(),
+                            utcnow=utcisoformat(utcnow))
         log.msg('Checking for events')
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
