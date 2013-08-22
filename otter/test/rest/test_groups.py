@@ -403,6 +403,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
+
+    This will go away, just here so that we've got the start for optional
+    Bobby support in Otter.
     """
     endpoint = "/v1.0/11111/groups/"
     invalid_methods = ("DELETE", "PUT")
@@ -425,7 +428,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
     @mock.patch('otter.rest.application.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
-    def test_group_create_bobby(self, mock_bobby, mock_url):
+    def test_group_create_bobby(self, create_group, get_url_root):
         """
         A scaling group is created and calls over to Bobby
         """
@@ -456,37 +459,13 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
 
-        response_body = self.assert_status_code(
+        self.assert_status_code(
             201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
 
         self.mock_store.create_scaling_group.assert_called_once_with(
             mock.ANY, '11111', expected_config, launch, policies or None)
 
-        resp = json.loads(response_body)
-        validate(resp, rest_schemas.create_and_manifest_response)
-
-        # compare the policies separately, because they have links and may be
-        # in a different order
-        resp_policies = resp['group'].pop('scalingPolicies')
-
-        self.assertEqual(resp, {
-            'group': {
-                'groupConfiguration': expected_config,
-                'launchConfiguration': launch,
-                'id': '1',
-                'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
-            }
-        })
-
-        mock_bobby.assert_called_once_with('11111', '1')
-
-        resp_policies.sort(key=lambda dictionary: dictionary['id'])
-        for pol in resp_policies:
-            self.assertEqual(pol.pop('links'), [{
-                "href": "/v1.0/11111/groups/1/policies/{0}/".format(pol.pop('id')),
-                "rel": "self"
-            }])
-        self.assertEqual(resp_policies, policies)
+        create_group.assert_called_once_with('11111', '1')
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):
