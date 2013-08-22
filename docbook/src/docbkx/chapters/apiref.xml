@@ -54,6 +54,7 @@
       <para>The operations described in this chapter allow developers to 
          manage webhooks. </para>
       <resources xmlns="http://wadl.dev.java.net/2009/02">
+         <resource href="../../wadl/autoscale.wadl#webhooks"/>
          <resource href="../../wadl/autoscale.wadl#webhook"/>
       </resources>
    </section>
