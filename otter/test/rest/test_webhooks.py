@@ -74,7 +74,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {"webhooks": [], "webhooks_links": []})
         validate(resp, rest_schemas.list_webhooks_response)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_returned_webhooks_dict_gets_translated(self, mock_url):
         """
         Test that the webhooks dict gets translated into a list of webhooks
@@ -168,7 +168,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_webhooks_create(self, mock_url):
         """
         Tries to create a set of webhooks.
@@ -276,7 +276,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             self.flushLoggedErrors(type(error))
             self.mock_group.get_webhook.reset_mock()
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_get_webhook(self, mock_url):
         """
         Get webhook returns a 200 with a body with the right schema if

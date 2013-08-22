@@ -36,7 +36,7 @@ class FormatterHelpers(TestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -92,7 +92,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def test_list_unknown_error_is_500(self):
         """
@@ -238,7 +238,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(resp_body)
         self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):
         """
         Tries to create a scaling group with the given request body (which
@@ -428,7 +428,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_view_manifest(self, url_root):
         """
         Viewing the manifest of an existant group returns whatever the

@@ -8,8 +8,8 @@ import mock
 from twisted.trial.unittest import TestCase
 
 from otter.rest.decorators import with_transaction_id
-from otter.rest.application import get_autoscale_links, app, transaction_id
 from otter.test.rest.request import RequestTestMixin
+from otter.util.http import get_autoscale_links, transaction_id
 
 
 class LinkGenerationTestCase(TestCase):
@@ -22,7 +22,7 @@ class LinkGenerationTestCase(TestCase):
         Set a blank root URL
         """
         self.base_url_patcher = mock.patch(
-            "otter.rest.application.get_url_root", return_value="")
+            "otter.util.http.get_url_root", return_value="")
         self.base_url_patcher.start()
 
     def tearDown(self):
