@@ -16,7 +16,7 @@ from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
 from otter.test.utils import iMock, patch
 
 
@@ -197,7 +197,8 @@ class RequestTestMixin(object):
         return locations[0]
 
     def assert_status_code(self, expected_status, endpoint=None,
-                           method="GET", body="", location=None):
+                           method="GET", body="", location=None,
+                           root=None):
         """
         Asserts that the status code of a particular request with the given
         endpoint, request method, request body results in the provided status
@@ -221,6 +222,9 @@ class RequestTestMixin(object):
 
         :return: the response body as a string
         """
+        if root is None:
+            root = self.mock_app().resource()
+
         response_wrapper = self.successResultOf(
             request(root, method, endpoint or self.endpoint, body=body))
 
@@ -230,6 +234,12 @@ class RequestTestMixin(object):
                              location)
         return response_wrapper.content
 
+    def mock_app(self):
+        mock_store = iMock(IScalingGroupCollection)
+        mock_group = iMock(IScalingGroup)
+        mock_store.get_scaling_group.return_value = mock_group
+
+        return Otter(mock_store).app
 
 class RestAPITestMixin(RequestTestMixin):
     """
@@ -249,9 +259,6 @@ class RestAPITestMixin(RequestTestMixin):
         self.mock_generate_transaction_id = patch(
             self, 'otter.rest.decorators.generate_transaction_id',
             return_value='transaction-id')
-
-        set_store(self.mock_store)
-        self.addCleanup(set_store, None)
 
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it

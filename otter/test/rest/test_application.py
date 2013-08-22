@@ -262,11 +262,16 @@ class RouteTests(RequestTestMixin, TestCase):
         """
         requests = [0]
 
-        @app.route('/foo/')
-        @with_transaction_id()
-        def foo(request, log):
-            requests[0] += 1
-            return 'ok'
+        mock_app = self.mock_app()
+
+        class FakeApp(object):
+            app = mock_app
+
+            @app.route('/foo/')
+            @with_transaction_id()
+            def foo(self, request, log):
+                requests[0] += 1
+                return 'ok'
 
         self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
         self.assertEqual(requests[0], 1)
@@ -286,11 +291,16 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
 
         transaction_ids = []
 
-        @app.route('/foo')
-        @with_transaction_id()
-        def foo(request, log):
-            transaction_ids.append(transaction_id(request))
-            return 'ok'
+        mock_app = self.mock_app()
+
+        class FakeApp(object):
+            app = mock_app
+
+            @app.route('/foo')
+            @with_transaction_id()
+            def foo(self, request, log):
+                transaction_ids.append(transaction_id(request))
+                return 'ok'
 
         self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
         self.assertEqual(transaction_ids[0], 'transaction-id')
