@@ -18,13 +18,6 @@
             xlink:href="https://github.com/rackerlabs/otter"
             >https://github.com/rackerlabs/otter</link>. </para>
     <para>
-        You can see and experiment with all &PRODNAME; API calls at
-        <link xlink:href="http://docs.autoscale.apiary.io/">http://docs.autoscale.apiary.io/</link>.
-    </para>
-    <para> To use &PRODNAME;, you must be able to set cloud monitoring
-        alarms and create cloud servers and cloud load balancers. You
-        can interact with those and other Rackspace cloud services via
-        API or GUI (Control Panel). 
         <itemizedlist>
             <listitem>
                 <para> To learn about working with Rackspace services
@@ -37,8 +30,9 @@
                     through the Rackspace Cloud Control Panel, visit
                         <link
                         xlink:href="http://www.rackspace.com/knowledge_center/"
-                        >http://www.rackspace.com/knowledge_center/</link>. </para>
+                        >http://www.rackspace.com/knowledge_center/</link>.
+                </para>
             </listitem>
-        </itemizedlist> 
+        </itemizedlist>
     </para>
 </section>

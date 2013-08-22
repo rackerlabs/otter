@@ -571,9 +571,8 @@ format="SVG" scale="60"/>
           </tbody>
         </table>
       </para>
-      <para>Replace the sample project ID number,
-          <parameter>1234</parameter>, with your actual account
-        number.</para>
+      <para>Replace the Tenant ID,
+          <parameter>1234</parameter>, with your actual Tenant ID.</para>
       <para>You will find your account number after the final '/' in
         the <code>publicURL</code> field returned by the
         authentication response. For example, in <xref
@@ -683,6 +682,12 @@ format="SVG" scale="60"/>
               <td colspan="2"><code>/v1.0/execute/*</code></td>
               <td colspan="2"><code>/v1\\.0/execute/(.*)</code></td>
               <td colspan="1">1 per second</td>
+            </tr>
+            <tr>
+              <td colspan="1">POST</td>
+              <td colspan="2"/>
+              <td colspan="2"/>
+              <td colspan="1"/>
             </tr>
           </tbody>
         </table>
