@@ -144,9 +144,7 @@ format="SVG" scale="60"/>
                     <listitem>
                         <para>Rackspace Cloud account. To sign up for
                             a Rackspace Cloud account, go to the
-                            Rackspace Public Cloud <link
-                                xlink:href="https://cart.rackspace.com/cloud/signup/"
-                                >signup page</link>. </para>
+                            Rackspace Public Cloud <link xlink:href="https://cart.rackspace.com/cloud/signup/">signup page</link>. </para>
                     </listitem>
                     <listitem>
                         <para>Rackspace username and password
@@ -160,17 +158,14 @@ format="SVG" scale="60"/>
                 <listitem>
                     <para>
                         Configure alarms by using Cloud Monitoring.
-                        For more information, see the <link
-                        xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html"
-                        >Rackspace Cloud Monitoring Getting
+                        For more information, see the <link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html">Rackspace Cloud Monitoring Getting
                         Started Guide</link>.
                     </para> 
                 </listitem>
                 <listitem>
                     <para>
                         Create servers by using Cloud Servers. For
-                        more information, see the <link
-                        xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
+                        more information, see the <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
                         >Next
                         Generation Cloud Servers™ Developer
                         Guide</link>.

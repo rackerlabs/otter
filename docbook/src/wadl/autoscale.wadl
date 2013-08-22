@@ -87,6 +87,7 @@
                                 <resource id="webhooks" path="/webhooks">
                                     <method href="#getWebhooks"/>
                                     <method href="#createWebhook"/>
+
                                     <resource id="webhook" path="/{webhookId}">
                                         <param name="webhookId" type="osapi:UUID" required="true" style="template">
                                             <doc>A webhook</doc>
@@ -552,7 +553,7 @@
     <method name="GET" id="getWebhooks">
         <doc title="Get a list of webhooks for the policy">
             <db:para role="shortdesc">
-                Verb a noun.
+                Get a list of webhooks for the policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get a list of webhooks and their IDs. This data is returned in
@@ -572,7 +573,7 @@
     <method id="createWebhook" name="POST">
         <doc title="Create a webhook">
             <db:para role="shortdesc">
-                Verb a noun.
+                Create a Webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create one or more new scaling policy webhooks. Webhooks must
