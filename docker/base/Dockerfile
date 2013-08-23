@@ -7,4 +7,4 @@ ENV     DEBIAN_FRONTEND noninteractive
 RUN     echo "deb http://mirror.rackspace.com/ubuntu/ precise main restricted universe" > /etc/apt/sources.list
 RUN     echo "deb http://mirror.rackspace.com/ubuntu/ precise-updates main restricted universe" >> /etc/apt/sources.list
 RUN     apt-get update
-RUN     apt-get -y install build-essential python-dev libxml2-dev libxslt1-dev python-pip python-virtualenv
+RUN     apt-get -y install build-essential git python-dev libxml2-dev libxslt1-dev python-pip python-virtualenv
