@@ -1,4 +1,7 @@
 
+# Build java
+docker build -t java docker/java
+
 # Build cassandra
 docker build -t cassandra docker/cassandra
 
