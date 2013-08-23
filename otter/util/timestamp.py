@@ -21,17 +21,6 @@ def now():
     return "{0}Z".format(datetime.utcnow().isoformat())
 
 
-def utcisoformat(time):
-    """
-    :param time: `datetime` instance whose ISO8601 format is needed
-    :return: ISO8601 zulu timestamp format of given UTC time
-    :raises: ValueError if given time has timezone info in it
-    """
-    if time.tzinfo:
-        raise ValueError('Found timezone info')
-    return "{0}Z".format(time.isoformat())
-
-
 def from_timestamp(timestamp):
     """
     :param str timestamp: a timestamp string which is a ISO8601 formatted

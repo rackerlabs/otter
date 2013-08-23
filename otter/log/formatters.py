@@ -3,6 +3,7 @@ Composable log observers for use with Twisted's log module.
 """
 import json
 import time
+from datetime import datetime
 
 from twisted.python.failure import Failure
 
@@ -17,10 +18,17 @@ class ReprFallbackEncoder(json.JSONEncoder):
     in the logged JSON and will actually be logged and not discarded by the
     logging system because of a formatting error.
     """
+    # TODO: Update docstring above and/or change classname
+    serializers = {datetime: lambda obj: obj.isoformat(),
+                   Failure: lambda obj: str(obj)}
+
     def default(self, obj):
         """
         Serialize obj as repr(obj).
         """
+        for _type, serializer in self.serializers.items():
+            if isinstance(obj, _type):
+                return serializer(obj)
         return repr(obj)
 
 

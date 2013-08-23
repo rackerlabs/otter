@@ -108,14 +108,14 @@ class SchedulerTestCase(TestCase):
                           self.mock_state, policy_id=event['policyId']) for event in events])
 
     @mock.patch('otter.scheduler.generate_transaction_id', return_value='transid')
-    @mock.patch('otter.scheduler.utcisoformat', return_value='wassup')
     @mock.patch('otter.scheduler.datetime', spec=['utcnow'])
-    def test_empty(self, mock_datetime, mock_utcisoformat, mock_gentransid):
+    def test_empty(self, mock_datetime, mock_gentransid):
         """
         No policies are executed when ``fetch_batch_of_events`` return empty list
         i.e. no events are there before now
         """
-        mock_datetime.utcnow.return_value = time = datetime(2012, 10, 10, 03, 20, 30, 0, None)
+        mock_datetime.utcnow.return_value = time = datetime(
+            2012, 10, 10, 03, 20, 30, 0, None)
         self.returns = [[]]
 
         d = self.scheduler_service.check_for_events(100)
@@ -123,8 +123,7 @@ class SchedulerTestCase(TestCase):
         self.validate_calls(d, [[]], None)
         self.assertFalse(self.mock_store.update_delete_events.called)
 
-        mock_utcisoformat.assert_called_once_with(time)
-        self.log.bind.assert_called_once_with(scheduler_run_id='transid', utcnow='wassup')
+        self.log.bind.assert_called_once_with(scheduler_run_id='transid', utcnow=time)
         self.log.bind.return_value.msg.assert_called_once_with('Checking for events')
 
     def test_one(self):

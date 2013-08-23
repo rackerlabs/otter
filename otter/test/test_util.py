@@ -262,29 +262,6 @@ class TimestampTests(TestCase):
         self.assertTrue(parsed.tzinfo is not None)
         self.assertEqual(parsed.replace(tzinfo=None), datetime.min)
 
-    def test_utcisoformat_success(self):
-        """
-        ``utcisoformat`` returns ISO8601 of given date
-        """
-        time = datetime(2000, 01, 01, 12, 0, 0, 0, None)
-        s = timestamp.utcisoformat(time)
-        self.assertEqual(s, '2000-01-01T12:00:00Z')
-
-    def test_utcisoformat_microseconds_success(self):
-        """
-        ``utcisoformat`` returns ISO8601 of given date with microseconds
-        """
-        time = datetime(2000, 01, 01, 12, 0, 0, 345664, None)
-        s = timestamp.utcisoformat(time)
-        self.assertEqual(s, '2000-01-01T12:00:00.345664Z')
-
-    def test_utcisoformat_with_tz(self):
-        """
-        ``utcisoformat`` raise `ValueError` if time with tzinfo is given
-        """
-        time = timestamp.from_timestamp('2000-01-01T12:00:00+03:00')
-        self.assertRaises(ValueError, timestamp.utcisoformat, time)
-
 
 class ConfigTest(TestCase):
     """
