@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from os import environ
-import simplejson as json
+import json
 
 with open("config.json") as f:
     config_json = json.load(f)
