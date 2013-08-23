@@ -1,4 +1,4 @@
-FROM    otter
+FROM    otter/base
 
 # The build process isn't a real tty
 ENV     DEBIAN_FRONTEND noninteractive
@@ -15,7 +15,7 @@ RUN     pip install pep257==0.2.0 pep8==1.3.3 pyflakes==0.5.0 mock==1.0.1 covera
 
 RUN     mkdir -p /root/.cloudcafe/configs/autoscale
 
-ADD     preprod.config /root/.cloudcafe/configs/autoscale
+ADD     preprod.config /root/.cloudcafe/configs/autoscale/
 ADD     run_cloudcafe.sh /srv/run_cloudcafe.sh
 RUN     /bin/chmod +x /srv/run_cloudcafe.sh
 
