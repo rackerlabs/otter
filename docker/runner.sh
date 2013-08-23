@@ -39,7 +39,7 @@ for (( i = 0; i < 10; i++ )); do
 done
 
 # Run otter unit tests
-docker run -i -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make unit"
+UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make unit")
 
 OTTER_CID=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter)
 OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
@@ -51,7 +51,12 @@ CC_ENVS="$CC_ENVS -e CC_USER_API_KEY=$CC_USER_API_KEY"
 CC_ENVS="$CC_ENVS -e CC_NON_AS_PASSWORD=$CC_NON_AS_PASSWORD"
 
 # Run CloudCafe tests
-docker run -i -t -e $CC_ENVS otter/cloudcafe
+CC_TESTS=$(docker run -d -t -e $CC_ENVS otter/cloudcafe)
+
+docker wait $UNIT_TESTS
+docker logs $UNIT_TESTS
+docker wait $CC_TESTS
+docker logs $CC_TESTS
 
 # SHUT.IT.DOWN.
 docker stop $OTTER_CID
