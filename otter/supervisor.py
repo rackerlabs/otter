@@ -7,14 +7,16 @@ from otter.util.hashkey import generate_job_id
 
 from otter.util.config import config_value
 from otter.worker import launch_server_v1
+from otter.undo import InMemoryUndoStack
 
 
 class Supervisor(object):
     """
     Manages execution of launch configurations.
     """
-    def __init__(self, auth_function):
+    def __init__(self, auth_function, coiterate):
         self.auth_function = auth_function
+        self.coiterate = coiterate
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
@@ -41,6 +43,17 @@ class Supervisor(object):
 
         assert launch_config['type'] == 'launch_server'
 
+        undo = InMemoryUndoStack(self.coiterate)
+
+        def when_fails(result):
+            log.msg("Encountered an error, rewinding {worker!r} job undo stack.",
+                    exc=result.value)
+            ud = undo.rewind()
+            ud.addCallback(lambda _: result)
+            return ud
+
+        completion_d.addErrback(when_fails)
+
         log.msg("Authenticating for tenant")
 
         d = self.auth_function(scaling_group.tenant_id)
@@ -53,7 +66,7 @@ class Supervisor(object):
                 scaling_group,
                 service_catalog,
                 auth_token,
-                launch_config['args'])
+                launch_config['args'], undo)
 
         d.addCallback(when_authenticated)
 
