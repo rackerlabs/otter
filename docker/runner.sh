@@ -25,10 +25,21 @@ docker build -t otter/cloudcafe docker/cloudcafe
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
 CASSANDRA_IP=$(docker inspect $CASSANDRA_CID | grep IPAddress | cut -d '"' -f 4)
 
+# This is the best way I could determine that Cassandra is up and functional
+# nc -z always returns 0 due to the nat port existing
+for (( i = 0; i < 10; i++ )); do
+    sleep 1
+    echo "Attempting to load schema"
+    LDS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make load-dev-schema")
+    CASSANDRA_RUNNING=$(docker wait $LDS)
+    if [[ $CASSANDRA_RUNNING -eq 0 ]]; then
+        echo "Schema loaded"
+        break
+    fi
+done
+
 # Run otter unit tests
 docker run -i -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make unit"
-# Setup dev-schema
-docker run -i -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make load-dev-schema"
 
 OTTER_CID=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter)
 OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
