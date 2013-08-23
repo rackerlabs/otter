@@ -20,9 +20,10 @@ test: unit integration
 run:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
-run_docker:
+run_docker: rewrite_config run
+
+rewrite_config:
 	./scripts/rewrite_config.py
-	run
 
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
