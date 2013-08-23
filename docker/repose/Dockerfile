@@ -9,16 +9,16 @@ RUN wget --output-document=/usr/share/repose/filters/filter-bundle.ear http://ma
 # Set the hostname so Cassandra doesn't explode
 RUN echo "127.0.0.1 repose localhost" > /etc/hosts
 
+# expose repose and jmx
+EXPOSE 8080
+EXPOSE 9999
+
 # repose configs
 ADD ./configs /etc/repose
 
 # set up start scripts
 ADD ./start.sh /usr/bin/start_repose.sh
 RUN chmod a+x /usr/bin/start_repose.sh
-
-# expose repose and jmx
-EXPOSE 8080
-EXPOSE 9999
 
 # start Repose
 CMD ["start_repose.sh"]
