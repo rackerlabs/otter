@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<rackspace-authorization xmlns="http://openrepose.org/components/openstack-identity/auth-z/v1.0">
+   <authentication-server username="%identity_username%>" password="%identity_password" href="%identity_url%" />
+   <service-endpoint href="%autoscale_url%" region="%autoscale_region%" name="autoscale" type="rax:autoscale"/>
+</rackspace-authorization>
