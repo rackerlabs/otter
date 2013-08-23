@@ -1,3 +1,4 @@
+#!/bin/bash
 
 # Build java
 docker build -t java docker/java
