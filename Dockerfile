@@ -10,4 +10,4 @@ RUN     pip install klein==0.2.1 twisted==13.1 tryfer==0.2.2 jsonschema==2.0 yun
 
 ADD     . /opt/otter
 
-CMD     cd /opt/otter; make run
+CMD     cd /opt/otter; make run_docker
