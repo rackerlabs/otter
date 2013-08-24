@@ -25,7 +25,7 @@ if otter_interface:
         ipaddress = check_output(cmd, shell=True)
     except CalledProcessError:
         ipaddress = "127.0.0.1"
-    config_json['url_root'] = "http://{0}:9000".format(ipaddress)
+    config_json['url_root'] = "http://{0}:9000".format(ipaddress.strip())
 else:
     config_json['url_root'] = environ.get('URL_ROOT', 'http://127.0.0.1:9000')
 
