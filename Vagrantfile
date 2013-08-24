@@ -84,6 +84,7 @@ Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
   config.vm.provider :virtualbox do |vb|
     config.vm.box = BOX_NAME
     config.vm.box_url = BOX_URI
+    vb.customize ["modifyvm", :id, "--memory", 1024]
   end
 end
 
