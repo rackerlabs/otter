@@ -21,7 +21,7 @@ if otter_interface:
             "ip addr show {0}".format(otter_interface),
             "grep -o 'inet [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+'",
             "grep -o [0-9].*"
-            ])
+        ])
         ipaddress = check_output(cmd)
     except CalledProcessError:
         ipaddress = "127.0.0.1"
