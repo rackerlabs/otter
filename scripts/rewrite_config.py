@@ -22,7 +22,7 @@ if otter_interface:
             "grep -o 'inet [0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+'",
             "grep -o [0-9].*"
         ])
-        ipaddress = check_output(cmd)
+        ipaddress = check_output(cmd, shell=True)
     except CalledProcessError:
         ipaddress = "127.0.0.1"
     config_json['url_root'] = "http://{0}:9000".format(ipaddress)
