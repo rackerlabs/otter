@@ -56,11 +56,17 @@ CC_ENVS="$CC_ENVS -e CC_NON_AS_PASSWORD=$CC_NON_AS_PASSWORD"
 # Run CloudCafe tests
 CC_TESTS=$(docker run -d -t -e $CC_ENVS otter/cloudcafe)
 
-docker wait $UNIT_TESTS
+UNIT_EXIT=$(docker wait $UNIT_TESTS)
 docker logs $UNIT_TESTS
-docker wait $CC_TESTS
+CC_EXIT=$(docker wait $CC_TESTS)
 docker logs $CC_TESTS
 
 # SHUT.IT.DOWN.
 docker stop $OTTER_CID
 docker stop $CASSANDRA_CID
+
+echo "Unit tests exited $UNIT_EXIT"
+echo "CloudCafe tests exited $CC_EXIT"
+if [[ $UNIT_EXIT -ne 0 ]] || [[ $CC_EXIT -ne 0 ]]; then
+    exit(1)
+fi
