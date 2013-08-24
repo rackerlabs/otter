@@ -68,5 +68,5 @@ docker stop $CASSANDRA_CID
 echo "Unit tests exited $UNIT_EXIT"
 echo "CloudCafe tests exited $CC_EXIT"
 if [[ $UNIT_EXIT -ne 0 ]] || [[ $CC_EXIT -ne 0 ]]; then
-    exit(1)
+    exit 1
 fi
