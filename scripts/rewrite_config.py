@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+"""
+Rewrite the config.json file based on environment variables to make
+docker and CloudCafe run correctly
+"""
+
 from os import environ
 from subprocess import check_output, CalledProcessError
 import json
