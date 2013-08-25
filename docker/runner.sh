@@ -1,5 +1,7 @@
 #!/bin/bash
 
+GIT_SHA=$(git rev-parse --short HEAD)
+
 docker rmi `docker images | grep none | awk '{print $3}'`
 docker rm `docker ps -a -q`
 
@@ -13,7 +15,7 @@ docker build -t cassandra docker/cassandra
 docker build -t otter/base docker/base
 
 # Build otter
-docker build -t otter .
+docker build -t otter:$GIT_SHA .
 
 # Build cloudcafe
 # This sucks because cloudcafe sucks
@@ -22,7 +24,8 @@ docker build -t otter .
 rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast
 cp -r autoscale_cloudcafe docker/cloudcafe
 cp -r autoscale_cloudroast docker/cloudcafe
-docker build -t otter/cloudcafe docker/cloudcafe
+docker build -t otter/cloudcafe:$GIT_SHA docker/cloudcafe
+rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast
 
 # Run Test containers
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
@@ -42,9 +45,9 @@ for (( i = 0; i < 10; i++ )); do
 done
 
 # Run otter unit tests
-UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter /bin/bash -c "cd /opt/otter; make unit")
+UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA /bin/bash -c "cd /opt/otter; make unit")
 
-OTTER_CID=$(docker run -d -t -e OTTER_INTERFACE=eth0 -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter)
+OTTER_CID=$(docker run -d -t -e OTTER_INTERFACE=eth0 -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA)
 OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
 
 # Setup CloudCafe environment variables
@@ -54,7 +57,7 @@ CC_ENVS="$CC_ENVS -e CC_USER_API_KEY=$CC_USER_API_KEY"
 CC_ENVS="$CC_ENVS -e CC_NON_AS_PASSWORD=$CC_NON_AS_PASSWORD"
 
 # Run CloudCafe tests
-CC_TESTS=$(docker run -d -t -e $CC_ENVS otter/cloudcafe)
+CC_FUNCTIONAL_TESTS=$(docker run -d -t -e $CC_ENVS otter/cloudcafe:$GIT_SHA /srv/run_cloudcafe.sh -p functional)
 
 UNIT_EXIT=$(docker wait $UNIT_TESTS)
 docker logs $UNIT_TESTS
@@ -64,6 +67,8 @@ docker logs $CC_TESTS
 # SHUT.IT.DOWN.
 docker stop $OTTER_CID
 docker stop $CASSANDRA_CID
+docker rmi otter:$GIT_SHA
+docker rmi otter/cloudcafe:$GIT_SHA
 
 echo "Unit tests exited $UNIT_EXIT"
 echo "CloudCafe tests exited $CC_EXIT"
