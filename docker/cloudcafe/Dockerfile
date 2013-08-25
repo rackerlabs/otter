@@ -21,7 +21,7 @@ RUN     /bin/chmod +x /srv/run_cloudcafe.sh
 
 ADD     autoscale_cloudcafe /opt/autoscale_cloudcafe
 ADD     autoscale_cloudroast /opt/autoscale_cloudroast
-RUN     cd /opt/autoscale_cloudcafe && python setup.py install
-RUN     cd /opt/autoscale_cloudroast && python setup.py install
+
+ENV     PYTHONPATH /opt/autoscale_cloudcafe:/opt/autoscale_cloudroast
 
 CMD     ["/srv/run_cloudcafe.sh"]
