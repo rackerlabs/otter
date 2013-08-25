@@ -24,4 +24,5 @@ ADD     autoscale_cloudroast /opt/autoscale_cloudroast
 
 ENV     PYTHONPATH /opt/autoscale_cloudcafe:/opt/autoscale_cloudroast
 
-CMD     ["/srv/run_cloudcafe.sh"]
+ENTRYPOINT     ["/srv/run_cloudcafe.sh"]
+CMD     ["-p", "functional"]
