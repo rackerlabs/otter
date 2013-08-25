@@ -21,4 +21,4 @@ ADD cassandra.yaml /opt/cassandra/conf/
 # start Cassandra
 EXPOSE 9160
 EXPOSE 7199
-CMD ["/opt/cassandra/bin/cassandra", "-f"]
+CMD /opt/cassandra/bin/cassandra -f
