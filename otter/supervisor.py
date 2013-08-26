@@ -75,7 +75,7 @@ class Supervisor(object):
 
         return succeed((job_id, completion_d))
 
-    def execute_delete_server(self, log, transaction_id, scaling_group, server):
+    def delete_server(self, log, transaction_id, scaling_group, server):
         """
         Executes a single delete server
 
@@ -103,6 +103,10 @@ class Supervisor(object):
         d.addErrback(log.err, 'Server deletion failed')
 
         return d
+
+    def remove_from_load_balancers(self, log, transaction_id, scaling_group, server):
+        return launch_server_v1.remove_from_load_balancers(
+            log, config_value('region'), service_catalog, auth_token server['lb_info'])
 
 
 _supervisor = None

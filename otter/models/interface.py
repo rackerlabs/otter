@@ -16,7 +16,8 @@ class GroupState(object):
     :ivar str group_id: the ID of the scaling group whose state this
         object represents
     :ivar dict active: the mapping of active server ids and their info
-    :ivar dict pending: the list of pending job ids and their info
+    :ivar dict pending: the list of instance ids building
+    :ivar desired: number of active servers desired
     :ivar bool paused: whether the scaling group is paused in scaling activities
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
         they were executed, if ever.
@@ -27,12 +28,13 @@ class GroupState(object):
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, active, pending, group_touched,
-                 policy_touched, paused, now=timestamp.now):
+    def __init__(self, tenant_id, group_id, active, pending, desired,
+                 group_touched, policy_touched, paused, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.active = active
         self.pending = pending
+        self.desired = desired
         self.paused = paused
         self.policy_touched = policy_touched
         self.group_touched = group_touched

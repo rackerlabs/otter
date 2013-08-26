@@ -408,6 +408,21 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
+    log.msg("Looking for cloud servers endpoint: %(service_name)s",
+            service_name=cloudServersOpenStack,
+            region=region)
+
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
+
+    (server_id, lb_details) = instance_details
+
+    return verified_delete(log, server_endpoint, auth_token, server_id)
+
+
+def remove_from_load_balancers(log, region, service_catalog, auth_token, lb_details):
+
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
@@ -420,28 +435,14 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                       cloudLoadBalancers,
                                       lb_region)
 
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
-            service_name=cloudServersOpenStack,
-            region=region)
-
-    server_endpoint = public_endpoint_url(service_catalog,
-                                          cloudServersOpenStack,
-                                          region)
-
-    (server_id, loadbalancer_details) = instance_details
-
     node_info = itertools.chain(
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
-          for (loadbalancer_id, node_details) in loadbalancer_details])
+          for (loadbalancer_id, node_details) in lb_details])
 
     d = gatherResults(
         [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
-    def when_removed_from_loadbalancers(_ignore):
-        return verified_delete(log, server_endpoint, auth_token, server_id)
-
-    d.addCallback(when_removed_from_loadbalancers)
     return d
 
 
