@@ -18,20 +18,6 @@ docker build -t otter/base docker/base
 # Build otter
 docker build -t otter:$GIT_SHA .
 
-# Build cloudcafe
-# This sucks because cloudcafe sucks
-# Docker can't build things from directories higher than the Dockerfile
-# and a directory can only have one Dockerfile
-cd docker/cloudcafe
-rm -rf autoscale_cloudcafe autoscale_cloudroast
-cp -r ../../autoscale_cloudcafe .
-cp -r ../../autoscale_cloudroast .
-# Update the CloudCafe config based on environment variables
-python update_cc_config.py
-docker build -t otter/cloudcafe:$GIT_SHA .
-rm -rf autoscale_cloudcafe autoscale_cloudroast preprod.config
-cd ../..
-
 # Run Test containers
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
 CASSANDRA_IP=$(docker inspect $CASSANDRA_CID | grep IPAddress | cut -d '"' -f 4)
@@ -53,7 +39,21 @@ done
 UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA /bin/bash -c "cd /opt/otter; make unit")
 
 OTTER_CID=$(docker run -d -t -e OTTER_INTERFACE=eth0 -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA)
-OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
+export OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
+
+# Build cloudcafe
+# This sucks because cloudcafe sucks
+# Docker can't build things from directories higher than the Dockerfile
+# and a directory can only have one Dockerfile
+cd docker/cloudcafe
+rm -rf autoscale_cloudcafe autoscale_cloudroast
+cp -r ../../autoscale_cloudcafe .
+cp -r ../../autoscale_cloudroast .
+# Update the CloudCafe config based on environment variables
+python update_cc_config.py
+docker build -t otter/cloudcafe:$GIT_SHA .
+rm -rf autoscale_cloudcafe autoscale_cloudroast preprod.config
+cd ../..
 
 # Run CloudCafe tests
 CC_FUNCTIONAL_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA)
