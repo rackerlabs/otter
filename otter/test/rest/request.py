@@ -163,6 +163,7 @@ class RequestTestMixin(object):
         error_message = [
             "Got status {0} but expected {1}".format(
                 response_wrapper.response.code, expected_status),
+            "Request URI: {0}".format(response_wrapper.request.uri),
             "Response: {0}".format(response_wrapper.content)]
         if message:
             error_message.insert(0, message)
