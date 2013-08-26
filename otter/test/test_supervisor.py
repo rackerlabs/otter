@@ -5,6 +5,7 @@ import mock
 
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail
+from twisted.internet.task import Cooperator
 
 from otter.models.interface import IScalingGroup
 from otter.supervisor import Supervisor
@@ -39,7 +40,13 @@ class SupervisorTests(TestCase):
         set_config_data({'region': 'ORD'})
         self.addCleanup(set_config_data, {})
 
-        self.supervisor = Supervisor(self.auth_function)
+        self.cooperator = mock.Mock(spec=Cooperator)
+
+        self.supervisor = Supervisor(self.auth_function, self.cooperator.coiterate)
+
+        self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
+        self.undo = self.InMemoryUndoStack.return_value
+        self.undo.rewind.return_value = succeed(None)
 
 
 class LaunchConfigTests(SupervisorTests):
@@ -117,7 +124,34 @@ class LaunchConfigTests(SupervisorTests):
             self.group,
             self.service_catalog,
             self.auth_token,
-            {'server': {}})
+            {'server': {}},
+            self.undo)
+
+    def test_execute_config_rewinds_undo_stack_on_failure(self):
+        """
+        execute_config rewinds the undo stack passed to launch_server,
+        when launch_server fails.
+        """
+        expected = ValueError('auth failure')
+        self.auth_function.return_value = fail(expected)
+
+        d = self.supervisor.execute_config(self.log, 'transaction-id',
+                                           self.group, self.launch_config)
+
+        (job_id, completed_d) = self.successResultOf(d)
+
+        self.failureResultOf(completed_d)
+        self.undo.rewind.assert_called_once_with()
+
+    def test_coiterate_passed_to_undo_stack(self):
+        """
+        execute_config passes Supervisor's coiterate function is to
+        InMemoryUndoStack.
+        """
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
+
+        self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
 
 
 class DeleteServerTests(SupervisorTests):

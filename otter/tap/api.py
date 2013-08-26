@@ -6,6 +6,8 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
+from twisted.internet.task import coiterate
+
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
@@ -110,7 +112,7 @@ def makeService(config):
             config_value('identity.admin_url')),
         cache_ttl)
 
-    supervisor = Supervisor(authenticator.authenticate_tenant)
+    supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
 
     set_supervisor(supervisor)
 
