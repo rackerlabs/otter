@@ -19,14 +19,14 @@ class ReprFallbackEncoder(json.JSONEncoder):
     logging system because of a formatting error.
     """
     # TODO: Update docstring above and/or change classname
-    serializers = {datetime: lambda obj: obj.isoformat(),
-                   Failure: lambda obj: str(obj)}
+    serializers = [(datetime, lambda obj: obj.isoformat()),
+                   (Failure,  lambda obj: str(obj))]
 
     def default(self, obj):
         """
         Serialize obj as repr(obj).
         """
-        for _type, serializer in self.serializers.items():
+        for _type, serializer in self.serializers:
             if isinstance(obj, _type):
                 return serializer(obj)
         return repr(obj)
