@@ -14,6 +14,7 @@ envvars = [
     'CC_USER_PASSWORD',
     'CC_USER_API_KEY',
     'CC_NON_AS_PASSWORD',
+    'OTTER_IP'
 ]
 
 def env_not_set(envvar):
@@ -28,9 +29,12 @@ if unset_vars:
         print("Must export {} environment variable".format(unset_var))
     exit(1)
 
+server_endpoint = "http://{}:9000/v1.0".format(environ['OTTER_IP'])
+
 cfg.set('user', 'password', environ['CC_USER_PASSWORD'])
 cfg.set('user', 'api_key', environ['CC_USER_API_KEY'])
 cfg.set('autoscale', 'non_autoscale_password', environ['CC_NON_AS_PASSWORD'])
+cfg.set('autoscale', 'server_endpoint', server_endpoint)
 
 with open(path.join(script_dir, 'preprod.config'), 'w') as f:
     cfg.write(f)
