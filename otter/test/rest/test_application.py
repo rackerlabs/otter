@@ -265,7 +265,7 @@ class RouteTests(RequestTestMixin, TestCase):
         class FakeApp(object):
             app = self.mock_app.app
 
-            @app.route('/foo/')
+            @app.route('/v1.0/foo/')
             @with_transaction_id()
             def foo(self, request, log):
                 requests[0] += 1
@@ -292,7 +292,7 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
         class FakeApp(object):
             app = self.mock_app.app
 
-            @app.route('/foo')
+            @app.route('/v1.0/foo')
             @with_transaction_id()
             def foo(self, request, log):
                 transaction_ids.append(transaction_id(request))
