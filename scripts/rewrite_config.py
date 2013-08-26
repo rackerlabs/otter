@@ -10,8 +10,10 @@ from sys import exit
 from subprocess import check_output, CalledProcessError
 import json
 
+
 def get_ip_for_interface(iface):
-    if iface == None: return None
+    if iface is None:
+        return None
     try:
         cmd = " | ".join([
             "ip addr show {0}".format(otter_interface),
@@ -45,10 +47,12 @@ if environ.get('DOCKER'):
     config_json['region'] = environ.get('OTTER_REGION', 'ORD')
     config_json['environment'] = environ.get('OTTER_ENVIRONMENT', 'staging')
 
-    config_json['identity']['url'] = environ.get('OTTER_ID_URL',
+    config_json['identity']['url'] = environ.get(
+        'OTTER_ID_URL',
         'https://staging.identity.api.rackspacecloud.com/v2.0'
     )
-    config_json['identity']['admin_url'] = environ.get('OTTER_ID_ADMIN_URL',
+    config_json['identity']['admin_url'] = environ.get(
+        'OTTER_ID_ADMIN_URL',
         'https://staging.identity.api.rackspacecloud.com/v2.0'
     )
 # These options should be set before the docker build
