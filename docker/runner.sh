@@ -70,11 +70,17 @@ cd ../..
 
 # Run CloudCafe tests
 CC_FUNCTIONAL_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA)
+CC_QUICKSYS_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA -p system -t speed=quick)
+CC_SLOWSYS_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA -p system -t speed=slow)
 
 UNIT_EXIT=$(docker wait $UNIT_TESTS)
 docker logs $UNIT_TESTS
 CC_FUNCTIONAL_EXIT=$(docker wait $CC_FUNCTIONAL_TESTS)
 docker logs $CC_FUNCTIONAL_TESTS
+CC_QUICKSYS_EXIT=$(docker wait $CC_QUICKSYS_TESTS)
+docker logs $CC_QUICKSYS_TESTS
+CC_SLOWSYS_EXIT=$(docker wait $CC_SLOWSYS_TESTS)
+docker logs $CC_SLOWSYS_TESTS
 
 # SHUT.IT.DOWN.
 docker stop $OTTER_CID
@@ -83,7 +89,13 @@ docker rmi otter:$GIT_SHA
 docker rmi otter/cloudcafe:$GIT_SHA
 
 echo "Unit tests exited $UNIT_EXIT"
-echo "CloudCafe tests exited $CC_FUNCTIONAL_EXIT"
-if [[ $UNIT_EXIT -ne 0 ]] || [[ $CC_FUNCTIONAL_EXIT -ne 0 ]]; then
+echo "CloudCafe Functional tests exited $CC_FUNCTIONAL_EXIT"
+echo "CloudCafe Quick System tests exited $CC_QUICKSYS_EXIT"
+echo "CloudCafe Slow System tests exited $CC_SLOWSYS_EXIT"
+if [[ $UNIT_EXIT -ne 0 ]] \
+    || [[ $CC_FUNCTIONAL_EXIT -ne 0 ]] \
+    || [[ $CC_QUICKSYS_EXIT -ne 0 ]] \
+    || [[ $CC_SLOWSYS_EXIT -ne 0 ]]
+then
     exit 1
 fi
