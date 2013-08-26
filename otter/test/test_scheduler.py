@@ -15,7 +15,6 @@ from otter.scheduler import SchedulerService
 from otter.test.utils import iMock, patch, CheckFailure
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
-from otter.rest.application import set_store
 from otter.models.cass import LOCK_TABLE_NAME
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
@@ -53,8 +52,6 @@ class SchedulerTestCase(TestCase):
         self.mock_generate_transaction_id = patch(
             self, 'otter.scheduler.generate_transaction_id',
             return_value='transaction-id')
-        set_store(self.mock_store)
-        self.addCleanup(set_store, None)
 
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
@@ -77,7 +74,8 @@ class SchedulerTestCase(TestCase):
         self.otter_log = patch(self, 'otter.scheduler.otter_log')
 
         self.clock = Clock()
-        self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
+        self.scheduler_service = SchedulerService(100, 1, self.slv_client,
+                                                  self.mock_store, self.clock)
 
         self.otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.log = self.otter_log.bind.return_value
