@@ -21,7 +21,7 @@ from otter.json_schema.group_examples import (
 from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.models.cass import CassScalingGroupCollection
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
 
 from otter.test.resources import OtterKeymaster
 
@@ -87,7 +87,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Set the Cassandra store, and also patch the controller
         """
         keyspace.resume()
-        set_store(store)
+        self.root = Otter(store).app.resource()
         set_config_data({'url_root': 'http://127.0.0.1'})
         self.addCleanup(set_config_data, {})
 
@@ -135,7 +135,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
             "scalingPolicies": self._policies
         }
         deferred = request(
-            root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body))
+            self.root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body))
         deferred.addCallback(_check_create_response)
         return deferred
 
@@ -154,7 +154,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         def _check_creation_worked(path):
             # TODO: check manifest and state as well
             d = defer.gatherResults([
-                request(root, 'GET', path + 'policies/').addCallback(
+                request(self.root, 'GET', path + 'policies/').addCallback(
                     _check_policies_created),
                 self.assert_state(path, self.config['minEntities'], False)])
 
@@ -178,7 +178,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
             self.assertEqual(response['group']['paused'], paused)
             self.assertEqual(response['group']['desiredCapacity'], entities)
 
-        return request(root, 'GET', path + 'state/').addCallback(_check_state)
+        return request(self.root, 'GET', path + 'state/').addCallback(_check_state)
 
     @defer.inlineCallbacks
     def delete_and_view_scaling_group(self, path):
@@ -186,13 +186,13 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Deleting a scaling group returns with a 204 no content.  The next
         attempt to view the scaling group should return a 404 not found.
         """
-        wrapper = yield request(root, 'DELETE', path)
+        wrapper = yield request(self.root, 'DELETE', path)
         self.assert_response(wrapper, 204, "Delete failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view policies
         # TODO: view state and manifest too, once they have been implemented
-        wrapper = yield request(root, 'GET', path + 'policies/')
+        wrapper = yield request(self.root, 'GET', path + 'policies/')
         self.assert_response(wrapper, 404, "Deleted group still there.")
 
         # flush any logged errors
@@ -207,7 +207,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["groups"]), number)
 
-        d = request(root, 'GET', '/v1.0/11111/groups/')
+        d = request(self.root, 'GET', '/v1.0/11111/groups/')
         return d.addCallback(_check_number)
 
     @defer.inlineCallbacks
@@ -238,13 +238,13 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         launch_path = path + 'launch/'
         edited_launch = launch_server_config()[1]
 
-        wrapper = yield request(root, 'PUT',
+        wrapper = yield request(self.root, 'PUT',
                                 launch_path, body=json.dumps(edited_launch))
         self.assert_response(wrapper, 204, "Edit launch config failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view again - the config should be the edited config
-        wrapper = yield request(root, 'GET', launch_path)
+        wrapper = yield request(self.root, 'GET', launch_path)
         self.assert_response(wrapper, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'launchConfiguration': edited_launch})
@@ -264,7 +264,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         self.config['metadata'] = {}
         self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
 
-        wrapper = yield request(root, 'PUT', config_path,
+        wrapper = yield request(self.root, 'PUT', config_path,
                                 body=json.dumps(self.config))
         self.assert_response(wrapper, 204, "Edit config failed")
         self.assertEqual(wrapper.content, "")
@@ -297,7 +297,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         Set up a silverberg client
         """
         keyspace.resume()
-        set_store(store)  # ensure it's the cassandra store
+        self.root = Otter(store).app.resource()
 
         set_config_data({'url_root': 'http://127.0.0.1'})
         self.addCleanup(set_config_data, {})
@@ -342,7 +342,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
             response = json.loads(wrapper.content)
             self.assertEqual(len(response["policies"]), number)
 
-        d = request(root, 'GET', self.policies_url)
+        d = request(self.root, 'GET', self.policies_url)
         return d.addCallback(_check_number)
 
     def create_and_view_scaling_policies(self):
@@ -383,7 +383,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
                      for pol in response["policies"]]
             return links
 
-        d = request(root, 'POST', self.policies_url,
+        d = request(self.root, 'POST', self.policies_url,
                     body=json.dumps(request_body))
         return d.addCallback(_verify_create_response)
 
@@ -395,13 +395,13 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         request_body = _policy()[-1]  # the one that was not created
 
-        wrapper = yield request(root, 'PUT', path,
+        wrapper = yield request(self.root, 'PUT', path,
                                 body=json.dumps(request_body))
         self.assert_response(wrapper, 204, "Update policy failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = yield request(root, 'GET', path)
+        wrapper = yield request(self.root, 'GET', path)
         self.assert_response(wrapper, 200)
 
         response = json.loads(wrapper.content)
@@ -423,12 +423,12 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         Deleting a scaling policy returns with a 204 no content.  The next
         attempt to view the scaling policy should return a 404 not found.
         """
-        wrapper = yield request(root, 'DELETE', path)
+        wrapper = yield request(self.root, 'DELETE', path)
         self.assert_response(wrapper, 204, "Delete policy failed.")
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = yield request(root, 'GET', path)
+        wrapper = yield request(self.root, 'GET', path)
         self.assert_response(wrapper, 404, "Deleted policy still there.")
 
         # flush any logged errors
@@ -472,7 +472,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
 
         yield self.assert_number_of_scaling_policies(len(first_policies))
 
-        wrapper = yield request(root, 'POST', first_policies[0] + 'execute/')
+        wrapper = yield request(self.root, 'POST', first_policies[0] + 'execute/')
         self.assertEqual(wrapper.response.code, 202,
                          "Execute failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "{}")
@@ -485,7 +485,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         self.mock_controller.maybe_execute_scaling_policy.return_value = defer.fail(
             NoSuchPolicyError('11111', '1', '2'))
 
-        wrapper = yield request(root, 'POST', self.policies_url + '1/execute/')
+        wrapper = yield request(self.root, 'POST', self.policies_url + '1/execute/')
         self.assertEqual(wrapper.response.code, 404,
                          "Execute did not fail as expected: {0}".format(wrapper.content))
 
