@@ -15,14 +15,10 @@ RUN     pip install pep257==0.2.0 pep8==1.3.3 pyflakes==0.5.0 mock==1.0.1 covera
 
 RUN     mkdir -p /root/.cloudcafe/configs/autoscale
 
-ADD     preprod.config /root/.cloudcafe/configs/autoscale/
-ADD     run_cloudcafe.sh /srv/run_cloudcafe.sh
-RUN     /bin/chmod +x /srv/run_cloudcafe.sh
-
 ADD     autoscale_cloudcafe /opt/autoscale_cloudcafe
 ADD     autoscale_cloudroast /opt/autoscale_cloudroast
 
 ENV     PYTHONPATH /opt/autoscale_cloudcafe:/opt/autoscale_cloudroast
 
-ENTRYPOINT     ["/srv/run_cloudcafe.sh"]
-CMD     ["-p", "functional"]
+ENTRYPOINT     ["cafe-runner", "autoscale", "preprod"]
+CMD            ["-p", "functional"]

@@ -10,9 +10,9 @@ deserializer=json
 [user]
 base_url=https://identity.api.rackspacecloud.com
 username=autoscalepreprod
-password=%user_password%
+password=
 tenant_name=849349
-api_key=%user_api_key%
+api_key=
 version=2.0
 
 [user_auth_config]
@@ -52,11 +52,11 @@ load_balancer_3 = 172369
 lb_other_region = 167295
 # Non autoscale account information
 non_autoscale_username = bill2test27
-non_autoscale_password = %non_autoscale_user_password%
+non_autoscale_password =
 non_autoscale_tenant = 731642
 
 region=ord
 autoscale_endpoint_name=autoscale
 server_endpoint_name=cloudServersOpenStack
-server_endpoint=http://%otter_ip%:9000/v1.0
+server_endpoint=
 load_balancer_endpoint_name=cloudLoadBalancers
