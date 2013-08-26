@@ -24,8 +24,10 @@ docker build -t otter:$GIT_SHA .
 rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast
 cp -r autoscale_cloudcafe docker/cloudcafe
 cp -r autoscale_cloudroast docker/cloudcafe
+# Update the CloudCafe config based on environment variables
+python otter/cloudcafe/update_cc_config.py
 docker build -t otter/cloudcafe:$GIT_SHA docker/cloudcafe
-rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast
+rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast preprod.config
 
 # Run Test containers
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
@@ -50,18 +52,12 @@ UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOST
 OTTER_CID=$(docker run -d -t -e OTTER_INTERFACE=eth0 -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA)
 OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
 
-# Setup CloudCafe environment variables
-CC_ENVS="OTTER_IP=$OTTER_IP"
-CC_ENVS="$CC_ENVS -e CC_USER_PASSWORD=$CC_USER_PASSWORD"
-CC_ENVS="$CC_ENVS -e CC_USER_API_KEY=$CC_USER_API_KEY"
-CC_ENVS="$CC_ENVS -e CC_NON_AS_PASSWORD=$CC_NON_AS_PASSWORD"
-
 # Run CloudCafe tests
-CC_FUNCTIONAL_TESTS=$(docker run -d -t -e $CC_ENVS otter/cloudcafe:$GIT_SHA /srv/run_cloudcafe.sh -p functional)
+CC_FUNCTIONAL_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA)
 
 UNIT_EXIT=$(docker wait $UNIT_TESTS)
 docker logs $UNIT_TESTS
-CC_EXIT=$(docker wait $CC_TESTS)
+CC_FUNCTIONAL_EXIT=$(docker wait $CC_FUNCTIONAL_TESTS)
 docker logs $CC_TESTS
 
 # SHUT.IT.DOWN.
