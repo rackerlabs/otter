@@ -50,10 +50,10 @@ class OtterWebhooks(object):
     """
     app = Klein()
 
-    def __init__(self, store, tenant_id, scaling_group_id, policy_id):
+    def __init__(self, store, tenant_id, group_id, policy_id):
         self.store = store
         self.tenant_id = tenant_id
-        self.scaling_group_id = scaling_group_id
+        self.group_id = group_id
         self.policy_id = policy_id
         self.app.route = partial(self.app.route, strict_slashes=False)
 
