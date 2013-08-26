@@ -18,7 +18,3 @@ class BaseApp(object):
 
         # BaseApp inheriters will be required to have a class variable app.
         self.app.route = partial(self.app.route, strict_slashes=False)
-
-        # everything should be json
-        resource = self.app.resource()
-        resource.defaultContentType = 'application/json'
