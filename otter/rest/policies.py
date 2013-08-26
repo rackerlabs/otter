@@ -15,7 +15,6 @@ from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.webhooks import OtterWebhooks
 from otter.util.http import get_autoscale_links, transaction_id
 from otter import controller
 
@@ -44,11 +43,6 @@ class OtterPolicies(BaseApp):
         self.self.tenant_id = tenant_id
         self.self.scaling_group_id = scaling_group_id
         super(BaseApp, self).__init__(*args, **kwargs)
-
-    @app.route('/webhooks', branch=True)
-    def webhooks(self, request):
-        return OtterWebhooks(self.tenant_id, self.scaling_group_id,
-                             self.store).app.resource()
 
     @app.route('/policies/', methods=['GET'])
     @with_transaction_id()
