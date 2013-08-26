@@ -56,7 +56,7 @@ class OtterGroups(BaseApp):
         self.tenant_id = tenant_id
         super(OtterGroups, self).__init__(*args, **kwargs)
 
-    @app.route('/',  methods=['GET'])
+    @app.route('/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
