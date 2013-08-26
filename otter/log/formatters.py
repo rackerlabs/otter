@@ -20,7 +20,7 @@ class ReprFallbackEncoder(json.JSONEncoder):
     """
     # TODO: Update docstring above and/or change classname
     serializers = [(datetime, lambda obj: obj.isoformat()),
-                   (Failure,  lambda obj: str(obj))]
+                   (Failure, lambda obj: str(obj))]
 
     def default(self, obj):
         """
