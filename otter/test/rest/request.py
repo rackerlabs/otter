@@ -239,6 +239,7 @@ class RequestTestMixin(object):
                              location)
         return response_wrapper.content
 
+
 class RestAPITestMixin(RequestTestMixin):
     """
     Setup and teardown for tests for the REST API endpoints

@@ -48,7 +48,8 @@ class Otter(object):
         """
         return OtterLaunch(self.store, tenant_id, group_id).app.resource()
 
-    @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/<string:policy_id>/webhooks/', branch=True)
+    @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/'
+               '<string:policy_id>/webhooks/', branch=True)
     def webhooks(self, request, tenant_id, group_id, policy_id):
         """
         webhook routes handled by OtterWebhooks

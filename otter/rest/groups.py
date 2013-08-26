@@ -201,96 +201,96 @@ class OtterGroups(object):
 
         Example response body to the above request::
 
-            {
-                "group": {
-                    "id": "{groupId}",
-                    "links": [
-                      {
-                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
-                        "rel": "self"
-                      }
-                    ],
-                    "groupConfiguration": {
-                        "name": "workers",
-                        "cooldown": 60,
-                        "minEntities": 5,
-                        "maxEntities": 100,
-                        "metadata": {
-                            "firstkey": "this is a string",
-                            "secondkey": "1"
-                        }
-                    },
-                    "launchConfiguration": {
-                        "type": "launch_server",
-                        "args": {
-                            "server": {
-                                "flavorRef": 3,
-                                "name": "webhead",
-                                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                                "OS-DCF:diskConfig": "AUTO",
-                                "metadata": {
-                                    "mykey": "myvalue"
-                                },
-                                "personality": [
-                                    {
-                                        "path": '/root/.ssh/authorized_keys',
-                                        "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                                    }
-                                ],
-                                "networks": [
-                                    {
-                                        "uuid": "11111111-1111-1111-1111-111111111111"
-                                    }
-                                ],
+        {
+            "group": {
+                "id": "{groupId}",
+                "links": [
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
+                    "rel": "self"
+                  }
+                ],
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1"
+                    }
+                },
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
                             },
-                            "loadBalancers": [
+                            "personality": [
                                 {
-                                    "loadBalancerId": 2200,
-                                    "port": 8081
+                                    "path": '/root/.ssh/authorized_keys',
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                                 }
-                            ]
-                        }
-                    },
-                    "scalingPolicies": [
-                        {
-                            "id": "{policyId1}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
-                                "rel": "self"
-                              }
                             ],
-                            "name": "scale up by 10",
-                            "change": 10,
-                            "cooldown": 5
-                        }
-                        {
-                            "id": "{policyId2}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
-                                "rel": "self"
-                              }
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
                             ],
-                            "name": 'scale down by 5.5 percent',
-                            "changePercent": -5.5,
-                            "cooldown": 6
                         },
-                        {
-                            "id": "{policyId3}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
-                                "rel": "self"
-                              }
-                            ],
-                            "name": 'set number of servers to 10',
-                            "desiredCapacity": 10,
-                            "cooldown": 3
-                        }
-                    ]
-                }
+                        "loadBalancers": [
+                            {
+                                "loadBalancerId": 2200,
+                                "port": 8081
+                            }
+                        ]
+                    }
+                },
+                "scalingPolicies": [
+                    {
+                        "id": "{policyId1}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": "scale up by 10",
+                        "change": 10,
+                        "cooldown": 5
+                    }
+                    {
+                        "id": "{policyId2}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": 'scale down by 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
+                    },
+                    {
+                        "id": "{policyId3}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": 'set number of servers to 10',
+                        "desiredCapacity": 10,
+                        "cooldown": 3
+                    }
+                ]
             }
+        }
 
         """
         data['groupConfiguration'].setdefault('maxEntities', MAX_ENTITIES)
@@ -338,96 +338,96 @@ class OtterGroups(object):
 
         Example response::
 
-            {
-                "group": {
-                    "id": "{groupId}",
-                    "links": [
-                      {
-                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
-                        "rel": "self"
-                      }
-                    ],
-                    "groupConfiguration": {
-                        "name": "workers",
-                        "cooldown": 60,
-                        "minEntities": 5,
-                        "maxEntities": 100,
-                        "metadata": {
-                            "firstkey": "this is a string",
-                            "secondkey": "1",
-                        }
-                    },
-                    "launchConfiguration": {
-                        "type": "launch_server",
-                        "args": {
-                            "server": {
-                                "flavorRef": 3,
-                                "name": "webhead",
-                                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                                "OS-DCF:diskConfig": "AUTO",
-                                "metadata": {
-                                    "mykey": "myvalue"
-                                },
-                                "personality": [
-                                    {
-                                        "path": '/root/.ssh/authorized_keys',
-                                        "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                                    }
-                                ],
-                                "networks": [
-                                    {
-                                        "uuid": "11111111-1111-1111-1111-111111111111"
-                                    }
-                                ],
+        {
+            "group": {
+                "id": "{groupId}",
+                "links": [
+                  {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
+                    "rel": "self"
+                  }
+                ],
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1",
+                    }
+                },
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
                             },
-                            "loadBalancers": [
+                            "personality": [
                                 {
-                                    "loadBalancerId": 2200,
-                                    "port": 8081
+                                    "path": '/root/.ssh/authorized_keys',
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
                                 }
-                            ]
-                        }
-                    },
-                    "scalingPolicies": [
-                        {
-                            "id": "{policyId1}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
-                                "rel": "self"
-                              }
                             ],
-                            "name": "scale up by 10",
-                            "change": 10,
-                            "cooldown": 5
-                        }
-                        {
-                            "id": "{policyId2}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
-                                "rel": "self"
-                              }
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
                             ],
-                            "name": 'scale down by 5.5 percent',
-                            "changePercent": -5.5,
-                            "cooldown": 6
                         },
-                        {
-                            "id": "{policyId3}",
-                            "links": [
-                              {
-                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
-                                "rel": "self"
-                              }
-                            ],
-                            "name": 'set number of servers to 10',
-                            "desiredCapacity": 10,
-                            "cooldown": 3
-                        }
-                    ]
-                }
+                        "loadBalancers": [
+                            {
+                                "loadBalancerId": 2200,
+                                "port": 8081
+                            }
+                        ]
+                    }
+                },
+                "scalingPolicies": [
+                    {
+                        "id": "{policyId1}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": "scale up by 10",
+                        "change": 10,
+                        "cooldown": 5
+                    }
+                    {
+                        "id": "{policyId2}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": 'scale down by 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
+                    },
+                    {
+                        "id": "{policyId3}",
+                        "links": [
+                          {
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
+                            "rel": "self"
+                          }
+                        ],
+                        "name": 'set number of servers to 10',
+                        "desiredCapacity": 10,
+                        "cooldown": 3
+                    }
+                ]
             }
+        }
         """
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
@@ -475,41 +475,41 @@ class OtterGroups(object):
 
         Example response::
 
-            {
-              "group": {
-                "id": "{groupId}",
+        {
+          "group": {
+            "id": "{groupId}",
+            "links": [
+              {
+                "href": "{url_root}/v1.0/010101/groups/{groupId},
+                "rel": "self"
+              }
+            ],
+            "active": [
+              {
+                "id": "{instanceId1}"
                 "links": [
                   {
-                    "href": "{url_root}/v1.0/010101/groups/{groupId},
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
                     "rel": "self"
                   }
-                ],
-                "active": [
+                ]
+              },
+              {
+                "id": "{instanceId2}"
+                "links": [
                   {
-                    "id": "{instanceId1}"
-                    "links": [
-                      {
-                        "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                        "rel": "self"
-                      }
-                    ]
-                  },
-                  {
-                    "id": "{instanceId2}"
-                    "links": [
-                      {
-                        "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}",
-                        "rel": "self"
-                      }
-                    ]
+                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}",
+                    "rel": "self"
                   }
-                ],
-                "activeCapacity": 2,
-                "pendingCapacity": 2,
-                "desiredCapacity": 4,
-                "paused": false
+                ]
               }
-            }
+            ],
+            "activeCapacity": 2,
+            "pendingCapacity": 2,
+            "desiredCapacity": 4,
+            "paused": false
+          }
+        }
         """
         def _format_and_stackify(state):
             return {"group": format_state_dict(state)}
