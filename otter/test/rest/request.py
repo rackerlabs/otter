@@ -225,7 +225,7 @@ class RequestTestMixin(object):
         :return: the response body as a string
         """
         if root is None:
-            root = self.mock_app.app.resource()
+            root = self.root
 
         response_wrapper = self.successResultOf(
             request(root, method, endpoint or self.endpoint, body=body))
@@ -271,6 +271,7 @@ class RestAPITestMixin(RequestTestMixin):
             return defer.succeed(None)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
+        self.root = Otter(self.mock_store).app.resource()
 
     def test_invalid_methods_are_405(self):
         """
