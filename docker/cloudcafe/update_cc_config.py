@@ -1,11 +1,13 @@
 
 from ConfigParser import SafeConfigParser
-from os import environ
+from os import environ, path
 from sys import exit
 
 cfg = SafeConfigParser()
 
-with open('preprod.config.template') as f:
+script_dir = path.dirname(path.realpath(__file__))
+
+with open(path.join(script_dir, 'preprod.config.template')) as f:
     cfg.read(f)
 
 envvars = [
@@ -30,5 +32,5 @@ cfg.set('user', 'password', environ['CC_USER_PASSWORD'])
 cfg.set('user', 'api_key', environ['CC_USER_API_KEY'])
 cfg.set('user', 'non_autoscale_password', environ['CC_NON_AS_PASSWORD'])
 
-with open('preprod.config', 'w') as f:
+with open(path.join(script_dir, 'preprod.config'), 'w') as f:
     cfg.write(f)
