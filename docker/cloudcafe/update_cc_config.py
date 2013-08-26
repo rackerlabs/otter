@@ -8,7 +8,7 @@ cfg = SafeConfigParser()
 script_dir = path.dirname(path.realpath(__file__))
 
 with open(path.join(script_dir, 'preprod.config.template')) as f:
-    cfg.read(f)
+    cfg.readfp(f)
 
 envvars = [
     'CC_USER_PASSWORD',
@@ -30,7 +30,7 @@ if unset_vars:
 
 cfg.set('user', 'password', environ['CC_USER_PASSWORD'])
 cfg.set('user', 'api_key', environ['CC_USER_API_KEY'])
-cfg.set('user', 'non_autoscale_password', environ['CC_NON_AS_PASSWORD'])
+cfg.set('autoscale', 'non_autoscale_password', environ['CC_NON_AS_PASSWORD'])
 
 with open(path.join(script_dir, 'preprod.config'), 'w') as f:
     cfg.write(f)

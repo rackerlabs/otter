@@ -21,13 +21,14 @@ docker build -t otter:$GIT_SHA .
 # This sucks because cloudcafe sucks
 # Docker can't build things from directories higher than the Dockerfile
 # and a directory can only have one Dockerfile
-rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast
+cd docker/cloudcafe
+rm -rf autoscale_cloudcafe autoscale_cloudroast
 cp -r autoscale_cloudcafe docker/cloudcafe
 cp -r autoscale_cloudroast docker/cloudcafe
 # Update the CloudCafe config based on environment variables
-python otter/cloudcafe/update_cc_config.py
-docker build -t otter/cloudcafe:$GIT_SHA docker/cloudcafe
-rm -rf docker/cloudcafe/autoscale_cloudcafe docker/cloudcafe/autoscale_cloudroast preprod.config
+python update_cc_config.py
+docker build -t otter/cloudcafe:$GIT_SHA .
+rm -rf autoscale_cloudcafe autoscale_cloudroast preprod.config
 
 # Run Test containers
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
