@@ -150,5 +150,5 @@ class SchedulerService(TimerService):
             deleted_policy_ids.add(policy_id)
 
         d.addErrback(collect_deleted_policy)
-        d.addErrback(log.err)
+        d.addErrback(log.err, 'Scheduler failed to execute policy')
         return d

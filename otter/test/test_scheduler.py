@@ -386,5 +386,6 @@ class SchedulerTestCase(TestCase):
         d = self.scheduler_service.execute_event(log, event, mock.Mock())
 
         self.assertIsNone(self.successResultOf(d))
-        log.err.assert_called_once_with(CheckFailure(ValueError), tenant_id='1234',
+        log.err.assert_called_once_with(CheckFailure(ValueError),
+                                        'Scheduler failed to execute policy', tenant_id='1234',
                                         scaling_group_id='scal44', policy_id='pol44')
