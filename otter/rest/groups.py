@@ -326,7 +326,7 @@ class OtterGroups(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:scaling_group_id>', methods=['GET'])
+    @app.route('/<string:scaling_group_id>/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -450,7 +450,7 @@ class OtterGroups(object):
 
     # Feature: Force delete, which stops scaling, deletes all servers for you, then
     #       deletes the scaling group.
-    @app.route('/<string:scaling_group_id>', methods=['DELETE'])
+    @app.route('/<string:scaling_group_id>/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
@@ -461,7 +461,7 @@ class OtterGroups(object):
         """
         return self.store.get_scaling_group(log, self.tenant_id, scaling_group_id).delete_group()
 
-    @app.route('/<string:scaling_group_id>/state', methods=['GET'])
+    @app.route('/<string:scaling_group_id>/state/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -520,7 +520,7 @@ class OtterGroups(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:scaling_group_id>/pause', methods=['POST'])
+    @app.route('/<string:scaling_group_id>/pause/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
@@ -533,7 +533,7 @@ class OtterGroups(object):
         group = self.store.get_scaling_group(log, self.tenant_id, scaling_group_id)
         return controller.pause_scaling_group(log, transaction_id(request), group)
 
-    @app.route('/<string:scaling_group_id>/resume', methods=['POST'])
+    @app.route('/<string:scaling_group_id>/resume/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)

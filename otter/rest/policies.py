@@ -45,7 +45,7 @@ class OtterPolicies(object):
         self.scaling_group_id = scaling_group_id
         self.app.route = partial(self.app.route, strict_slashes=False)
 
-    @app.route('/policies/', methods=['GET'])
+    @app.route('/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -130,7 +130,7 @@ class OtterPolicies(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/policies/', methods=['POST'])
+    @app.route('/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
@@ -210,7 +210,7 @@ class OtterPolicies(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/policies/<string:policy_id>/', methods=['GET'])
+    @app.route('/<string:policy_id>/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -248,7 +248,7 @@ class OtterPolicies(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/policies/<string:policy_id>/', methods=['PUT'])
+    @app.route('/<string:policy_id>/', methods=['PUT'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
@@ -273,7 +273,7 @@ class OtterPolicies(object):
         deferred = rec.update_policy(policy_id, data)
         return deferred
 
-    @app.route('/policies/<string:policy_id>/', methods=['DELETE'])
+    @app.route('/<string:policy_id>/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
@@ -285,7 +285,7 @@ class OtterPolicies(object):
         deferred = rec.delete_policy(policy_id)
         return deferred
 
-    @app.route('/policies/<string:policy_id>/execute/', methods=['POST'])
+    @app.route('/<string:policy_id>/execute/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(202)

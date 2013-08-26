@@ -31,7 +31,7 @@ class OtterConfig(object):
         self.group_id = group_id
         self.app.route = partial(self.app.route, strict_slashes=False)
 
-    @app.route('/config/', methods=['GET'])
+    @app.route('/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -62,7 +62,7 @@ class OtterConfig(object):
         deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
         return deferred
 
-    @app.route('/config/', methods=['PUT'])
+    @app.route('/', methods=['PUT'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
@@ -114,7 +114,7 @@ class OtterLaunch(object):
         self.group_id = group_id
         self.app.route = partial(self.app.route, strict_slashes=False)
 
-    @app.route('/launch/', methods=['GET'])
+    @app.route('/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
@@ -166,7 +166,7 @@ class OtterLaunch(object):
         deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
         return deferred
 
-    @app.route('/launch/', methods=['PUT'])
+    @app.route('/', methods=['PUT'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
