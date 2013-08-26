@@ -15,6 +15,10 @@ docker build -t cassandra docker/cassandra
 # Build otter/base
 docker build -t otter/base docker/base
 
+# This will only update the OTTER_ID_PASSWORD so
+# we don't have to pass it in plain text later on
+./scripts/rewrite_config.py
+
 # Build otter
 docker build -t otter:$GIT_SHA .
 
