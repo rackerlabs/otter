@@ -23,12 +23,13 @@ docker build -t otter:$GIT_SHA .
 # and a directory can only have one Dockerfile
 cd docker/cloudcafe
 rm -rf autoscale_cloudcafe autoscale_cloudroast
-cp -r autoscale_cloudcafe docker/cloudcafe
-cp -r autoscale_cloudroast docker/cloudcafe
+cp -r ../../autoscale_cloudcafe .
+cp -r ../../autoscale_cloudroast .
 # Update the CloudCafe config based on environment variables
 python update_cc_config.py
 docker build -t otter/cloudcafe:$GIT_SHA .
 rm -rf autoscale_cloudcafe autoscale_cloudroast preprod.config
+cd ../..
 
 # Run Test containers
 CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
@@ -59,7 +60,7 @@ CC_FUNCTIONAL_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GI
 UNIT_EXIT=$(docker wait $UNIT_TESTS)
 docker logs $UNIT_TESTS
 CC_FUNCTIONAL_EXIT=$(docker wait $CC_FUNCTIONAL_TESTS)
-docker logs $CC_TESTS
+docker logs $CC_FUNCTIONAL_TESTS
 
 # SHUT.IT.DOWN.
 docker stop $OTTER_CID
@@ -68,7 +69,7 @@ docker rmi otter:$GIT_SHA
 docker rmi otter/cloudcafe:$GIT_SHA
 
 echo "Unit tests exited $UNIT_EXIT"
-echo "CloudCafe tests exited $CC_EXIT"
-if [[ $UNIT_EXIT -ne 0 ]] || [[ $CC_EXIT -ne 0 ]]; then
+echo "CloudCafe tests exited $CC_FUNCTIONAL_EXIT"
+if [[ $UNIT_EXIT -ne 0 ]] || [[ $CC_FUNCTIONAL_EXIT -ne 0 ]]; then
     exit 1
 fi
