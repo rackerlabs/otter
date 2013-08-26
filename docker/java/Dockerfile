@@ -1,6 +1,9 @@
 from ubuntu:12.04
 ENV DEBIAN_FRONTEND noninteractive
 
+# Nice to have a reliable way to know you're in a container
+ENV     DOCKER true
+
 run apt-get -y install aptitude curl wget net-tools less
 
 # install Java 6
