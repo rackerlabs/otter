@@ -35,10 +35,19 @@ for (( i = 0; i < 10; i++ )); do
     fi
 done
 
-# Run otter unit tests
-UNIT_TESTS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA /bin/bash -c "cd /opt/otter; make unit")
+OTTER_ENVS="OTTER_SEED_HOSTS=$CASSANDRA_IP"
+OTTER_ENVS="$OTTER_ENVS -e CASSANDRA_HOST=$CASSANDRA_IP"
+OTTER_ENVS="$OTTER_ENVS -e PYTHONPATH=/opt/otter"
+OTTER_ENVS="$OTTER_ENVS -e OTTER_INTERFACE=eth0"
+OTTER_ENVS="$OTTER_ENVS -e OTTER_REGION=ORD"
+OTTER_ENVS="$OTTER_ENVS -e OTTER_ENVIRONMENT=production"
+OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_URL=https://identity.api.rackspacecloud.com/v2.0"
+OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_ADMIN_URL=https://as-proxy.rax.io/v2.0"
 
-OTTER_CID=$(docker run -d -t -e OTTER_INTERFACE=eth0 -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA)
+# Run otter unit tests
+UNIT_TESTS=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA /bin/bash -c "cd /opt/otter; make unit")
+
+OTTER_CID=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA)
 export OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
 
 # Build cloudcafe
