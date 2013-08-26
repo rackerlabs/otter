@@ -159,13 +159,6 @@ class RequestTestMixin(object):
         # but I don't have a good idea for how best to discover them.
         #
         headers = response_wrapper.response.headers
-        if expected_status not in [405, 301]:
-            self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
-            self.assertEqual(headers.getRawHeaders('Content-Type'),
-                             ['application/json'])
-        else:
-            content_type = headers.getRawHeaders('Content-Type')[0]
-            self.assertIn('text/html', content_type)
 
         error_message = [
             "Got status {0} but expected {1}".format(
@@ -176,6 +169,14 @@ class RequestTestMixin(object):
 
         self.assertEqual(response_wrapper.response.code, expected_status,
                          "\n".join(error_message))
+
+        if expected_status not in [405, 301]:
+            self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
+            self.assertEqual(headers.getRawHeaders('Content-Type'),
+                             ['application/json'])
+        else:
+            content_type = headers.getRawHeaders('Content-Type')[0]
+            self.assertIn('text/html', content_type)
 
     def get_location_header(self, response_wrapper):
         """
