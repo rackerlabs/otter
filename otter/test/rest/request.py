@@ -225,7 +225,7 @@ class RequestTestMixin(object):
         :return: the response body as a string
         """
         if root is None:
-            root = self.mock_app().resource()
+            root = self.mock_app.app.resource()
 
         response_wrapper = self.successResultOf(
             request(root, method, endpoint or self.endpoint, body=body))
@@ -236,12 +236,13 @@ class RequestTestMixin(object):
                              location)
         return response_wrapper.content
 
+    @property
     def mock_app(self):
         mock_store = iMock(IScalingGroupCollection)
         mock_group = iMock(IScalingGroup)
         mock_store.get_scaling_group.return_value = mock_group
 
-        return Otter(mock_store).app
+        return Otter(mock_store)
 
 class RestAPITestMixin(RequestTestMixin):
     """
