@@ -7,6 +7,9 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.models.mock import MockScalingGroupCollection
+
+from otter.rest.application import Otter
 from otter.rest.decorators import with_transaction_id
 from otter.test.rest.request import RequestTestMixin
 from otter.util.http import get_autoscale_links, transaction_id
@@ -263,7 +266,7 @@ class RouteTests(RequestTestMixin, TestCase):
         requests = [0]
 
         class FakeApp(object):
-            app = self.mock_app.app
+            app = Otter(MockScalingGroupCollection()).app
 
             @app.route('/v1.0/foo/')
             @with_transaction_id()
@@ -290,7 +293,7 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
         transaction_ids = []
 
         class FakeApp(object):
-            app = self.mock_app.app
+            app = Otter(MockScalingGroupCollection()).app
 
             @app.route('/v1.0/foo')
             @with_transaction_id()
