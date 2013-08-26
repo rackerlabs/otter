@@ -11,7 +11,6 @@ import json
 from klein import Klein
 
 from otter.json_schema import rest_schemas, group_schemas
-from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -34,15 +33,16 @@ def policy_dict_to_list(policy_dict, tenantId, groupId):
     return policy_list
 
 
-class OtterPolicies(BaseApp):
+class OtterPolicies(object):
     """
     """
     app = Klein()
 
-    def __init__(self, tenant_id, scaling_group_id, *args, **kwargs):
-        self.self.tenant_id = tenant_id
-        self.self.scaling_group_id = scaling_group_id
-        super(BaseApp, self).__init__(*args, **kwargs)
+    def __init__(self, store, tenant_id, scaling_group_id):
+        self.store = store
+        self.tenant_id = tenant_id
+        self.scaling_group_id = scaling_group_id
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/policies/', methods=['GET'])
     @with_transaction_id()

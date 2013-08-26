@@ -11,20 +11,19 @@ from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.groups import OtterGroups
 from otter.rest.policies import OtterPolicies
 from otter.rest.webhooks import OtterExecute, OtterWebhooks
-from otter.rest.base import BaseApp
 
 
 Request.defaultContentType = 'application/json'
 
-class Otter(BaseApp):
+class Otter(object):
     """
     Otter holds the Klein app and routes for the REST service.
     """
     app = Klein()
 
-    def __init__(self, store=None, *args, **kwargs):
+    def __init__(self, store):
+        self.store = store
         self.app.route = partial(self.app.route, strict_slashes=False)
-        super(Otter, self).__init__(store, *args, **kwargs)
 
     @app.route('/')
     def base(self, request):
@@ -40,27 +39,27 @@ class Otter(BaseApp):
         """
         /v1.0/<tenantId>/groups and subroutes delegated to OtterGroups.
         """
-        return OtterGroups(tenant_id, self.store).app.resource()
+        return OtterGroups(self.store, tenant_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/config')
     def config(self, request, tenant_id, group_id):
-        return OtterConfig(tenant_id, group_id, self.store).app.resource()
+        return OtterConfig(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch')
     def launch(self, request, tenant_id, group_id):
-        return OtterLaunch(tenant_id, group_id, self.store).app.resource()
+        return OtterLaunch(self.store, tenant_id,group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies', branch=True)
     def policies(self, request, tenant_id, group_id):
-        return OtterPolicies(tenant_id, group_id, self.store).app.resource()
+        return OtterPolicies(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/webhooks', branch=True)
     def webhooks(self, request, tenant_id, group_id):
-        return OtterWebhooks(tenant_id, group_id, self.store).app.resource()
+        return OtterWebhooks(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
     def execute(self, request, capability_version, capability_hash):
         """
         """
-        return OtterExecute(capability_version, capability_hash,
-                            self.store).app.resource()
+        return OtterExecute(self.store, capability_version,
+                            capability_hash).app.resource()

@@ -10,7 +10,6 @@ import json
 from klein import Klein
 
 from otter.json_schema import group_schemas
-from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -20,15 +19,16 @@ from otter import controller
 from otter.rest.errors import InvalidMinEntities
 
 
-class OtterConfig(BaseApp):
+class OtterConfig(object):
     """
     """
     app = Klein()
 
-    def __init__(self, tenant_id, group_id, *args, **kwargs):
+    def __init__(self, store, tenant_id, group_id):
+        self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
-        super(OtterConfig, self).__init__(*args, **kwargs)
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/config/', methods=['GET'])
     @with_transaction_id()
@@ -101,15 +101,16 @@ class OtterConfig(BaseApp):
         return deferred
 
 
-class OtterLaunch(BaseApp):
+class OtterLaunch(object):
     """
     """
     app = Klein()
 
-    def __init__(self, tenant_id, group_id, *args, **kwargs):
+    def __init__(self, store, tenant_id, group_id):
+        self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
-        super(OtterConfig, self).__init__(*args, **kwargs)
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/launch/', methods=['GET'])
     @with_transaction_id()

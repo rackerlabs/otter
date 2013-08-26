@@ -11,7 +11,6 @@ from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -46,15 +45,16 @@ def format_state_dict(state):
     }
 
 
-class OtterGroups(BaseApp):
+class OtterGroups(object):
     """
     Routes to handle requests related to scaling groups.
     """
     app = Klein()
 
-    def __init__(self, tenant_id, *args, **kwargs):
+    def __init__(self, store, tenant_id):
+        self.store = store
         self.tenant_id = tenant_id
-        super(OtterGroups, self).__init__(*args, **kwargs)
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()

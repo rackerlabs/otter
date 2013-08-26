@@ -13,7 +13,6 @@ from klein import Klein
 
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
-from otter.rest.base import BaseApp
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -45,16 +44,17 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
     return webhook_model
 
 
-class OtterWebhooks(BaseApp):
+class OtterWebhooks(object):
     """
     """
     app = Klein()
 
-    def __init__(self, tenant_id, scaling_group_id, policy_id, *args, **kwargs):
+    def __init__(self, store, tenant_id, scaling_group_id, policy_id):
+        self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
         self.policy_id = policy_id
-        super(OtterWebhooks, self).__init__(*args, **kwargs)
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -294,15 +294,16 @@ class OtterWebhooks(BaseApp):
         return deferred
 
 
-class OtterExecute(BaseApp):
+class OtterExecute(object):
     """
     """
     app = Klein()
 
-    def __init__(self, capability_version, capability_hash, *args, **kwargs):
+    def __init__(self, store, capability_version, capability_hash):
+        self.store = store
         self.capability_version = capability_version
         self.capability_hash = capability_hash
-        super(OtterExecute, self).__init__(*args, **kwargs)
+        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['POST'])
     @with_transaction_id()
