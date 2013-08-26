@@ -35,6 +35,7 @@ def policy_dict_to_list(policy_dict, tenantId, groupId):
 
 class OtterPolicies(object):
     """
+    REST endpoints for policies of a scaling group.
     """
     app = Klein()
 

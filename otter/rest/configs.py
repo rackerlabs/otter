@@ -21,6 +21,7 @@ from otter.rest.errors import InvalidMinEntities
 
 class OtterConfig(object):
     """
+    REST endpoints for the configuration of scaling groups.
     """
     app = Klein()
 
@@ -103,6 +104,7 @@ class OtterConfig(object):
 
 class OtterLaunch(object):
     """
+    REST endpoints for launch configurations.
     """
     app = Klein()
 

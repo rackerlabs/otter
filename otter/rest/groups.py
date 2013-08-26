@@ -47,7 +47,7 @@ def format_state_dict(state):
 
 class OtterGroups(object):
     """
-    Routes to handle requests related to scaling groups.
+    REST endpoints for managing scaling groups.
     """
     app = Klein()
 

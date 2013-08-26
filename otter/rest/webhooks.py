@@ -46,6 +46,7 @@ def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
 
 class OtterWebhooks(object):
     """
+    REST endpoints for managing scaling group webhooks.
     """
     app = Klein()
 
@@ -296,6 +297,7 @@ class OtterWebhooks(object):
 
 class OtterExecute(object):
     """
+    REST endpoint for executing a webhook.
     """
     app = Klein()
 

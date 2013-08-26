@@ -12,8 +12,8 @@ from otter.rest.groups import OtterGroups
 from otter.rest.policies import OtterPolicies
 from otter.rest.webhooks import OtterExecute, OtterWebhooks
 
-
 Request.defaultContentType = 'application/json'
+
 
 class Otter(object):
     """
@@ -37,29 +37,42 @@ class Otter(object):
     @app.route('/v1.0/<string:tenant_id>/groups', branch=True)
     def groups(self, request, tenant_id):
         """
-        /v1.0/<tenantId>/groups and subroutes delegated to OtterGroups.
+        group routes delegated to OtterGroups.
         """
         return OtterGroups(self.store, tenant_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/config')
     def config(self, request, tenant_id, group_id):
+        """
+        config route handled by OtterConfig
+        """
         return OtterConfig(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch')
     def launch(self, request, tenant_id, group_id):
-        return OtterLaunch(self.store, tenant_id,group_id).app.resource()
+        """
+        launch route handled by OtterLaunch
+        """
+        return OtterLaunch(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies', branch=True)
     def policies(self, request, tenant_id, group_id):
+        """
+        policies routes handled by OtterPolicies
+        """
         return OtterPolicies(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/webhooks', branch=True)
     def webhooks(self, request, tenant_id, group_id):
+        """
+        webhook routes handled by OtterWebhooks
+        """
         return OtterWebhooks(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
     def execute(self, request, capability_version, capability_hash):
         """
+        execute route handled by OtterExecute
         """
         return OtterExecute(self.store, capability_version,
                             capability_hash).app.resource()
