@@ -1,4 +1,5 @@
 #!/bin/bash
+set -ex
 
 GIT_SHA=$(git rev-parse --short HEAD)
 
