@@ -467,7 +467,7 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
-                    timeout=120,
+                    timeout=3660,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -484,9 +484,11 @@ def verified_delete(log,
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
     :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 2.
+        verifying a delete is retried. Default: 5.
     :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404,
+        failure, if Nova fails to return a 404.  Default is 3660, because if
+        the server is building, the delete will not happen until immediately
+        after it has finished building.
 
     :return: Deferred that fires when the expected status has been seen.
     """
