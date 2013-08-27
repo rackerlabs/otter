@@ -4,13 +4,14 @@ Tests for the worker supervisor.
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Cooperator
 
 from otter.models.interface import IScalingGroup
 from otter.supervisor import Supervisor
-from otter.test.utils import iMock, patch
+from otter.test.utils import iMock, patch, DummyException
 from otter.util.config import set_config_data
+from otter.util.deferredutils import DeferredPool
 
 
 class SupervisorTests(TestCase):
@@ -152,6 +153,66 @@ class LaunchConfigTests(SupervisorTests):
                                        self.group, self.launch_config)
 
         self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
+
+    def test_job_deferred_added_to_deferred_pool(self):
+        """
+        The launch config job deferred is added to a deferred pool, if it is
+        provided to the constructor
+        """
+        pool = DeferredPool()
+        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
+                                pool)
+        self.launch_server.return_value = Deferred()  # block forward progress
+
+        # the pool starts off empty
+        self.successResultOf(pool.notify_when_empty())  # the pool starts empty
+
+        supervisor.execute_config(self.log, 'transaction-id',
+                                  self.group, self.launch_config)
+
+        # the pool is now not empty, since the job has been added
+        empty = pool.notify_when_empty()
+        self.assertNoResult(empty)  # the pool is not empty now
+
+        # after launch server returns, the pool empties
+        self.launch_server.return_value.callback((self.fake_server_details, {}))
+        self.successResultOf(empty)
+
+    def test_deferred_pool_does_not_interfere_with_success_result(self):
+        """
+        Adding a job to the deferred pool does not interfere with the success
+        result being propagated to completion deferred
+        """
+        pool = DeferredPool()
+        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
+                                pool)
+
+        # does not interfere with the result of completed_d
+        d = supervisor.execute_config(self.log, 'transaction-id',
+                                      self.group, self.launch_config)
+        (job_id, completed_d) = self.successResultOf(d)
+        self.assertEqual(
+            self.successResultOf(completed_d),
+            {'id': 'server_id', 'links': ['links'],
+             'name': 'meh', 'lb_info': {}})
+
+    def test_deferred_pool_does_not_interfere_with_failure_result(self):
+        """
+        Adding a job to the deferred pool does not interfere with the failure
+        result being propagated to completion deferred
+        """
+        pool = DeferredPool()
+        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
+                                pool)
+
+        self.launch_server.return_value = fail(DummyException(':('))
+
+        d = supervisor.execute_config(self.log, 'transaction-id',
+                                      self.group, self.launch_config)
+
+        (job_id, completed_d) = self.successResultOf(d)
+
+        self.failureResultOf(completed_d, DummyException)
 
 
 class DeleteServerTests(SupervisorTests):

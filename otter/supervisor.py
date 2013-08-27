@@ -13,10 +13,17 @@ from otter.undo import InMemoryUndoStack
 class Supervisor(object):
     """
     Manages execution of launch configurations.
+
+    :ivar callable auth_function: authentication function to use to obtain an
+        auth token and service catalog.  Should accept a tenant ID.
+
+    :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
+        should be waited on
     """
-    def __init__(self, auth_function, coiterate):
+    def __init__(self, auth_function, coiterate, deferred_pool=None):
         self.auth_function = auth_function
         self.coiterate = coiterate
+        self.deferred_pool = deferred_pool
 
     def execute_config(self, log, transaction_id, scaling_group, launch_config):
         """
@@ -84,6 +91,10 @@ class Supervisor(object):
             }
 
         d.addCallback(when_launch_server_completed)
+
+        if self.deferred_pool is not None:
+            self.deferred_pool.add(d)
+
         d.chainDeferred(completion_d)
 
         return succeed((job_id, completion_d))
