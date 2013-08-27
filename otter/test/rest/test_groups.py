@@ -27,7 +27,7 @@ from otter.rest.groups import format_state_dict
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
 
-from otter.rest.application import set_bobby
+from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
 
@@ -418,7 +418,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
         super(AllGroupsBobbyEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def tearDown(self):
         """
@@ -426,7 +426,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         """
         set_bobby(None)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
     def test_group_create_bobby(self, create_group, get_url_root):
         """
