@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import CancelledError, gatherResults, maybeDeferred
+from twisted.internet.defer import gatherResults, maybeDeferred
 
 import treq
 
@@ -121,24 +121,15 @@ def wait_for_active(log,
         sd.addCallback(check_status)
         return sd
 
-    d = retry_and_timeout(
+    timeout_description = ("Waiting for server <{0}> to change from BUILD "
+                           "state to ACTIVE state").format(server_id)
+
+    return retry_and_timeout(
         poll, timeout,
         can_retry=transient_errors_except(UnexpectedServerStatus),
         next_interval=repeating_interval(interval),
-        clock=clock)
-
-    def on_error(f):
-        if f.check(CancelledError):
-            time_building = clock.seconds() - start_time
-            log.msg(('Server {instance_id} failed to change from BUILD state '
-                     'to ACTIVE within a {timeout} second timeout (it has been '
-                     '{time_building} seconds).'),
-                    timeout=timeout, time_building=time_building)
-        return f
-
-    d.addErrback(on_error)
-
-    return d
+        clock=clock,
+        deferred_description=timeout_description)
 
 
 def create_server(server_endpoint, auth_token, server_config):
@@ -476,7 +467,7 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
-                    timeout=120,
+                    timeout=3660,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -493,9 +484,11 @@ def verified_delete(log,
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
     :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 2.
+        verifying a delete is retried. Default: 5.
     :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404,
+        failure, if Nova fails to return a 404.  Default is 3660, because if
+        the server is building, the delete will not happen until immediately
+        after it has finished building.
 
     :return: Deferred that fires when the expected status has been seen.
     """
@@ -521,11 +514,13 @@ def verified_delete(log,
 
         start_time = clock.seconds()
 
-        # this is treating all errors as transient, so the only error that can
-        # occur is a CancelledError from timing out
+        timeout_description = (
+            "Waiting for Nova to actually delete server {0}".format(server_id))
+
         verify_d = retry_and_timeout(check_status, timeout,
                                      next_interval=repeating_interval(interval),
-                                     clock=clock)
+                                     clock=clock,
+                                     deferred_description=timeout_description)
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
@@ -533,15 +528,7 @@ def verified_delete(log,
                         time_delete=time_delete)
 
         verify_d.addCallback(on_success)
-
-        def on_timeout(_):
-            time_delete = clock.seconds() - start_time
-            del_log.err(None, timeout=timeout, time_delete=time_delete,
-                        why=('Server {instance_id} failed to be deleted within '
-                             'a {timeout} second timeout (it has been '
-                             '{time_delete} seconds).'))
-
-        verify_d.addErrback(on_timeout)
+        verify_d.addErrback(del_log.err)
 
     d.addCallback(verify)
     return d
