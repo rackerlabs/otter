@@ -76,10 +76,10 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
 
     based on:  https://twistedmatrix.com/trac/ticket/990
     """
-    timed_out = []
+    timed_out = [False]
 
     def time_it_out():
-        timed_out.append(True)
+        timed_out[0] = True
         deferred.cancel()
 
     delayed_call = clock.callLater(timeout, time_it_out)
@@ -87,7 +87,7 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
     def convert_cancelled(f):
         # if the failure is CancelledError, and we timed it out, convert it
         # to a TimedOutError.  Otherwise, propagate it.
-        if timed_out:
+        if timed_out[0]:
             f.trap(defer.CancelledError)
             raise TimedOutError(timeout, deferred_description)
         return f
