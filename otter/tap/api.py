@@ -6,6 +6,8 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
+from twisted.internet.task import coiterate
+
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
@@ -14,6 +16,7 @@ from twisted.application.service import MultiService
 from twisted.web.server import Site
 
 from otter.rest.application import Otter
+from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassScalingGroupCollection
 from otter.models.mock import MockScalingGroupCollection
@@ -26,6 +29,7 @@ from otter.auth import CachingAuthenticator
 from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
 from silverberg.logger import LoggingCQLClient
+from otter.bobby import BobbyClient
 
 
 class Options(usage.Options):
@@ -92,6 +96,10 @@ def makeService(config):
     else:
         store = MockScalingGroupCollection()
 
+    bobby_url = config_value('bobby_url')
+    if bobby_url is not None:
+        set_bobby(BobbyClient(bobby_url))
+
     cache_ttl = config_value('identity.cache_ttl')
 
     if cache_ttl is None:
@@ -108,7 +116,7 @@ def makeService(config):
             config_value('identity.admin_url')),
         cache_ttl)
 
-    supervisor = Supervisor(authenticator.authenticate_tenant)
+    supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
 
     set_supervisor(supervisor)
 

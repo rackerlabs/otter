@@ -27,6 +27,9 @@ from otter.rest.groups import format_state_dict
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
 
+from otter.rest.application import set_bobby
+from otter.bobby import BobbyClient
+
 
 class FormatterHelpers(TestCase):
     """
@@ -395,6 +398,74 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch
         }))
         self.flushLoggedErrors(AssertionError)
+
+
+class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
+
+    This will go away, just here so that we've got the start for optional
+    Bobby support in Otter.
+    """
+    endpoint = "/v1.0/11111/groups/"
+    invalid_methods = ("DELETE", "PUT")
+
+    def setUp(self):
+        """
+        Set up mock Bobby client
+        """
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
+
+        super(AllGroupsBobbyEndpointTestCase, self).setUp()
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        patch(self, 'otter.rest.application.get_url_root', return_value="")
+
+    def tearDown(self):
+        """
+        Revert mock Bobby client
+        """
+        set_bobby(None)
+
+    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
+    def test_group_create_bobby(self, create_group, get_url_root):
+        """
+        A scaling group is created and calls over to Bobby
+        """
+        request_body = {
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 1,
+                "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        }
+
+        config = request_body['groupConfiguration']
+        launch = request_body['launchConfiguration']
+        policies = request_body.get('scalingPolicies', [])
+
+        expected_config = config.copy()
+
+        rval = {
+            'groupConfiguration': expected_config,
+            'launchConfiguration': launch,
+            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
+                                        [p.copy() for p in policies])),
+            'id': '1'
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
+        self.assert_status_code(
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
+
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', expected_config, launch, policies or None)
+
+        create_group.assert_called_once_with('11111', '1')
 
 
 class OneGroupTestCase(RestAPITestMixin, TestCase):

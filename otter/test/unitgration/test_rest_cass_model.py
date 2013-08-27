@@ -12,6 +12,7 @@ tests and Cassandra model unit tests do not lie.
 
 import json
 import mock
+import os
 
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
@@ -65,7 +66,9 @@ def _policy():
     ]
 
 try:
-    keymaster = OtterKeymaster()
+    cassandra_host = os.environ.get('CASSANDRA_HOST', 'localhost')
+    cassandra_port = int(os.environ.get('CASSANDRA_PORT', 9160))
+    keymaster = OtterKeymaster(host=cassandra_host, port=cassandra_port)
 except Exception as e:
     skip = "Cassandra unavailable: {0}".format(e)
 else:
