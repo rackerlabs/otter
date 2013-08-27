@@ -441,6 +441,9 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
+        log = self.log.bind(system='CassScalingGroup.modify_state',
+                            debug=True, category='locking')
+
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
                     new_state.group_id == self.uuid)
@@ -457,12 +460,19 @@ class CassScalingGroup(object):
                                            params, get_consistency_level('update', 'state'))
 
         def _modify_state():
+            log.msg('Acquired lock')
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
+
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
                          max_retry=5, retry_wait=random.uniform(3, 5))
-        return with_lock(lock, _modify_state)
+
+        def _log_release_lock(result):
+            log.msg('Released lock')
+            return result
+
+        return with_lock(lock, _modify_state).addBoth(_log_release_lock)
 
     def update_config(self, data):
         """
@@ -754,6 +764,9 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
         """
+        log = self.log.bind(system='CassScalingGroup.delete_group', debug=True,
+                            category='locking')
+
         # Events can only be deleted by policy id, since that and trigger are
         # the only parts of the compound key
         def _delete_everything(policies):
@@ -785,13 +798,19 @@ class CassScalingGroup(object):
             return d
 
         def _delete_group():
+            log.msg('Acquired lock')
             d = self.view_state()
             d.addCallback(_maybe_delete)
             return d
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
                          max_retry=5, retry_wait=random.uniform(3, 5))
-        return with_lock(lock, _delete_group)
+
+        def _log_release_lock(result):
+            log.msg('Released lock')
+            return result
+
+        return with_lock(lock, _delete_group).addBoth(_log_release_lock)
 
 
 def _delete_many_query_and_params(cf, column, column_values):
