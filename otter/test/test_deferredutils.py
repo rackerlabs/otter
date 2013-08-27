@@ -7,7 +7,8 @@ from twisted.internet.task import Clock
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.trial.unittest import TestCase
 
-from otter.util.deferredutils import timeout_deferred, retry_and_timeout
+from otter.util.deferredutils import (
+    timeout_deferred, retry_and_timeout, TimedOutError)
 from otter.test.utils import DummyException, patch
 
 
@@ -15,6 +16,13 @@ class TimeoutDeferredTests(TestCase):
     """
     Tests for the method method ``timeout_deferred``
     """
+    def setUp(self):
+        """
+        Create a clock and a deferred to be cancelled
+        """
+        self.clock = Clock()
+        self.deferred = Deferred()
+
     def test_propagates_result_if_success_before_timeout(self):
         """
         The deferred callbacks with the result if it succeeds before the
@@ -47,9 +55,9 @@ class TimeoutDeferredTests(TestCase):
         clock.advance(15)
         self.assertIsNone(self.successResultOf(d))
 
-    def test_cancels_if_past_timeout(self):
+    def test_times_out_if_past_timeout(self):
         """
-        The deferred errbacks with an CancelledError if the timeout occurs
+        The deferred errbacks with a TimedOutError if the timeout occurs
         before it either callbacks or errbacks.
         """
         clock = Clock()
@@ -59,7 +67,61 @@ class TimeoutDeferredTests(TestCase):
 
         clock.advance(15)
 
-        self.failureResultOf(d, CancelledError)
+        self.failureResultOf(d, TimedOutError)
+
+    def test_preserves_cancellation_function_callback(self):
+        """
+        If a cancellation function that callbacks is provided to the deferred
+        being cancelled, its effects will not be overriden with a TimedOutError.
+        """
+        d = Deferred(lambda c: c.callback('I was cancelled!'))
+        timeout_deferred(d, 10, self.clock)
+        self.assertNoResult(d)
+
+        self.clock.advance(15)
+
+        self.assertEqual(self.successResultOf(d), 'I was cancelled!')
+
+    def test_preserves_cancellation_function_errback(self):
+        """
+        If a cancellation function that errbacks (with a non-CancelledError) is
+        provided to the deferred being cancelled, this other error will not be
+        converted to a TimedOutError.
+        """
+        d = Deferred(lambda c: c.errback(DummyException('what!')))
+        timeout_deferred(d, 10, self.clock)
+        self.assertNoResult(d)
+
+        self.clock.advance(15)
+
+        self.failureResultOf(d, DummyException)
+
+    def test_preserves_early_cancellation_error(self):
+        """
+        If the Deferred is manually cancelled before the timeout, it is not
+        re-cancelled (no AlreadyCancelledError), and the CancelledError is not
+        obscured
+        """
+        timeout_deferred(self.deferred, 10, self.clock)
+        self.assertNoResult(self.deferred)
+
+        self.deferred.cancel()
+        self.failureResultOf(self.deferred, CancelledError)
+
+        self.clock.advance(15)
+        # no AlreadyCancelledError raised?  Good.
+
+    def test_deferred_description_passed_to_TimedOutError(self):
+        """
+        If a deferred_description is passed, the TimedOutError will have that
+        string as part of it's string representation.
+        """
+        timeout_deferred(self.deferred, 5.3, self.clock,
+                         deferred_description="It'sa ME!")
+        self.clock.advance(6)
+
+        f = self.failureResultOf(self.deferred, TimedOutError)
+        self.assertIn("It'sa ME! timed out after 5.3 seconds", str(f))
 
 
 class RetryAndTimeoutTests(TestCase):
@@ -82,13 +144,15 @@ class RetryAndTimeoutTests(TestCase):
         """
         clock = mock.MagicMock()
         retry_and_timeout('do_work', 'timeout', can_retry='can_retry',
-                          next_interval='next_interval', clock=clock)
+                          next_interval='next_interval', clock=clock,
+                          deferred_description='description')
 
         self.retry.assert_called_once_with('do_work', can_retry='can_retry',
                                            next_interval='next_interval',
                                            clock=clock)
         self.timeout.assert_called_once_with(self.retry.return_value,
-                                             'timeout', clock=clock)
+                                             'timeout', clock=clock,
+                                             deferred_description='description')
 
     def test_retry_and_timeout_get_the_same_default_clock(self):
         """
