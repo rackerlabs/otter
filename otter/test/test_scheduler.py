@@ -20,6 +20,8 @@ from otter.models.cass import LOCK_TABLE_NAME
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
 
+from datetime import datetime
+
 
 class SchedulerTestCase(TestCase):
     """
@@ -105,16 +107,23 @@ class SchedulerTestCase(TestCase):
                          [mock.call(mock.ANY, 'transaction-id', self.mock_group,
                           self.mock_state, policy_id=event['policyId']) for event in events])
 
-    def test_empty(self):
+    @mock.patch('otter.scheduler.generate_transaction_id', return_value='transid')
+    @mock.patch('otter.scheduler.datetime', spec=['utcnow'])
+    def test_empty(self, mock_datetime, mock_gentransid):
         """
         No policies are executed when ``fetch_batch_of_events`` return empty list
         i.e. no events are there before now
         """
+        mock_datetime.utcnow.return_value = time = datetime(
+            2012, 10, 10, 03, 20, 30, 0, None)
         self.returns = [[]]
+
         d = self.scheduler_service.check_for_events(100)
+
         self.validate_calls(d, [[]], None)
         self.assertFalse(self.mock_store.update_delete_events.called)
-        self.log.bind.assert_called_once_with(scheduler_run_id=mock.ANY, utcnow=mock.ANY)
+
+        self.log.bind.assert_called_once_with(scheduler_run_id='transid', utcnow=time)
         self.log.bind.return_value.msg.assert_called_once_with('Checking for events')
 
     def test_one(self):
