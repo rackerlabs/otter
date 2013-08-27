@@ -4,6 +4,7 @@ Temporary place for bobby globals
 
 _bobby = None
 
+
 def get_bobby():
     """
     :return: The bobby instance or None
