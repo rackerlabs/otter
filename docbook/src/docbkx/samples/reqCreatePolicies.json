@@ -2,25 +2,25 @@
   {
     "name": "scale up by one server",
     "change": 1,
-    "cooldown": 150,
+    "cooldown": 1800,
     "type": "webhook"
   },
   {
     "name": "scale down by 5.5 percent",
     "changePercent": -5.5,
-    "cooldown": 6,
+    "cooldown": 1800,
     "type": "webhook"
   },
   {
-    "name": "scale down by 5.5 percent",
-    "changePercent": -5.5,
-    "cooldown": 6,
+    "name": "set group to 5 servers",
+    "desiredCapacity": 5,
+    "cooldown": 1800,
     "type": "webhook"
   },
   {
     "name": "scale down by 5.5 percent at 11pm",
     "changePercent": -5.5,
-    "cooldown": 6,
+    "cooldown": 1800,
     "type": "schedule",
     "args": {
       "cron": "23 * * * *"
@@ -29,10 +29,35 @@
   {
     "name": "scale down by 5.5 percent on the 5th",
     "changePercent": -5.5,
-    "cooldown": 6,
+    "cooldown": 1800,
     "type": "schedule",
     "args": {
       "at": "2013-06-05T03:12Z"
     }
-  }
+  },
+  {
+    "name": "scale down by 5.5 percent",
+    "changePercent": -5.5,
+    "cooldown": 1800,
+    "type": "cloud_monitoring",
+    "args": {
+          "check": {
+            "label": "Website check 1",
+            "type": "remote.http",
+            "details": {
+                "url": "http://www.foo.com",
+                "method": "GET"
+            },
+            "monitoring_zones_poll": [
+                "mzA"
+            ],
+            "timeout": 30,
+            "period": 100,
+            "target_alias": "default"
+        },
+        "alarm_criteria": {
+            "criteria": "if (metric[\"duration\"] >= 2) { return new AlarmStatus(OK); } return new AlarmStatus(CRITICAL);"
+        }
+     }
+    }
 ]

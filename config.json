@@ -6,7 +6,6 @@
         "seed_hosts": ["tcp:127.0.0.1:9160"],
         "keyspace": "otter"
     },
-    "bobby_url": "http://127.0.0.1:9876/v1.0/",
     "identity": {
         "username": "autoscale",
         "password": "REPLACE_WITH_REAL_PASSWORD",

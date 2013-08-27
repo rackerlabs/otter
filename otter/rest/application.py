@@ -15,7 +15,7 @@ from otter.util.config import config_value
 
 
 _store = None
-
+_bobby = None
 
 Request.defaultContentType = 'application/json'  # everything should be json
 
@@ -53,6 +53,23 @@ def set_store(store):
     """
     global _store
     _store = store
+
+
+def get_bobby():
+    """
+    :return: The bobby instance or None
+    """
+    return _bobby
+
+
+def set_bobby(bobby):
+    """
+    Sets the Bobby used in coordination.
+
+    :param bobby: the Bobby instance used in MaaS coordination
+    """
+    global _bobby
+    _bobby = bobby
 
 
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
