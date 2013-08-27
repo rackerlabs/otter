@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import gatherResults
+from twisted.internet.defer import gatherResults, maybeDeferred
 
 import treq
 
@@ -150,7 +150,7 @@ def create_server(server_endpoint, auth_token, server_config):
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
+def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
@@ -161,6 +161,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     :param str lb_config: An lb_config dictionary.
     :param str ip_address: The IP Address of the node to add to the load
         balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with the Add Node to load balancer response
         as a dict.
@@ -177,10 +178,19 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
     d.addErrback(wrap_request_error, endpoint, 'add')
-    return d.addCallback(treq.json_content)
+
+    def when_done(result):
+        undo.push(remove_from_load_balancer,
+                  endpoint,
+                  auth_token,
+                  lb_id,
+                  result['nodes'][0]['id'])
+        return result
+
+    return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
+def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -189,20 +199,28 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
     :param str ip_address: IP address of the node to add to the load balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
-    return gatherResults([
-        add_to_load_balancer(
-            endpoint,
-            auth_token,
-            lb_config,
-            ip_address).addCallback(
-                lambda response, lb_id: (lb_id, response),
-                lb_config['loadBalancerId'])
-        for lb_config in lb_configs
-    ], consumeErrors=True)
+    lb_iter = iter(lb_configs)
+
+    results = []
+
+    def add_next(_):
+        try:
+            lb_config = lb_iter.next()
+
+            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
+            d.addCallback(results.append)
+            d.addCallback(add_next)
+            return d
+        except StopIteration:
+            return results
+
+    return maybeDeferred(add_next, None)
 
 
 def endpoints(service_catalog, service_name, region):
@@ -290,7 +308,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     return launch_config
 
 
-def launch_server(log, region, scaling_group, service_catalog, auth_token, launch_config):
+def launch_server(log, region, scaling_group, service_catalog, auth_token,
+                  launch_config, undo):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -303,6 +322,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
+    :param IUndoStack undo: The stack that will be rewound if undo fails.
 
     :return: Deferred that fires with a 2-tuple of server details and the
         list of load balancer responses from add_to_load_balancers.
@@ -337,23 +357,29 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     d = create_server(server_endpoint, auth_token, server_config)
 
-    def _wait_for_server(server):
-        ilog = log.bind(instance_id=server['server']['id'])
+    def wait_for_server(server):
+        server_id = server['server']['id']
+
+        undo.push(
+            verified_delete, log, server_endpoint, auth_token, server_id)
+
+        ilog = log.bind(instance_id=server_id)
         return wait_for_active(
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'])
+            server_id)
 
-    d.addCallback(_wait_for_server)
+    d.addCallback(wait_for_server)
 
-    def _add_lb(server):
+    def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        lbd = add_to_load_balancers(
+            lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
-    d.addCallback(_add_lb)
+    d.addCallback(add_lb)
     return d
 
 

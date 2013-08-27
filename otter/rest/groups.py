@@ -15,6 +15,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
+from otter.rest.application import get_bobby
 
 
 def format_state_dict(state):
@@ -300,6 +301,14 @@ def create_new_scaling_group(request, log, tenant_id, data):
         return d.addCallback(lambda _: result)
 
     deferred.addCallback(_do_obey_config_change)
+
+    def _add_to_bobby(result, client):
+        d = client.create_group(tenant_id, result["id"])
+        return d.addCallback(lambda _: result)
+
+    bobby = get_bobby()
+    if bobby is not None:
+        deferred.addCallback(_add_to_bobby, bobby)
 
     def _format_output(result):
         uuid = result['id']
