@@ -26,7 +26,7 @@ class CreateGroupTest(BobbyFixture):
         self.resources.add(self.group_id,
                            self.bobby_client.delete_group)
 
-    def test_create_group_response(self):
+    def test_create_group_response_object(self):
         """
         Create a group in bobby with a given group_id, notification
         and notification plans, and verify the response object.
@@ -46,13 +46,16 @@ class CreateGroupTest(BobbyFixture):
         """
         group_id = '90364858-78f3-4543-85bc-e75a407c08d4'
         group1_response = self.bobby_client.create_group(group_id,
-            'test', 'test')
+                                                         'test', 'test')
         self.assertEquals(group1_response.status_code, 201, msg='Create'
-            ' group in bobby failed with {0}'.format(group1_response.status_code))
-        group2_response = self.bobby_client.create_group(group_id, 'no-dont', 'save-me')
+                          ' group in bobby failed with {0}'.format(group1_response.status_code))
+        group2_response = self.bobby_client.create_group(
+            group_id, 'no-dont', 'save-me')
         self.assertEquals(group2_response.status_code, 403, msg='Create'
-            ' group, with already existing group ID in bobby, failed with'
-            ' {0}'.format(group2_response.status_code))
+                          ' group, with already existing group ID in bobby, failed with'
+                          ' {0}'.format(group2_response.status_code))
+        self.resources.add(group_id,
+                           self.bobby_client.delete_group)
 
     def test_create_group_without_group_id(self):
         """

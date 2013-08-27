@@ -27,11 +27,11 @@ class GetGroupTest(BobbyGroupFixture):
         the response object.
         """
         self.assertEquals(self.get_group_response.status_code, 200,
-                          msg='Get group in bobby resulted in {0}'.format(
-                          self.get_group_response.status_code))
+                          msg='Get group in bobby resulted in '
+                          ' {0}'.format(self.get_group_response.status_code))
         self.validate_headers(self.get_group_response.headers)
         get_group = self.get_group_response.entity
-        self.assert_create_bobby_group_feilds(get_group, self.group_id_temp)
+        self.assert_create_bobby_group_fields(get_group, self.group_id_temp)
 
     def test_get_invalid_group(self):
         """
@@ -41,5 +41,3 @@ class GetGroupTest(BobbyGroupFixture):
         self.assertEquals(get_group_response.status_code, 404,
                           msg='Get for non existant group in bobby resulted in '
                           '{0}'.format(get_group_response.status_code))
-
-

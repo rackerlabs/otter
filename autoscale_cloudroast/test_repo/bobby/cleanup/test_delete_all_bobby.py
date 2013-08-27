@@ -22,3 +22,20 @@ class DeleteAll(BobbyFixture):
         list_groups_again = (self.bobby_client.list_groups()).entity
         print 'Deleting {0} groups, {1} still exist'.format(len(list_groups), len(list_groups_again))\
             if len(list_groups_again) is not 0 else "Deleted {0} groups".format(len(list_groups))
+
+    @tags(type='bobbyservergroups')
+    def test_delete_all_server_groups_in_bobby(self):
+        """
+        Delete all server groups on the account from bobby
+        PS: Need groups id to be able to delete server groups and these groups
+        may not exist in the groups table :(
+        """
+        # groups = self.bobby_client.list_groups().entity
+        # for group in groups:
+        #     list_groups = self.bobby_client.list_server_groups(group.groupId).entity
+        #     for each_group in list_groups:
+        #         self.bobby_client.delete_server_group(each_group.groupId, each_group.serverId)
+        #     list_groups_again = (self.bobby_client.list_server_groups()).entity
+        #     print 'Deleting {0} groups, {1} still exist'.format(len(list_groups),\
+        #         len(list_groups_again)) if len(list_groups_again) is not 0 else \
+        #         "Deleted {0} groups".format(len(list_groups))

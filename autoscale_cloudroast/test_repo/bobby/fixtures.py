@@ -26,8 +26,8 @@ class BobbyFixture(BaseTestFixture):
         cls.bobby_client = BobbyAPIClient(cls.url, None, 'json', 'json')
         cls.bobby_config = BobbyConfig()
         cls.bobby_behaviors = BobbyBehaviors(cls.bobby_config,
-                                                     cls.bobby_client)
-        #cls.autoscale_fixt = AutoscaleFixture()
+                                             cls.bobby_client)
+        # cls.autoscale_fixt = AutoscaleFixture()
 
         cls.tenant_id = cls.bobby_config.tenant_id
         cls.group_id = cls.bobby_config.group_id
@@ -52,19 +52,19 @@ class BobbyFixture(BaseTestFixture):
         self.assertTrue(headers['x-response-id'] is not None,
                         msg='No x-response-id')
 
-    def assert_create_bobby_group_feilds(self, group, group_id=None):
+    def assert_create_bobby_group_fields(self, group, group_id=None):
         """
         Assert the reponse of a bobby group
         """
         group_id = group_id or self.group_id
         self.assertEquals(group.tenantId, self.tenant_id,
-            msg='The tenant ID in the response did not match')
+                          msg='The tenant ID in the response did not match')
         self.assertEquals(group.groupId, group_id,
-            msg='The group ID in the response did not match')
+                          msg='The group ID in the response did not match')
         self.assertEquals(group.notification, self.notification,
-            msg='The notification in the response did not match')
+                          msg='The notification in the response did not match')
         self.assertEquals(group.notificationPlan, self.notification_plan,
-            msg='The notification plan in the response did not match')
+                          msg='The notification plan in the response did not match')
 
     @classmethod
     def tearDownClass(cls):

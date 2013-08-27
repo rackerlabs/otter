@@ -5,7 +5,10 @@ from test_repo.bobby.fixtures import BobbyFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
-class GetGroupTest(BobbyFixture):
+class ListGroupTest(BobbyFixture):
+    """
+    Test for list groups
+    """
 
     def test_list_group_response(self):
         """
@@ -17,8 +20,8 @@ class GetGroupTest(BobbyFixture):
         self.bobby_behaviors.create_bobby_group_given(group_id_2)
         list_group_response = self.bobby_client.list_groups()
         self.assertEquals(list_group_response.status_code, 200,
-                          msg='List group in bobby resulted in {0}'.format(
-                          list_group_response.status_code))
+                          msg='List group in bobby resulted in '
+                          ' {0}'.format(list_group_response.status_code))
         self.validate_headers(list_group_response.headers)
         group_id_list = [each_group.groupId for each_group in list_group_response.entity]
         self.assertTrue(group_id_1 in group_id_list, msg='Group with id'

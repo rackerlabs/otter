@@ -37,5 +37,3 @@ class BobbyConfig(ConfigSectionInterface):
         Notification plan for the tenant in bobby
         """
         return self.get('notification_plan')
-
-
