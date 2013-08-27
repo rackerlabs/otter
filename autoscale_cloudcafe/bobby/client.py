@@ -188,7 +188,7 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         return self.request('DELETE', url,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def list_groups_policies(self, group_id, requestslib_kwargs=None):
+    def list_bobby_policies(self, group_id, requestslib_kwargs=None):
         """
         :summary: List all the policies for a given group ID.
         :return: Response Object containing response code 200 and body with
@@ -205,9 +205,9 @@ class BobbyAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 
-    def create_groups_policies(self, group_id, entity_id, policy_id,
-                               alarm_id, check_id,
-                               requestslib_kwargs=None):
+    def create_bobby_policy(self, group_id, entity_id, policy_id,
+                            alarm_template, check_template,
+                            requestslib_kwargs=None):
         """
         :summary: Create a policy object.
         :param group_id: The scaling group id
@@ -226,14 +226,14 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         url = '{0}/groups/{1}/policies'.format(self.url, group_id)
         group_policy = BobbyPolicies_Request(entity_id=entity_id,
                                              policy_id=policy_id,
-                                             alarm_id=alarm_id,
-                                             check_id=check_id)
+                                             alarm_template=alarm_template,
+                                             check_template=check_template)
         return self.request('POST', url,
                             request_entity=group_policy,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 
-    def get_groups_policy(self, group_id, policy_id, requestslib_kwargs=None):
+    def get_bobby_policy(self, group_id, policy_id, requestslib_kwargs=None):
         """
         :summary: Get a policy in the group
         :param group_id: The scaling group id
@@ -253,7 +253,7 @@ class BobbyAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 
-    def delete_groups_policy(self, group_id, policy_id, requestslib_kwargs=None):
+    def delete_bobby_policy(self, group_id, policy_id, requestslib_kwargs=None):
         """
         :summary: Deletes the policy
         :param group_id: The id of an existing scaling group.

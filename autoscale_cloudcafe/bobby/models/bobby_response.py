@@ -137,7 +137,11 @@ class Policies(AutoMarshallingModel):
         policies = Policies(**policies_dict)
         if hasattr(policies, 'links'):
             policies.links = Links._dict_to_obj(policies.links)
-        attr_list = ['alarmTemplateId', 'checkTemplateId', 'groupId', 'policyId']
+        if hasattr(policies, 'alarmTemplate'):
+            policies.alarmTemplate = Alarm._dict_to_obj(policies.alarmTemplate)
+        if hasattr(policies, 'checkTemplate'):
+            policies.checkTemplate = Check._dict_to_obj(policies.checkTemplate)
+        attr_list = ['groupId', 'policyId']
         for k in attr_list:
             if hasattr(policies, k):
                 setattr(policies, k, getattr(policies, k))
@@ -146,3 +150,73 @@ class Policies(AutoMarshallingModel):
                 newkey = re.split('}', each)[1]
                 setattr(policies, newkey, policies_dict[each])
         return policies
+
+
+class Alarm(AutoMarshallingModel):
+    """
+    Marshalling objects for Bobby policies' alarms
+    """
+    def __init__(self, **kwargs):
+        super(Alarm, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _dict_to_obj(cls, alarm_dict):
+        """
+        Method to turn dictionary into Alarm instance.
+        """
+        alarm = Alarm(**alarm_dict)
+        if hasattr(alarm, 'criteria'):
+            setattr(alarm, 'criteria', getattr(alarm, 'criteria'))
+        return alarm
+
+
+class Check(AutoMarshallingModel):
+    """
+    Marshalling objects for Bobby policies' Checks
+    """
+    def __init__(self, **kwargs):
+        super(Check, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _dict_to_obj(cls, check_dict):
+        """
+        Method to turn dictionary into check instance.
+        """
+        check = Check(**check_dict)
+        if hasattr(check, 'details'):
+            check.details = Details._dict_to_obj(check.details)
+        for each in check_dict:
+            if each.startswith('{'):
+                newkey = re.split('}', each)[1]
+                setattr(check, newkey, check_dict[each])
+        return check
+
+
+class Details(AutoMarshallingModel):
+    """
+    Marshalling objects for Bobby policies' Details
+    """
+    def __init__(self, **kwargs):
+        super(Details, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _dict_to_obj(cls, details_dict):
+        """
+        Method to turn dictionary into details instance.
+        """
+        details = Details(**details_dict)
+        attr_list = ['url', 'method']
+        for k in attr_list:
+            if hasattr(details, k):
+                setattr(details, k, getattr(details, k))
+        for each in details_dict:
+            if each.startswith('{'):
+                newkey = re.split('}', each)[1]
+                setattr(details, newkey, details_dict[each])
+        return details
