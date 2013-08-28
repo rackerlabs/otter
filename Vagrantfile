@@ -70,8 +70,9 @@ Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
     rs.username = ENV["RS_USERNAME"]
     rs.api_key  = ENV["RS_API_KEY"]
     rs.public_key_path = ENV["RS_PUBLIC_KEY"]
-    rs.flavor   = /512MB/
-    rs.image    = /Ubuntu/
+    rs.flavor   = /2GB/
+    rs.image    = /Precise/
+    rs.server_name = "vagrant_#{ENV['USER']}"
   end
 
   config.vm.provider :vmware_fusion do |f, override|
