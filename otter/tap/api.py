@@ -134,13 +134,18 @@ def makeService(config):
 
     s = MultiService()
 
+    # by default, shutdown only when the supervisor's jobs are done.  No further
+    # jobs should be added, since the scheduler service shuts down without
+    # waiting (as it should) and the API service is also shut down without
+    # waiting (as it should)
     if (config_value('delayed_shutdown') is None or config_value('delayed_shutdown')):
         supervisor_pool = DeferredPool()
-        supervisor = Supervisor(authenticator.authenticate_tenant, coiterate,
-                                supervisor_pool)
         supervisor_service = DeferredPoolWaitingService(supervisor_pool,
                                                         'supervisor')
         supervisor_service.setServiceParent(s)
+
+        supervisor = Supervisor(authenticator.authenticate_tenant, coiterate,
+                                supervisor_pool)
     else:
         supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
 
