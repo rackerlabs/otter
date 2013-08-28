@@ -5,12 +5,13 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from otter.tap.api import Options, makeService
+from otter.tap.api import Options, DeferredPoolWaitingService, makeService
+from otter.util.deferredutils import DeferredPool
 from otter.test.utils import patch
 
 
@@ -65,12 +66,44 @@ class APIOptionsTests(TestCase):
 
     def test_short_store_options(self):
         """
-        The m shor toption should end up in the 'mock' key
+        The m short option should end up in the 'mock' key
         """
         config = Options()
         self.assertFalse(config['mock'])
         config.parseOptions(['-m'])
         self.assertTrue(config['mock'])
+
+
+class DeferredPoolWaitingServiceTests(TestCase):
+    """
+    Tests for :class:`DeferredPoolWaitingService`
+    """
+    def test_will_not_stop_until_pool_empty(self):
+        """
+        The deferred returned by stopService will not fire until the pool is
+        empty.
+        """
+        pool = DeferredPool()
+        d = defer.Deferred()
+        pool.add(d)
+
+        dpws = DeferredPoolWaitingService(pool)
+        sd = dpws.stopService()
+
+        self.assertFalse(dpws.running)
+        self.assertNoResult(sd)
+
+        d.callback(None)
+
+        self.successResultOf(sd)
+
+    def test_may_have_name(self):
+        """
+        If a name is passed, the service is named
+        """
+        pool = DeferredPool()
+        dpws = DeferredPoolWaitingService(pool, 'my_name')
+        self.assertEqual(dpws.name, 'my_name')
 
 
 class APIMakeServiceTests(TestCase):
@@ -225,3 +258,30 @@ class APIMakeServiceTests(TestCase):
         scheduler_service.assert_called_once_with(100, 10,
                                                   self.LoggingCQLClient.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
+
+    @mock.patch('otter.tap.api.Supervisor')
+    def test_supervisor_service_set_by_default(self, supervisor):
+        """
+        By default, a supervisor service that waits on supervisor deferreds is
+        added to the Multiservice as a service named 'supervisor'
+        """
+        parent = makeService(test_config)
+        supervisor_service = parent.getServiceNamed('supervisor')
+        self.assertIsInstance(supervisor_service, DeferredPoolWaitingService)
+
+        supervisor.assert_called_once_with(mock.ANY, mock.ANY,
+                                           supervisor_service.pool)
+
+    @mock.patch('otter.tap.api.Supervisor')
+    def test_supervisor_service_not_created_if_negative_flag(self, supervisor):
+        """
+        If the config value `delayed_shutdown` is set to False, specifically,
+        the supervisor is created without a DeferredPool, and no
+        DeferredPoolWaitingService is added to the MultiService
+        """
+        mock_config = test_config.copy()
+        mock_config['delayed_shutdown'] = False
+        parent = makeService(mock_config)
+
+        self.assertRaises(KeyError, parent.getServiceNamed, 'supervisor')
+        supervisor.assert_called_once_with(mock.ANY, mock.ANY)
