@@ -54,7 +54,6 @@ class OtterWebhooks(object):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -304,7 +303,6 @@ class OtterExecute(object):
         self.store = store
         self.capability_version = capability_version
         self.capability_hash = capability_hash
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['POST'])
     @with_transaction_id()

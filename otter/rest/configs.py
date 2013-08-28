@@ -28,7 +28,6 @@ class OtterConfig(object):
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -111,7 +110,6 @@ class OtterLaunch(object):
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()

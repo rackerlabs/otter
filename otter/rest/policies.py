@@ -42,7 +42,6 @@ class OtterPolicies(object):
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()

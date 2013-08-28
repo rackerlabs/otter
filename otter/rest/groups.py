@@ -54,7 +54,6 @@ class OtterGroups(object):
     def __init__(self, store, tenant_id):
         self.store = store
         self.tenant_id = tenant_id
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
