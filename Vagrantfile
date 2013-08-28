@@ -23,7 +23,7 @@ Vagrant::Config.run do |config|
       "apt-get update -qq; apt-get install -q -y --force-yes lxc-docker; "
 
     # Add raring kernel
-    pkg_cmd << "apt-get install linux-image-generic-lts-raring linux-headers-generic-lts-raring; "
+    pkg_cmd << "apt-get install -y -q linux-image-generic-lts-raring linux-headers-generic-lts-raring; "
 
     # Add guest additions if local vbox VM
     is_vbox = true
