@@ -5,8 +5,6 @@ Autoscale REST endpoints having to do with a group or collection of groups
 from functools import partial
 import json
 
-from klein import Klein
-
 from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
@@ -16,6 +14,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
+from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
 from otter.rest.bobby import get_bobby
 
@@ -50,7 +49,7 @@ class OtterGroups(object):
     """
     REST endpoints for managing scaling groups.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, tenant_id):
         self.store = store

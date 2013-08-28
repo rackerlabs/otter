@@ -9,13 +9,12 @@ policy.
 from functools import partial
 import json
 
-from klein import Klein
-
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
 
 from otter.models.interface import (
@@ -48,7 +47,7 @@ class OtterWebhooks(object):
     """
     REST endpoints for managing scaling group webhooks.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, tenant_id, group_id, policy_id):
         self.store = store
@@ -299,7 +298,7 @@ class OtterExecute(object):
     """
     REST endpoint for executing a webhook.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, capability_version, capability_hash):
         self.store = store

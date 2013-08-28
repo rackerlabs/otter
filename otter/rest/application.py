@@ -1,12 +1,9 @@
 """
 Contains the actual Klein app and base route handlers for the REST service.
 """
-from functools import partial
-
 from twisted.web.server import Request
 
-from klein import Klein
-
+from otter.rest.otterapp import OtterApp
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.groups import OtterGroups
 from otter.rest.policies import OtterPolicies
@@ -19,11 +16,10 @@ class Otter(object):
     """
     Otter holds the Klein app and routes for the REST service.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store):
         self.store = store
-        self.app.route = partial(self.app.route, strict_slashes=False)
 
     @app.route('/')
     def base(self, request):

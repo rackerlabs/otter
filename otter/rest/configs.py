@@ -7,12 +7,11 @@ or launch configuration for a scaling group.
 from functools import partial
 import json
 
-from klein import Klein
-
 from otter.json_schema import group_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.util.http import transaction_id
 
 from otter import controller
@@ -23,7 +22,7 @@ class OtterConfig(object):
     """
     REST endpoints for the configuration of scaling groups.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, tenant_id, group_id):
         self.store = store
@@ -106,7 +105,7 @@ class OtterLaunch(object):
     """
     REST endpoints for launch configurations.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, tenant_id, group_id):
         self.store = store

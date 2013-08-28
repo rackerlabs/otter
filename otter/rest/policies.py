@@ -8,12 +8,11 @@ the scaling policies associated with a particular scaling group.
 from functools import partial
 import json
 
-from klein import Klein
-
 from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
+from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
 from otter import controller
 
@@ -37,7 +36,7 @@ class OtterPolicies(object):
     """
     REST endpoints for policies of a scaling group.
     """
-    app = Klein()
+    app = OtterApp()
 
     def __init__(self, store, tenant_id, scaling_group_id):
         self.store = store

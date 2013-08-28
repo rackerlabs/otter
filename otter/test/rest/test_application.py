@@ -7,9 +7,7 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
-from otter.models.mock import MockScalingGroupCollection
-
-from otter.rest.application import Otter
+from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id
 from otter.test.rest.request import RequestTestMixin
 from otter.util.http import get_autoscale_links, transaction_id
@@ -266,7 +264,7 @@ class RouteTests(RequestTestMixin, TestCase):
         requests = [0]
 
         class FakeApp(object):
-            app = Otter(MockScalingGroupCollection()).app
+            app = OtterApp()
 
             @app.route('/v1.0/foo/')
             @with_transaction_id()
@@ -274,7 +272,8 @@ class RouteTests(RequestTestMixin, TestCase):
                 requests[0] += 1
                 return 'ok'
 
-        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo',
+                                root=FakeApp().app.resource())
         self.assertEqual(requests[0], 1)
 
 
@@ -293,7 +292,7 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
         transaction_ids = []
 
         class FakeApp(object):
-            app = Otter(MockScalingGroupCollection()).app
+            app = OtterApp()
 
             @app.route('/v1.0/foo')
             @with_transaction_id()
@@ -301,5 +300,6 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
                 transaction_ids.append(transaction_id(request))
                 return 'ok'
 
-        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo',
+                                root=FakeApp().app.resource())
         self.assertEqual(transaction_ids[0], 'transaction-id')
