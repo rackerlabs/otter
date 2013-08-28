@@ -18,9 +18,9 @@ Vagrant::Config.run do |config|
   if Dir.glob("#{File.dirname(__FILE__)}/.vagrant/machines/default/*/id").empty?
 
     # Add lxc-docker package
-    pkg_cmd = "apt-get update -qq; apt-get install -q -y python-software-properties; " \
-      "add-apt-repository -y ppa:dotcloud/lxc-docker; apt-get update -qq; " \
-      "apt-get install -q -y lxc-docker; "
+    pkg_cmd = "wget -q -O - http://get.docker.io/gpg | apt-key add -;" \
+      "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list;" \
+      "apt-get update -qq; apt-get install -q -y --force-yes lxc-docker; "
 
     # Add raring kernel
     pkg_cmd << "apt-get install linux-image-generic-lts-raring linux-headers-generic-lts-raring; "
