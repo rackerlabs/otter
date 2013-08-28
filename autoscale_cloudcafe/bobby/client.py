@@ -3,7 +3,7 @@ Client objects for all the bobby api calls
 """
 from bobby.models.bobby_response import BobbyGroup, ServerGroup, Policies
 from bobby.models.bobby_requests import BobbyGroup_Request, ServerGroup_Request, \
-    BobbyPolicies_Request
+    BobbyPolicies_Request, Update_BobbyPolicies_Request
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
 
@@ -205,31 +205,32 @@ class BobbyAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 
-    def create_bobby_policy(self, group_id, entity_id, policy_id,
+    def create_bobby_policy(self, group_id, policy_id,
                             alarm_template, check_template,
                             requestslib_kwargs=None):
         """
         :summary: Create a policy object.
         :param group_id: The scaling group id
         :type name: String
-        :param entity_id: The entity Id for the server in the group
-        :type cooldown: String
-        :param policy_id: The server id of the server in the group
+        :param policy_id: The policy id of the policy in the bobby
         :type change: String
+        :param check_template: The check template for the policy in the bobby
+        :type change: String? Dict?
+        :param alarm_template: The alarm template for the policy in the bobby
+        :type change: String? Dict?
         :return: Response Object containing response code 201 and body with
-                details of newly created server group
+                details of newly created policy
         :rtype: Response Object
 
         POST
         '/{tenantId}/groups/{groupId}/policies'
         """
         url = '{0}/groups/{1}/policies'.format(self.url, group_id)
-        group_policy = BobbyPolicies_Request(entity_id=entity_id,
-                                             policy_id=policy_id,
+        bobby_policy = BobbyPolicies_Request(policy_id=policy_id,
                                              alarm_template=alarm_template,
                                              check_template=check_template)
         return self.request('POST', url,
-                            request_entity=group_policy,
+                            request_entity=bobby_policy,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 
@@ -250,6 +251,36 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         url = '{0}/groups/{1}/policies/{2}'.format(
             self.url, group_id, policy_id)
         return self.request('GET', url,
+                            requestslib_kwargs=requestslib_kwargs,
+                            response_entity_type=Policies)
+
+    def update_bobby_policy(self, group_id, policy_id,
+                            alarm_template, check_template,
+                            requestslib_kwargs=None):
+        """
+        :summary: Create a policy object.
+        :param group_id: The scaling group id
+        :type name: String
+        :param policy_id: The policy id of the policy in the bobby
+        :type change: String
+        :param check_template: The check template for the policy in the bobby
+        :type change: String? Dict?
+        :param alarm_template: The alarm template for the policy in the bobby
+        :type change: String? Dict?
+        :return: Response Object containing response code 204 and body with
+                details of updated policy
+        :rtype: Response Object
+
+        PUT
+        '/{tenantId}/groups/{groupId}/policies/{policyId}'
+        """
+        url = '{0}/groups/{1}/policies/{2}'.format(
+            self.url, group_id, policy_id)
+        bobby_policy = Update_BobbyPolicies_Request(
+            alarm_template=alarm_template,
+            check_template=check_template)
+        return self.request('PUT', url,
+                            request_entity=bobby_policy,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Policies)
 

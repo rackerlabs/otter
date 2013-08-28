@@ -53,35 +53,32 @@ class BobbyBehaviors(BaseBehavior):
         return bobby_server_group
 
     def create_bobby_policy_given(self, group_id=None, policy_id=None,
-                                  entity_id=None, alarm_template=None,
-                                  check_template=None):
+                                  alarm_template=None, check_template=None):
         """
         Creates a policy in bobby with the given values
         """
         group_id = group_id or self.bobby_config.group_id
         policy_id = policy_id or rand_name('0123POLICY-78f3-4543-85bc1-')
-        entity_id = entity_id or rand_name('0123ENTITY-78f3-4543-85bc1-')
-        check_template = check_template or '87767676'
-            # {
-            #     "label": "Website check 1",
-            #     "type": "remote.http",
-            #     "details": {
-            #         "url": "http://www.foo.com",
-            #         "method": "GET"
-            #     },
-            #     "monitoring_zones_poll": [
-            #         "mzA"
-            #     ],
-            #     "timeout": 30,
-            #     "period": 100,
-            #     "target_alias": "default"
-            # }
-        alarm_template = alarm_template or '98987987'
-            # {"criteria": "if (metric[\"duration\"] >= 2) { return new AlarmStatus(OK); }"
-            #     " return new AlarmStatus(CRITICAL);"}
+        check_template = check_template or '7867' or \
+            {
+                "label": "Website check 1",
+                "type": "remote.http",
+                "details": {
+                    "url": "http://www.foo.com",
+                    "method": "GET"
+                },
+                "monitoring_zones_poll": [
+                    "mzA"
+                ],
+                "timeout": 30,
+                "period": 100,
+                "target_alias": "default"
+            }
+        alarm_template = alarm_template or '8787' or \
+            {"criteria": "if (metric[\"duration\"] >= 2) { return new AlarmStatus(OK); }"
+                " return new AlarmStatus(CRITICAL);"}
         bobby_policy = self.bobby_client.create_bobby_policy(
             group_id=group_id,
-            entity_id=entity_id,
             policy_id=policy_id,
             check_template=check_template,
             alarm_template=alarm_template)

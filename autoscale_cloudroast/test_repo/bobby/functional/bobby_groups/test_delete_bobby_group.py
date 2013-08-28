@@ -31,10 +31,10 @@ class DeleteGroupTest(BobbyGroupFixture):
 
     def test_delete_non_existant_group(self):
         """
-        Delete a non existant group and verify the response code is 403.
+        Delete a non existant group and verify the response code is 404.
         """
         delete_response = self.bobby_client.delete_group('I-DONT-EXIST')
-        self.assertEquals(delete_response.status_code, 403,
+        self.assertEquals(delete_response.status_code, 404,
                           msg='Deleteing a group resulted in {0} as against '
-                          ' 403'.format(delete_response.status_code))
+                          ' 404'.format(delete_response.status_code))
         self.validate_headers(delete_response.headers)

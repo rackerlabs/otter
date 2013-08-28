@@ -137,14 +137,15 @@ class Policies(AutoMarshallingModel):
         policies = Policies(**policies_dict)
         if hasattr(policies, 'links'):
             policies.links = Links._dict_to_obj(policies.links)
-        if hasattr(policies, 'alarmTemplate'):
-            policies.alarmTemplate = Alarm._dict_to_obj(policies.alarmTemplate)
-        if hasattr(policies, 'checkTemplate'):
-            policies.checkTemplate = Check._dict_to_obj(policies.checkTemplate)
-        attr_list = ['groupId', 'policyId']
+            attr_list = ['groupId', 'policyId', 'alarmTemplate', 'checkTemplate']
+            # the alarmTemplate and checkTemplate above is temporary
         for k in attr_list:
             if hasattr(policies, k):
                 setattr(policies, k, getattr(policies, k))
+        # if hasattr(policies, 'alarmTemplate'):
+        #     policies.alarmTemplate = Alarm._dict_to_obj(policies.alarmTemplate)
+        # if hasattr(policies, 'checkTemplate'):
+        #     policies.checkTemplate = Check._dict_to_obj(policies.checkTemplate)
         for each in policies_dict:
             if each.startswith('{'):
                 newkey = re.split('}', each)[1]

@@ -37,7 +37,7 @@ class CreateGroupTest(BobbyFixture):
             notification_plan=self.notification_plan).entity
         self.resources.add(self.group_id,
                            self.bobby_client.delete_group)
-        self.assert_create_bobby_group_feilds(create_group)
+        self.assert_create_bobby_group_fields(create_group)
 
     def test_create_groups_with_same_ids(self):
         """
