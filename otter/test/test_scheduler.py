@@ -12,13 +12,15 @@ from silverberg.lock import BusyLockError
 from silverberg.cassandra.ttypes import TimedOutException
 
 from otter.scheduler import SchedulerService
-from otter.test.utils import iMock, patch, CheckFailure
+from otter.test.utils import iMock, patch, CheckFailure, mock_log
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.rest.application import set_store
 from otter.models.cass import LOCK_TABLE_NAME
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
+
+from datetime import datetime
 
 
 class SchedulerTestCase(TestCase):
@@ -105,16 +107,23 @@ class SchedulerTestCase(TestCase):
                          [mock.call(mock.ANY, 'transaction-id', self.mock_group,
                           self.mock_state, policy_id=event['policyId']) for event in events])
 
-    def test_empty(self):
+    @mock.patch('otter.scheduler.generate_transaction_id', return_value='transid')
+    @mock.patch('otter.scheduler.datetime', spec=['utcnow'])
+    def test_empty(self, mock_datetime, mock_gentransid):
         """
         No policies are executed when ``fetch_batch_of_events`` return empty list
         i.e. no events are there before now
         """
+        mock_datetime.utcnow.return_value = time = datetime(
+            2012, 10, 10, 03, 20, 30, 0, None)
         self.returns = [[]]
+
         d = self.scheduler_service.check_for_events(100)
+
         self.validate_calls(d, [[]], None)
         self.assertFalse(self.mock_store.update_delete_events.called)
-        self.log.bind.assert_called_once_with(scheduler_run_id=mock.ANY, utcnow=mock.ANY)
+
+        self.log.bind.assert_called_once_with(scheduler_run_id='transid', utcnow=time)
         self.log.bind.return_value.msg.assert_called_once_with('Checking for events')
 
     def test_one(self):
@@ -372,3 +381,20 @@ class SchedulerTestCase(TestCase):
         self.assertEqual(self.mock_group.modify_state.call_count, len(events))
         self.assertEqual(self.mock_store.get_scaling_group.call_args_list,
                          [mock.call(mock.ANY, e['tenantId'], e['groupId']) for e in events])
+
+    def test_exec_event_logs(self):
+        """
+        `execute_event` logs error with all the ids bound
+        """
+        log = mock_log()
+        log.err.return_value = None
+        event = {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
+                 'trigger': 'now', 'cron': 'c1'}
+        self.mock_group.modify_state.side_effect = lambda *_: defer.fail(ValueError('meh'))
+
+        d = self.scheduler_service.execute_event(log, event, mock.Mock())
+
+        self.assertIsNone(self.successResultOf(d))
+        log.err.assert_called_once_with(CheckFailure(ValueError),
+                                        'Scheduler failed to execute policy', tenant_id='1234',
+                                        scaling_group_id='scal44', policy_id='pol44')

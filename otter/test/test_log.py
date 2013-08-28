@@ -4,6 +4,7 @@ Tests for logging integration.
 
 import json
 import mock
+from datetime import datetime
 
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
@@ -102,6 +103,28 @@ class JSONObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with(
             {'message': (SameJSON({'foo': 'NotSerializableRepr'}),)})
+
+    def test_datetime_logging(self):
+        """
+        JSONObserverWrapper serializes datetime object in ISO 8601 format
+        """
+        time = datetime(2012, 10, 20, 5, 36, 23)
+        eventDict = {'foo': time}
+        observer = JSONObserverWrapper(self.observer)
+        observer(eventDict)
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON({'foo': '2012-10-20T05:36:23'}),)})
+
+    def test_failure_logging(self):
+        """
+        JSONObserverWrapper serializes datetime object in ISO 8601 format
+        """
+        failure = Failure(ValueError('meh'))
+        eventDict = {'foo': failure}
+        observer = JSONObserverWrapper(self.observer)
+        observer(eventDict)
+        self.observer.assert_called_once_with(
+            {'message': (SameJSON({'foo': str(failure)}),)})
 
 
 class StreamObserverWrapperTests(TestCase):

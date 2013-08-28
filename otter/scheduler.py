@@ -87,12 +87,8 @@ class SchedulerService(TimerService):
 
             deleted_policy_ids = set()
 
-            def eb(failure, policy_id):
-                failure.trap(NoSuchPolicyError, NoSuchScalingGroupError)
-                deleted_policy_ids.add(policy_id)
-
             deferreds = [
-                self.execute_event(log, event).addErrback(eb, event['policyId']).addErrback(log.err)
+                self.execute_event(log, event, deleted_policy_ids)
                 for event in events
             ]
             d = defer.gatherResults(deferreds, consumeErrors=True)
@@ -130,11 +126,14 @@ class SchedulerService(TimerService):
         deferred.addErrback(log.err)
         return deferred
 
-    def execute_event(self, log, event):
+    def execute_event(self, log, event, deleted_policy_ids):
         """
         Execute a single event
 
         :param log: A bound log for logging
+        :param event: event dict to execute
+        :param deleted_policy_ids: Set of policy ids that are deleted. Policy id will be added
+                                   to this if its scaling group or policy has been deleted
         :return: a deferred with the results of execution
         """
         tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
@@ -145,4 +144,11 @@ class SchedulerService(TimerService):
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
         d.addErrback(ignore_and_log, CannotExecutePolicyError, log, 'Cannot execute policy')
+
+        def collect_deleted_policy(failure):
+            failure.trap(NoSuchScalingGroupError, NoSuchPolicyError)
+            deleted_policy_ids.add(policy_id)
+
+        d.addErrback(collect_deleted_policy)
+        d.addErrback(log.err, 'Scheduler failed to execute policy')
         return d
