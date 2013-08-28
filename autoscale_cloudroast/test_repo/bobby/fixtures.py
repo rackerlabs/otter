@@ -90,7 +90,7 @@ class BobbyGroupFixture(BobbyFixture):
         Creates a group with default values
         """
         super(BobbyGroupFixture, cls).setUpClass()
-        cls.group_id = rand_name('012345678-RAND-4543-85bc')
+        cls.group_id = group_id or rand_name('012345678-RAND-4543-85bc')
         notification = notification or cls.notification
         notification_plan = notification_plan or cls.notification_plan
         cls.create_group_response = cls.bobby_client.\

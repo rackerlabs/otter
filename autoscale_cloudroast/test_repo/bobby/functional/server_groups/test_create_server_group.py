@@ -53,6 +53,7 @@ class CreateServerGroupTest(BobbyFixture):
                           ' group, with already existing server and entity ID in bobby, failed'
                           ' with {0}'.format(group2_response.status_code))
 
+    @unittest.skip('AUTO-554')
     def test_create_group_without_server_id(self):
         """
         Create a server group in bobby without a server_id, and verify the
@@ -66,6 +67,7 @@ class CreateServerGroupTest(BobbyFixture):
                           msg='The response code for create server group with a server_id in bobby '
                           'resulted in {0}'.format(create_group_response.status_code))
 
+    @unittest.skip('AUTO-554')
     def test_create_group_with_invalid_server_id(self):
         """
         Create a server group in bobby with an invalid server_id, and verify the

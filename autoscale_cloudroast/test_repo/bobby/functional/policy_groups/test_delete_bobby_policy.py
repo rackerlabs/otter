@@ -3,6 +3,7 @@ Test delete bobby policy in bobby
 """
 from test_repo.bobby.fixtures import BobbyFixture
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
 class DeleteBobbyPolicyTest(BobbyFixture):
@@ -34,6 +35,7 @@ class DeleteBobbyPolicyTest(BobbyFixture):
                           ' 204'.format(delete_response.status_code))
         self.validate_headers(delete_response.headers)
 
+    @unittest.skip('AUTO-566')
     def test_delete_non_existant_group(self):
         """
         Delete a non existant group and verify the response code is 404.
@@ -45,6 +47,7 @@ class DeleteBobbyPolicyTest(BobbyFixture):
                           ' 404 for an invalid groupId'.format(delete_response.status_code))
         self.validate_headers(delete_response.headers)
 
+    @unittest.skip('AUTO-566')
     def test_delete_non_existant_policy(self):
         """
         Delete a non existant policy and verify the response code is 404.

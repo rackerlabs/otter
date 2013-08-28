@@ -248,7 +248,9 @@ class BobbyAPIClient(AutoMarshallingRestClient):
         GET
         '/{tenantId}/groups/{groupId}/policies/{policyId}'
         """
-        url = '{0}/groups/{1}/policies/{2}'.format(
+        url_new = str(group_id)
+        url_scheme = urlparse(url_new).scheme
+        url = url_new if url_scheme else '{0}/groups/{1}/policies/{2}'.format(
             self.url, group_id, policy_id)
         return self.request('GET', url,
                             requestslib_kwargs=requestslib_kwargs,

@@ -3,8 +3,10 @@ Test update bobby policy in bobby
 """
 from test_repo.bobby.fixtures import BobbyFixture
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
+@unittest.skip('Update not implemented yet')
 class UpdateBobbyPolicyTest(BobbyFixture):
 
     """

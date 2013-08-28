@@ -60,6 +60,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           ' with already existing group and policy ID in bobby, failed'
                           ' with {0}'.format(policy2_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_without_policy_id(self):
         """
         Create a policy in bobby without a policy_id, and verify the
@@ -74,6 +75,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           msg='The response code for create policy without policy_id '
                           'resulted in {0}'.format(create_policy_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_without_alarm_template(self):
         """
         Create a policy in bobby without a alarm_template, and verify the
@@ -88,6 +90,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           msg='The response code for create policy without alarm_template '
                           'resulted in {0}'.format(create_policy_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_without_check_template(self):
         """
         Create a policy in bobby without a check_template, and verify the
@@ -102,6 +105,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           msg='The response code for create policy without check_template '
                           'resulted in {0}'.format(create_policy_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_with_invalid_alarm_template(self):
         """
         Create a policy in bobby with an invalid alarm_template, and verify the
@@ -113,6 +117,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           msg='The response code for create policy in bobby with invalid '
                           'alarmTemplate resulted in {0}'.format(create_policy_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_with_invalid_check_template(self):
         """
         Create a policy in bobby with an invalid check_template, and verify the
@@ -124,6 +129,7 @@ class CreateBobbyPolicyTest(BobbyFixture):
                           msg='The response code for create policy in bobby with invalid '
                           'checkTemplate resulted in {0}'.format(create_policy_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_create_group_with_nonexistant_group_id(self):
         """
         Create a policy in bobby with an nonexistant group_id, and verify the

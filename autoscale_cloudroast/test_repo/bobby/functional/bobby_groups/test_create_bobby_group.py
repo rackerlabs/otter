@@ -2,6 +2,7 @@
 Test to create and verify the created group in bobby.
 """
 from test_repo.bobby.fixtures import BobbyFixture
+import unittest
 
 
 class CreateGroupTest(BobbyFixture):
@@ -39,6 +40,7 @@ class CreateGroupTest(BobbyFixture):
                            self.bobby_client.delete_group)
         self.assert_create_bobby_group_fields(create_group)
 
+    @unittest.skip('AUTO-565')
     def test_create_groups_with_same_ids(self):
         """
         Create a groups in bobby with the same ID and verify group id
@@ -57,6 +59,7 @@ class CreateGroupTest(BobbyFixture):
         self.resources.add(group_id,
                            self.bobby_client.delete_group)
 
+    @unittest.skip('AUTO-554')
     def test_create_group_without_group_id(self):
         """
         Create a group in bobby without a group_id, and verify the
@@ -70,6 +73,7 @@ class CreateGroupTest(BobbyFixture):
                           msg='The response code for create  group in bobby '
                           'resulted in {0}'.format(create_group_response.status_code))
 
+    @unittest.skip('AUTO-554')
     def test_create_group_without_notification(self):
         """
         Create a group in bobby without a notification, and verify the
@@ -85,6 +89,7 @@ class CreateGroupTest(BobbyFixture):
         self.resources.add(self.group_id,
                            self.bobby_client.delete_group)
 
+    @unittest.skip('AUTO-554')
     def test_create_group_without_notification_plan(self):
         """
         Create a group in bobby without a notification plan, and verify the
@@ -100,7 +105,8 @@ class CreateGroupTest(BobbyFixture):
         self.resources.add(self.group_id,
                            self.bobby_client.delete_group)
 
-    def test_create_group_without_notification_notification_plans(self):
+    @unittest.skip('AUTO-554')
+    def test_create_group_without_notification_and_notification_plans(self):
         """
         Create a group in bobby without a notification and notification plan,
         and verify the response code is 400.
@@ -113,6 +119,7 @@ class CreateGroupTest(BobbyFixture):
                           msg='The response code for create  group in bobby '
                           'resulted in {0}'.format(create_group_response.status_code))
 
+    @unittest.skip('AUTO-554')
     def test_create_group_without_notification_plan_as_dict(self):
         """
         Create a group in bobby with a notification plan as a dict, and verify the

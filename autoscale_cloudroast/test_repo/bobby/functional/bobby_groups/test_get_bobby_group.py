@@ -3,6 +3,7 @@ Test get groups in bobby
 """
 from test_repo.bobby.fixtures import BobbyGroupFixture
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
 class GetGroupTest(BobbyGroupFixture):
@@ -33,6 +34,7 @@ class GetGroupTest(BobbyGroupFixture):
         get_group = self.get_group_response.entity
         self.assert_create_bobby_group_fields(get_group, self.group_id_temp)
 
+    @unittest.skip('AUTO-567')
     def test_get_invalid_group(self):
         """
         Get a non existant group, and verify the response code is 404.

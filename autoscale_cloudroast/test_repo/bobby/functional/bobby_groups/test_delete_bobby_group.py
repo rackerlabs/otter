@@ -3,6 +3,7 @@ Test delete group in bobby
 """
 from test_repo.bobby.fixtures import BobbyGroupFixture
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
 class DeleteGroupTest(BobbyGroupFixture):
@@ -29,6 +30,7 @@ class DeleteGroupTest(BobbyGroupFixture):
                           ' 204'.format(delete_response.status_code))
         self.validate_headers(delete_response.headers)
 
+    @unittest.skip('AUTO-566')
     def test_delete_non_existant_group(self):
         """
         Delete a non existant group and verify the response code is 404.

@@ -3,6 +3,7 @@ Test get server groups in bobby
 """
 from test_repo.bobby.fixtures import BobbyFixture
 from cloudcafe.common.tools.datagen import rand_name
+import unittest
 
 
 class GetServerGroupTest(BobbyFixture):
@@ -42,6 +43,7 @@ class GetServerGroupTest(BobbyFixture):
         self.assertEquals(get_group.serverId, self.server_id,
                           msg='The serverId in the response does not match')
 
+    @unittest.skip('AUTO-570')
     def test_get_invalid_group(self):
         """
         Get a non existant group, and verify the response code is 404.
@@ -52,6 +54,7 @@ class GetServerGroupTest(BobbyFixture):
                           msg='Get for non existant group in bobby resulted in '
                           '{0}'.format(get_server_group_response.status_code))
 
+    @unittest.skip('AUTO-570')
     def test_get_invalid_server_id(self):
         """
         Get a non existant server id, and verify the response code is 404.
