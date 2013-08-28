@@ -17,6 +17,9 @@ class Supervisor(object):
     :ivar callable auth_function: authentication function to use to obtain an
         auth token and service catalog.  Should accept a tenant ID.
 
+    :ivar callable coiterate: coiterate function that will be passed to
+        InMemoryUndoStack.
+
     :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
         should be waited on
     """
