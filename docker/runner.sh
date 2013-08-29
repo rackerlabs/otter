@@ -33,13 +33,19 @@ CASSANDRA_IP=$(docker inspect $CASSANDRA_CID | grep IPAddress | cut -d '"' -f 4)
 for (( i = 0; i < 10; i++ )); do
     sleep 1
     echo "Attempting to load schema"
-    LDS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter make load-dev-schema)
+    LDS=$(docker run -d -t -e CASSANDRA_HOST=$CASSANDRA_IP -e OTTER_SEED_HOSTS="tcp:$CASSANDRA_IP:9160" -e PYTHONPATH=/opt/otter otter:$GIT_SHA make load-dev-schema)
     CASSANDRA_RUNNING=$(docker wait $LDS)
     if [[ $CASSANDRA_RUNNING -eq 0 ]]; then
+        SCHEMA_LOADED=true
         echo "Schema loaded"
         break
     fi
 done
+
+if [[ -z $SCHEMA_LOADED ]]; then
+    echo "Schema failed to load"
+    exit 1
+fi
 
 OTTER_ENVS="OTTER_SEED_HOSTS=$CASSANDRA_IP"
 OTTER_ENVS="$OTTER_ENVS -e CASSANDRA_HOST=$CASSANDRA_IP"
