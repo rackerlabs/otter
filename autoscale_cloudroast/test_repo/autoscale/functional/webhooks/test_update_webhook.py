@@ -53,8 +53,8 @@ class UpdateWebhook(ScalingGroupWebhookFixture):
         updated_webhook = get_webhook_response.entity
         self.assertEquals(update_webhook_response.status_code, 204,
                           msg='Update webhook failed with {0} for group'
-                          '{1}'.format(update_webhook_response.status_code,
-                                       self.group.id))
+                          ' {1}'.format(update_webhook_response.status_code,
+                                        self.group.id))
         self.assertTrue(update_webhook_response.headers is not None,
                         msg='The headers are not as expected for group '
                         '{0}'.format(self.group.id))

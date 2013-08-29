@@ -17,7 +17,7 @@ class ExecuteWebhook(ScalingGroupWebhookFixture):
         execute_wb_resp = self.autoscale_client.execute_webhook(cap_url)
         self.assertEquals(execute_wb_resp.status_code, 202,
                           msg='Execute webhook failed with {0} for group'
-                          '{1}'.format(execute_wb_resp.status_code, self.group.id))
+                          ' {1}'.format(execute_wb_resp.status_code, self.group.id))
         self.validate_headers(execute_wb_resp.headers)
 
     def test_execute_webhook_after_update(self):

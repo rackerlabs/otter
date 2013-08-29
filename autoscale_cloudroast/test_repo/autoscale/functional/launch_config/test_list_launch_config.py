@@ -48,26 +48,26 @@ class ListLaunchConfigTest(AutoscaleFixture):
         """
         self.assertEquals(self.launch_config_response.status_code, 200,
                           msg='List launch config failed with {0} for group '
-                          '{1} ' .format(self.launch_config_response.status_code, self.group.id))
+                          '{1} '.format(self.launch_config_response.status_code, self.group.id))
         self.validate_headers(self.launch_config_response.headers)
         self.assertEquals(
             self.launch_config.server.name, self.lc_name,
             msg='Prefix/Suffix server name in the launch config did not match'
-                'for group {0}'.format(self.group.id))
+                ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.launch_config.server.flavorRef, self.lc_flavor_ref,
             msg='Server flavor in the launch config did not match'
-                'for group {0}'.format(self.group.id))
+                ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.launch_config.server.imageRef, self.lc_image_ref,
             msg='Server ImageRef in the launch config did not match'
-                'for group {0}'.format(self.group.id))
+                ' for group {0}'.format(self.group.id))
         self.assertEquals(self.autoscale_behaviors.personality_list(
                           self.launch_config.server.personality),
                           self.autoscale_behaviors.personality_list(
                               self.lc_personality),
                           msg='Server personality in the launch config did not match'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(
                 self.launch_config.server.metadata),
@@ -79,11 +79,11 @@ class ListLaunchConfigTest(AutoscaleFixture):
                           self.autoscale_behaviors.network_uuid_list(
                               self.lc_networks),
                           msg='Server networks did not match'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.lbaas_list(
                 self.launch_config.loadBalancers),
             self.autoscale_behaviors.lbaas_list(
                 self.lc_load_balancers),
             msg='Load balancers in the launch config did not match'
-                'for group {0}'.format(self.group.id))
+                ' for group {0}'.format(self.group.id))

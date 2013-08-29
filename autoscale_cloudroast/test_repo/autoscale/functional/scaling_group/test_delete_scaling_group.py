@@ -48,8 +48,8 @@ class DeleteScalingGroupTest(AutoscaleFixture):
         self.validate_headers(delete_resp.headers)
         self.assertEquals(delete_resp.status_code, 204,
                           msg='The delete resulted in {0} for group'
-                              '{1}'.format(delete_resp.status_code, self.group.id))
+                              ' {1}'.format(delete_resp.status_code, self.group.id))
         delete_resp = self.autoscale_client.delete_scaling_group(self.group.id)
         self.assertEquals(delete_resp.status_code, 404,
                           msg='The delete on a deleted group succeeded with {0} for group'
-                              '{1}'.format(delete_resp.status_code, self.group.id))
+                              ' {1}'.format(delete_resp.status_code, self.group.id))

@@ -39,8 +39,8 @@ class ScalingGroupListTest(AutoscaleFixture):
         group_info = group_info_response.entity
         self.assertEqual(200, group_info_response.status_code,
                          msg='The get scaling group call failed with {0} for group'
-                         '{1}'.format(group_info_response.status_code,
-                                      self.first_scaling_group.id))
+                         ' {1}'.format(group_info_response.status_code,
+                                       self.first_scaling_group.id))
         self.validate_headers(group_info_response.headers)
         self.assertEqual(group_info.id, self.first_scaling_group.id,
                          msg='Group id did not match for group '

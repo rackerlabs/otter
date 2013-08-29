@@ -40,7 +40,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities)
         self.assertEquals(upd_group_resp.status_code, 400,
                           msg='Update failed with {0} as it does not include full request'
-                          'for group {1}'.format(upd_group_resp.status_code, self.group.id))
+                          ' for group {1}'.format(upd_group_resp.status_code, self.group.id))
 
     def test_update_minentities_only(self):
         """
@@ -178,18 +178,18 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         self.validate_headers(update_group_response.headers)
         self.assertEquals(updated_config.minEntities, self.gc_min_entities,
                           msg='Min entities in the Group config did not update'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.cooldown, self.gc_cooldown,
                           msg='Cooldown time in the Group config did not update'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.name, self.gc_name,
                           msg='Name in the Group config did not update'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.maxEntities, self.gc_max_entities,
                           msg='Max entities in the Group config did not update'
-                          'for group {0}'.format(self.group.id))
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(updated_config.metadata),
             self.gc_metadata,
             msg='Metadata in the Group config did not update'
-            'for group {0}'.format(self.group.id))
+            ' for group {0}'.format(self.group.id))

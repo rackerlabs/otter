@@ -16,8 +16,8 @@ class CreateScalingPolicy(ScalingGroupPolicyFixture):
         """
         self.assertEquals(self.create_policy_response.status_code, 201,
                           msg='Create scaling policy failed with {0} for group'
-                          '{1}'.format(self.group.id,
-                                       self.create_policy_response.status_code))
+                          ' {1}'.format(self.group.id,
+                                        self.create_policy_response.status_code))
         self.validate_headers(self.create_policy_response.headers)
         self.assertTrue(self.policy['id'] is not None,
                         msg='Scaling policy id is None for group'

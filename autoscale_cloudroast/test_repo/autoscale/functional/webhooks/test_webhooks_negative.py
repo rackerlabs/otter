@@ -293,5 +293,5 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             metadata='{}')
         self.assertEquals(
             create_resp.status_code, 400, msg='create webhook with metadata'
-            'results in {0} for group {1}'.format(create_resp.status_code,
-                                                  self.group.id))
+            ' results in {0} for group {1}'.format(create_resp.status_code,
+                                                   self.group.id))

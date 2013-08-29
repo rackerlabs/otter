@@ -39,8 +39,8 @@ class ListGroupConfigTest(AutoscaleFixture):
         """
         self.assertEquals(self.group_config_response.status_code, 200,
                           msg='List group config failed with {0} for group'
-                          '{1}'.format(self.group_config_response.status_code,
-                                       self.group.id))
+                          ' {1}'.format(self.group_config_response.status_code,
+                                        self.group.id))
         self.validate_headers(self.group_config_response.headers)
         self.assertEquals(self.group_config.minEntities,
                           self.gc_min_entities,
