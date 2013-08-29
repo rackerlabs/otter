@@ -6,11 +6,8 @@ Autoscale REST endpoints having to do with administration of otter.
 
 import json
 
-from klein import Klein
-
 from otter.util import timestamp
-
-from otter.models.mock import MockAdmin
+from otter.rest.otterapp import OtterApp
 
 
 class OtterAdmin(object):
@@ -18,13 +15,10 @@ class OtterAdmin(object):
     The admin application is a RESTful interface to the backend of
     otter.
     """
-    app = Klein()
+    app = OtterApp()
 
-    def __init__(self, store=None):
-        if store is not None:
-            self.store = store
-        else:
-            self.store = MockAdmin()
+    def __init__(self, store):
+        self.store = store
 
     @app.route('/', methods=['GET'])
     def root(self, request):
