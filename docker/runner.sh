@@ -57,7 +57,7 @@ OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_URL=https://identity.api.rackspacecloud.com/
 OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_ADMIN_URL=https://as-proxy.rax.io/v2.0"
 
 # Run otter unit tests
-UNIT_TESTS=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA /bin/bash -c "cd /opt/otter; make unit")
+UNIT_TESTS=$(docker run -d -t -e $OTTER_ENVS -e JENKINS_URL=subunit otter:$GIT_SHA make unit)
 
 OTTER_CID=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA)
 export OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
