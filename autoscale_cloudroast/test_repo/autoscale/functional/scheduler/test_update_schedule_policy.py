@@ -141,17 +141,21 @@ class UpdateSchedulerScalingPolicy(ScalingGroupFixture):
         """
         self.assertEquals(
             updated_policy.id, policy['id'],
-            msg='Policy Id is not as expected after update')
+            msg='Policy Id is not as expected after update for policy'
+            '{0}'.format(policy['id']))
         self.assertEquals(
             updated_policy.links, policy['links'],
-            msg='Links for the scaling policy is none after the update')
+            msg='Links for the scaling policy is none after the update for policy'
+            '{0}'.format(policy['id']))
         self.assertEquals(
             updated_policy.name, policy['name'],
-            msg='Name of the policy is None after update')
+            msg='Name of the policy is None after update for policy'
+            '{0}'.format(policy['id']))
         self.assertEquals(
-            updated_policy.cooldown, policy[
-                'cooldown'],
-            msg='Cooldown of the policy in null after an update')
+            updated_policy.cooldown, policy['cooldown'],
+            msg='Cooldown of the policy in null after an update for policy'
+            '{0}'.format(policy['id']))
         self.assertEquals(
             updated_policy.change, policy['change'],
-            msg='Change in the policy is not as expected')
+            msg='Change in the policy is not as expected for policy'
+            '{0}'.format(policy['id']))

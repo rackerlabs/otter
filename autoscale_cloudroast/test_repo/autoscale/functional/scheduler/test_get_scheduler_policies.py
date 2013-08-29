@@ -45,7 +45,7 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
                           .format(get_at_style_policy_response.status_code,
                                   self.group.id))
         self.assertTrue(get_at_style_policy_response.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(get_at_style_policy_response.headers)
         self.assert_get_policy(self.at_style_policy,
                                get_at_style_policy_response.entity,
@@ -63,7 +63,7 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
                           .format(get_cron_style_policy_response.status_code,
                                   self.group.id))
         self.assertTrue(get_cron_style_policy_response.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(get_cron_style_policy_response.headers)
         self.assert_get_policy(self.cron_style_policy,
                                get_cron_style_policy_response.entity,
@@ -78,7 +78,8 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             group_id=self.group.id,
             policy_id=self.cron_style_policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete at-style policy failed')
+            del_resp.status_code, 204, msg='Delete at-style policy failed for group'
+            '{0}'.format(self.group.id))
         get_cron_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
             self.cron_style_policy['id'])
@@ -98,7 +99,8 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             group_id=self.group.id,
             policy_id=self.at_style_policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete at-style policy failed')
+            del_resp.status_code, 204, msg='Delete at-style policy failed for group'
+            '{0}'.format(self.group.id))
         get_at_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
             self.at_style_policy['id'])

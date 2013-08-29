@@ -38,21 +38,27 @@ class ListGroupConfigTest(AutoscaleFixture):
         Verify the list group config for response code 200, headers and data
         """
         self.assertEquals(self.group_config_response.status_code, 200,
-                          msg='List group config failed with {0}'
-                          .format(self.group_config_response.status_code))
+                          msg='List group config failed with {0} for group'
+                          '{1}'.format(self.group_config_response.status_code,
+                                       self.group.id))
         self.validate_headers(self.group_config_response.headers)
         self.assertEquals(self.group_config.minEntities,
                           self.gc_min_entities,
-                          msg='Min entities in the Group config did not match')
+                          msg='Min entities in the Group config did not match'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(self.group_config.cooldown,
                           self.gc_cooldown,
-                          msg='Cooldown time in the Group config did not match')
+                          msg='Cooldown time in the Group config did not match'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(self.group_config.name, self.gc_name,
-                          msg='Name in the Group config did not match')
+                          msg='Name in the Group config did not match'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(self.group_config.maxEntities,
                           self.gc_max_entities,
-                          msg='Max entities in the Group config did not match')
+                          msg='Max entities in the Group config did not match'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(self.group_config.metadata),
             self.gc_metadata,
-            msg='Metadata in the Group config did not match')
+            msg='Metadata in the Group config did not match'
+            ' for group {0}'.format(self.group.id))

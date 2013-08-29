@@ -26,19 +26,26 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
                           .format(schedule_policy_cron_style['status_code'], self.group.id))
         self.validate_headers(schedule_policy_cron_style['headers'])
         self.assertTrue(schedule_policy_cron_style['id'] is not None,
-                        msg='Scaling policy id is None')
+                        msg='Scaling policy id is None for group '
+                        '{0}'.format(self.group.id))
         self.assertTrue(schedule_policy_cron_style['links'] is not None,
-                        msg="Newly created scaling policy's links are null")
+                        msg="Newly created scaling policy's links are null for group "
+                        '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_cron_style['cooldown'], self.sp_cooldown,
-                          msg="scaling policy's cooldown time does not match")
+                          msg="scaling policy's cooldown time does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_cron_style['change'], self.sp_change,
-                          msg="Scaling policy's change does not match")
+                          msg="Scaling policy's change does not match  for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_cron_style['schedule_type'], schedule_type,
-                          msg="Scaling policy's schedule type does not match")
+                          msg="Scaling policy's schedule type does not match  for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_cron_style['schedule_value'], schedule_value,
-                          msg="Scaling policy's schedule value does not match")
+                          msg="Scaling policy's schedule value does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_cron_style['count'], 1,
-                          msg='More scaling policies listed than created')
+                          msg='More scaling policies listed than created for group '
+                          '{0}'.format(self.group.id))
 
     def test_create_schedule_at_style_scaling_policy(self):
         """
@@ -56,16 +63,23 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
                           .format(schedule_policy_at_style['status_code'], self.group.id))
         self.validate_headers(schedule_policy_at_style['headers'])
         self.assertTrue(schedule_policy_at_style['id'] is not None,
-                        msg='Scaling policy id is None')
+                        msg='Scaling policy id is None for group '
+                        '{0}'.format(self.group.id))
         self.assertTrue(schedule_policy_at_style['links'] is not None,
-                        msg="Newly created scaling policy's links are null")
+                        msg="Newly created scaling policy's links are null for group "
+                        '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_at_style['cooldown'], self.sp_cooldown,
-                          msg="scaling policy's cooldown time does not match")
+                          msg="scaling policy's cooldown time does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_at_style['change'], self.sp_change,
-                          msg="Scaling policy's change does not match")
+                          msg="Scaling policy's change does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_at_style['schedule_type'], schedule_type,
-                          msg="Scaling policy's schedule type does not match")
+                          msg="Scaling policy's schedule type does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_at_style['schedule_value'], schedule_value,
-                          msg="Scaling policy's schedule value does not match")
+                          msg="Scaling policy's schedule value does not match for group "
+                          '{0}'.format(self.group.id))
         self.assertEquals(schedule_policy_at_style['count'], 1,
-                          msg='More scaling policies listed than created')
+                          msg='More scaling policies listed than created for group '
+                          '{0}'.format(self.group.id))

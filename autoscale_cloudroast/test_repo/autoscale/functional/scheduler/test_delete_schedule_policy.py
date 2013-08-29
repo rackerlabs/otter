@@ -46,7 +46,7 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
                           'for group {1}'
                           .format(delete_at_style_policy.status_code, self.group.id))
         self.assertTrue(delete_at_style_policy.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(delete_at_style_policy.headers)
         self.assertTrue(self.at_style_policy['id'] not in self._policy_list_for_group(self.group.id))
         self.assertTrue(self.cron_style_policy['id'] in self._policy_list_for_group(self.group.id))
@@ -64,7 +64,7 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
                           'for group {1}'
                           .format(delete_at_style_policy.status_code, self.group.id))
         self.assertTrue(delete_at_style_policy.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(delete_at_style_policy.headers)
         self.assertTrue(self.at_style_policy['id'] in self._policy_list_for_group(self.group.id))
         self.assertTrue(self.cron_style_policy['id'] not in self._policy_list_for_group(self.group.id))
