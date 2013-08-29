@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 
 from ConfigParser import SafeConfigParser
 from os import environ, path
