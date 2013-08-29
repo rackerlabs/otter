@@ -8,6 +8,7 @@ import json
 
 from otter.util import timestamp
 from otter.rest.otterapp import OtterApp
+from otter.rest.decorators import succeeds_with, with_transaction_id
 
 
 class OtterAdmin(object):
@@ -28,7 +29,9 @@ class OtterAdmin(object):
         return ''
 
     @app.route('/metrics', methods=['GET'])
-    def list_metrics(self, request, log=None):
+    @with_transaction_id()
+    @succeeds_with(200)
+    def list_metrics(self, request, log):
         """
         Get a list of metrics from cassandra.
 
