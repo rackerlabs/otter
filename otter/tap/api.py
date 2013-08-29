@@ -134,7 +134,7 @@ def makeService(config):
         store = MockScalingGroupCollection()
         store_admin = MockAdmin()
 
-        set_store(CassScalingGroupCollection(cassandra_cluster))
+    set_store(store)
 
     cache_ttl = config_value('identity.cache_ttl')
 
