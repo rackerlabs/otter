@@ -1,7 +1,11 @@
+# otter/base
 FROM    ubuntu:12.04
 
 # The build process isn't a real tty
 ENV     DEBIAN_FRONTEND noninteractive
+
+# We want to use our own pypi repo
+ENV     PIP_INDEX_URL http://pypi.as.rax.io/pypi/
 
 # Nice to have a reliable way to know you're in a container
 ENV     DOCKER true
