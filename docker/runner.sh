@@ -2,6 +2,8 @@
 set -ex
 
 GIT_SHA=$(git rev-parse --short HEAD)
+MAX_HEAP_SIZE=${MAX_HEAP_SIZE:-"512M"}
+HEAP_NEWSIZE=${HEAP_NEWSIZE:-"256M"}
 
 docker rmi $(docker images | grep none | awk '{print $3}')
 docker rm $(docker ps -a -q)
@@ -23,7 +25,7 @@ docker build -t otter/base docker/base
 docker build -t otter:$GIT_SHA .
 
 # Run Test containers
-CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=512M -e HEAP_NEWSIZE=256M cassandra)
+CASSANDRA_CID=$(docker run -d -t -h cassandra -e MAX_HEAP_SIZE=$MAX_HEAP_SIZE -e HEAP_NEWSIZE=$HEAP_NEWSIZE cassandra)
 CASSANDRA_IP=$(docker inspect $CASSANDRA_CID | grep IPAddress | cut -d '"' -f 4)
 
 # This is the best way I could determine that Cassandra is up and functional
