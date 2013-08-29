@@ -460,19 +460,14 @@ class CassScalingGroup(object):
                                            params, get_consistency_level('update', 'state'))
 
         def _modify_state():
-            log.msg('Acquired lock')
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5))
+                         max_retry=5, retry_wait=random.uniform(3, 5), log=log)
 
-        def _log_release_lock(result):
-            log.msg('Released lock')
-            return result
-
-        return with_lock(lock, _modify_state).addBoth(_log_release_lock)
+        return with_lock(lock, _modify_state)
 
     def update_config(self, data):
         """
@@ -798,19 +793,14 @@ class CassScalingGroup(object):
             return d
 
         def _delete_group():
-            log.msg('Acquired lock')
             d = self.view_state()
             d.addCallback(_maybe_delete)
             return d
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5))
+                         max_retry=5, retry_wait=random.uniform(3, 5), log=log)
 
-        def _log_release_lock(result):
-            log.msg('Released lock')
-            return result
-
-        return with_lock(lock, _delete_group).addBoth(_log_release_lock)
+        return with_lock(lock, _delete_group)
 
 
 def _delete_many_query_and_params(cf, column, column_values):
