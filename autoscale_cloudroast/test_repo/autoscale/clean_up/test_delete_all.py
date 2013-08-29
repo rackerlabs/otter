@@ -3,7 +3,6 @@ Deletes.
 """
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
-from time import sleep
 
 
 class DeleteAll(AutoscaleFixture):
@@ -41,25 +40,3 @@ class DeleteAll(AutoscaleFixture):
         list_servers = (self.server_client.list_servers()).entity
         print 'Deleting {0} servers, {1} still exist'.format(len(all_servers), len(list_servers))\
             if len(list_servers) is not 0 else "Deleted {0} servers".format(len(all_servers))
-
-    @tags(type='nodes')
-    def test_delete_all_but_one_node_on_all_loadbalancers_on_the_account(self):
-        """
-        Deletes all nodes on load balancers except one, on the account
-        """
-
-        loadbalancer_id_list = [self.load_balancer_1, self.load_balancer_2, self.load_balancer_3]
-        for each_load_balancer in loadbalancer_id_list:
-            nodes = self.lbaas_client.list_nodes(each_load_balancer).entity
-            node_id_list = [each_node.id for each_node in nodes]
-            if len(node_id_list) is 1:
-                print 'Nothing to delete. Only one node on load balancer'
-            else:
-                node_id_list.pop()
-                for each_node_id in node_id_list:
-                    self.lbaas_client.delete_node(each_load_balancer, each_node_id)
-                    sleep(1)  # wait for lb to get out of PENDING_UPDATE state
-                list_nodes = (
-                    self.lbaas_client.list_nodes(each_load_balancer)).entity
-                print 'Deleting {0} nodes, {1} still exists'.format(len(node_id_list), len(list_nodes))\
-                    if len(list_nodes) > 1 else 'Deleted {0} nodes one remains'.format(len(node_id_list))
