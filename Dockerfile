@@ -1,7 +1,7 @@
 FROM    otter/base
 
 ADD     . /opt/otter
+WORKDIR /opt/otter
 RUN     pip install -r requirements.txt
 
-WORKDIR /opt/otter
 CMD     ["make", "run_docker"]
