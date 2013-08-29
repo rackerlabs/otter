@@ -32,6 +32,7 @@ from otter.rest.application import root, set_store
 from otter.util.config import set_config_data, config_value
 from otter.log.setup import make_observer_chain
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
+from otter.models.mock import MockAdmin, MockScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
@@ -127,6 +128,12 @@ def makeService(config):
             seed_endpoints,
             config_value('cassandra.keyspace'))
 
+        store = CassScalingGroupCollection(cassandra_cluster)
+        store_admin = CassAdmin(cassandra_cluster)
+    else:
+        store = MockScalingGroupCollection()
+        store_admin = MockAdmin()
+
         set_store(CassScalingGroupCollection(cassandra_cluster))
 
     cache_ttl = config_value('identity.cache_ttl')
@@ -158,12 +165,7 @@ def makeService(config):
     api_service = service(str(config_value('port')), site)
     api_service.setServiceParent(s)
 
-    # Setup admin service
-    if not config_value('mock'):
-        otterAdmin = OtterAdmin(CassAdmin(cassandra_cluster))
-    else:
-        otterAdmin = OtterAdmin()
-
+    otterAdmin = OtterAdmin(store_admin)
     admin_site = Site(otterAdmin.app.resource())
     admin_site.displayTracebacks = False
 
