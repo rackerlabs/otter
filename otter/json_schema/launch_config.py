@@ -55,9 +55,13 @@ def validate_launch_config(log, tenant_id, launch_config):
 
     def when_authenticated((auth_token, service_catalog)):
         service_endpoint = get_service_endpoint(service_catalog)
-        deferreds = [validate(log, auth_token, service_endpoint, server.get(prop))
-                     .addErrback(raise_validation_error, prop)
-                     for validate, prop in validate_functions]
+        deferreds = []
+        for validate, prop in validate_functions:
+            prop_value = server.get(prop)
+            if prop_value:
+                d = validate(log, auth_token, service_endpoint, prop_value)
+                d.addErrback(raise_validation_error, prop)
+                deferreds.append(d)
         return defer.gatherResults(deferreds, consumeErrors=True).addErrback(unwrap_first_error)
 
     return d.addCallback(when_authenticated)
