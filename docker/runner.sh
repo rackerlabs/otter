@@ -48,7 +48,7 @@ if [[ -z $SCHEMA_LOADED ]]; then
     exit 1
 fi
 
-OTTER_ENVS="OTTER_SEED_HOSTS=$CASSANDRA_IP"
+OTTER_ENVS="-e=OTTER_SEED_HOSTS=$CASSANDRA_IP"
 OTTER_ENVS="$OTTER_ENVS -e CASSANDRA_HOST=$CASSANDRA_IP"
 OTTER_ENVS="$OTTER_ENVS -e PYTHONPATH=$PYTHONPATH"
 OTTER_ENVS="$OTTER_ENVS -e OTTER_INTERFACE=eth0"
@@ -58,9 +58,9 @@ OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_URL=https://identity.api.rackspacecloud.com/
 OTTER_ENVS="$OTTER_ENVS -e OTTER_ID_ADMIN_URL=https://as-proxy.rax.io/v2.0"
 
 # Run otter unit tests
-UNIT_TESTS=$(docker run -d -t -e $OTTER_ENVS -e JENKINS_URL=subunit otter:$GIT_SHA make unit)
+UNIT_TESTS=$(docker run -d -t $OTTER_ENVS -e JENKINS_URL=subunit otter:$GIT_SHA make unit)
 
-OTTER_CID=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA)
+OTTER_CID=$(docker run -d -t $OTTER_ENVS otter:$GIT_SHA)
 export OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
 
 CC_ENV="OTTER_IP=$OTTER_IP"
