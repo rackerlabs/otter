@@ -8,6 +8,7 @@ from functools import partial
 import json
 
 from otter.json_schema import group_schemas
+from otter.json_schema.launch_config import validate_launch_config
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
@@ -200,5 +201,6 @@ def edit_launch_config(request, log, tenant_id, group_id, data):
     Users may have an invalid configuration based on dependencies.
     """
     rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = rec.update_launch_config(data)
+    deferred = validate_launch_config(data['args'])
+    deferred.addCallback(lambda _: rec.update_launch_config(data))
     return deferred
