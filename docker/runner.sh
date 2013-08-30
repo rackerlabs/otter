@@ -1,9 +1,13 @@
 #!/bin/bash
 set -ex
 
+# Make sure we didn't export this from a previous run
+unset OTTER_IP
+
 GIT_SHA=$(git rev-parse --short HEAD)
 MAX_HEAP_SIZE=${MAX_HEAP_SIZE:-"512M"}
 HEAP_NEWSIZE=${HEAP_NEWSIZE:-"256M"}
+PYTHONPATH=/opt/otter:/opt/otter/autoscale_cloudcafe:/opt/otter/autoscale_cloudroast
 
 docker rmi $(docker images | grep none | awk '{print $3}')
 docker rm $(docker ps -a -q)
@@ -52,7 +56,7 @@ fi
 
 OTTER_ENVS="OTTER_SEED_HOSTS=$CASSANDRA_IP"
 OTTER_ENVS="$OTTER_ENVS -e CASSANDRA_HOST=$CASSANDRA_IP"
-OTTER_ENVS="$OTTER_ENVS -e PYTHONPATH=/opt/otter"
+OTTER_ENVS="$OTTER_ENVS -e PYTHONPATH=$PYTHONPATH"
 OTTER_ENVS="$OTTER_ENVS -e OTTER_INTERFACE=eth0"
 OTTER_ENVS="$OTTER_ENVS -e OTTER_REGION=ORD"
 OTTER_ENVS="$OTTER_ENVS -e OTTER_ENVIRONMENT=production"
