@@ -12,12 +12,6 @@ PYTHONPATH=/opt/otter:/opt/otter/autoscale_cloudcafe:/opt/otter/autoscale_cloudr
 docker rmi $(docker images | grep none | awk '{print $3}')
 docker rm $(docker ps -a -q)
 
-# Build java
-docker build -t java docker/java
-
-# Build cassandra
-docker build -t cassandra docker/cassandra
-
 # Build otter/base
 docker build -t otter/base docker/base
 
