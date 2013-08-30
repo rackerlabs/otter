@@ -58,5 +58,5 @@ non_autoscale_tenant = 731642
 region=ord
 autoscale_endpoint_name=autoscale
 server_endpoint_name=cloudServersOpenStack
-server_endpoint=
+server_endpoint=http://127.0.0.1:9000/v1.0
 load_balancer_endpoint_name=cloudLoadBalancers
