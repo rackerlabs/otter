@@ -21,6 +21,9 @@ docker build -t otter/base docker/base
 # we don't have to pass it in plain text later on
 ./scripts/rewrite_config.py
 
+# Setup the Cloudcafe config
+./docker/cloudcafe/update_cc_config.py
+
 # Build otter
 docker build -t otter:$GIT_SHA .
 
@@ -62,26 +65,18 @@ UNIT_TESTS=$(docker run -d -t -e $OTTER_ENVS -e JENKINS_URL=subunit otter:$GIT_S
 OTTER_CID=$(docker run -d -t -e $OTTER_ENVS otter:$GIT_SHA)
 export OTTER_IP=$(docker inspect $OTTER_CID | grep IPAddress | cut -d '"' -f 4)
 
-# Build cloudcafe
-# This sucks because cloudcafe sucks
-# Docker can't build things from directories higher than the Dockerfile
-# and a directory can only have one Dockerfile
-cd docker/cloudcafe
-rm -rf autoscale_cloudcafe autoscale_cloudroast
-cp -r ../../autoscale_cloudcafe .
-cp -r ../../autoscale_cloudroast .
-# Update the CloudCafe config based on environment variables
-python update_cc_config.py
-docker build -t otter/cloudcafe:$GIT_SHA .
-rm -rf autoscale_cloudcafe autoscale_cloudroast preprod.config
-cd ../..
+CC_ENV="OTTER_IP=$OTTER_IP"
+CC_ENV="$CC_ENV -e PYTHONPATH=/opt/otter/autoscale_cloudcafe:/opt/otter/autoscale_cloudroast"
+
+CC_RUN="cafe-runner autoscale /opt/otter/docker/cloudcafe/preprod.config"
 
 # Run CloudCafe tests
-CC_FUNCTIONAL_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA)
-CC_QUICKSYS_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA -p system -t speed=quick)
+CC_FUNCTIONAL_TESTS=$(docker run -d -t -e $CC_ENV otter:$GIT_SHA $CC_RUN -p functional)
+CC_QUICKSYS_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter:$GIT_SHA $CC_RUN -p system -t speed=quick)
 # CC_SLOWSYS_TESTS=$(docker run -d -t -e OTTER_IP=$OTTER_IP otter/cloudcafe:$GIT_SHA -p system -t speed=slow)
 
 UNIT_EXIT=$(docker wait $UNIT_TESTS)
+docker cp $UNIT_TESTS:/opt/otter/test-report.xml .
 docker logs $UNIT_TESTS
 CC_FUNCTIONAL_EXIT=$(docker wait $CC_FUNCTIONAL_TESTS)
 docker logs $CC_FUNCTIONAL_TESTS
@@ -95,7 +90,6 @@ CC_SLOWSYS_EXIT=0
 docker stop $OTTER_CID
 docker stop $CASSANDRA_CID
 docker rmi otter:$GIT_SHA
-docker rmi otter/cloudcafe:$GIT_SHA
 
 echo "Unit tests exited $UNIT_EXIT"
 echo "CloudCafe Functional tests exited $CC_FUNCTIONAL_EXIT"
