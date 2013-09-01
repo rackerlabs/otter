@@ -20,6 +20,9 @@ Vagrant::Config.run do |config|
       "echo deb https://get.docker.io/ubuntu docker main > /etc/apt/sources.list.d/docker.list;" \
       "apt-get update -qq; apt-get install -q -y --force-yes lxc-docker; "
 
+    # >0.5.0 Docker no longer listens on a real interface and thus isn't accessible
+    pkg_cmd << 'sed -i "s/docker -d/docker -H=tcp:\/\/0.0.0.0:4243 -d/g" /etc/init/docker.conf; '
+
     # Add raring kernel
     pkg_cmd << "apt-get install -y -q linux-image-generic-lts-raring linux-headers-generic-lts-raring; "
 
