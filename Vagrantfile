@@ -4,8 +4,6 @@
 BOX_NAME = ENV['BOX_NAME'] || "precise64"
 BOX_URI = ENV['BOX_URI'] || "http://files.vagrantup.com/precise64.box"
 VF_BOX_URI = ENV['BOX_URI'] || "http://files.vagrantup.com/precise64_vmware_fusion.box"
-AWS_REGION = ENV['AWS_REGION'] || "us-east-1"
-AWS_AMI    = ENV['AWS_AMI']    || "ami-d0f89fb9"
 FORWARD_DOCKER_PORTS = ENV['FORWARD_DOCKER_PORTS']
 
 Vagrant::Config.run do |config|
@@ -54,17 +52,6 @@ end
 
 # Providers were added on Vagrant >= 1.1.0
 Vagrant::VERSION >= "1.1.0" and Vagrant.configure("2") do |config|
-  config.vm.provider :aws do |aws, override|
-    aws.access_key_id = ENV["AWS_ACCESS_KEY_ID"]
-    aws.secret_access_key = ENV["AWS_SECRET_ACCESS_KEY"]
-    aws.keypair_name = ENV["AWS_KEYPAIR_NAME"]
-    override.ssh.private_key_path = ENV["AWS_SSH_PRIVKEY"]
-    override.ssh.username = "ubuntu"
-    aws.region = AWS_REGION
-    aws.ami    = AWS_AMI
-    aws.instance_type = "t1.micro"
-  end
-
   config.vm.provider :rackspace do |rs|
     config.ssh.private_key_path = ENV["RS_PRIVATE_KEY"]
     rs.username = ENV["RS_USERNAME"]
