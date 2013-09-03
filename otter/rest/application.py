@@ -65,11 +65,12 @@ class Otter(object):
         return OtterPolicies(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/', branch=True)
-    def groups(self, request, tenant_id):
+    @with_transaction_id()
+    def groups(self, request, log, tenant_id):
         """
         group routes delegated to OtterGroups.
         """
-        return OtterGroups(self.store, tenant_id).app.resource()
+        return OtterGroups(self.store, log, tenant_id).app.resource()
 
     @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
     def execute(self, request, capability_version, capability_hash):

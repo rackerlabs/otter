@@ -9,8 +9,7 @@ from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
@@ -51,15 +50,15 @@ class OtterGroups(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id):
+    def __init__(self, store, log, tenant_id):
         self.store = store
+        self.log = log
         self.tenant_id = tenant_id
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_all_scaling_groups(self, request, log):
+    def list_all_scaling_groups(self, request):
         """
         Lists all the autoscaling groups and their states per for a given tenant ID.
 
@@ -107,7 +106,7 @@ class OtterGroups(object):
                 "groups_links": []
             }
 
-        deferred = self.store.list_scaling_group_states(log, self.tenant_id)
+        deferred = self.store.list_scaling_group_states(self.log, self.tenant_id)
         deferred.addCallback(format_list)
         deferred.addCallback(json.dumps)
         return deferred
@@ -121,11 +120,10 @@ class OtterGroups(object):
     # attached.  If we are going to create the scaling policies here too, we should
     # probably also return their ids and links, just like the manifest.
     @app.route('/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(create_group_request)
-    def create_new_scaling_group(self, request, log, data):
+    def create_new_scaling_group(self, request, data):
         """
         Create a new scaling group, given the general scaling group configuration,
         launch configuration, and optional scaling policies.  This data provided
@@ -299,14 +297,14 @@ class OtterGroups(object):
             raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
         deferred = self.store.create_scaling_group(
-            log, self.tenant_id, data['groupConfiguration'], data['launchConfiguration'],
+            self.log, self.tenant_id, data['groupConfiguration'], data['launchConfiguration'],
             data.get('scalingPolicies', None))
 
         def _do_obey_config_change(result):
             group_id = result['id']
             config = result['groupConfiguration']
-            group = self.store.get_scaling_group(log, self.tenant_id, group_id)
-            d = group.modify_state(partial(controller.obey_config_change, log,
+            group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
+            d = group.modify_state(partial(controller.obey_config_change, self.log,
                                            transaction_id(request), config))
             return d.addCallback(lambda _: result)
 
@@ -334,10 +332,9 @@ class OtterGroups(object):
         return deferred
 
     @app.route('/<string:scaling_group_id>/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def view_manifest_config_for_scaling_group(self, request, log, scaling_group_id):
+    def view_manifest_config_for_scaling_group(self, request, scaling_group_id):
         """
         View manifested view of the scaling group configuration, including the
         launch configuration, and the scaling policies.  This data is returned in
@@ -449,7 +446,7 @@ class OtterGroups(object):
 
             return {"group": data}
 
-        group = self.store.get_scaling_group(log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
         deferred = group.view_manifest()
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
@@ -458,21 +455,19 @@ class OtterGroups(object):
     # Feature: Force delete, which stops scaling, deletes all servers for you, then
     #       deletes the scaling group.
     @app.route('/<string:scaling_group_id>/', methods=['DELETE'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def delete_scaling_group(self, request, log, scaling_group_id):
+    def delete_scaling_group(self, request, scaling_group_id):
         """
         Delete a scaling group if there are no entities belonging to the scaling
         group.  If successful, no response body will be returned.
         """
-        return self.store.get_scaling_group(log, self.tenant_id, scaling_group_id).delete_group()
+        return self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id).delete_group()
 
     @app.route('/<string:scaling_group_id>/state/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def get_scaling_group_state(self, request, log, scaling_group_id):
+    def get_scaling_group_state(self, request, scaling_group_id):
         """
         Get the current state of the scaling group, including the current set of
         active entities, number of pending entities, and the desired number
@@ -521,34 +516,32 @@ class OtterGroups(object):
         def _format_and_stackify(state):
             return {"group": format_state_dict(state)}
 
-        group = self.store.get_scaling_group(log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
         deferred = group.view_state()
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/<string:scaling_group_id>/pause/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def pause_scaling_group(self, request, log, scaling_group_id):
+    def pause_scaling_group(self, request, scaling_group_id):
         """
         Pause a scaling group.  This means that no scaling policies will get
         executed (execution will be rejected).  This is an idempotent operation -
         pausing an already paused group does nothing.
         """
-        group = self.store.get_scaling_group(log, self.tenant_id, scaling_group_id)
-        return controller.pause_scaling_group(log, transaction_id(request), group)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        return controller.pause_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/<string:scaling_group_id>/resume/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def resume_scaling_group(self, request, log, scaling_group_id):
+    def resume_scaling_group(self, request, scaling_group_id):
         """
         Resume a scaling group.  This means that scaling policies will now get
         executed as usual.  This is an idempotent operation - resuming an already
         running group does nothing.
         """
-        group = self.store.get_scaling_group(log, self.tenant_id, scaling_group_id)
-        return controller.resume_scaling_group(log, transaction_id(request), group)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        return controller.resume_scaling_group(self.log, transaction_id(request), group)
