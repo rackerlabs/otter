@@ -119,13 +119,15 @@ class FaultTestCase(TestCase):
         :return nothing
         """
         class FakeApp(object):
+            log = self.mockLog
+
             @fails_with({})
             @succeeds_with(204)
-            def doWork(self, request, log):
+            def doWork(self, request):
                 """ Test Work """
                 return defer.succeed('hello')
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
 
@@ -140,13 +142,15 @@ class FaultTestCase(TestCase):
         :return nothing
         """
         class FakeApp(object):
+            log = self.mockLog
+
             @succeeds_with(204)
             @fails_with({})
-            def doWork(self, request, log):
+            def doWork(self, request):
                 """ Test Work """
                 return defer.succeed('hello')
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
         self.mockLog.bind.assert_called_once_with(code=204, uri='/')
@@ -160,12 +164,14 @@ class FaultTestCase(TestCase):
         :return nothing
         """
         class FakeApp(object):
+            log = self.mockLog
+
             @fails_with({BlahError: 404})
             @succeeds_with(204)
-            def doWork(self, request, log):
+            def doWork(self, request):
                 return defer.fail(BlahError('fail'))
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -189,12 +195,14 @@ class FaultTestCase(TestCase):
         :return nothing
         """
         class FakeApp(object):
+            log = self.mockLog
+
             @fails_with({DetailsError: 404})
             @succeeds_with(204)
-            def doWork(self, request, log):
+            def doWork(self, request):
                 return defer.fail(DetailsError('fail'))
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -219,12 +227,14 @@ class FaultTestCase(TestCase):
         :return nothing
         """
         class FakeApp(object):
+            log = self.mockLog
+
             @succeeds_with(204)
             @fails_with({DetailsError: 404})
-            def doWork(self, request, log):
+            def doWork(self, request):
                 return defer.fail(DetailsError('fail'))
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
@@ -258,12 +268,14 @@ class FaultTestCase(TestCase):
         mapping = {KeyError: 404, BlahError: 400}
 
         class FakeApp(object):
+            log = self.mockLog
+
             @fails_with(select_dict([BlahError], mapping))
             @succeeds_with(204)
-            def doWork(self, request, log):
+            def doWork(self, request):
                 return defer.fail(BlahError('fail'))
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
@@ -290,12 +302,14 @@ class FaultTestCase(TestCase):
         blah = BlahError('fail')
 
         class FakeApp(object):
+            log = self.mockLog
+
             @fails_with(select_dict([KeyError], mapping))
             @succeeds_with(204)
-            def doWork(self, request, log):
+            def doWork(self, request):
                 return defer.fail(blah)
 
-        d = FakeApp().doWork(self.mockRequest, self.mockLog)
+        d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(500)
 
