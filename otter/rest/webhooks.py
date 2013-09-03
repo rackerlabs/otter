@@ -322,7 +322,9 @@ class OtterExecute(object):
                         exc=failure.value)
 
         def execute_policy((tenant_id, group_id, policy_id)):
-            bound_log = self.log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
+            bound_log = self.log.bind(tenant_id=tenant_id,
+                                      scaling_group_id=group_id,
+                                      policy_id=policy_id)
             logl[0] = bound_log
             group = self.store.get_scaling_group(bound_log, tenant_id, group_id)
             return group.modify_state(partial(controller.maybe_execute_scaling_policy,
