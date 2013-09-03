@@ -3,6 +3,7 @@ Contains the actual Klein app and base route handlers for the REST service.
 """
 from twisted.web.server import Request
 
+from otter.rest.decorators import with_transaction_id
 from otter.rest.otterapp import OtterApp
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.groups import OtterGroups
@@ -31,11 +32,12 @@ class Otter(object):
         return ''
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/config/')
-    def config(self, request, tenant_id, group_id):
+    @with_transaction_id()
+    def config(self, request, log, tenant_id, group_id):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, tenant_id, group_id).app.resource()
+        return OtterConfig(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch/')
     def launch(self, request, tenant_id, group_id):

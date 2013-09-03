@@ -24,7 +24,7 @@ def fails_with(mapping):
     """
     def decorator(f):
         @wraps(f)
-        def _(self, request, bound_log, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
 
             def _fail(failure, request):
                 failure = unwrap_first_error(failure)
@@ -37,7 +37,7 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
-                    bound_log.bind(
+                    self.log.bind(
                         uri=request.uri,
                         **errorObj
                     ).msg(failure.value.message)
@@ -48,14 +48,14 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
-                    bound_log.bind(
+                    self.log.bind(
                         uri=request.uri,
                         code=code
                     ).err(failure, 'Unhandled Error handling request')
                 request.setResponseCode(code)
                 return json.dumps(errorObj)
 
-            d = defer.maybeDeferred(f, self, request, bound_log, *args, **kwargs)
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addErrback(_fail, request)
             return d
         return _
@@ -82,19 +82,19 @@ def succeeds_with(success_code):
     """
     def decorator(f):
         @wraps(f)
-        def _(self, request, bound_log, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
             def _succeed(result, request):
                 # Default twisted response code is 200.  Assuming that if this
                 # is 200, then it is the default and can be overriden
                 if request.code == 200:
                     request.setResponseCode(success_code)
-                bound_log.bind(
+                self.log.bind(
                     uri=request.uri,
                     code=request.code
                 ).msg('Request succeeded')
                 return result
 
-            d = defer.maybeDeferred(f, self, request, bound_log, *args, **kwargs)
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addCallback(_succeed, request)
             return d
         return _

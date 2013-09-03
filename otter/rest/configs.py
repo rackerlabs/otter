@@ -24,16 +24,16 @@ class OtterConfig(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, log, tenant_id, group_id):
         self.store = store
+        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def view_config_for_scaling_group(self, request, log):
+    def view_config_for_scaling_group(self, request):
         """
         Get the configuration for a scaling group, which includes the minimum
         number of entities, the maximum number of entities, global cooldown, and
@@ -55,17 +55,16 @@ class OtterConfig(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.view_config()
         deferred.addCallback(lambda conf: json.dumps({"groupConfiguration": conf}))
         return deferred
 
     @app.route('/', methods=['PUT'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_config)
-    def edit_config_for_scaling_group(self, request, log, data):
+    def edit_config_for_scaling_group(self, request, data):
         """
         Edit the configuration for a scaling group, which includes the minimum
         number of entities, the maximum number of entities, global cooldown, and
@@ -92,10 +91,10 @@ class OtterConfig(object):
 
         def _do_obey_config_change(_, group):
             return group.modify_state(
-                partial(controller.obey_config_change, log, transaction_id(request),
+                partial(controller.obey_config_change, self.log, transaction_id(request),
                         data))
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.update_config(data).addCallback(_do_obey_config_change, rec)
         return deferred
 
