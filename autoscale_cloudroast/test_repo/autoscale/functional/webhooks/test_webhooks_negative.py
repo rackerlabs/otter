@@ -145,8 +145,8 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             webhook_id=webhook['id'])
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create webhooks succeeded with invalid request: {0}'
-                          .format(error_create_resp.status_code))
+                          msg='Create webhooks succeeded with invalid request: '
+                          '{0}'.format(error_create_resp.status_code))
         self.assertTrue(create_error is None,
                         msg='Create webhooks with invalid request returned: {0} for group '
                         '{1}'.format(create_error, self.group.id))
@@ -266,8 +266,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
             create_resp.entity)
         cap_url = webhook['links'].capability
         del_resp = self.autoscale_client.delete_webhook(group_id=self.group.id,
-                                                        policy_id=self.policy[
-                                                            'id'],
+                                                        policy_id=self.policy['id'],
                                                         webhook_id=webhook['id'])
         self.assertEquals(
             create_resp.status_code, 201, msg='create webhook failed')

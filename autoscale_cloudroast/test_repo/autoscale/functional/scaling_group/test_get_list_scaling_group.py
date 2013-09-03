@@ -87,11 +87,11 @@ class ScalingGroupListTest(AutoscaleFixture):
         for i in list_groups:
             group_id_list.append(i.id)
         self.assertTrue(self.first_scaling_group.id in
-                        group_id_list, msg='Group with id {0} was not found in the list {1}'
-                        .format(self.first_scaling_group.id, group_id_list))
+                        group_id_list, msg='Group with id {0} was not found in the list '
+                        '{1}'.format(self.first_scaling_group.id, group_id_list))
         self.assertTrue(self.second_scaling_group.id in
-                        group_id_list, msg='Group with id {0} was not found in the list {1}'
-                        .format(self.second_scaling_group.id, group_id_list))
+                        group_id_list, msg='Group with id {0} was not found in the list '
+                        '{1}'.format(self.second_scaling_group.id, group_id_list))
         self.assertTrue(self.third_scaling_group.id in
-                        group_id_list, msg='Group with id {0} was not found in the list {1}'
-                        .format(self.third_scaling_group.id, group_id_list))
+                        group_id_list, msg='Group with id {0} was not found in the list '
+                        '{1}'.format(self.third_scaling_group.id, group_id_list))

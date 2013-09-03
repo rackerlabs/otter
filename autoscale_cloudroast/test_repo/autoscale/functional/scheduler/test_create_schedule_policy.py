@@ -59,8 +59,8 @@ class CreateScheduleScalingPolicy(ScalingGroupFixture):
             sp_change=self.sp_change,
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 201,
-                          msg='Create schedule scaling policy failed with {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          msg='Create schedule scaling policy failed with {0} for group '
+                          '{1}'.format(schedule_policy_at_style['status_code'], self.group.id))
         self.validate_headers(schedule_policy_at_style['headers'])
         self.assertTrue(schedule_policy_at_style['id'] is not None,
                         msg='Scaling policy id is None for group '

@@ -23,15 +23,15 @@ class ListSchedulerScalingPolicy(ScalingGroupPolicyFixture):
             sp_change=self.sp_change,
             schedule_at=self.at_value)
         self.assertEquals(self.at_style_policy['status_code'], 201,
-                          msg='Create schedule policy (at style) failed with {0} for group {1}'
-                          .format(self.at_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (at style) failed with {0} for group '
+                          '{1}'.format(self.at_style_policy['status_code'], self.group.id))
         self.cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_change=self.sp_change,
             schedule_cron=self.cron_value)
         self.assertEquals(self.cron_style_policy['status_code'], 201,
-                          msg='Create schedule policy (cron style) failed with {0} for group {1}'
-                          .format(self.cron_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (cron style) failed with {0} for group '
+                          '{1}'.format(self.cron_style_policy['status_code'], self.group.id))
 
     def test_list_scheduler_policies(self):
         """
