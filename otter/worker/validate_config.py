@@ -1,5 +1,7 @@
 """
 Contains code to validate launch config
+
+TODO: Apart from this, add schema validation to a minimum extent
 """
 
 from twisted.internet import defer
