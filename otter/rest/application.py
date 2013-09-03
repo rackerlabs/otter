@@ -73,9 +73,10 @@ class Otter(object):
         return OtterGroups(self.store, log, tenant_id).app.resource()
 
     @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
-    def execute(self, request, capability_version, capability_hash):
+    @with_transaction_id()
+    def execute(self, request, log, capability_version, capability_hash):
         """
         execute route handled by OtterExecute
         """
-        return OtterExecute(self.store, capability_version,
+        return OtterExecute(self.store, log, capability_version,
                             capability_hash).app.resource()
