@@ -8,8 +8,7 @@ from functools import partial
 import json
 
 from otter.json_schema import group_schemas
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import transaction_id
@@ -105,16 +104,16 @@ class OtterLaunch(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, log, tenant_id, group_id):
         self.store = store
+        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def view_launch_config(self, request, log):
+    def view_launch_config(self, request):
         """
         Get the launch configuration for a scaling group, which includes the
         details of how to create a server, from what image, which load balancers to
@@ -157,17 +156,16 @@ class OtterLaunch(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.view_launch_config()
         deferred.addCallback(lambda conf: json.dumps({"launchConfiguration": conf}))
         return deferred
 
     @app.route('/', methods=['PUT'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.launch_config)
-    def edit_launch_config(self, request, log, data):
+    def edit_launch_config(self, request, data):
         """
         Edit the launch configuration for a scaling group, which includes the
         details of how to create a server, from what image, which load balancers to
@@ -215,6 +213,6 @@ class OtterLaunch(object):
         Nova should validate the image before saving the new config.
         Users may have an invalid configuration based on dependencies.
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.update_launch_config(data)
         return deferred

@@ -40,11 +40,12 @@ class Otter(object):
         return OtterConfig(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch/')
-    def launch(self, request, tenant_id, group_id):
+    @with_transaction_id()
+    def launch(self, request, log, tenant_id, group_id):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, tenant_id, group_id).app.resource()
+        return OtterLaunch(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/'
                '<string:policy_id>/webhooks/', branch=True)
