@@ -6,7 +6,7 @@ from twisted.internet.defer import Deferred, succeed
 from otter.util.hashkey import generate_job_id
 
 from otter.util.config import config_value
-from otter.worker import launch_server_v1
+from otter.worker import launch_server_v1, validate_config
 from otter.undo import InMemoryUndoStack
 
 
@@ -119,21 +119,22 @@ class Supervisor(object):
 
     def validate_launch_config(self, log, tenant_id, launch_config):
         """
-        Validate launch config w.r.t a particular tenant
+        Validate launch config for a tenant
         """
         if launch_config['type'] != 'launch_server':
             raise ValidationError('Invalid "type" in launchConfiguration')
 
         def when_authenticated((auth_token, service_catalog)):
             log.msg('Validating launch server config')
-            return launch_server_v1.validate_launch_server_config(
+            return validate_config.validate_launch_server_config(
                 log,
                 config_value('region'),
                 service_catalog,
                 auth_token,
                 launch_config['args'])
 
-        log = log.bind(system='otter.supervisor.validate_launch_config')
+        log = log.bind(system='otter.supervisor.validate_launch_config',
+                       tenant_id=scaling_group.tenant_id)
         d = self.auth_function(scaling_group.tenant_id)
         log.msg('Authenticating for tenant')
         return d.addCallback(when_authenticated)

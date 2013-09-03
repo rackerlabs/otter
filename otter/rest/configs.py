@@ -15,6 +15,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.application import app, get_store, transaction_id
 
 from otter import controller
+from otter.supervisor import get_supervisor
 from otter.rest.errors import InvalidMinEntities
 
 
@@ -201,6 +202,6 @@ def edit_launch_config(request, log, tenant_id, group_id, data):
     Users may have an invalid configuration based on dependencies.
     """
     rec = get_store().get_scaling_group(log, tenant_id, group_id)
-    deferred = validate_launch_config(data['args'])
+    deferred = get_supervisor().validate_launch_config(data['args'])
     deferred.addCallback(lambda _: rec.update_launch_config(data))
     return deferred

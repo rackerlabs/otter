@@ -6,6 +6,7 @@ from functools import partial
 import json
 
 from otter import controller
+from otter.supervisor import get_supervisor
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -290,7 +291,7 @@ def create_new_scaling_group(request, log, tenant_id, data):
     if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
         raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
-    deferred = validate_launch_config(data['launchConfiguration']['args'])
+    deferred = get_supervisor().validate_launch_config(log, data['launchConfiguration'])
 
     deferred.addCallback(partial(get_store().create_scaling_group, log, tenant_id,
                                  data['groupConfiguration'], data['launchConfiguration'],

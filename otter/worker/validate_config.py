@@ -1,5 +1,5 @@
 """
-Temporarily Contains code to validate launch config until I figure out its right place
+Contains code to validate launch config
 """
 
 from twisted.internet import defer
@@ -7,7 +7,6 @@ import treq
 
 from jsonschema import ValidationError
 
-from otter.supervisor import get_supervisor
 from otter.util.deferredutils import unwrap_first_error
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
@@ -15,20 +14,20 @@ from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 
 
-def get_service_endpoint(service_catalog):
+def get_service_endpoint(service_catalog, region):
     """
     Get the service endpoint used to connect cloud services
     """
     cloudServersOpenStack = config_value('cloudServersOpenStack')
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
-                                          config_value('region'))
+                                          region)
     return server_endpoint
 
 
 def validate_launch_server_config(log, region, service_catalog, auth_token, launch_config):
     """
-    Validate launch configuration of given `tenant_id`
+    Validate launch_server type configuration
 
     :returns: Deferred that is fired if configuration is valid and errback(ed) with
               `ValidationError` if invalid
@@ -43,8 +42,6 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         (validate_personality, 'personality')
     ]
 
-    d = get_supervisor().auth_function(tenant_id)
-
     def raise_validation_error(failure, prop):
         log.msg('Validation of "{}" property in launchConfiguration failed'.format(prop),
                 reason=failure)
@@ -53,18 +50,15 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         else:
             raise ValidationError('Invalid "{}" in launchConfiguration'.format(prop))
 
-    def when_authenticated((auth_token, service_catalog)):
-        service_endpoint = get_service_endpoint(service_catalog)
-        deferreds = []
-        for validate, prop in validate_functions:
-            prop_value = server.get(prop)
-            if prop_value:
-                d = validate(log, auth_token, service_endpoint, prop_value)
-                d.addErrback(raise_validation_error, prop)
-                deferreds.append(d)
-        return defer.gatherResults(deferreds, consumeErrors=True).addErrback(unwrap_first_error)
-
-    return d.addCallback(when_authenticated)
+    service_endpoint = get_service_endpoint(service_catalog, region)
+    deferreds = []
+    for validate, prop in validate_functions:
+        prop_value = server.get(prop)
+        if prop_value:
+            d = validate(log, auth_token, service_endpoint, prop_value)
+            d.addErrback(raise_validation_error, prop)
+            deferreds.append(d)
+    return defer.gatherResults(deferreds, consumeErrors=True).addErrback(unwrap_first_error)
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
