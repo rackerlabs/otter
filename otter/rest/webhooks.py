@@ -49,17 +49,17 @@ class OtterWebhooks(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id, policy_id):
+    def __init__(self, store, log, tenant_id, group_id, policy_id):
         self.store = store
+        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_webhooks(self, request, log):
+    def list_webhooks(self, request):
         """
         Get a list of all webhooks (capability URL) associated with a particular
         scaling policy. This data is returned in the body of the response in JSON
@@ -119,18 +119,17 @@ class OtterWebhooks(object):
                 "webhooks_links": []
             }
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.list_webhooks(self.policy_id)
         deferred.addCallback(format_webhooks)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_webhooks_request)
-    def create_webhooks(self, request, log, data):
+    def create_webhooks(self, request, data):
         """
         Create one or many new webhooks associated with a particular scaling policy.
         Webhooks may (but do not need to) include some arbitrary medata, and must
@@ -207,17 +206,16 @@ class OtterWebhooks(object):
 
             return {'webhooks': webhook_list}
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.create_webhooks(self.policy_id, data)
         deferred.addCallback(format_webhooks_and_send_redirect)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def get_webhook(self, request, log, webhook_id):
+    def get_webhook(self, request, webhook_id):
         """
         Get a webhook which has a name, some arbitrary metdata, and a capability
         URL.  This data is returned in the body of the response in JSON format.
@@ -248,18 +246,17 @@ class OtterWebhooks(object):
                                      self.policy_id)
             return {'webhook': result}
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.get_webhook(self.policy_id, webhook_id)
         deferred.addCallback(format_one_webhook)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['PUT'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
-    def update_webhook(self, request, log, webhook_id, data):
+    def update_webhook(self, request, webhook_id, data):
         """
         Update a particular webhook.
         A webhook may (but do not need to) include some arbitrary medata, and must
@@ -275,20 +272,19 @@ class OtterWebhooks(object):
                 }
             }
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.update_webhook(self.policy_id, webhook_id, data)
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['DELETE'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def delete_webhook(self, request, log, webhook_id):
+    def delete_webhook(self, request, webhook_id):
         """
         Deletes a particular webhook.
         If successful, no response body will be returned.
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.delete_webhook(self.policy_id, webhook_id)
         return deferred
 

@@ -49,11 +49,12 @@ class Otter(object):
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/'
                '<string:policy_id>/webhooks/', branch=True)
-    def webhooks(self, request, tenant_id, group_id, policy_id):
+    @with_transaction_id()
+    def webhooks(self, request, log, tenant_id, group_id, policy_id):
         """
         webhook routes handled by OtterWebhooks
         """
-        return OtterWebhooks(self.store, tenant_id, group_id, policy_id).app.resource()
+        return OtterWebhooks(self.store, log, tenant_id, group_id, policy_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/', branch=True)
     def policies(self, request, tenant_id, group_id):
