@@ -9,8 +9,7 @@ from functools import partial
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+from otter.rest.decorators import validate_body, fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -38,16 +37,16 @@ class OtterPolicies(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, scaling_group_id):
+    def __init__(self, store, log, tenant_id, scaling_group_id):
         self.store = store
+        self.log = log
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_policies(self, request, log):
+    def list_policies(self, request):
         """
         Get a list of scaling policies in the group. Each policy describes an id,
         name, type, adjustment, cooldown, and links. This data is returned in the
@@ -122,18 +121,17 @@ class OtterPolicies(object):
                 "policies_links": []
             }
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.list_policies()
         deferred.addCallback(format_policies)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_policies_request)
-    def create_policies(self, request, log, data):
+    def create_policies(self, request, data):
         """
         Create one or many new scaling policies.
         Scaling policies must include a name, type, adjustment, and cooldown.
@@ -202,17 +200,16 @@ class OtterPolicies(object):
 
             return {'policies': policy_list}
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.create_policies(data)
         deferred.addCallback(format_policies_and_send_redirect)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['GET'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def get_policy(self, request, log, policy_id):
+    def get_policy(self, request, policy_id):
         """
         Get a scaling policy which describes an id, name, type, adjustment, and
         cooldown, and links.  This data is returned in the body of the response in
@@ -240,18 +237,17 @@ class OtterPolicies(object):
             policy_dict['links'] = get_autoscale_links(self.tenant_id, self.scaling_group_id, policy_id)
             return {'policy': policy_dict}
 
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.get_policy(policy_id)
         deferred.addCallback(openstackify)
         deferred.addCallback(json.dumps)
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['PUT'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
-    def update_policy(self, request, log, policy_id, data):
+    def update_policy(self, request, policy_id, data):
         """
         Updates a scaling policy. Scaling policies must include a name, type,
         adjustment, and cooldown.
@@ -267,27 +263,25 @@ class OtterPolicies(object):
 
 
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.update_policy(policy_id, data)
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['DELETE'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def delete_policy(self, request, log, policy_id):
+    def delete_policy(self, request, policy_id):
         """
         Delete a scaling policy. If successful, no response body will be returned.
         """
-        rec = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.delete_policy(policy_id)
         return deferred
 
     @app.route('/<string:policy_id>/execute/', methods=['POST'])
-    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(202)
-    def execute_policy(self, request, log, policy_id):
+    def execute_policy(self, request, policy_id):
         """
         Execute this scaling policy.
 
@@ -297,9 +291,9 @@ class OtterPolicies(object):
 
             {}
         """
-        group = self.store.get_scaling_group(log, self.tenant_id, self.scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                       log, transaction_id(request),
+                                       self.log, transaction_id(request),
                                        policy_id=policy_id))
         d.addCallback(lambda _: "{}")  # Return value TBD
         return d
