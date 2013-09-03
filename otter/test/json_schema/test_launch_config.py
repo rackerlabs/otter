@@ -8,9 +8,9 @@ from twisted.trial.unittest import TestCase
 
 from jsonschema import ValidationError
 
-from otter.test.utils import mock_log, patch
+from otter.test.utils import mock_log, patch, mock_treq
 
-from otter.json_schema.launch_config import validate_launch_config
+from otter.json_schema.launch_config import validate_launch_config, validate_image
 from otter.supervisor import set_supervisor
 
 
@@ -129,3 +129,49 @@ class ValidateLaunchConfigTests(TestCase):
         """
         # TODO
         pass
+
+
+class ValidateImageTests(TestCase):
+    """
+    Tests for `validate_image`
+    """
+
+    def setUp(self):
+        """
+        Mock treq
+        """
+        self.log = mock_log()
+        #self.treq = patch(self, 'otter.json_schema.launch_config.treq')
+        self.treq = patch(self, 'otter.json_schema.launch_config.treq',
+                          new=mock_treq(code=200,
+                                        json_content={'image': {'status': 'ACTIVE'}},
+                                        method='get'))
+        patch(self, 'otter.util.http.treq', new=self.treq)
+        self.headers = {'content-type': ['application/json'],
+                        'accept': ['application/json']}
+
+    def test_valid(self):
+        """
+        Succeeds if given image is valid
+        """
+        self.headers['x-auth-token'] = ['token']
+        d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
+        self.successResultOf(d)
+        self.treq.get.assert_called_with('endpoint/images/image_ref', headers=self.headers)
+
+    def test_inactive_image(self):
+        """
+        `ValidationError` is raised if given image is inactive
+        """
+        self.treq.json_content.return_value = defer.succeed({'image': {'status': 'INACTIVE'}})
+        d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
+        f = self.failureResultOf(d, ValidationError)
+        self.assertEqual(f.value.message, 'Image "image_ref" is not active')
+
+    def test_unknown_image(self):
+        """
+        Errbacks if imageRef is unknown
+        """
+        self.treq.get.return_value = defer.succeed(mock.MagicMock(code=404))
+        d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
+        self.failureResultOf(d)
