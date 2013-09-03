@@ -26,7 +26,7 @@ def get_service_endpoint(service_catalog):
     return server_endpoint
 
 
-def validate_launch_config(log, tenant_id, launch_config):
+def validate_launch_server_config(log, region, service_catalog, auth_token, launch_config):
     """
     Validate launch configuration of given `tenant_id`
 

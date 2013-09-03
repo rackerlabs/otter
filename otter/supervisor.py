@@ -117,6 +117,27 @@ class Supervisor(object):
 
         return d
 
+    def validate_launch_config(self, log, tenant_id, launch_config):
+        """
+        Validate launch config w.r.t a particular tenant
+        """
+        if launch_config['type'] != 'launch_server':
+            raise ValidationError('Invalid "type" in launchConfiguration')
+
+        def when_authenticated((auth_token, service_catalog)):
+            log.msg('Validating launch server config')
+            return launch_server_v1.validate_launch_server_config(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                launch_config['args'])
+
+        log = log.bind(system='otter.supervisor.validate_launch_config')
+        d = self.auth_function(scaling_group.tenant_id)
+        log.msg('Authenticating for tenant')
+        return d.addCallback(when_authenticated)
+
 
 _supervisor = None
 
