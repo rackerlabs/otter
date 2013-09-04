@@ -103,6 +103,11 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
                                      spec=['obey_config_change'])
         patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
 
+        # Patch supervisor
+        get_supervisor = patch(self, 'otter.rest.groups.get_supervisor')
+        patch(self, 'otter.rest.configs.get_supervisor', new=get_supervisor)
+        get_supervisor.return_value.validate_launch_config.return_value = defer.succeed(None)
+
         def _mock_obey_config_change(log, trans, config, group, state):
             return defer.succeed(GroupState(
                 state.tenant_id, state.group_id, *self.active_pending_etc))
