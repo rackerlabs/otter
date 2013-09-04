@@ -17,6 +17,6 @@ class DeleteScalingPolicy(ScalingGroupPolicyFixture):
             group_id=self.group.id,
             policy_id=self.policy['id'])
         self.assertEquals(delete_policy.status_code, 204,
-                          msg='Delete scaling policy failed with {0}'
-                          .format(delete_policy.status_code))
+                          msg='Delete scaling policy failed with {0} for group'
+                          ' {1}'.format(delete_policy.status_code, self.group.id))
         self.validate_headers(delete_policy.headers)
