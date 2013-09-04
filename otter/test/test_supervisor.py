@@ -225,3 +225,43 @@ class DeleteServerTests(SupervisorTests):
         args, kwargs = self.log.bind.return_value.err.call_args
         self.assertEqual(args[0].value, expected)
         self.assertEqual(args[1], 'Server deletion failed')
+
+
+class ValidateLaunchConfigTests(SupervisorTests):
+    """
+    Tests for func:``otter.supervisor.validate_launch_config``
+    """
+
+    def setUp(self):
+        """
+        mock worker functions and other dependant objects
+        """
+        super(ValidateLaunchConfigTests, self).setUp()
+        self.log = mock_log()
+        self.validate_launch_server_config = patch(
+            self, 'otter.supervisor.validate_config.validate_launch_server_config',
+            return_value=succeed(None))
+
+    def test_authenticates(self):
+        """
+        It authenticates
+        """
+        pass
+
+    def test_validate_launch_server_config_called(self):
+        """
+        `validate_launch_server_config` is called with correct args
+        """
+        pass
+
+    def test_launch_server_type_check(self):
+        """
+        Only launch_server type is allowed
+        """
+        pass
+
+    def test_log_binds(self):
+        """
+        Log is bound to tenant_id and message is logged at each step
+        """
+        pass

@@ -290,6 +290,7 @@ def create_new_scaling_group(request, log, tenant_id, data):
     if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
         raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
+    # REVIEW: Should this call supervisor directly or through controller?
     deferred = get_supervisor().validate_launch_config(log, tenant_id, data['launchConfiguration'])
 
     deferred.addCallback(

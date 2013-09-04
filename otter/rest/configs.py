@@ -201,6 +201,7 @@ def edit_launch_config(request, log, tenant_id, group_id, data):
     Users may have an invalid configuration based on dependencies.
     """
     rec = get_store().get_scaling_group(log, tenant_id, group_id)
+    # REVIEW: Should this call supervisor directly or through controller?
     deferred = get_supervisor().validate_launch_config(log, tenant_id, data)
     deferred.addCallback(lambda _: rec.update_launch_config(data))
     return deferred
