@@ -124,8 +124,7 @@ class ValidateImageTests(TestCase):
         Mock treq
         """
         self.log = mock_log()
-        #self.treq = patch(self, 'otter.json_schema.launch_config.treq')
-        self.treq = patch(self, 'otter.json_schema.launch_config.treq',
+        self.treq = patch(self, 'otter.worker.validate_config.treq',
                           new=mock_treq(code=200,
                                         json_content={'image': {'status': 'ACTIVE'}},
                                         method='get'))
