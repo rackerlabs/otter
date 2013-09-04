@@ -237,31 +237,49 @@ class ValidateLaunchConfigTests(SupervisorTests):
         mock worker functions and other dependant objects
         """
         super(ValidateLaunchConfigTests, self).setUp()
-        self.log = mock_log()
+        self.log = mock.Mock()
         self.validate_launch_server_config = patch(
             self, 'otter.supervisor.validate_config.validate_launch_server_config',
             return_value=succeed(None))
+        self.launch_config = {'type': 'launch_server', 'args': 'launch_args'}
 
-    def test_authenticates(self):
+    def test_valid(self):
         """
-        It authenticates
+        It authenticates and calls validate_launch_server_config with correct args
         """
-        pass
+        d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
+                                                   self.launch_config)
+        self.successResultOf(d)
+        self.auth_function.assert_called_once_with(self.group.tenant_id)
+        self.validate_launch_server_config.assert_called_once_with(
+            self.log.bind(), 'ORD', self.service_catalog, self.auth_token, 'launch_args')
 
-    def test_validate_launch_server_config_called(self):
+    def test_invalid_config_error_propogates(self):
         """
-        `validate_launch_server_config` is called with correct args
+        Invalid launch config error is propogated
         """
-        pass
+        self.validate_launch_server_config.return_value = fail(ValueError('huh'))
+        d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
+                                                   self.launch_config)
+        f = self.failureResultOf(d, ValueError)
+        self.assertEqual(f.value.args, ('huh',))
 
     def test_launch_server_type_check(self):
         """
         Only launch_server type is allowed
         """
-        pass
+        self.assertRaises(NotImplementedError, self.supervisor.validate_launch_config,
+                          self.log, self.group.tenant_id, {'type':'delete_server'})
 
     def test_log_binds(self):
         """
         Log is bound to tenant_id and message is logged at each step
         """
-        pass
+        d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
+                                                   self.launch_config)
+        self.successResultOf(d)
+        self.log.bind.assert_called_once_with(
+            system='otter.supervisor.validate_launch_config', tenant_id=self.group.tenant_id)
+        log = self.log.bind.return_value
+        log.msg.assert_has_calls([mock.call('Authenticating for tenant'),
+                                  mock.call('Validating launch server config')])
