@@ -28,12 +28,13 @@ class GroupState(object):
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, active, pending, desired,
+    def __init__(self, tenant_id, group_id, active, pending, deleting, desired,
                  group_touched, policy_touched, paused, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.active = active
         self.pending = pending
+        self.deleting = deleting
         self.desired = desired
         self.paused = paused
         self.policy_touched = policy_touched

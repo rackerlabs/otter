@@ -7,15 +7,15 @@ def execute_group_transition(current):
     """
     Compare the current state w.r.t what is desired and execute actions that need
     to be performed to come to desired state
-    :return: deferred when all actions are executed
+    :return: deferred that fires when all actions are executed
     """
     # TODO: Consider adding to load balancer also
 
     # TODO: Decide on handling errors from executing nova calls.
     # If overLimit, then pause the group and so on
 
-    # child build times
-    d = check_build_times(current)
+    # child build and delete times
+    d = check_times(current)
 
     # delete servers in error state
     del_err_deferred = delete_error_servers(current)
@@ -64,21 +64,33 @@ def delete_error_servers(log, state):
     deferreds = []
     for server_id in state.error:
         d = delete_server(server_id).addCallback(remove_server, server_id)
+        # TODO: Put group in error state if delete fails
         d.addErrback(log.err, 'Could not delete server in error', server_id=server_id)
         deferreds.append(d) # TODO: schedule to execute state transition after some time
 
     return defer.gatherResults(deferreds, consumeErrors=True)
 
 
-def check_build_times(log, state):
+def check_times(log, state):
     """
-    Check build time of pending servers and possibly? delete them if they have
-    been building for too long
+    Check the time since servers has been building and deleting. If they take too long,
+    delete them
     """
-    for server_id, info in current.pending.items():
+    deferreds = []
+    for server_id, info in state.pending.items():
         if datetime.utcnow() - info['created_at'] > timedelta(hours=1):
             log.err('server building for too long', server_id=server_id)
-    return defer.succeed(None)
+            d = supervisor.delete_server(server_id)
+            d.addCallback(lambda _, server_id: state.remove_pending(server_id), server_id)
+            deferreds.append(d)
+    for server_id, info in state.deleting.items():
+        if datetime.utcnow() - info['delete_at'] > timedelta(hours=1):
+            log.err('server deleting for too long', server_id=server_id)
+            d = supervisor.delete_server(server_id)
+            d.addCallback(lambda _, server_id: state.remove_deleting(server_id), server_id)
+            deferreds.append(d)
+    # TODO: If any of the delete call fails, put the group in error state
+    return defer.gatherResults(deferreds, consumeErrors=True)
 
 
 #------------- State transition events---------------
@@ -108,6 +120,8 @@ def server_deleted(group, state, instance_id):
         state.remove_pending(instance_id)
     elif instance_id in state.error:
         state.remove_error(instance_id)
+    elif instance_id in state.deleting:
+        state.remove_deleting(instance_id)
     else:
         # ERROR. A server we did not track got deleted
         log.msg('Untracked server deleted')
