@@ -130,6 +130,9 @@ class Supervisor(object):
                 auth_token,
                 launch_config['args'])
 
+        if launch_config['type'] != 'launch_server':
+            raise NotImplementedError('Validating launch config for launch_server only')
+
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)
         d = self.auth_function(tenant_id)
