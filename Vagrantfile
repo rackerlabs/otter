@@ -26,6 +26,9 @@ Vagrant::Config.run do |config|
     # Add raring kernel
     pkg_cmd << "apt-get install -y -q linux-image-generic-lts-raring linux-headers-generic-lts-raring; "
 
+    # Add git
+    pkg_cmd << "apt-get install -q -y git; "
+
     # Add guest additions if local vbox VM
     is_vbox = true
     ARGV.each do |arg| is_vbox &&= !arg.downcase.start_with?("--provider") end

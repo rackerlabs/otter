@@ -1,19 +1,21 @@
 {
-    "environment": "staging",
-    "region": "ORD",
-    "url_root": "http://127.0.0.1:9000",
-    "cassandra": {
-        "seed_hosts": ["tcp:127.0.0.1:9160"],
-        "keyspace": "otter"
-    },
-    "identity": {
-        "username": "autoscale",
-        "password": "REPLACE_WITH_REAL_PASSWORD",
-        "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
-        "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
-    },
-    "scheduler": {
-        "interval": 10,
-        "batchsize": 100
-    }
+  "cassandra": {
+    "keyspace": "otter", 
+    "seed_hosts": [
+      "tcp:127.0.0.1:9160"
+    ]
+  }, 
+  "environment": "staging", 
+  "identity": {
+    "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0", 
+    "password": null, 
+    "url": "https://staging.identity.api.rackspacecloud.com/v2.0", 
+    "username": "autoscale"
+  }, 
+  "region": "ORD", 
+  "scheduler": {
+    "batchsize": 100, 
+    "interval": 10
+  }, 
+  "url_root": "http://127.0.0.1:9000"
 }
