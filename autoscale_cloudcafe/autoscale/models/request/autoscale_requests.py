@@ -80,6 +80,132 @@ class Update_Policy_Request(AutoMarshallingModel):
         return json.dumps(self._auto_to_dict())
 
 
+class Maas_Policy_Request(AutoMarshallingModel):
+    """
+    Marshalling for maas policy requests
+    """
+
+    def __init__(self, name, cooldown, change=None, change_percent=None,
+                 desired_capacity=None, policy_type=None, check_label=None,
+                 check_type=None, check_url=None, check_method=None,
+                 monitoring_zones=None, check_timeout=None, check_period=None,
+                 target_alias=None, alarm_criteria=None):
+        super(Maas_Policy_Request, self).__init__()
+        self.name = name
+        self.cooldown = cooldown
+        self.change = change
+        self.changePercent = change_percent
+        self.desiredCapacity = desired_capacity
+        self.type = policy_type
+        self.check_label = check_label
+        self.check_type = check_type
+        self.check_url = check_url
+        self.check_method = check_method
+        self.monitoring_zones = monitoring_zones
+        self.check_timeout = check_timeout
+        self.check_period = check_period
+        self.target_alias = target_alias
+        self.alarm_criteria = alarm_criteria
+
+    def _obj_to_json(self):
+        body = {}
+        if self.name:
+            body['name'] = self.name
+        if self.cooldown:
+            body['cooldown'] = self.cooldown
+        if self.type:
+            body['type'] = self.type
+        if self.change_percent:
+            body['changePercent'] = self.change_percent
+        if self.change:
+            body['change'] = self.change
+        if self.desired_capacity:
+            body['desiredCapacity'] = self.desired_capacity
+        if self.check_label:
+            body['args']['check']['label'] = self.check_label
+        if self.check_type:
+            body['args']['check']['type'] = self.check_type
+        if self.check_timeout:
+            body['args']['check']['timeout'] = self.check_timeout
+        if self.check_period:
+            body['args']['check']['period'] = self.check_period
+        if self.check_period:
+            body['args']['check']['period'] = self.check_period
+        if self.check_type:
+            body['args']['check']['target_alias'] = self.target_alias
+        if self.check_url and self.check_method:
+            body['args']['check']['details']['url'] = self.check_url
+            body['args']['check']['details']['method'] = self.check_method
+        else:
+            body['args']['check']['details'] = {}
+        if self.alarm_criteria:
+            body['args']['alarm_criteria']['criteria'] = self.alarm_criteria
+        return [json.dumps(body)]
+
+
+class Update_Maas_Policy_Request(AutoMarshallingModel):
+    """
+    Marshalling for maas policy requests
+    """
+
+    def __init__(self, name, cooldown, change=None, change_percent=None,
+                 desired_capacity=None, policy_type=None, check_label=None,
+                 check_type=None, check_url=None, check_method=None,
+                 monitoring_zones=None, check_timeout=None, check_period=None,
+                 target_alias=None, alarm_criteria=None):
+        super(Update_Maas_Policy_Request, self).__init__()
+        self.name = name
+        self.cooldown = cooldown
+        self.change = change
+        self.changePercent = change_percent
+        self.desiredCapacity = desired_capacity
+        self.type = policy_type
+        self.check_label = check_label
+        self.check_type = check_type
+        self.check_url = check_url
+        self.check_method = check_method
+        self.monitoring_zones = monitoring_zones
+        self.check_timeout = check_timeout
+        self.check_period = check_period
+        self.target_alias = target_alias
+        self.alarm_criteria = alarm_criteria
+
+    def _obj_to_json(self):
+        body = {}
+        if self.name:
+            body['name'] = self.name
+        if self.cooldown:
+            body['cooldown'] = self.cooldown
+        if self.type:
+            body['type'] = self.type
+        if self.change_percent:
+            body['changePercent'] = self.change_percent
+        if self.change:
+            body['change'] = self.change
+        if self.desired_capacity:
+            body['desiredCapacity'] = self.desired_capacity
+        if self.check_label:
+            body['args']['check']['label'] = self.check_label
+        if self.check_type:
+            body['args']['check']['type'] = self.check_type
+        if self.check_timeout:
+            body['args']['check']['timeout'] = self.check_timeout
+        if self.check_period:
+            body['args']['check']['period'] = self.check_period
+        if self.check_period:
+            body['args']['check']['period'] = self.check_period
+        if self.check_type:
+            body['args']['check']['target_alias'] = self.target_alias
+        if self.check_url and self.check_method:
+            body['args']['check']['details']['url'] = self.check_url
+            body['args']['check']['details']['method'] = self.check_method
+        else:
+            body['args']['check']['details'] = {}
+        if self.alarm_criteria:
+            body['args']['alarm_criteria']['criteria'] = self.alarm_criteria
+        return json.dumps(body)
+
+
 class Group_Request(AutoMarshallingModel):
     """
     Marshalling for group requests
