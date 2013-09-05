@@ -11,7 +11,8 @@ import json
 
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
-from otter.rest.decorators import validate_body, fails_with, succeeds_with
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   log_arguments)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -214,6 +215,7 @@ class OtterWebhooks(object):
     @app.route('/<string:webhook_id>/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
+    @log_arguments
     def get_webhook(self, request, webhook_id):
         """
         Get a webhook which has a name, some arbitrary metdata, and a capability
@@ -255,6 +257,7 @@ class OtterWebhooks(object):
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
+    @log_arguments
     def update_webhook(self, request, webhook_id, data):
         """
         Update a particular webhook.
@@ -278,6 +281,7 @@ class OtterWebhooks(object):
     @app.route('/<string:webhook_id>/', methods=['DELETE'])
     @fails_with(exception_codes)
     @succeeds_with(204)
+    @log_arguments
     def delete_webhook(self, request, webhook_id):
         """
         Deletes a particular webhook.

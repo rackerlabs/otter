@@ -9,7 +9,8 @@ from functools import partial
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
-from otter.rest.decorators import validate_body, fails_with, succeeds_with
+from otter.rest.decorators import (validate_body, fails_with,
+                                   succeeds_with, log_arguments)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -209,6 +210,7 @@ class OtterPolicies(object):
     @app.route('/<string:policy_id>/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
+    @log_arguments
     def get_policy(self, request, policy_id):
         """
         Get a scaling policy which describes an id, name, type, adjustment, and
@@ -247,6 +249,7 @@ class OtterPolicies(object):
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
+    @log_arguments
     def update_policy(self, request, policy_id, data):
         """
         Updates a scaling policy. Scaling policies must include a name, type,
@@ -270,6 +273,7 @@ class OtterPolicies(object):
     @app.route('/<string:policy_id>/', methods=['DELETE'])
     @fails_with(exception_codes)
     @succeeds_with(204)
+    @log_arguments
     def delete_policy(self, request, policy_id):
         """
         Delete a scaling policy. If successful, no response body will be returned.
@@ -281,6 +285,7 @@ class OtterPolicies(object):
     @app.route('/<string:policy_id>/execute/', methods=['POST'])
     @fails_with(exception_codes)
     @succeeds_with(202)
+    @log_arguments
     def execute_policy(self, request, policy_id):
         """
         Execute this scaling policy.
