@@ -112,6 +112,17 @@ def bind_log(f):
     return _
 
 
+def log_arguments(f):
+    """
+    Binds all arguments that are not 'self' or 'request' to self.log
+    """
+    @wraps(f)
+    def _(self, request, *args, **kwargs):
+        self.log = self.log.bind(**kwargs)
+        return f(self, request, *args, **kwargs)
+    return _
+
+
 def with_transaction_id():
     """
     Generates a request txnid

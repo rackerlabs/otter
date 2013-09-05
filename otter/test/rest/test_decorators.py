@@ -14,7 +14,7 @@ from twisted.python.failure import Failure
 
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
-    with_transaction_id)
+    with_transaction_id, log_arguments)
 from otter.test.utils import patch
 
 
@@ -418,3 +418,53 @@ class ValidateBodyTestCase(TestCase):
                 return defer.succeed((args, kwargs))
 
         self.failureResultOf(FakeApp().handle_body(self.request), ValidationError)
+
+
+class LogArgumentsTestCase(TestCase):
+    """
+    Tests for the `log_arguments` decorator
+    """
+
+    def setUp(self):
+        """
+        SetUp a mock request and log for testing `log_arguments`.
+        """
+        self.mockRequest = mock.MagicMock()
+        self.mockRequest.code = 200
+        self.mockRequest.uri = '/'
+
+        self.mockLog = mock.MagicMock()
+
+    def test_no_arguments_logged(self):
+        """
+        Nothing is bound to the log on routes with no extra arguments.
+        """
+        class FakeApp(object):
+            log = self.mockLog
+
+            @log_arguments
+            def doWork(self, request):
+                return defer.succeed('')
+
+        d = FakeApp().doWork(self.mockRequest)
+        self.successResultOf(d)
+
+        self.mockLog.bind.assert_called_once_with()
+
+    def test_multiple_arguments_logged(self):
+        """
+        Extra kwargs are bound to the log
+        """
+        class FakeApp(object):
+            log = self.mockLog
+
+            @log_arguments
+            def doWork(self, request, extra_arg1, **kwargs):
+                return defer.succeed('')
+
+        kwargs = {'truth': 42}
+
+        d = FakeApp().doWork(self.mockRequest, 'ignored', **kwargs)
+        self.successResultOf(d)
+
+        self.mockLog.bind.assert_called_once_with(**kwargs)
