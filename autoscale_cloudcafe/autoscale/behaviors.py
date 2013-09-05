@@ -192,6 +192,72 @@ class AutoscaleBehaviors(BaseBehavior):
                 headers=create_response.headers)
             return policy
 
+    def create_maas_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
+                                 sp_change=None, sp_change_percent=None,
+                                 sp_desired_capacity=None, sp_policy_type='cloud_monitoring',
+                                 check_label=None, check_type=None, check_url=None, check_method=None,
+                                 monitoring_zones=None, check_timeout=None,
+                                 check_period=None, alarm_criteria=None,
+                                 check_disabled=None, check_metadata=None,
+                                 target_alias=None, target_hostname=None,
+                                 target_resolver=None):
+        """
+        :summary: creates the specified policy for the given schedule
+        :return: returns the newly created policy object
+        :rtype: returns the policy object
+        """
+        sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
+        check_label = check_label or rand_name('scaling_group_check')
+        sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
+        check_type = check_type or int(self.autoscale_config.check_type)
+        check_url = check_url or int(self.autoscale_config.check_url)
+        check_method = check_method or int(self.autoscale_config.check_method)
+        check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
+        check_period = check_period or int(self.autoscale_config.check_period)
+        monitoring_zones = monitoring_zones or int(self.autoscale_config.monitoring_zones)
+        target_alias = target_alias or int(self.autoscale_config.target_alias)
+        if sp_change_percent is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change_percent=sp_change_percent, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
+        elif sp_desired_capacity is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                desired_capacity=sp_desired_capacity, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
+        else:
+            sp_change = sp_change or int(self.autoscale_config.sp_change)
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change=sp_change, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
+        if create_response.status_code != 201:
+            return dict(status_code=create_response.status_code)
+        else:
+            policy = AutoscaleBehaviors.get_policy_properties(
+                self, policy_list=create_response.entity, status_code=create_response.status_code,
+                headers=create_response.headers)
+            return policy
+
     def get_time_in_utc(self, delay):
         """
         Given the delay in seconds, returns current time in utc + the delay

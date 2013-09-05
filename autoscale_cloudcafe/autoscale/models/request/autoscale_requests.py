@@ -7,6 +7,7 @@ import json
 
 
 class Webhook_Request(AutoMarshallingModel):
+
     """
     Marshalling for webhook requests
     """
@@ -24,6 +25,7 @@ class Webhook_Request(AutoMarshallingModel):
 
 
 class Update_Webhook_Request(AutoMarshallingModel):
+
     """
     Marshalling for update webhook requests
     """
@@ -39,6 +41,7 @@ class Update_Webhook_Request(AutoMarshallingModel):
 
 
 class Policy_Request(AutoMarshallingModel):
+
     """
     Marshalling for policy requests
     """
@@ -61,6 +64,7 @@ class Policy_Request(AutoMarshallingModel):
 
 
 class Update_Policy_Request(AutoMarshallingModel):
+
     """
     Marshalling for update policy requests
     """
@@ -81,6 +85,7 @@ class Update_Policy_Request(AutoMarshallingModel):
 
 
 class Maas_Policy_Request(AutoMarshallingModel):
+
     """
     Marshalling for maas policy requests
     """
@@ -89,7 +94,9 @@ class Maas_Policy_Request(AutoMarshallingModel):
                  desired_capacity=None, policy_type=None, check_label=None,
                  check_type=None, check_url=None, check_method=None,
                  monitoring_zones=None, check_timeout=None, check_period=None,
-                 target_alias=None, alarm_criteria=None):
+                 target_alias=None, alarm_criteria=None, check_disabled=None,
+                 check_metadata=None, target_hostname=None,
+                 target_resolver=None):
         super(Maas_Policy_Request, self).__init__()
         self.name = name
         self.cooldown = cooldown
@@ -106,6 +113,10 @@ class Maas_Policy_Request(AutoMarshallingModel):
         self.check_period = check_period
         self.target_alias = target_alias
         self.alarm_criteria = alarm_criteria
+        self.check_disabled = check_disabled
+        self.check_metadata = check_metadata
+        self.target_hostname = target_hostname
+        self.target_resolver = target_resolver
 
     def _obj_to_json(self):
         body = {}
@@ -129,10 +140,19 @@ class Maas_Policy_Request(AutoMarshallingModel):
             body['args']['check']['timeout'] = self.check_timeout
         if self.check_period:
             body['args']['check']['period'] = self.check_period
-        if self.check_period:
-            body['args']['check']['period'] = self.check_period
-        if self.check_type:
+        if self.check_disabled:
+            body['args']['check']['disabled'] = self.check_disabled
+        if self.check_metadata:
+            body['args']['check']['metadata'] = self.check_metadata
+        if self.monitoring_zones:
+            body['args']['check'][
+                'monitoring_zones_poll'] = self.monitoring_zones
+        if self.target_alias:
             body['args']['check']['target_alias'] = self.target_alias
+        if self.target_hostname:
+            body['args']['check']['target_hostname'] = self.target_hostname
+        if self.target_resolver:
+            body['args']['check']['target_resolver'] = self.target_resolver
         if self.check_url and self.check_method:
             body['args']['check']['details']['url'] = self.check_url
             body['args']['check']['details']['method'] = self.check_method
@@ -144,6 +164,7 @@ class Maas_Policy_Request(AutoMarshallingModel):
 
 
 class Update_Maas_Policy_Request(AutoMarshallingModel):
+
     """
     Marshalling for maas policy requests
     """
@@ -207,6 +228,7 @@ class Update_Maas_Policy_Request(AutoMarshallingModel):
 
 
 class Group_Request(AutoMarshallingModel):
+
     """
     Marshalling for group requests
     """
@@ -225,6 +247,7 @@ class Group_Request(AutoMarshallingModel):
 
 
 class Config_Request(AutoMarshallingModel):
+
     """
     Marshalling for group config requests
     """
@@ -254,12 +277,13 @@ class Config_Request(AutoMarshallingModel):
                 'args': json.loads(server_json)}
         if self.load_balancers:
             body['args']['loadBalancers'] = self.load_balancers
-        #if self.disk_config:
+        # if self.disk_config:
         #    del body['args']['server']['diskConfig']
         return json.dumps(body)
 
 
 class ScalingGroup_Request(AutoMarshallingModel):
+
     """
     Marshalling for scaling group requests
     """
