@@ -12,7 +12,13 @@ def execute_group_transition(current):
     # TODO: Consider adding to load balancer also
 
     # TODO: Decide on handling errors from executing nova calls.
-    # If overLimit, then pause the group and so on
+    def handle_service_errors(failure):
+        """
+        Decide how to handle errors occurred from calling dependent services like
+        nova/loadbalancer
+        """
+        # For example, If API-ratelimited, then pause the group till time expires
+        pass
 
     # child build and delete times
     d = check_times(current)
@@ -31,6 +37,13 @@ def execute_group_transition(current):
 
     return gatherResults([d.addCallback(check_desired), del_err_deferred],
                          consumeErrors=True).addCallback(lambda _: current)
+
+
+def collect_errors(results):
+    errors = [error for succeeded, error in results if not succeeded]
+    if errors:
+        raise APIErrors(errors)
+    return None
 
 
 def execute_scale_up(state, delta):
@@ -60,6 +73,7 @@ def delete_error_servers(log, state):
 
     def remove_server(_, server_id):
         state.remove_error(server_id)
+        state.add_deleting(server_id)
 
     deferreds = []
     for server_id in state.error:
@@ -73,24 +87,34 @@ def delete_error_servers(log, state):
 
 def check_times(log, state):
     """
-    Check the time since servers has been building and deleting. If they take too long,
+    Check the time since servers has been building and deleting. If they take too long, try to
     delete them
     """
+
+    def remove_pending(_, server_id):
+        state.remove_pending(server_id)
+        state.add_deleting(server_id)
+
     deferreds = []
     for server_id, info in state.pending.items():
         if datetime.utcnow() - info['created_at'] > timedelta(hours=1):
-            log.err('server building for too long', server_id=server_id)
+            log.msg('server building for too long', server_id=server_id)
             d = supervisor.delete_server(server_id)
-            d.addCallback(lambda _, server_id: state.remove_pending(server_id), server_id)
+            d.addCallback(remove_pending, server_id)
+            d.addErrback(ignore_request_api_error, 404, log, 'Server already deleted',
+                         server_id=server_id)
             deferreds.append(d)
     for server_id, info in state.deleting.items():
         if datetime.utcnow() - info['delete_at'] > timedelta(hours=1):
-            log.err('server deleting for too long', server_id=server_id)
+            log.msg('server deleting for too long', server_id=server_id)
             d = supervisor.delete_server(server_id)
             d.addCallback(lambda _, server_id: state.remove_deleting(server_id), server_id)
+            d.addErrback(ignore_request_api_error, 404, log, 'Server already deleted',
+                         server_id=server_id)
             deferreds.append(d)
-    # TODO: If any of the delete call fails, put the group in error state
-    return defer.gatherResults(deferreds, consumeErrors=True)
+
+    d = defer.DeferredList(deferreds, consumeErrors=True)
+    return d.addCallback(collect_errors)
 
 
 #------------- State transition events---------------
