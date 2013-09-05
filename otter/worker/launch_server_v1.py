@@ -64,7 +64,7 @@ def server_details(server_endpoint, auth_token, server_id):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_details')
+    d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
