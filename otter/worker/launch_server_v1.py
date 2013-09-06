@@ -294,7 +294,7 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     server_name_suffix = server_config.get('name')
     if server_name_suffix:
-        name_parts.append(server_name_suffix)
+        name_parts.insert(0, server_name_suffix)
 
     server_config['name'] = '-'.join(name_parts)
 
