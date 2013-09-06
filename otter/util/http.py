@@ -7,6 +7,8 @@ from urllib import quote
 
 import treq
 
+from otter.util.config import config_value
+
 
 class RequestError(Exception):
     """
@@ -133,3 +135,112 @@ def headers(auth_token=None):
         h['x-auth-token'] = [auth_token]
 
     return h
+
+
+def get_url_root():
+    """
+    Get the URL root
+    :return: string containing the URL root
+    """
+    return config_value('url_root')
+
+
+def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
+                        webhook_id=None, capability_hash=None,
+                        capability_version="1", format="json",
+                        api_version="1.0"):
+    """
+    Generates links into the autoscale system, based on the ids given.  If
+    the format is "json", then a JSON blob will be given in the form of::
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          }
+        ]
+
+    Otherwise, the return value will just be the link.
+
+    :param tenant_id: the tenant ID of the user
+    :type tenant_id: ``str``
+
+    :param group_id: the scaling group UUID - if not provided then the link(s)
+        will be just the link to listing all scaling groups for the tenant
+        ID/creating an autoscale group.
+    :type group_id: ``str`` or ``None``
+
+    :param policy_id: the scaling policy UUID - if not provided (and `group_id`
+        is provided)then the link(s) will be just the link to the scaling group,
+        and if blank then the link(s) will to listings of all the policies
+        for the scaling group.
+    :type policy_id: ``str`` or ``None``
+
+    :param webhook_id: the webhook UUID - if not provided (and `group_id` and
+        `policy_id` are provided) then the link(s) will be just the link to the
+        scaling policy, and if blank then the link(s) will to listings of all
+        the webhooks for the scaling policy
+    :type webhook_id: ``str`` or ``None``
+
+    :param format: whether to return a bunch of links in JSON format
+    :type format: ``str`` that should be 'json' if the JSON format is desired
+
+    :param api_version: Which API version to provide links to - generally
+        should not be overriden
+    :type api_version: ``str``
+
+    :param capability_hash: a unique value for the capability url
+    :type capability_hash: ``str``
+
+    :param capability_version: capability hash generation version - defaults to
+        1
+    :type capability_version: ``str``
+
+    :return: JSON blob if `format="json"` is given, a ``str`` containing a link
+        else
+    """
+    api = "v{0}".format(api_version)
+    segments = [get_url_root(), api, tenant_id, "groups"]
+
+    if group_id is not None:
+        segments.append(group_id)
+        if policy_id is not None:
+            segments.extend(("policies", policy_id))
+            if webhook_id is not None:
+                segments.extend(("webhooks", webhook_id))
+
+    if segments[-1] != '':
+        segments.append('')
+
+    url = append_segments(*segments)
+
+    if format == "json":
+        links = [
+            {"href": url, "rel": "self"}
+        ]
+
+        if capability_hash is not None:
+            capability_url = append_segments(
+                get_url_root(),
+                api,
+                "execute",
+                capability_version,
+                capability_hash, '')
+
+            links.append({"href": capability_url, "rel": "capability"})
+
+        return links
+    else:
+        return url
+
+
+def transaction_id(request):
+    """
+    Extract the transaction id from the given request.
+
+    :param IRequest request: The request we are trying to get the
+        transaction id for.
+
+    :returns: A string transaction id.
+    """
+    return request.responseHeaders.getRawHeaders('X-Response-Id')[0]
