@@ -61,11 +61,10 @@ http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addRol
 </section>
 <section xml:id="rolesAvailable">
 <title>Roles Available to &PROD; </title>
-    <para>
-      Currently, three roles can be used to access the &PROD; API. These roles, admin, creator, and observer,
-        apply to this specific product. The following table
-        describes these roles and their permissions.
-    </para>
+    <para> Currently, three roles can be used to access the &PROD;
+            API. These roles, admin, and observer, apply to this
+            specific product. The following table describes these
+            roles and their permissions. </para>
 <table rules="all" xml:id="RBAC_product_roles_table">
     <caption>&PROD; Product Roles and Capabilities</caption>
 <col width="50%"/>
@@ -85,12 +84,7 @@ http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/POST_addRol
 across a specific product, where access is
 granted</td>
 </tr>
-<tr>
-<td>
-<code>autoscale:creator</code></td>
-<td>Create, Read, and Update permissions across a
-specific product, where access is granted</td>
-</tr>
+<tr/>
 <tr>
 <td>
 <code>autoscale:observer</code></td>
