@@ -7,13 +7,19 @@ TODO: Apart from this, add schema validation to a minimum extent
 from twisted.internet import defer
 import treq
 
-from jsonschema import ValidationError
-
-from otter.util.deferredutils import unwrap_first_error
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
+
+
+class InvalidLaunchConfiguration(Exception):
+    """
+    Represents an invalid launch configuration
+    """
+    def __init__(self, message):
+        super(Exception, self).__init__(message)
+        self.message = message
 
 
 def get_service_endpoint(service_catalog, region):
@@ -32,7 +38,7 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
     Validate launch_server type configuration
 
     :returns: Deferred that is fired if configuration is valid and errback(ed) with
-              `ValidationError` if invalid
+              `InvalidLaunchConfiguration` if invalid
     """
 
     server = launch_config['server']
@@ -44,13 +50,24 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         (validate_personality, 'personality')
     ]
 
+    def collect_errors(results):
+        failures = [result for succeeded, result in results if not succeeded]
+        if not failures:
+            return None
+        if len(failures) > 1:
+            msg = ('Following problems with launch configuration:\n' +
+                   '\n'.join([failure.value.message for failure in failures]))
+            raise InvalidLaunchConfiguration(msg)
+        else:
+            return failures[0]
+
     def raise_validation_error(failure, prop):
         log.msg('Validation of "{}" property in launchConfiguration failed'.format(prop),
                 reason=failure)
-        if failure.check(ValidationError):
+        if failure.check(InvalidLaunchConfiguration):
             return failure
         else:
-            raise ValidationError('Invalid "{}" in launchConfiguration'.format(prop))
+            raise InvalidLaunchConfiguration('Invalid "{}" in launchConfiguration'.format(prop))
 
     service_endpoint = get_service_endpoint(service_catalog, region)
     deferreds = []
@@ -60,12 +77,13 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
             d = validate(log, auth_token, service_endpoint, prop_value)
             d.addErrback(raise_validation_error, prop)
             deferreds.append(d)
-    return defer.gatherResults(deferreds, consumeErrors=True).addErrback(unwrap_first_error)
+
+    return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
     """
-    Validate Image
+    Validate Image by getting the image information. It ensures that image is active
     """
     d = treq.get(append_segments(server_endpoint, 'images', image_ref),
                  headers=headers(auth_token))
@@ -74,7 +92,7 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
 
     def is_image_active(image_detail):
         if image_detail['image']['status'] != 'ACTIVE':
-            raise ValidationError('Image "{}" is not active'.format(image_ref))
+            raise InvalidLaunchConfiguration('Image "{}" is not active'.format(image_ref))
 
     d.addCallback(treq.json_content)
     return d.addCallback(is_image_active)
@@ -82,7 +100,7 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
 
 def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     """
-    Validate flavor
+    Validate flavor by getting its information
     """
     d = treq.get(append_segments(server_endpoint, 'flavors', flavor_ref),
                  headers=headers(auth_token))

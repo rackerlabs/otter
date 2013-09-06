@@ -6,13 +6,12 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from jsonschema import ValidationError
-
 from otter.test.utils import mock_log, patch, mock_treq
 from otter.util.config import set_config_data
 
 from otter.worker.validate_config import (validate_launch_server_config, validate_image,
-                                          validate_flavor, get_service_endpoint)
+                                          validate_flavor, get_service_endpoint,
+                                          InvalidLaunchConfiguration)
 
 
 class ValidateLaunchServerConfigTests(TestCase):
@@ -57,50 +56,51 @@ class ValidateLaunchServerConfigTests(TestCase):
 
     def test_invalid_image(self):
         """
-        Invalid image causes ValidationError
+        Invalid image causes InvalidLaunchConfiguration
         """
-        self.validate_image.return_value = defer.fail(ValidationError(':('))
+        self.validate_image.return_value = defer.fail(InvalidLaunchConfiguration(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        f = self.failureResultOf(d, ValidationError)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
         self.assertEqual(f.value.message, ':(')
 
     def test_invalid_flavor(self):
         """
-        Invalid flavor causes ValidationError
+        Invalid flavor causes InvalidLaunchConfiguration
         """
-        self.validate_flavor.return_value = defer.fail(ValidationError(':('))
+        self.validate_flavor.return_value = defer.fail(InvalidLaunchConfiguration(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        f = self.failureResultOf(d, ValidationError)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
         self.assertEqual(f.value.message, ':(')
 
     def test_invalid_image_and_flavor(self):
         """
-        ValidationError is raised if both image and flavor are invalid
+        InvalidLaunchConfiguration is raised if both image and flavor are invalid
         """
-        self.validate_image.return_value = defer.fail(ValidationError(':('))
-        self.validate_flavor.return_value = defer.fail(ValidationError(":'("))
+        self.validate_image.return_value = defer.fail(InvalidLaunchConfiguration('image problem'))
+        self.validate_flavor.return_value = defer.fail(InvalidLaunchConfiguration('flavor problem'))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        self.failureResultOf(d, ValidationError)
-        # It is not well defined (maybe I dont know) which validationerror
-        # will be picked up. hence not checking value
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
+        self.assertEqual(
+            f.value.message,
+            'Following problems with launch configuration:\nimage problem\nflavor problem')
 
     def test_other_error_raised(self):
         """
-        `ValidationError` is raised even if any of the internal validate_* functions raise some
-        other error
+        `InvalidLaunchConfiguration` is raised even if any of the internal validate_* functions
+        raise some other error
         """
         self.validate_image.return_value = defer.fail(ValueError(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        f = self.failureResultOf(d, ValidationError)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
         self.assertEqual(f.value.message, 'Invalid "imageRef" in launchConfiguration')
 
     def test_validation_error_logged(self):
         """
-        `ValidationError` is logged as msg
+        `InvalidLaunchConfiguration` is logged as msg
         """
-        self.validate_image.return_value = defer.fail(ValidationError(':('))
+        self.validate_image.return_value = defer.fail(InvalidLaunchConfiguration(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        f = self.failureResultOf(d, ValidationError)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
         self.log.msg.assert_called_once_with(
             'Validation of "imageRef" property in launchConfiguration failed',
             reason=f)
@@ -145,11 +145,11 @@ class ValidateImageTests(TestCase):
 
     def test_inactive_image(self):
         """
-        `ValidationError` is raised if given image is inactive
+        `InvalidLaunchConfiguration` is raised if given image is inactive
         """
         self.treq.json_content.return_value = defer.succeed({'image': {'status': 'INACTIVE'}})
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
-        f = self.failureResultOf(d, ValidationError)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
         self.assertEqual(f.value.message, 'Image "image_ref" is not active')
 
     def test_unknown_image(self):
@@ -167,6 +167,7 @@ class ValidateImageTests(TestCase):
         self.treq.get.return_value = defer.succeed(mock.MagicMock(code=500))
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.failureResultOf(d)
+
 
 class ValidateFlavorTests(TestCase):
     """
@@ -208,11 +209,17 @@ class GetServiceEndpointTests(TestCase):
     """
 
     def setUp(self):
+        """
+        Mock public_endpoint_url and set_config_data
+        """
         set_config_data({'cloudServersOpenStack': 'cloud'})
         self.public_endpoint_url = patch(self, 'otter.worker.validate_config.public_endpoint_url',
                                          return_value='http://service')
 
     def tearDown(self):
+        """
+        Reset config data
+        """
         set_config_data({})
 
     def test_works(self):

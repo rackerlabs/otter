@@ -269,7 +269,7 @@ class ValidateLaunchConfigTests(SupervisorTests):
         Only launch_server type is allowed
         """
         self.assertRaises(NotImplementedError, self.supervisor.validate_launch_config,
-                          self.log, self.group.tenant_id, {'type':'delete_server'})
+                          self.log, self.group.tenant_id, {'type': 'delete_server'})
 
     def test_log_binds(self):
         """
