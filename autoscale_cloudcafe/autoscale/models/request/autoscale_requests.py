@@ -101,8 +101,8 @@ class Maas_Policy_Request(AutoMarshallingModel):
         self.name = name
         self.cooldown = cooldown
         self.change = change
-        self.changePercent = change_percent
-        self.desiredCapacity = desired_capacity
+        self.change_percent = change_percent
+        self.desired_capacity = desired_capacity
         self.type = policy_type
         self.check_label = check_label
         self.check_type = check_type
@@ -119,7 +119,7 @@ class Maas_Policy_Request(AutoMarshallingModel):
         self.target_resolver = target_resolver
 
     def _obj_to_json(self):
-        body = {}
+        body = {'args': {'check': {}, 'alarm_criteria': {}}}
         if self.name:
             body['name'] = self.name
         if self.cooldown:
@@ -153,14 +153,14 @@ class Maas_Policy_Request(AutoMarshallingModel):
             body['args']['check']['target_hostname'] = self.target_hostname
         if self.target_resolver:
             body['args']['check']['target_resolver'] = self.target_resolver
+        body['args']['check']['details'] = {}
         if self.check_url and self.check_method:
+            body['args']['check']['details'] = {}
             body['args']['check']['details']['url'] = self.check_url
             body['args']['check']['details']['method'] = self.check_method
-        else:
-            body['args']['check']['details'] = {}
         if self.alarm_criteria:
             body['args']['alarm_criteria']['criteria'] = self.alarm_criteria
-        return [json.dumps(body)]
+        return json.dumps(body)
 
 
 class Update_Maas_Policy_Request(AutoMarshallingModel):
@@ -213,8 +213,8 @@ class Update_Maas_Policy_Request(AutoMarshallingModel):
             body['args']['check']['timeout'] = self.check_timeout
         if self.check_period:
             body['args']['check']['period'] = self.check_period
-        if self.check_period:
-            body['args']['check']['period'] = self.check_period
+        if self.monitoring_zones_poll:
+            body['args']['check']['monitoring_zones'] = self.monitoring_zones_poll
         if self.check_type:
             body['args']['check']['target_alias'] = self.target_alias
         if self.check_url and self.check_method:

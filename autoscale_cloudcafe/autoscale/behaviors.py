@@ -192,30 +192,31 @@ class AutoscaleBehaviors(BaseBehavior):
                 headers=create_response.headers)
             return policy
 
-    def create_maas_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
-                                 sp_change=None, sp_change_percent=None,
-                                 sp_desired_capacity=None, sp_policy_type='cloud_monitoring',
-                                 check_label=None, check_type=None, check_url=None, check_method=None,
-                                 monitoring_zones=None, check_timeout=None,
-                                 check_period=None, alarm_criteria=None,
-                                 check_disabled=None, check_metadata=None,
-                                 target_alias=None, target_hostname=None,
-                                 target_resolver=None):
+    def create_monitoring_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
+                                       sp_change=None, sp_change_percent=None,
+                                       sp_desired_capacity=None, sp_policy_type='cloud_monitoring',
+                                       check_label=None, check_type=None, check_url=None,
+                                       check_method=None, monitoring_zones=None,
+                                       check_timeout=None, check_period=None,
+                                       alarm_criteria=None, check_disabled=None,
+                                       check_metadata=None, target_alias=None,
+                                       target_hostname=None, target_resolver=None):
         """
-        :summary: creates the specified policy for the given schedule
+        :summary: creates a monitoring policy for the given schedule
         :return: returns the newly created policy object
         :rtype: returns the policy object
         """
         sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
         check_label = check_label or rand_name('scaling_group_check')
         sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
-        check_type = check_type or int(self.autoscale_config.check_type)
-        check_url = check_url or int(self.autoscale_config.check_url)
-        check_method = check_method or int(self.autoscale_config.check_method)
+        check_type = check_type or self.autoscale_config.check_type
+        check_url = check_url or self.autoscale_config.check_url
+        check_method = check_method or self.autoscale_config.check_method
         check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
         check_period = check_period or int(self.autoscale_config.check_period)
-        monitoring_zones = monitoring_zones or int(self.autoscale_config.monitoring_zones)
-        target_alias = target_alias or int(self.autoscale_config.target_alias)
+        alarm_criteria = alarm_criteria or self.autoscale_config.alarm_criteria
+        monitoring_zones = ['mzord', 'mzdfw', 'mziad']
+        target_alias = target_alias or self.autoscale_config.target_alias
         if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
@@ -416,6 +417,67 @@ class AutoscaleBehaviors(BaseBehavior):
                         if policy_type.args.cron:
                             policy['schedule_type'] = 'cron'
                             policy['schedule_value'] = policy_type.args.cron
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.url:
+                            policy['check_url'] = policy_type.args.check.url
+                            policy['check_method'] = policy_type.args.check.method
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.type:
+                            policy['check_type'] = policy_type.args.check.type
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.label:
+                            policy['check_type'] = policy_type.args.check.label
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.disabled:
+                            policy['check_disabled'] = policy_type.args.check.disabled
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.metadata:
+                            policy['check_metadata'] = policy_type.args.check.metadata
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.period:
+                            policy['check_period'] = policy_type.args.check.period
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.timeout:
+                            policy['check_timeout'] = policy_type.args.check.timeout
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.monitoring_zones_poll:
+                            policy['monitoring_zones'] = policy_type.args.check.monitoring_zones_poll
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_alias:
+                            policy['target_alias'] = policy_type.args.check.target_alias
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_hostname:
+                            policy['target_hostname'] = policy_type.args.check.target_hostname
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_resolver:
+                            policy['target_resolver'] = policy_type.args.check.target_resolver
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.alarm_criteria:
+                            policy['alarm_criteria'] = policy_type.args.alarm_criteria.criteria
                     except AttributeError:
                         pass
             except AttributeError:
