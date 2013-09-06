@@ -34,6 +34,8 @@ from otter.util.timestamp import from_timestamp
 
 from otter.scheduler import next_cron_occurrence
 
+from otter.log import DEBUG
+
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BusyLockError
@@ -389,7 +391,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
                                                      self.group.uuid, max_retry=5,
-                                                     retry_wait=mock.ANY)
+                                                     retry_wait=mock.ANY, log=mock.ANY)
         args, kwargs = self.basic_lock_mock.call_args_list[0]
         self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
 
@@ -439,6 +441,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         second_retry_wait = kwargs['retry_wait']
         self.assertTrue(3 <= second_retry_wait <= 5)
         self.assertNotEqual(first_retry_wait, second_retry_wait)
+
+    def test_modify_state_lock_debug_log(self):
+        """
+        `modify_state` locks with debug log
+        """
+        def modifier(group, state):
+            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+
+        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
+        self.returns = [None, None]
+        log = self.group.log = mock.Mock()
+
+        self.group.modify_state(modifier)
+
+        log.bind.assert_called_once_with(system='CassScalingGroup.modify_state')
+        log.bind().bind.assert_called_once_with(level=DEBUG, category='locking')
+        self.basic_lock_mock.assert_called_once_with(
+            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=mock.ANY,
+            log=log.bind().bind())
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -1585,7 +1606,24 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         mock_rand_uniform.assert_called_once_with(3, 5)
         self.basic_lock_mock.assert_called_once_with(self.connection, 'locks', self.group.uuid,
-                                                     max_retry=5, retry_wait=3.56)
+                                                     max_retry=5, retry_wait=3.56, log=mock.ANY)
+
+    @mock.patch('otter.models.cass.random.uniform')
+    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
+    def test_delete_lock_with_debug_log(self, mock_view_state, mock_rand_uniform):
+        """
+        The lock is created with debug log
+        """
+        mock_rand_uniform.return_value = 3.56
+        log = self.group.log = mock.Mock()
+
+        self.group.delete_group()
+
+        log.bind.assert_called_once_with(system='CassScalingGroup.delete_group')
+        log.bind().bind.assert_called_once_with(level=DEBUG, category='locking')
+        self.basic_lock_mock.assert_called_once_with(
+            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=3.56,
+            log=log.bind().bind())
 
 
 # wrapper for serialization mocking - 'serialized' things will just be wrapped

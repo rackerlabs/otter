@@ -16,7 +16,7 @@ from silverberg.lock import BasicLock, BusyLockError, with_lock
 from otter.util.hashkey import generate_transaction_id
 from otter.rest.application import get_store
 from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
-from otter.log import log as otter_log
+from otter.log import log as otter_log, DEBUG
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.util.deferredutils import ignore_and_log
 
@@ -46,7 +46,7 @@ class SchedulerService(TimerService):
         from otter.models.cass import LOCK_TABLE_NAME
         self.log = otter_log.bind(system='otter.scheduler')
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0,
-                              log=self.log.bind(debug=True))
+                              log=self.log.bind(level=DEBUG))
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.clock = clock
 
@@ -65,7 +65,7 @@ class SchedulerService(TimerService):
         def _do_check():
             d = with_lock(self.lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            d.addErrback(ignore_and_log, BusyLockError, self.log,
+            d.addErrback(ignore_and_log, BusyLockError, self.log.bind(level=DEBUG),
                          "Couldn't get lock to process events")
             d.addErrback(self.log.err)
             return d
@@ -84,7 +84,7 @@ class SchedulerService(TimerService):
             if not len(events):
                 return events, set()
 
-            log.msg('Processing events', num_events=len(events))
+            log.debug('Processing events', num_events=len(events))
 
             deleted_policy_ids = set()
 
@@ -124,7 +124,7 @@ class SchedulerService(TimerService):
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
-        log.msg('Checking for events')
+        log.debug('Checking for events')
         deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
         deferred.addCallback(update_delete_events)

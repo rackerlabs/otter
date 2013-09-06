@@ -14,6 +14,7 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.scheduler import next_cron_occurrence
+from otter.log import DEBUG
 
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
@@ -441,8 +442,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
-        log = self.log.bind(system='CassScalingGroup.modify_state',
-                            debug=True, category='locking')
+        log = self.log.bind(system='CassScalingGroup.modify_state')
 
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -465,7 +465,8 @@ class CassScalingGroup(object):
             return d.addCallback(_write_state)
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5), log=log)
+                         max_retry=5, retry_wait=random.uniform(3, 5),
+                         log=log.bind(level=DEBUG, category='locking'))
 
         return with_lock(lock, _modify_state)
 
@@ -759,8 +760,7 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
         """
-        log = self.log.bind(system='CassScalingGroup.delete_group', debug=True,
-                            category='locking')
+        log = self.log.bind(system='CassScalingGroup.delete_group')
 
         # Events can only be deleted by policy id, since that and trigger are
         # the only parts of the compound key
@@ -798,7 +798,8 @@ class CassScalingGroup(object):
             return d
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5), log=log)
+                         max_retry=5, retry_wait=random.uniform(3, 5),
+                         log=log.bind(level=DEBUG, category='locking'))
 
         return with_lock(lock, _delete_group)
 
