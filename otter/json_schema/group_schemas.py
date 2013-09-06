@@ -11,6 +11,7 @@ from croniter import croniter
 
 from otter.util.timestamp import from_timestamp
 from otter.json_schema import format_checker
+from jsonschema import ValidationError
 
 # This is built using union types which may not be available in Draft 4
 # see: http://stackoverflow.com/questions/9029524/json-schema-specify-field-is-
@@ -33,7 +34,7 @@ from otter.json_schema import format_checker
 # Launch Schemas
 #
 
-MAX_ENTITIES = 25
+MAX_ENTITIES = 1000
 MAX_COOLDOWN = 86400   # 24 * 60 * 60
 
 metadata = {
@@ -220,7 +221,7 @@ def validate_datetime(dt_str):
         raise ValueError('Error parsing datetime str')
     # Ensure time is in future
     if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
-        raise ValueError('time must be in future')
+        raise ValidationError('Invalid "{}" datetime: It must be in the future'.format(dt_str))
     return True
 
 
@@ -240,7 +241,7 @@ def validate_cron(cron):
         # https://github.com/taichino/croniter/issues/23
         raise ValueError('Error parsing cron')
     if len(cron.split()) == 6:
-        raise ValueError('Seconds not allowed')
+        raise ValidationError('Invalid "{}" cron entry: Seconds not allowed'.format(cron))
     return True
 
 _policy_base_type = {

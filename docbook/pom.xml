@@ -14,8 +14,21 @@
     <plugins>
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
+        <artifactId>olink-maven-plugin</artifactId>
+        <version>1.0</version>
+        <executions>
+          <execution>
+	    <phase>initialize</phase>
+	    <goals>
+	      <goal>olink</goal>
+	    </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>clouddocs-maven-plugin</artifactId>
-        <version>1.8.0</version>
+        <version>1.9.0</version>
         <executions>
           <execution>
             <id>autoscale</id>
@@ -31,15 +44,21 @@
 	              autoscale-reference.xml
               </includes>
               -->
+              <!-- if <security> specified, build doc for narrow audience such as INTERNAL or REVIEWER;
+                to build doc for all readers, leave this commented out
                 <security>internal</security>
+              -->
             </configuration>
           </execution>
         </executions>
         <configuration>
-	  <enableDisqus>intranet</enableDisqus>
-	  <feedbackEmail>rose.coste@rackspace.com,michael.mcgrail@rackspace.com</feedbackEmail>
+	  <enableDisqus>internet</enableDisqus>
+	  <socialIcons>0</socialIcons>
+	  <metaRobots>1</metaRobots>
+	  <!-- notify these people when comments are posted on docs-internal.rackspace.com -->
+	  <feedbackEmail>rose.coste@rackspace.com,constanze.kratel@rackspace.com,felix.sargent@rackspace.com</feedbackEmail>
 	  <branding>rackspace</branding>
-          <failOnValidationerror>no</failOnValidationerror>
+	  <!-- <failOnValidationerror>no</failOnValidationerror> -->
 	  <showXslMessages>true</showXslMessages>
 	  <highlightSource>false</highlightSource>
         </configuration>

@@ -5,6 +5,7 @@ from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
 
 
 class GetWebhook(ScalingGroupWebhookFixture):
+
     """
     Verify get webhook
     """
@@ -23,28 +24,24 @@ class GetWebhook(ScalingGroupWebhookFixture):
             cls.webhook['id'])
         cls.get_webhook = cls.get_webhook_response.entity
 
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete scaling group.
-        """
-        super(GetWebhook, cls).tearDownClass()
-
     def test_get_webhook(self):
         """
         Get a webhook and verify response code 200, headers and the data.
         """
         self.assertEquals(self.get_webhook_response.status_code, 200,
-                          msg='Get webhook failed with {0}'
-                          .format(self.get_webhook_response.status_code))
+                          msg='Get webhook failed with {0} for group '
+                          '{1}'.format(self.get_webhook_response.status_code,
+                                       self.group.id))
         self.validate_headers(self.get_webhook_response.headers)
         self.assertEquals(self.get_webhook.id, self.webhook['id'],
-                          msg='Webhook Id is null')
+                          msg='Webhook Id is null for group {0}'.format(self.group.id))
         self.assertEquals(self.get_webhook.links, self.webhook['links'],
-                          msg='Links for the webhook is null')
+                          msg='Links for the webhook is null for group '
+                          '{0}'.format(self.group.id))
         self.assertEquals(self.get_webhook.name, self.wb_name,
-                          msg='Name of the webhook did not match')
+                          msg='Name of the webhook did not match for group '
+                          '{0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(self.get_webhook.metadata),
             self.wb_metadata,
-            msg='Metadata of the webhook did not match')
+            msg='Metadata of the webhook did not match for group {0}'.format(self.group.id))

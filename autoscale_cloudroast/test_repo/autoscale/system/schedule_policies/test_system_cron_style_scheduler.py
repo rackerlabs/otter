@@ -4,6 +4,7 @@ and desired caapacity
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
+from cafe.drivers.unittest.decorators import tags
 
 
 class CronStyleSchedulerTests(AutoscaleFixture):
@@ -19,19 +20,12 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         """
         super(CronStyleSchedulerTests, self).setUp()
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            lc_name="cron_style_scheduled",
+            lc_name='cron_style_scheduled',
             gc_cooldown=0)
         self.group = create_group_response.entity
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Scaling group deleted by the Autoscale fixture's teardown
-        """
-        super(CronStyleSchedulerTests, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='slow')
     def test_system_cron_style_change_policy_up_down(self):
         """
         Create a cron style schedule policy via change to scale up by 2, followed by
@@ -54,6 +48,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_cron_style_desired_capacity_policy_up_down(self):
         """
         Create a cron style schedule policy via desired capacity to scale up by 1,
@@ -76,6 +71,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
         sleep(60 + self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
 
+    @tags(speed='slow')
     def test_system_cron_style_policy_cooldown(self):
         """
         Create a cron style scheduler policy via change to scale up with cooldown>0,
@@ -94,6 +90,7 @@ class CronStyleSchedulerTests(AutoscaleFixture):
             policy_id=cron_style_policy['id'])
         self.assertEquals(execute_scheduled_policy.status_code, 403)
 
+    @tags(speed='slow')
     def test_system_cron_style_policy_executes_again(self):
         """
         1-minute Cron-style policy executes in a minute and then again after 1 minute

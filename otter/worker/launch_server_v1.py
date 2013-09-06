@@ -20,8 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import Deferred, gatherResults
-from twisted.internet.task import LoopingCall
+from twisted.internet.defer import gatherResults, maybeDeferred
 
 import treq
 
@@ -29,6 +28,9 @@ from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
+from otter.util.deferredutils import retry_and_timeout
+from otter.util.retry import (repeating_interval, transient_errors_except,
+                              TransientRetryError)
 
 
 class UnexpectedServerStatus(Exception):
@@ -59,10 +61,10 @@ def server_details(server_endpoint, auth_token, server_id):
 
     :return: A dict of the server details.
     """
-    d = treq.get(append_segments(server_endpoint, 'servers', server_id),
-                 headers=headers(auth_token))
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.get(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_details')
+    d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -71,56 +73,63 @@ def wait_for_active(log,
                     auth_token,
                     server_id,
                     interval=5,
+                    timeout=3600,
                     clock=None):
     """
     Wait until the server specified by server_id's status is 'ACTIVE'
-
-    @TODO: Timeouts
 
     :param log: A bound logger.
     :param str server_endpoint: Server endpoint URI.
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
-    :param str expected_status: Nova status string.
-    :param int interval: Polling interval.  Default: 5.
+    :param int interval: Polling interval in seconds.  Default: 5.
+    :param int timeout: timeout to poll for the server status in seconds.
+        Default 3600 (1 hour)
 
     :return: Deferred that fires when the expected status has been seen.
     """
     log.msg("Checking instance status every {interval} seconds",
             interval=interval)
 
-    d = Deferred()
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
+    start_time = clock.seconds()
 
     def poll():
         def check_status(server):
             status = server['server']['status']
 
-            log.msg("Waiting for 'ACTIVE' got {status}.", status=status)
-            if server['server']['status'] == 'ACTIVE':
-                d.callback(server)
-            elif server['server']['status'] != 'BUILD':
-                d.errback(UnexpectedServerStatus(
+            if status == 'ACTIVE':
+                time_building = clock.seconds() - start_time
+                log.msg(("Server changed from 'BUILD' to 'ACTIVE' within "
+                         "{time_building} seconds"),
+                        time_building=time_building)
+                return server
+
+            elif status != 'BUILD':
+                raise UnexpectedServerStatus(
                     server_id,
                     status,
-                    'ACTIVE'))
+                    'ACTIVE')
+
+            else:
+                raise TransientRetryError()  # just poll again
 
         sd = server_details(server_endpoint, auth_token, server_id)
         sd.addCallback(check_status)
-
         return sd
 
-    lc = LoopingCall(poll)
+    timeout_description = ("Waiting for server <{0}> to change from BUILD "
+                           "state to ACTIVE state").format(server_id)
 
-    if clock is not None:  # pragma: no cover
-        lc.clock = clock
-
-    def stop(r):
-        lc.stop()
-        return r
-
-    d.addBoth(stop)
-
-    return lc.start(interval).addCallback(lambda _: d)
+    return retry_and_timeout(
+        poll, timeout,
+        can_retry=transient_errors_except(UnexpectedServerStatus),
+        next_interval=repeating_interval(interval),
+        clock=clock,
+        deferred_description=timeout_description)
 
 
 def create_server(server_endpoint, auth_token, server_config):
@@ -133,15 +142,15 @@ def create_server(server_endpoint, auth_token, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
-    d = treq.post(append_segments(server_endpoint, 'servers'),
-                  headers=headers(auth_token),
+    path = append_segments(server_endpoint, 'servers')
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_create')
+    d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
+def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
@@ -152,6 +161,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     :param str lb_config: An lb_config dictionary.
     :param str ip_address: The IP Address of the node to add to the load
         balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with the Add Node to load balancer response
         as a dict.
@@ -160,18 +170,26 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
 
-    d = treq.post(path,
-                  headers=headers(auth_token),
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({"nodes": [{"address": ip_address,
                                               "port": port,
                                               "condition": "ENABLED",
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'add')
-    return d.addCallback(treq.json_content)
+    d.addErrback(wrap_request_error, path, 'add')
+
+    def when_done(result):
+        undo.push(remove_from_load_balancer,
+                  endpoint,
+                  auth_token,
+                  lb_id,
+                  result['nodes'][0]['id'])
+        return result
+
+    return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
+def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -180,20 +198,28 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
     :param str ip_address: IP address of the node to add to the load balancer.
+    :param IUndoStack undo: An IUndoStack to push any reversable operations onto.
 
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
-    return gatherResults([
-        add_to_load_balancer(
-            endpoint,
-            auth_token,
-            lb_config,
-            ip_address).addCallback(
-                lambda response, lb_id: (lb_id, response),
-                lb_config['loadBalancerId'])
-        for lb_config in lb_configs
-    ], consumeErrors=True)
+    lb_iter = iter(lb_configs)
+
+    results = []
+
+    def add_next(_):
+        try:
+            lb_config = lb_iter.next()
+
+            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
+            d.addCallback(results.append)
+            d.addCallback(add_next)
+            return d
+        except StopIteration:
+            return results
+
+    return maybeDeferred(add_next, None)
 
 
 def endpoints(service_catalog, service_name, region):
@@ -281,7 +307,8 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
     return launch_config
 
 
-def launch_server(log, region, scaling_group, service_catalog, auth_token, launch_config):
+def launch_server(log, region, scaling_group, service_catalog, auth_token,
+                  launch_config, undo):
     """
     Launch a new server given the launch config auth tokens and service catalog.
     Possibly adding the newly launched server to a load balancer.
@@ -294,6 +321,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
     :param str auth_token: The user's auth token.
     :param dict launch_config: A launch_config args structure as defined for
         the launch_server_v1 type.
+    :param IUndoStack undo: The stack that will be rewound if undo fails.
 
     :return: Deferred that fires with a 2-tuple of server details and the
         list of load balancer responses from add_to_load_balancers.
@@ -328,23 +356,29 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
 
     d = create_server(server_endpoint, auth_token, server_config)
 
-    def _wait_for_server(server):
-        ilog = log.bind(instance_id=server['server']['id'])
+    def wait_for_server(server):
+        server_id = server['server']['id']
+
+        undo.push(
+            verified_delete, log, server_endpoint, auth_token, server_id)
+
+        ilog = log.bind(instance_id=server_id)
         return wait_for_active(
             ilog,
             server_endpoint,
             auth_token,
-            server['server']['id'])
+            server_id)
 
-    d.addCallback(_wait_for_server)
+    d.addCallback(wait_for_server)
 
-    def _add_lb(server):
+    def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
+        lbd = add_to_load_balancers(
+            lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 
-    d.addCallback(_add_lb)
+    d.addCallback(add_lb)
     return d
 
 
@@ -363,7 +397,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
     d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'remove')
+    d.addErrback(wrap_request_error, path, 'remove')
     d.addCallback(lambda _: None)
     return d
 
@@ -390,7 +424,6 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
-
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
@@ -422,11 +455,79 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):
-        d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                        headers=headers(auth_token))
-        d.addCallback(check_success, [204])
-        d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
-        return d
+        return verified_delete(log, server_endpoint, auth_token, server_id)
 
     d.addCallback(when_removed_from_loadbalancers)
+    return d
+
+
+def verified_delete(log,
+                    server_endpoint,
+                    auth_token,
+                    server_id,
+                    interval=5,
+                    timeout=3660,
+                    clock=None):
+    """
+    Attempt to delete a server from the server endpoint, and ensure that it is
+    deleted by trying again until getting the server results in a 404.
+
+    There is a possibility Nova sometimes fails to delete servers.  Log if this
+    happens, and if so, re-evaluate workarounds.
+
+    Time out attempting to verify deletes after a period of time and log an
+    error.
+
+    :param log: A bound logger.
+    :param str server_endpoint: Server endpoint URI.
+    :param str auth_token: Keystone Auth token.
+    :param str server_id: Opaque nova server id.
+    :param int interval: Deletion interval in seconds - how long until
+        verifying a delete is retried. Default: 5.
+    :param int timeout: Seconds after which the deletion will be logged as a
+        failure, if Nova fails to return a 404.  Default is 3660, because if
+        the server is building, the delete will not happen until immediately
+        after it has finished building.
+
+    :return: Deferred that fires when the expected status has been seen.
+    """
+    del_log = log.bind(instance_id=server_id)
+    del_log.msg('Deleting server')
+
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.delete(path, headers=headers(auth_token))
+    d.addCallback(check_success, [204])
+    d.addErrback(wrap_request_error, path, 'server_delete')
+
+    if clock is None:  # pragma: no cover
+        from twisted.internet import reactor
+        clock = reactor
+
+    def verify(_):
+        def check_status():
+            check_d = treq.head(
+                append_segments(server_endpoint, 'servers', server_id),
+                headers=headers(auth_token))
+            check_d.addCallback(check_success, [404])
+            return check_d
+
+        start_time = clock.seconds()
+
+        timeout_description = (
+            "Waiting for Nova to actually delete server {0}".format(server_id))
+
+        verify_d = retry_and_timeout(check_status, timeout,
+                                     next_interval=repeating_interval(interval),
+                                     clock=clock,
+                                     deferred_description=timeout_description)
+
+        def on_success(_):
+            time_delete = clock.seconds() - start_time
+            del_log.msg('Server deleted successfully: {time_delete} seconds.',
+                        time_delete=time_delete)
+
+        verify_d.addCallback(on_success)
+        verify_d.addErrback(del_log.err)
+
+    d.addCallback(verify)
     return d

@@ -10,10 +10,8 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from testtools.matchers import ContainsDict, Equals
-
 from otter.tap.api import Options, makeService
-from otter.test.utils import matches
+from otter.test.utils import patch
 
 
 test_config = {
@@ -100,29 +98,23 @@ class APIMakeServiceTests(TestCase):
         """
         Configure mocks for Site and the strports service constructor.
         """
-        service_patcher = mock.patch('otter.tap.api.service')
-        self.service = service_patcher.start()
-        self.addCleanup(service_patcher.stop)
+        self.service = patch(self, 'otter.tap.api.service')
+        self.Site = patch(self, 'otter.tap.api.Site')
+        self.clientFromString = patch(self, 'otter.tap.api.clientFromString')
 
-        site_patcher = mock.patch('otter.tap.api.Site')
-        self.Site = site_patcher.start()
-        self.addCleanup(site_patcher.stop)
+        self.RoundRobinCassandraCluster = patch(self, 'otter.tap.api.RoundRobinCassandraCluster')
+        self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
+        self.log = patch(self, 'otter.tap.api.log')
 
-        clientFromString_patcher = mock.patch('otter.tap.api.clientFromString')
-        self.clientFromString = clientFromString_patcher.start()
-        self.addCleanup(clientFromString_patcher.stop)
+        Otter_patcher = mock.patch('otter.tap.api.Otter')
+        self.Otter = Otter_patcher.start()
+        self.addCleanup(Otter_patcher.stop)
 
-        RoundRobinCassandraCluster_patcher = mock.patch('otter.tap.api.RoundRobinCassandraCluster')
-        self.RoundRobinCassandraCluster = RoundRobinCassandraCluster_patcher.start()
-        self.addCleanup(RoundRobinCassandraCluster_patcher.stop)
+        self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
 
-        set_store_patcher = mock.patch('otter.tap.api.set_store')
-        self.set_store = set_store_patcher.start()
-        self.addCleanup(set_store_patcher.stop)
-
-        CassScalingGroupCollection_patcher = mock.patch('otter.tap.api.CassScalingGroupCollection')
-        self.CassScalingGroupCollection = CassScalingGroupCollection_patcher.start()
-        self.addCleanup(CassScalingGroupCollection_patcher.stop)
+        SchedulerService_patcher = mock.patch('otter.tap.api.SchedulerService')
+        self.SchedulerService = SchedulerService_patcher.start()
+        self.addCleanup(SchedulerService_patcher.stop)
 
     def test_service_site_on_port(self):
         """
@@ -199,8 +191,10 @@ class APIMakeServiceTests(TestCase):
         cassandra cluster connection.
         """
         makeService(test_config)
-        self.CassScalingGroupCollection.assert_called_once_with(
-            self.RoundRobinCassandraCluster.return_value)
+        self.log.bind.assert_called_once_with(system='otter.silverberg')
+        self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
+                                                      self.log.bind.return_value)
+        self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
 
     def test_cassandra_store(self):
         """
@@ -208,8 +202,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.set_store.assert_called_once_with(
-            self.CassScalingGroupCollection.return_value)
+        self.Otter.assert_called_once_with(self.CassScalingGroupCollection.return_value)
 
     def test_mock_store(self):
         """
@@ -218,84 +211,35 @@ class APIMakeServiceTests(TestCase):
         """
         mock_config = test_config.copy()
         mock_config['mock'] = True
+
         makeService(mock_config)
 
         for mocked in (self.RoundRobinCassandraCluster,
                        self.CassScalingGroupCollection,
-                       self.set_store, self.clientFromString):
+                       self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
 
-    @mock.patch('otter.tap.api.GraylogUDPPublisher')
-    @mock.patch('otter.tap.api.log.addObserver')
-    def test_graylog(self, addObserver, GraylogUDPPublisher):
+    def test_mock_store_with_scheduler(self):
         """
-        makeService configures the log observer to publish to graylog when
-        graylog is in the config and GraylogUDPPublisher is importable (and
-        hence not None)
+        makeService does not setup a SchedulerService when Cassandra is
+        mocked, and a scheduler config exists.
         """
         mock_config = test_config.copy()
-        mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
+        mock_config['mock'] = True
+        mock_config['scheduler'] = {'interval': 1, 'batchsize': 5}
 
         makeService(mock_config)
 
-        # It's pretty hard to actually tell what the observer is, so we assume
-        # if addObserver was called once, and GraylogUDPPublisher was called,
-        # we set things up correctly.
-        addObserver.assert_called_once_with(mock.ANY)
-
-        GraylogUDPPublisher.assert_called_once_with(**mock_config['graylog'])
-
-    @mock.patch('otter.tap.api.GraylogUDPPublisher', new=None)
-    @mock.patch('otter.tap.api.log.addObserver')
-    def test_graylog_warning(self, addObserver):
-        """
-        makeService warns when graylog is in the config but GraylogUDPPublisher
-        is not importable (and hence None).  It does not add any log observers.
-        """
-        mock_config = test_config.copy()
-        mock_config['graylog'] = {'host': '127.0.0.1', 'port': 12211}
-
-        makeService(mock_config)
-        self.assertFalse(addObserver.called)
-        message = Equals("There is a configuration option for Graylog, but "
-                         "txgraylog is not installed.")
-        warnings = self.flushWarnings([makeService])
-        self.assertEqual(warnings,
-                         [matches(ContainsDict({'message': message}))])
-
-    @mock.patch('otter.tap.api.AirbrakeLogObserver')
-    def test_airbrake(self, airbrake_observer):
-        """
-        makeService configures the log observer to publish to airbrake when
-        airbrake is in the config and AirbrakeLogObserver is importable
-        (and hence not None)
-        """
-        mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
-
-        makeService(mock_config)
-
-        airbrake_observer.assert_called_once_with('XXX', 'prod', use_ssl=True)
-        airbrake_observer.return_value.start.assert_called_once_with()
-
-    @mock.patch('otter.tap.api.AirbrakeLogObserver', new=None)
-    def test_airbrake_warning(self):
-        """
-        makeService warns when airbrake is in the config but AirbrakeLogObserver
-        is not importable (and hence None).  It does not add any log observers.
-        """
-        mock_config = test_config.copy()
-        mock_config['airbrake'] = {'api_key': 'XXX'}
-
-        makeService(mock_config)
-
-        message = Equals("There is a configuration option for Airbrake, but "
-                         "txairbrake is not installed.")
-        warnings = self.flushWarnings([makeService])
-        self.assertEqual(warnings,
-                         [matches(ContainsDict({'message': message}))])
+        for mocked in (self.RoundRobinCassandraCluster,
+                       self.LoggingCQLClient,
+                       self.CassScalingGroupCollection,
+                       self.SchedulerService,
+                       self.clientFromString):
+            mock_calls = getattr(mocked, 'mock_calls')
+            self.assertEqual(len(mock_calls), 0,
+                             "{0} called with {1}".format(mocked, mock_calls))
 
     @mock.patch('otter.tap.api.SchedulerService')
     def test_scheduler_service(self, scheduler_service):
@@ -307,5 +251,6 @@ class APIMakeServiceTests(TestCase):
 
         expected_parent = makeService(mock_config)
         scheduler_service.assert_called_once_with(100, 10,
-                                                  self.RoundRobinCassandraCluster.return_value)
+                                                  self.LoggingCQLClient.return_value,
+                                                  self.CassScalingGroupCollection.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)

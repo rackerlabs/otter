@@ -19,7 +19,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         (no bookmark link)
         """
         self.assertTrue(self.group.links is not None,
-                        msg='No links returned upon scaling group creation')
+                        msg='No links returned upon scaling group creation'
+                        ' for group {0}'.format(self.group.id))
         self._validate_links(self.group.links.self, self.group.id)
         get_group_resp = self.autoscale_client.\
             view_manifest_config_for_scaling_group(self.group.links.self)
@@ -30,7 +31,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         Verify that scaling policy has links for self
         """
         self.assertTrue(self.policy['links'] is not None,
-                        msg='No links returned upon scaling policy creation')
+                        msg='No links returned upon scaling policy creation'
+                        ' for group {0}'.format(self.group.id))
         self._validate_links(self.policy['links'].self, self.policy['id'])
         get_policy_resp = self.autoscale_client.get_policy_details(
             self.group.id, self.policy['links'].self)
@@ -41,7 +43,8 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         Verify that webhook has links for self
         """
         self.assertTrue(self.webhook['links'] is not None,
-                        msg='No links returned upon webhook creation')
+                        msg='No links returned upon webhook creation'
+                        ' for group {0}'.format(self.group.id))
         self._validate_links(self.webhook['links'].self, self.webhook['id'])
         get_webhook_resp = self.autoscale_client.get_webhook(
             self.group.id, self.policy['id'], self.webhook['links'].self)
@@ -68,8 +71,9 @@ class AutoscalingLinksTest(ScalingGroupWebhookFixture):
         """
         """
         self.assertTrue(item_id in self_link,
-                        msg='The ID does not exist in self links')
+                        msg='The ID does not exist in self links'
+                        ' for item_id {0}'.format(item_id))
         self.assertTrue(self.url in self_link,
                         msg='The url used to create the group doesnt match'
-                        ' the url in self link')
+                        ' the url in self link for id {0}'.format(item_id))
         self.assertTrue(self._has_version(self_link))

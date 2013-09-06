@@ -2,43 +2,35 @@
 Twisted Application plugin for otter API nodes.
 """
 import jsonfig
-import warnings
 
 from twisted.python import usage
 
 from twisted.internet import reactor
+from twisted.internet.task import coiterate
+
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
 from twisted.application.service import MultiService
 
 from twisted.web.server import Site
-from twisted.python import log
-
-try:
-    from txairbrake.observers import AirbrakeLogObserver as _a
-    AirbrakeLogObserver = _a   # to get around pyflakes
-except ImportError:
-    AirbrakeLogObserver = None
-
-try:
-    from otter.log.graylog import GraylogUDPPublisher as _g
-    GraylogUDPPublisher = _g   # to get around pyflakes
-except ImportError:
-    GraylogUDPPublisher = None
 
 from otter.rest.admin import OtterAdmin
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
+from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
-from otter.log.setup import make_observer_chain
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
+from otter.models.mock import MockScalingGroupCollection
 from otter.scheduler import SchedulerService
 
 from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
 
+from otter.log import log
 from silverberg.cluster import RoundRobinCassandraCluster
+from silverberg.logger import LoggingCQLClient
+from otter.bobby import BobbyClient
 
 
 class Options(usage.Options):
@@ -94,40 +86,22 @@ def makeService(config):
     """
     set_config_data(dict(config))
 
-    # Try to configure graylog and airbrake.
-
-    if config_value('graylog'):
-        if GraylogUDPPublisher is not None:
-            log.addObserver(
-                make_observer_chain(
-                    GraylogUDPPublisher(**config_value('graylog')), False))
-        else:
-            warnings.warn("There is a configuration option for Graylog, but "
-                          "txgraylog is not installed.")
-
-    if config_value('airbrake'):
-        if AirbrakeLogObserver is not None:
-            airbrake = AirbrakeLogObserver(
-                config_value('airbrake.api_key'),
-                config_value('environment'),
-                use_ssl=True
-            )
-
-            airbrake.start()
-        else:
-            warnings.warn("There is a configuration option for Airbrake, but "
-                          "txairbrake is not installed.")
-
     if not config_value('mock'):
         seed_endpoints = [
             clientFromString(reactor, str(host))
             for host in config_value('cassandra.seed_hosts')]
 
-        cassandra_cluster = RoundRobinCassandraCluster(
+        cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
             seed_endpoints,
-            config_value('cassandra.keyspace'))
+            config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
 
-        set_store(CassScalingGroupCollection(cassandra_cluster))
+        store = CassScalingGroupCollection(cassandra_cluster)
+    else:
+        store = MockScalingGroupCollection()
+
+    bobby_url = config_value('bobby_url')
+    if bobby_url is not None:
+        set_bobby(BobbyClient(bobby_url))
 
     cache_ttl = config_value('identity.cache_ttl')
 
@@ -145,14 +119,14 @@ def makeService(config):
             config_value('identity.admin_url')),
         cache_ttl)
 
-    supervisor = Supervisor(authenticator.authenticate_tenant)
+    supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
 
     set_supervisor(supervisor)
 
     s = MultiService()
 
-    # Setup root service
-    site = Site(root)
+    otter = Otter(store)
+    site = Site(otter.app.resource())
     site.displayTracebacks = False
 
     api_service = service(str(config_value('port')), site)
@@ -174,7 +148,7 @@ def makeService(config):
     if config_value('scheduler') and not config_value('mock'):
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                              int(config_value('scheduler.interval')),
-                                             cassandra_cluster)
+                                             cassandra_cluster, store)
         scheduler_service.setServiceParent(s)
 
     return s

@@ -74,7 +74,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {"webhooks": [], "webhooks_links": []})
         validate(resp, rest_schemas.list_webhooks_response)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_returned_webhooks_dict_gets_translated(self, mock_url):
         """
         Test that the webhooks dict gets translated into a list of webhooks
@@ -168,7 +168,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_webhooks_create(self, mock_url):
         """
         Tries to create a set of webhooks.
@@ -276,7 +276,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             self.flushLoggedErrors(type(error))
             self.mock_group.get_webhook.reset_mock()
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_get_webhook(self, mock_url):
         """
         Get webhook returns a 200 with a body with the right schema if
@@ -429,10 +429,12 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
 
-    def test_execute_webhook(self):
+    @mock.patch('otter.rest.decorators.log')
+    def test_execute_webhook(self, log):
         """
         Execute a webhook by hash returns a 202
         """
+        log = log.bind().bind()
         self.mock_store.webhook_info_by_hash.return_value = defer.succeed(
             (self.tenant_id, self.group_id, self.policy_id))
 
@@ -440,10 +442,14 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             202, '/v1.0/execute/1/11111/', 'POST')
 
         self.mock_store.get_scaling_group.assert_called_once_with(
-            mock.ANY, self.tenant_id, self.group_id)
+            log.bind(), self.tenant_id, self.group_id)
+
+        self.assertEqual(log.bind.call_args_list[0],
+                         mock.call(tenant_id=self.tenant_id, scaling_group_id=self.group_id,
+                                   policy_id=self.policy_id))
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            mock.ANY,
+            log.bind(),
             'transaction-id',
             self.mock_group,
             self.mock_state,
@@ -507,7 +513,8 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             self.mock_group.modify_state.side_effect = lambda *args, **kwargs: defer.fail(exc)
             self.assert_status_code(202, '/v1.0/execute/1/11111/', 'POST')
 
-            cap_log.msg.assert_any_call(
+            cap_log.bind().msg.assert_any_call(
                 'Non-fatal error during webhook execution: {exc!r}', exc=exc)
 
             self.assertEqual(0, cap_log.err.call_count)
+            self.assertEqual(0, cap_log.bind().err.call_count)

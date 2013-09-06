@@ -9,10 +9,11 @@ from functools import partial
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+from otter.rest.decorators import (validate_body, fails_with,
+                                   succeeds_with, log_arguments)
 from otter.rest.errors import exception_codes
-from otter.rest.application import (app, get_store, get_autoscale_links, transaction_id)
+from otter.rest.otterapp import OtterApp
+from otter.util.http import get_autoscale_links, transaction_id
 from otter import controller
 
 
@@ -31,278 +32,273 @@ def policy_dict_to_list(policy_dict, tenantId, groupId):
     return policy_list
 
 
-@app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
-           methods=['GET'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(200)
-def list_policies(request, log, tenantId, groupId):
+class OtterPolicies(object):
     """
-    Get a list of scaling policies in the group. Each policy describes an id,
-    name, type, adjustment, cooldown, and links. This data is returned in the
-    body of the response in JSON format.
+    REST endpoints for policies of a scaling group.
+    """
+    app = OtterApp()
 
-    Example response::
+    def __init__(self, store, log, tenant_id, scaling_group_id):
+        self.store = store
+        self.log = log
+        self.tenant_id = tenant_id
+        self.scaling_group_id = scaling_group_id
 
-        {
-            "policies": [
+    @app.route('/', methods=['GET'])
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    def list_policies(self, request):
+        """
+        Get a list of scaling policies in the group. Each policy describes an id,
+        name, type, adjustment, cooldown, and links. This data is returned in the
+        body of the response in JSON format.
+
+        Example response::
+
+            {
+                "policies": [
+                    {
+                        "id":"{policyId1}",
+                        "data": {
+                            "name": "scale up by one server",
+                            "change": 1,
+                            "cooldown": 150
+                        },
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}/"
+                                "rel": "self"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "{policyId2}",
+                        "data": {
+                            "name": "scale up ten percent",
+                            "changePercent": 10,
+                            "cooldown": 150
+                        },
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}/"
+                                "rel": "self"
+                            }
+                        ]
+                    },
+                    {
+                        "id":"{policyId3}",
+                        "data": {
+                            "name": "scale down one server",
+                            "change": -1,
+                            "cooldown": 150
+                        },
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}/"
+                                "rel": "self"
+                            }
+                        ]
+                    },
+                    {
+                        "id": "{policyId4}",
+                        "data": {
+                            "name": "scale down ten percent",
+                            "changePercent": -10,
+                            "cooldown": 150
+                        },
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}/"
+                                "rel": "self"
+                            }
+                        ]
+                    }
+                ]
+            }
+        """
+        def format_policies(policy_dict):
+            return {
+                'policies': policy_dict_to_list(policy_dict, self.tenant_id, self.scaling_group_id),
+                "policies_links": []
+            }
+
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.list_policies()
+        deferred.addCallback(format_policies)
+        deferred.addCallback(json.dumps)
+        return deferred
+
+    @app.route('/', methods=['POST'])
+    @fails_with(exception_codes)
+    @succeeds_with(201)
+    @validate_body(rest_schemas.create_policies_request)
+    def create_policies(self, request, data):
+        """
+        Create one or many new scaling policies.
+        Scaling policies must include a name, type, adjustment, and cooldown.
+        The response header will point to the list policies endpoint.
+        An array of scaling policies is provided in the request body in JSON format.
+
+        Example request::
+
+            [
                 {
-                    "id":"{policyId1}",
-                    "data": {
+                    "name": "scale up by one server",
+                    "change": 1,
+                    "cooldown": 150
+                },
+                {
+                    "name": 'scale down by 5.5 percent',
+                    "changePercent": -5.5,
+                    "cooldown": 6
+                }
+            ]
+
+        Example response::
+
+            {
+                "policies": [
+                    {
+                        "id": {policyId1},
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}/"
+                                "rel": "self"
+                            }
+                        ],
                         "name": "scale up by one server",
                         "change": 1,
                         "cooldown": 150
                     },
-                    "links": [
-                        {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId1}/"
-                            "rel": "self"
-                        }
-                    ]
-                },
-                {
-                    "id": "{policyId2}",
-                    "data": {
-                        "name": "scale up ten percent",
-                        "changePercent": 10,
-                        "cooldown": 150
-                    },
-                    "links": [
-                        {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId2}/"
-                            "rel": "self"
-                        }
-                    ]
-                },
-                {
-                    "id":"{policyId3}",
-                    "data": {
-                        "name": "scale down one server",
-                        "change": -1,
-                        "cooldown": 150
-                    },
-                    "links": [
-                        {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId3}/"
-                            "rel": "self"
-                        }
-                    ]
-                },
-                {
-                    "id": "{policyId4}",
-                    "data": {
-                        "name": "scale down ten percent",
-                        "changePercent": -10,
-                        "cooldown": 150
-                    },
-                    "links": [
-                        {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId1}/policy/{policyId4}/"
-                            "rel": "self"
-                        }
-                    ]
-                }
-            ]
-        }
-    """
-    def format_policies(policy_dict):
-        return {
-            'policies': policy_dict_to_list(policy_dict, tenantId, groupId),
-            "policies_links": []
-        }
-
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.list_policies()
-    deferred.addCallback(format_policies)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@app.route('/<string:tenantId>/groups/<string:groupId>/policies/',
-           methods=['POST'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(201)
-@validate_body(rest_schemas.create_policies_request)
-def create_policies(request, log, tenantId, groupId, data):
-    """
-    Create one or many new scaling policies.
-    Scaling policies must include a name, type, adjustment, and cooldown.
-    The response header will point to the list policies endpoint.
-    An array of scaling policies is provided in the request body in JSON format.
-
-    Example request::
-
-        [
-            {
-                "name": "scale up by one server",
-                "change": 1,
-                "cooldown": 150
-            },
-            {
-                "name": 'scale down by 5.5 percent',
-                "changePercent": -5.5,
-                "cooldown": 6
+                    {
+                        "id": {policyId2},
+                        "links": [
+                            {
+                                "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}/"
+                                "rel": "self"
+                            }
+                        ],
+                        "name": 'scale down by 5.5 percent',
+                        "changePercent": -5.5,
+                        "cooldown": 6
+                    }
+                ]
             }
-        ]
+        """
 
-    Example response::
+        def format_policies_and_send_redirect(policy_dict):
+            request.setHeader(
+                "Location",
+                get_autoscale_links(self.tenant_id, self.scaling_group_id, "", format=None)
+            )
 
-        {
-            "policies": [
-                {
-                    "id": {policyId1},
+            policy_list = []
+            for policy_uuid, policy_item in policy_dict.iteritems():
+                policy_item['id'] = policy_uuid
+                policy_item['links'] = get_autoscale_links(
+                    self.tenant_id, self.scaling_group_id, policy_uuid)
+                policy_list.append(policy_item)
+
+            return {'policies': policy_list}
+
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.create_policies(data)
+        deferred.addCallback(format_policies_and_send_redirect)
+        deferred.addCallback(json.dumps)
+        return deferred
+
+    @app.route('/<string:policy_id>/', methods=['GET'])
+    @fails_with(exception_codes)
+    @succeeds_with(200)
+    @log_arguments
+    def get_policy(self, request, policy_id):
+        """
+        Get a scaling policy which describes an id, name, type, adjustment, and
+        cooldown, and links.  This data is returned in the body of the response in
+        JSON format.
+
+        Example response::
+
+            {
+                "policy": {
+                    "id": {policyId},
                     "links": [
                         {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId1}/"
+                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}/"
                             "rel": "self"
                         }
                     ],
                     "name": "scale up by one server",
                     "change": 1,
                     "cooldown": 150
-                },
-                {
-                    "id": {policyId2},
-                    "links": [
-                        {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId2}/"
-                            "rel": "self"
-                        }
-                    ],
-                    "name": 'scale down by 5.5 percent',
-                    "changePercent": -5.5,
-                    "cooldown": 6
                 }
-            ]
-        }
-    """
+            }
+        """
+        def openstackify(policy_dict):
+            policy_dict['id'] = policy_id
+            policy_dict['links'] = get_autoscale_links(self.tenant_id, self.scaling_group_id, policy_id)
+            return {'policy': policy_dict}
 
-    def format_policies_and_send_redirect(policy_dict):
-        request.setHeader(
-            "Location",
-            get_autoscale_links(tenantId, groupId, "", format=None)
-        )
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.get_policy(policy_id)
+        deferred.addCallback(openstackify)
+        deferred.addCallback(json.dumps)
+        return deferred
 
-        policy_list = []
-        for policy_uuid, policy_item in policy_dict.iteritems():
-            policy_item['id'] = policy_uuid
-            policy_item['links'] = get_autoscale_links(
-                tenantId, groupId, policy_uuid)
-            policy_list.append(policy_item)
+    @app.route('/<string:policy_id>/', methods=['PUT'])
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    @validate_body(group_schemas.policy)
+    @log_arguments
+    def update_policy(self, request, policy_id, data):
+        """
+        Updates a scaling policy. Scaling policies must include a name, type,
+        adjustment, and cooldown.
+        If successful, no response body will be returned.
 
-        return {'policies': policy_list}
+        Example request::
 
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.create_policies(data)
-    deferred.addCallback(format_policies_and_send_redirect)
-    deferred.addCallback(json.dumps)
-    return deferred
-
-
-@app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
-    methods=['GET'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(200)
-def get_policy(request, log, tenantId, groupId, policyId):
-    """
-    Get a scaling policy which describes an id, name, type, adjustment, and
-    cooldown, and links.  This data is returned in the body of the response in
-    JSON format.
-
-    Example response::
-
-        {
-            "policy": {
-                "id": {policyId},
-                "links": [
-                    {
-                        "href": "{url_root}/v1.0/010101/groups/{groupId}/policy/{policyId}/"
-                        "rel": "self"
-                    }
-                ],
-                "name": "scale up by one server",
-                "change": 1,
+            {
+                "name": "scale up by two servers",
+                "change": 2,
                 "cooldown": 150
             }
-        }
-    """
-    def openstackify(policy_dict):
-        policy_dict['id'] = policyId
-        policy_dict['links'] = get_autoscale_links(tenantId, groupId, policyId)
-        return {'policy': policy_dict}
-
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.get_policy(policyId)
-    deferred.addCallback(openstackify)
-    deferred.addCallback(json.dumps)
-    return deferred
 
 
-@app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
-    methods=['PUT'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(204)
-@validate_body(group_schemas.policy)
-def update_policy(request, log, tenantId, groupId, policyId, data):
-    """
-    Updates a scaling policy. Scaling policies must include a name, type,
-    adjustment, and cooldown.
-    If successful, no response body will be returned.
+        """
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.update_policy(policy_id, data)
+        return deferred
 
-    Example request::
+    @app.route('/<string:policy_id>/', methods=['DELETE'])
+    @fails_with(exception_codes)
+    @succeeds_with(204)
+    @log_arguments
+    def delete_policy(self, request, policy_id):
+        """
+        Delete a scaling policy. If successful, no response body will be returned.
+        """
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.delete_policy(policy_id)
+        return deferred
 
-        {
-            "name": "scale up by two servers",
-            "change": 2,
-            "cooldown": 150
-        }
+    @app.route('/<string:policy_id>/execute/', methods=['POST'])
+    @fails_with(exception_codes)
+    @succeeds_with(202)
+    @log_arguments
+    def execute_policy(self, request, policy_id):
+        """
+        Execute this scaling policy.
 
+        TBD: Response body.
 
-    """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.update_policy(policyId, data)
-    return deferred
+        Example response::
 
-
-@app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/',
-    methods=['DELETE'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(204)
-def delete_policy(request, log, tenantId, groupId, policyId):
-    """
-    Delete a scaling policy. If successful, no response body will be returned.
-    """
-    rec = get_store().get_scaling_group(log, tenantId, groupId)
-    deferred = rec.delete_policy(policyId)
-    return deferred
-
-
-@app.route(
-    '/<string:tenantId>/groups/<string:groupId>/policies/<string:policyId>/execute/',
-    methods=['POST'])
-@with_transaction_id()
-@fails_with(exception_codes)
-@succeeds_with(202)
-def execute_policy(request, log, tenantId, groupId, policyId):
-    """
-    Execute this scaling policy.
-
-    TBD: Response body.
-
-    Example response::
-
-        {}
-    """
-    group = get_store().get_scaling_group(log, tenantId, groupId)
-    d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                   log, transaction_id(request),
-                                   policy_id=policyId))
-    d.addCallback(lambda _: "{}")  # Return value TBD
-    return d
+            {}
+        """
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
+                                       self.log, transaction_id(request),
+                                       policy_id=policy_id))
+        d.addCallback(lambda _: "{}")  # Return value TBD
+        return d

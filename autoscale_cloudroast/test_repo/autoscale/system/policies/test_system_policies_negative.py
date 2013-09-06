@@ -2,6 +2,7 @@
 System tests for scaling policies negative scenarios
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
 
 
 class ScalingPoliciesNegativeFixture(AutoscaleFixture):
@@ -29,17 +30,9 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
             group_id=self.group.id,
             policy_data=self.policy_down_data,
             execute_policy=False)
-        self.resources.add(self.group.id,
-                           self.autoscale_client.delete_scaling_group)
+        self.resources.add(self.group, self.empty_scaling_group)
 
-    def tearDown(self):
-        """
-        Emptying the scaling group by updating minentities=maxentities=0,
-        which is then deleted by the Autoscale fixture's teardown
-        """
-        super(ScalingPoliciesNegativeFixture, self).tearDown()
-        self.empty_scaling_group(self.group)
-
+    @tags(speed='quick')
     def test_system_execute_policy_when_maxentities_equals_minentities(self):
         """
         Update minentities=maxentities and execution of a scale up policy
@@ -53,6 +46,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Scale up policy executed when minentities=maxentities: {0} for group {1}'
                           .format(execute_policy_up.status_code, self.group.id))
 
+    @tags(speed='quick')
     def test_system_execute_scale_down_on_newly_created_group_with_minentities(self):
         """
         Update minentities=maxentities and execution of a scale down policy
@@ -68,6 +62,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
 
+    @tags(speed='quick')
     def test_system_delete_policy_during_execution(self):
         """
         Policy execution is not affected/paused when the policy is deleted during execution.
@@ -87,10 +82,12 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Scale up policy failed for group {0} cause policy was deleted'
                           ' during execution: {1}'
                           .format(self.group.id, execute_policy_up.status_code))
-        self.autoscale_behaviors.wait_for_expected_number_of_active_servers(
+        self.check_for_expected_number_of_building_servers(
             group_id=self.group.id,
-            expected_servers=self.group.groupConfiguration.minEntities + self.policy_up_data['change'])
+            expected_servers=self.group.groupConfiguration.minEntities +
+            self.policy_up_data['change'])
 
+    @tags(speed='quick')
     def test_system_execute_scale_up_after_maxentities_met(self):
         """
         Update max entities of the scaling group to be 3 and execute scale up policy
@@ -119,19 +116,15 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' has maxentities, response code: {1}'
                           .format(self.group.id, reexecute_scale_up.status_code))
 
+    @tags(speed='slow')
     def test_system_scaleup_update_min_max_0_delete_group(self):
         """
-        Create a scaling group and execute a scale up policy, update min and max entities
-        to be 0 and delete the group (while the servers from the create group and execute policy
-        are still building). All the servers on the group should be deleted
-        before the user can delete the group (AUTO-339)
+        Create a scaling group and update min and max entities to be 0 and delete
+        the group (while the servers from the create group are still building).
+        The user will be able to delete the group and autoscaling will delete the
+        servers on the group (AUTO-339)
         """
-        execute_policy_up = self.autoscale_client.execute_policy(self.group.id,
-                                                                 self.policy_up['policy_id'])
-        self.assertEquals(execute_policy_up.status_code, 202,
-                          msg='Scale up policy execution failed for group {0} '
-                          'when change delta < maxentities with response: {1}'
-                          .format(self.group.id, execute_policy_up.status_code))
+        server_name = self.group.launchConfiguration.server.name
         self._update_group_min_max_entities(group=self.group,
                                             maxentities=0, minentities=0)
         delete_group = self.autoscale_client.delete_scaling_group(
@@ -140,9 +133,9 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           msg='Delete group failed for group {0} when min and maxentities '
                           'is update to 0 with response {1}'
                           .format(self.group.id, delete_group.status_code))
-        # find a way to list servers in a scaling group without using the group state call
-        # i.e. using nova to verify the servers were deleted
+        self.assert_servers_deleted_successfully(server_name)
 
+    @tags(speed='quick')
     def test_system_scaleup_update_min_scale_down(self):
         """
         Create a scaling group and execute a scale up policy, update min = current desired capacity.
@@ -165,6 +158,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' on the group {0} with response code {1}'
                           .format(self.group.id, execute_policy_down.status_code))
 
+    @tags(speed='quick')
     def test_system_update_webhook_policy_to_at_style_scheduler(self):
         """
         Policy update fails when a webhook type policy is updated to be of type
@@ -183,6 +177,7 @@ class ScalingPoliciesNegativeFixture(AutoscaleFixture):
                           ' on the group {0} with response code {1}'.format(
                               self.group.id, upd_policy_response.status_code))
 
+    @tags(speed='quick')
     def test_system_update_webhook_policy_to_cron_style_scheduler(self):
         """
         Policy update fails when a webhook type policy is updated to be of type

@@ -4,13 +4,15 @@
 <!-- -->
 <!-- You can resolve the entites with xmllint -->
 <!-- -->
-<!-- xmllint -noent RAX-AUTH.wadl -->
+<!-- xmllint -noent autoscale.wadl -->
 <!--*******************************************************-->
+<!-- need xmlns:identity to use &commonFaults; &getFaults; &postPutFaults; in METHODS -->
 <!DOCTYPE application [
 <!ENTITY % common SYSTEM "../common/common.ent">
 %common;
 ]>
 <application xmlns="http://wadl.dev.java.net/2009/02"
+    xmlns:identity="http://docs.openstack.org/identity/api/v2.0" 
     xmlns:db="http://docbook.org/ns/docbook"
     xmlns:raxapi="http://docs.rackspace.com/volume/api/v1"
     xmlns:wadl="http://wadl.dev.java.net/2009/02"
@@ -26,16 +28,22 @@
 
             <!-- GROUPS resource -->
             <resource id="tenantid" path="/{tenantId}">
-                <param name="tenantId" type="xsd:string" required="true" style="template"/>
+                <param name="tenantId" type="xsd:string" required="true" style="template">
+                    <doc>A subscriber to the autoscaling service</doc>
+                </param>
                 <resource id="groups" path="/groups">
-                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true"/>
+                    <param name="X-Auth-Token" style="header" type="xsd:string" required="true">
+                        <doc>A valid authentication token</doc>
+                    </param>
 
                     <method href="#getGroups"/>
                     <method href="#createGroup"/>
 
                     <resource id="group" path="/{groupId}">
 
-                        <param name="groupId" type="osapi:UUID" required="true" style="template"/>
+                        <param name="groupId" type="osapi:UUID" required="true" style="template">
+                            <doc>A scaling group</doc>
+                        </param>
                         <method href="#getGroupManifest"/>
                         <method href="#deleteGroup"/>
 
@@ -65,7 +73,9 @@
                             <method href="#createPolicies"/>
 
                             <resource id="policy" path="/{policyId}">
-                                <param name="policyId" type="osapi:UUID" required="true" style="template"/>
+                                <param name="policyId" type="osapi:UUID" required="true" style="template">
+                                    <doc>A scaling policy</doc>
+                                </param>
                                 <method href="#getPolicy"/>
                                 <method href="#putPolicy"/>
                                 <method href="#deletePolicy"/>
@@ -77,8 +87,11 @@
                                 <resource id="webhooks" path="/webhooks">
                                     <method href="#getWebhooks"/>
                                     <method href="#createWebhook"/>
+
                                     <resource id="webhook" path="/{webhookId}">
-                                        <param name="webhookId" type="osapi:UUID" required="true" style="template"/>
+                                        <param name="webhookId" type="osapi:UUID" required="true" style="template">
+                                            <doc>A webhook</doc>
+                                        </param>
                                         <method href="#getWebhook"/>
                                         <method href="#putWebhook"/>
                                         <method href="#deleteWebhook"/>
@@ -101,12 +114,15 @@
     <!-- ======================================================================================= -->
       <method id="createGroup" name="POST">
         <doc title="Create Group">
+            <db:para role="shortdesc">
+                Create an autoscaling group.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Create a new scaling group, given the general scaling group
-                configuration, launch configuration, and optional scaling policies.
-                This data provided in the request body in JSON format. If
-                successful, the created group in JSON format containing id and
-                links is returned.
+                This operation creates an autoscaling group. To describe the group you wish to create, 
+                specify the scaling group
+                configuration, launch configuration, and optional scaling policies in the request body in JSON format. 
+                If the group is created successfuly, the response body describes the created group in JSON format. The response includes an ID and
+                links for the group.
             </p>
         </doc>
         <request>
@@ -118,20 +134,23 @@
             </representation>
         </request>
         <response status="201">
-            <param name="Location" style="header"
-                   required="true" type="xsd:anyURI"/>
+            <param name="location" style="header"
+                   required="true" type="xsd:anyURI">
+            <doc>An autoscaling endpoint</doc>
+            </param>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/resCreateGroup.json"/>
                 </doc>
             </representation>
         </response>
+          &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getGroups" name="GET">
         <doc title="List Scaling Groups" xml:lang="EN">
             <db:para role="shortdesc">
-                Lists all the autoscaling groups for the specified tenant ID.
+                List the autoscaling groups available to the specified tenant.
             </db:para>
             <db:para>
                 For the tenant specified by
@@ -147,14 +166,18 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults;  
     </method>
 
     <method id="getGroupManifest" name="GET">
         <doc title="List All Group Details">
+            <db:para role="shortdesc">
+                List detailed autoscaling group configuration.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                View manifested view of the scaling group configuration,
-                including the launch configuration, and the scaling policies. This
-                data is returned in the body of the response in JSON format.
+                For the specified autoscaling group configuration,
+                this operation returns details including the launch configuration and the scaling policies. These 
+                details are returned in the response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -164,26 +187,35 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="deleteGroup" name="DELETE">
         <doc title="Delete Group">
+            <db:para role="shortdesc">
+                Delete autoscaling group.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Delete a scaling group if there are no entities belonging to the
-                scaling group. If successful, no response body will be returned. If
-                there are pending or active entities, a 409 will be returned.
+                This operation deletes the specified autoscaling group if the group is empty. 
+                An empty group contains no entities. If deletion is successful, no response body is returned. If
+                the group contains pending or active entities, deletion fails and a 409 is returned.
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getGroupState" name="GET">
         <doc title="Get Group State">
+            <db:para role="shortdesc">
+                Report autoscaling group state.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get the current state of the scaling group, including the
+                This operation retrieves the current state of the specified autoscaling group.
+                It describes the state of the group in terms of its 
                 current set of active entities, the number of pending entities, and
-                the desired number of entities. This data is returned in the body
-                of the response in JSON format.
+                the desired number of entities. The description is returned in the response body
+                in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -193,15 +225,21 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="getGroupConfig" name="GET">
         <doc title="Get Group Configuration">
+            <db:para role="shortdesc">
+                List autoscaling group configuration.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get the configuration for a scaling group, which includes the
-                minimum number of entities, the maximum number of entities, global
-                cooldown, and other metadata. This data is returned in the body of
-                the response in JSON format.
+                For the specified autoscaling group, this operation lists the group's configuration. 
+                The configuration describes the
+                minimum number of entities in the group, 
+                the maximum number of entities in the group, 
+                the global
+                cooldown time for the group, and other metadata. The configuration is returned in the response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -211,15 +249,22 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putGroupConfig" name="PUT">
         <doc title="Replace Group Configuration">
+            <db:para role="shortdesc">
+                Update autoscaling group configuration.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Edit the configuration for a scaling group, which includes the
-            minimum number of entities, the maximum number of entities, global
-            cooldown, and other metadata. This data provided in the request
-            body in JSON format. If successful, no response body will be
+            This operation changes the configuration of an existing autoscaling group.
+            To change the configuration, 
+            describe the new configuration in the request body in JSON format. 
+            Configuration elements you can describe include 
+            the
+            minimum number of entities, the maximum number of entities, the global
+            cooldown time, and other metadata. If the change is successful, no response body is
             returned.
             </p>
         </doc>
@@ -231,15 +276,21 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getLaunchConfig" name="GET">
-        <doc title="Get Group Launch Configuration">
+        <doc title="Get Launch Configuration">
+            <db:para role="shortdesc">
+                List launch configuration.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get the launch configuration for a scaling group, which includes
-                the details of how to create a server, from what image, which load
-                balancers to join it to, and what networks to add it to, and other
-                metadata. This data is returned in the body of the response in JSON
+                For the specified autoscaling group, this operation lists the group's launch configuration. 
+                The launch configuration describes the details of how to create a server, 
+                from what image to create a server, 
+                which load
+                balancers to join the server to, which networks to add the server to, and other
+                metadata. The launch configuration is returned in the response body in JSON
                 format.
             </p>
         </doc>
@@ -250,16 +301,24 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults;  
     </method>
 
     <method id="putLaunchConfig" name="PUT">
-        <doc title="Replace Group Launch Configuration">
+        <doc title="Replace Launch Configuration">
+            <db:para role="shortdesc">
+                Update launch group configuration.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Edit the launch configuration for a scaling group, which
-            includes the details of how to create a server, from what image,
-            which load balancers to join it to, and what networks to add it to,
-            and other metadata. This data provided in the request body in JSON
-            format. If successful, no response body will be returned.
+                This operation changes an existing launch configuration for the specified autoscaling group.
+                To change the launch configuration, 
+                describe the new configuration in the request body in JSON format. 
+                Configuration elements you can describe include 
+                how to create a server, 
+                from what image to create a server, 
+                which load
+                balancers to join the server to, which networks to add the server to, and other
+                metadata. If the change is successful, no response body is returned.
             </p>
         </doc>
         <request>
@@ -270,13 +329,16 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="pauseGroup" name="POST">
         <doc title="Pause Group Policy Execution">
+            <db:para role="shortdesc">
+                Pause policy execution.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Pause all execution of scaling policies for this scaling
-            group.
+                For the specified autoscaling group, this operation pauses all execution of autoscaling policies.
             </p>
         </doc>
         <request>
@@ -285,13 +347,16 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="resumeGroup" name="POST">
         <doc title="Resume Group Policy Execution">
+            <db:para role="shortdesc">
+                Resume policy execution.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Resume all execution of scaling policies for this scaling
-                group.
+                For the specified autoscaling group, this operation resumes all execution of autoscaling policies.
             </p>
         </doc>
         <request>
@@ -300,14 +365,19 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getPolicies">
-        <doc title="Get a list of policies">
+        <doc title="Get Policies List">
+            <db:para role="shortdesc">
+                List scaling policies in the autoscaling group.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get a list of scaling policies in the group. Each policy
-            describes an id, name, type, adjustment, cooldown, and links. This
-            data is returned in the body of the response in JSON format.
+            For the specified autoscaling group, this operation returns a list of the scaling policies that are available to the group. 
+            Each policy is described in terms of an ID, 
+            name, type, adjustment, cooldown time, and links. These
+            descriptions are returned in the response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -317,39 +387,100 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method name="POST" id="createPolicies">
-        <doc title="Create a new policy">
+        <doc title="Create Policy">
+            <db:para role="shortdesc">
+                Create autoscaling policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Create one or many new scaling policies. Scaling policies must
-            include a name, type, adjustment, and cooldown. The response header
-            will point to the list policies endpoint. An array of scaling
-            policies is provided in the request body in JSON format.
+            For the specified autoscaling group, this operation creates one or multiple autoscaling policies. 
+            To create a policy, describe it in the request body in JSON format.
+            Each description must include a name, type, adjustment, and cooldown time.
+            </p>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+            Use the JSON response to obtain information about the newly-created policy or policies.
+            <ul>
+                <li>The response header points to the List Policies endpoint.</li>
+                <li>The response body provides an array of scaling policies.</li>
+            </ul>
+            </p>
+            <p xmlns="http://www.w3.org/1999/xhtml">
+            The examples below demonstrate several methods of creating autoscaling policies:
+            <ul>
+                <li>a request to create a policy based on desired capacity</li>
+                <li>a request to create a policy based on incremental change</li>
+                <li>a request to create a policy based on change percentage</li>
+                <li>a request to create a policy based on change percentage scheduled daily, at a specific time of day</li>
+                <li>a request to create a policy based on change percentage scheduled once, for a specific date and time</li>
+                <li>a request to create a policy based on change percentage in response to an alarm</li>
+                <li>a request to create multiple policies, followed by the matching response</li>
+            </ul>
             </p>
         </doc>
         <request>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
+                    <xsdxt:sample title="Create Policy (Desired Capacity) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-desiredCapacity.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Incremental Change) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-change.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercent.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change at Time) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentTime.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change on Date) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentDate.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policy (Percentage Change on Alarm) Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentAlarm.json"/>
+                    </xsdxt:sample>
+                </doc>
+                <doc xml:lang="en">
+                    <xsdxt:sample title="Create Policies Request: JSON" >
+                        <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
+                    </xsdxt:sample>
                 </doc>
             </representation>
         </request>
         <response status="201">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
+                    <xsdxt:sample title="Create Policies Response: JSON" >
+                        <xsdxt:code href="../docbkx/samples/resCreatePolicies.json"/>
+                    </xsdxt:sample>
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getPolicy">
-        <doc title="Get details of a policy">
+        <doc title="Get Policy Details">
+            <db:para role="shortdesc">
+                Describe one policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get a scaling policy which describes an id, name, type,
-            adjustment, and cooldown, and links. This data is returned in the
-            body of the response in JSON format.
+            For the specified autoscaling policy, this operation returns a description. 
+            The description includes an ID, name, type,
+            adjustment, cooldown time, and links. The description is returned in the
+            response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -359,14 +490,20 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putPolicy" name="PUT">
-        <doc title="Replace a policy">
+        <doc title="Replace Policy">
+            <db:para role="shortdesc">
+                Update policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Updates a scaling policy. Scaling policies must include a name,
-            type, adjustment, and cooldown. If successful, no response body
-            will be returned.
+            This operation changes an existing autoscaling policy for the specified tenant.
+            To change the policy, describe the new policy in the request body in JSON format.
+            Updates a scaling policy. You must describe the policy's name,
+            type, adjustment, and cooldown time. If the change is successful, no response body
+            is returned.
             </p>
         </doc>
         <request>
@@ -377,22 +514,30 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="deletePolicy" name="DELETE">
-        <doc title="Delete a policy">
+        <doc title="Delete Policy">
+            <db:para role="shortdesc">
+                Delete policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Delete a scaling policy. If successful, no response body will be
-            returned.
+                This operation deletes the specified autoscaling policy from the specified tenant. 
+                If deletion is successful, no response body is returned.
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="executePolicy" name="POST">
-        <doc title="Execute a policy">
+        <doc title="Execute Policy">
+            <db:para role="shortdesc">
+                Execute policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Execute a scaling policy. If successful, a response body will be
+                This operation executes the specified autoscaling policy. If execution is successful, a response body is
             returned.
             </p>
         </doc>
@@ -402,13 +547,17 @@
             </representation>
         </request>
         <response status="202"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method name="GET" id="getWebhooks">
         <doc title="Get a list of webhooks for the policy">
+            <db:para role="shortdesc">
+                Get a list of webhooks for the policy.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Get a list of webhooks and their IDs. This data is returned in
-                the body of the response in JSON format.
+                the response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -418,10 +567,14 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="createWebhook" name="POST">
         <doc title="Create a webhook">
+            <db:para role="shortdesc">
+                Create a Webhook.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 Create one or more new scaling policy webhooks. Webhooks must
             have a name. If successful, the created response body will contain
@@ -443,13 +596,18 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="getWebhook" name="GET">
-        <doc title="View Webhook Info">
+        <doc title="View Webhook">
+            <db:para role="shortdesc">
+                Describe one webhook.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get information about a specific scaling policy webhook. This
-            data is returned in the body of the response in JSON format.
+            For the specified tenant and the specified autoscaling policy, 
+            this operation returns a description of the specified webhook. 
+            The description is returned in the response body in JSON format.
             </p>
         </doc>
         <response status="200">
@@ -459,15 +617,20 @@
                 </doc>
             </representation>
         </response>
+        &commonFaults; &getFaults; 
     </method>
 
     <method id="putWebhook" name="PUT">
-        <doc title="Replace a Webhook">
+        <doc title="Update Webhook">
+            <db:para role="shortdesc">
+                Update webhook.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Update an existing webhook. WebhookIds not recognized will be
-            ignored with accompanying data. URLs will be ignored if submitted,
-            but that will not invalidate the request. If successful, no
-            response body will be returned.
+            For the specified tenant and policy, this operation changes the specified webhook. 
+            If the specified webhook is not recognized, the change is ignored. 
+            If a URL is submitted, the URL is ignored but that does not invalidate the request. 
+            If the change is successful, no
+            response body is returned.
             </p>
         </doc>
         <request>
@@ -478,21 +641,29 @@
             </representation>
         </request>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="deleteWebhook" name="DELETE">
-        <doc title="Delete a webhook">
+        <doc title="Delete Webhook">
+            <db:para role="shortdesc">
+                Delete webhook.
+            </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Delete a scaling policy webhook. If successful, no response body
-                will be returned.
+                This operation deletes the specified autoscaling policy webhook. If deletion is successful, no response body
+                is returned.
             </p>
         </doc>
         <response status="204"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
     <method id="anonymousExecute" name="POST">
-        <doc title="Execute an anonymous webhook">
-            <p xmlns="http://www.w3.org/1999/xhtml">Execute an anonymous webhook</p>
+        <doc title="Execute Anonymous Webhook">
+            <db:para role="shortdesc">
+                Execute anonymous webhook.
+            </db:para>
+            <p xmlns="http://www.w3.org/1999/xhtml">This operation executes an anonymous webhook.</p>
         </doc>
         <request>
             <representation mediaType="application/json">
@@ -500,5 +671,7 @@
             </representation>
         </request>
         <response status="202"/>
+        &commonFaults; &getFaults; &postPutFaults; 
     </method>
+
 </application>

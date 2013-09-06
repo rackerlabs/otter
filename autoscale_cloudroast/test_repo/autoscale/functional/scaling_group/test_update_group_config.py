@@ -6,35 +6,27 @@ from cloudcafe.common.tools.datagen import rand_name
 
 
 class UpdateGroupConfigTest(AutoscaleFixture):
+
     """
     Verify update group.
     """
-    #AUTO-303
+    # AUTO-303
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         """
         Create a scaling group.
         """
-        super(UpdateGroupConfigTest, cls).setUpClass()
-        create_resp = cls.autoscale_behaviors.create_scaling_group_given(
+        super(UpdateGroupConfigTest, self).setUp()
+        create_resp = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=2,
             gc_max_entities=10)
-        cls.group = create_resp.entity
-        cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
-        cls.gc_name = rand_name('updgroupconfig')
-        cls.gc_min_entities = cls.group.groupConfiguration.minEntities
-        cls.gc_cooldown = 800
-        cls.gc_max_entities = 15
-        cls.gc_metadata = {'upd_key1': 'upd_value1'}
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(UpdateGroupConfigTest, cls).tearDownClass()
+        self.group = create_resp.entity
+        self.resources.add(self.group, self.empty_scaling_group)
+        self.gc_name = rand_name('updgroupconfig')
+        self.gc_min_entities = self.group.groupConfiguration.minEntities
+        self.gc_cooldown = 800
+        self.gc_max_entities = 15
+        self.gc_metadata = {'upd_key1': 'upd_value1'}
 
     def test_update_minentities_to_be_the_same(self):
         """
@@ -48,7 +40,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             min_entities=self.group.groupConfiguration.minEntities)
         self.assertEquals(upd_group_resp.status_code, 400,
                           msg='Update failed with {0} as it does not include full request'
-                          .format(upd_group_resp.status_code))
+                          ' for group {1}'.format(upd_group_resp.status_code, self.group.id))
 
     def test_update_minentities_only(self):
         """
@@ -70,8 +62,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         Verify update with an incomplete request containing minentities over maxentities,
         fails with 400
         """
-        #AUTO-302
-        upd_min_entities = 25
+        # AUTO-302
+        upd_min_entities = self.max_maxentities + 1
         upd_group_resp = self.autoscale_client.update_group_config(
             self.group.id,
             name=self.group.groupConfiguration.name,
@@ -88,7 +80,7 @@ class UpdateGroupConfigTest(AutoscaleFixture):
         Verify update with an incomplete request containing maxentities under minentities,
         fails with 400
         """
-        #AUTO-302
+        # AUTO-302
         upd_max_entities = 0
         upd_group_resp = self.autoscale_client.update_group_config(
             self.group.id,
@@ -145,8 +137,8 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             max_entities=self.group.groupConfiguration.maxEntities,
             metadata=upd_metadata)
         self.assertEquals(upd_group_resp.status_code, 204,
-                          msg='Update failed with {0}'
-                          .format(upd_group_resp.status_code))
+                          msg='Update failed with {0} for group'
+                          ' {1}'.format(upd_group_resp.status_code, self.group.id))
         get_upd_group = self.autoscale_client.\
             view_scaling_group_config(group_id=self.group.id)
         self.assertEquals(get_upd_group.status_code, 200)
@@ -181,18 +173,23 @@ class UpdateGroupConfigTest(AutoscaleFixture):
             self.group.id)
         updated_config = group_config_response.entity
         self.assertEquals(update_group_response.status_code, 204,
-                          msg='Update group config failed with {0}'
-                          .format(update_group_response.status_code))
+                          msg='Update group config failed with {0} for group '
+                          '{1}'.format(update_group_response.status_code, self.group.id))
         self.validate_headers(update_group_response.headers)
         self.assertEquals(updated_config.minEntities, self.gc_min_entities,
-                          msg='Min entities in the Group config did not update')
+                          msg='Min entities in the Group config did not update'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.cooldown, self.gc_cooldown,
-                          msg='Cooldown time in the Group config did not update')
+                          msg='Cooldown time in the Group config did not update'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.name, self.gc_name,
-                          msg='Name in the Group config did not update')
+                          msg='Name in the Group config did not update'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(updated_config.maxEntities, self.gc_max_entities,
-                          msg='Max entities in the Group config did not update')
+                          msg='Max entities in the Group config did not update'
+                          ' for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(updated_config.metadata),
             self.gc_metadata,
-            msg='Metadata in the Group config did not update')
+            msg='Metadata in the Group config did not update'
+            ' for group {0}'.format(self.group.id))

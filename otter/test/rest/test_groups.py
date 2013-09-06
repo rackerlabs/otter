@@ -16,6 +16,7 @@ from otter.json_schema.group_examples import (
     policy as policy_examples)
 
 from otter.json_schema import rest_schemas, validate
+from otter.json_schema.group_schemas import MAX_ENTITIES
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError)
@@ -26,6 +27,9 @@ from otter.rest.groups import format_state_dict
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
 
+from otter.rest.bobby import set_bobby
+from otter.bobby import BobbyClient
+
 
 class FormatterHelpers(TestCase):
     """
@@ -35,7 +39,7 @@ class FormatterHelpers(TestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -91,7 +95,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def test_list_unknown_error_is_500(self):
         """
@@ -237,7 +241,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(resp_body)
         self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):
         """
         Tries to create a scaling group with the given request body (which
@@ -248,7 +252,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         policies = request_body.get('scalingPolicies', [])
 
         expected_config = config.copy()
-        expected_config.setdefault('maxEntities', 25)
+        expected_config.setdefault('maxEntities', MAX_ENTITIES)
         expected_config.setdefault('metadata', {})
 
         rval = {
@@ -300,6 +304,20 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 "name": "group",
                 "minEntities": 10,
                 "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        })
+
+    def test_group_create_default_maxentities(self):
+        """
+        A scaling group without maxentities defaults to configured maxEntities
+        """
+        self._test_successful_create({
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 10,
                 "cooldown": 10,
                 "metadata": {}
             },
@@ -382,6 +400,74 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(AssertionError)
 
 
+class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/`` endpoints (create, list) with Bobby
+
+    This will go away, just here so that we've got the start for optional
+    Bobby support in Otter.
+    """
+    endpoint = "/v1.0/11111/groups/"
+    invalid_methods = ("DELETE", "PUT")
+
+    def setUp(self):
+        """
+        Set up mock Bobby client
+        """
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
+
+        super(AllGroupsBobbyEndpointTestCase, self).setUp()
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+        patch(self, 'otter.util.http.get_url_root', return_value="")
+
+    def tearDown(self):
+        """
+        Revert mock Bobby client
+        """
+        set_bobby(None)
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
+    def test_group_create_bobby(self, create_group, get_url_root):
+        """
+        A scaling group is created and calls over to Bobby
+        """
+        request_body = {
+            'groupConfiguration': {
+                "name": "group",
+                "minEntities": 1,
+                "maxEntities": 10,
+                "cooldown": 10,
+                "metadata": {}
+            },
+            'launchConfiguration': launch_examples()[0]
+        }
+
+        config = request_body['groupConfiguration']
+        launch = request_body['launchConfiguration']
+        policies = request_body.get('scalingPolicies', [])
+
+        expected_config = config.copy()
+
+        rval = {
+            'groupConfiguration': expected_config,
+            'launchConfiguration': launch,
+            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
+                                        [p.copy() for p in policies])),
+            'id': '1'
+        }
+
+        self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
+
+        self.assert_status_code(
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
+
+        self.mock_store.create_scaling_group.assert_called_once_with(
+            mock.ANY, '11111', expected_config, launch, policies or None)
+
+        create_group.assert_called_once_with('11111', '1')
+
+
 class OneGroupTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/groups/{groupId}/`` endpoints (view manifest,
@@ -413,7 +499,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_view_manifest(self, url_root):
         """
         Viewing the manifest of an existant group returns whatever the

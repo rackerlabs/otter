@@ -20,26 +20,17 @@ class GetListEntityStatusTest(AutoscaleFixture):
             gc_min_entities=cls.gc_min_entities_alt,
             gc_max_entities=cls.gc_max_entities)
         cls.group = group_response.entity
-        cls.resources.add(cls.group.id,
-                          cls.autoscale_client.delete_scaling_group)
         cls.group_state_response = cls.autoscale_client.list_status_entities_sgroups(
             cls.group.id)
         cls.group_state = cls.group_state_response.entity
-
-    @classmethod
-    def tearDownClass(cls):
-        """
-        Delete the scaling group.
-        """
-        super(GetListEntityStatusTest, cls).tearDownClass()
 
     def test_entity_status_response(self):
         """
         Verify list status' response code is 200, header.
         """
         self.assertEquals(200, self.group_state_response.status_code,
-                          msg='The list entities call failed with {0}'
-                          .format(self.group_state_response.status_code))
+                          msg='The list entities call failed with {0} for group '
+                          '{1}'.format(self.group_state_response.status_code, self.group.id))
         self.validate_headers(self.group_state_response.headers)
 
     def test_entity_status(self):
@@ -50,8 +41,12 @@ class GetListEntityStatusTest(AutoscaleFixture):
         self.assertEquals(self.group_state.desiredCapacity,
                           self.group_state.activeCapacity + self.group_state.pendingCapacity)
         self.assertEquals(self.group_state.paused, False,
-                          msg='The scaling group status is paused upon creation')
+                          msg='The scaling group status is paused upon creation'
+                          ' for group {0}'.format(self.group.id))
         self.assertGreaterEqual(self.group_state.desiredCapacity, self.gc_min_entities_alt,
-                                msg='Less than required number of servers in desired capacity')
+                                msg='Less than required number of servers in desired capacity'
+                                ' for group {0}'.format(self.group.id))
         self.assertLessEqual(self.group_state.desiredCapacity, self.gc_max_entities,
-                             msg='Total server count is over maxEntities')
+                             msg='Total server count is over maxEntities'
+                             ' for group {0}'.format(self.group.id))
+        self.empty_scaling_group(self.group)
