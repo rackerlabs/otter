@@ -113,7 +113,7 @@ def PEP3101FormattingWrapper(observer):
     return PEP3101FormattingObserver
 
 
-IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
+IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why", "level"])
 
 
 def GELFObserverWrapper(observer, hostname, seconds=None):
