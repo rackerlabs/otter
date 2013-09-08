@@ -86,7 +86,7 @@ format="SVG" scale="60"/>
               <revdescription>
                   <itemizedlist spacing="compact">
                       <listitem>
-                          <para>Initial Unlimited Availability release.</para>
+                          <para>Initial preview release.</para>
                       </listitem>
                   </itemizedlist>
               </revdescription>
@@ -96,8 +96,8 @@ format="SVG" scale="60"/>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial public draft of full developer guide for Early Access
-                                release.</para>
+                            <para>Initial internal draft of full
+                developer guide for Early Access release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
