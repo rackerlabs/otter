@@ -23,6 +23,7 @@ from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.models.cass import CassScalingGroupCollection
 from otter.rest.application import root, set_store
+from otter.supervisor import set_supervisor
 
 from otter.test.resources import OtterKeymaster
 
@@ -104,9 +105,9 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
 
         # Patch supervisor
-        get_supervisor = patch(self, 'otter.rest.groups.get_supervisor')
-        patch(self, 'otter.rest.configs.get_supervisor', new=get_supervisor)
-        get_supervisor.return_value.validate_launch_config.return_value = defer.succeed(None)
+        supervisor = mock.Mock(spec=['validate_launch_config'])
+        supervisor.validate_launch_config.return_value = defer.succeed(None)
+        set_supervisor(supervisor)
 
         def _mock_obey_config_change(log, trans, config, group, state):
             return defer.succeed(GroupState(
@@ -125,6 +126,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         keyspace.dirtied()
         keyspace.pause()
         keyspace.reset(self.mktemp())
+        set_supervisor(None)
 
     def create_scaling_group(self):
         """
