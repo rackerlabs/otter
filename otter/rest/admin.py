@@ -1,85 +1,34 @@
 """
-Autoscale REST endpoints having to do with administration of otter.
-
-(/metrics)
+Autoscale REST endpoints having to do with administration of Otter.
 """
-
-import json
-
-from klein import Klein
-
-from otter.util import timestamp
-
-from otter.models.mock import MockAdmin
-from otter.rest.decorators import (fails_with, succeeds_with,
-                                   with_transaction_id)
-from otter.rest.errors import exception_codes
+from otter.rest.decorators import with_transaction_id
+from otter.rest.metrics import OtterMetrics
+from otter.rest.otterapp import OtterApp
 
 
 class OtterAdmin(object):
     """
-    The admin application is a RESTful interface to the backend of
-    otter.
+    OtterAdmin is a RESTful interface to manage and otter.
     """
-    app = Klein()
+    app = OtterApp()
 
-    def __init__(self, store=None):
-        if store is None:
-            self.store = MockAdmin()
-        else:
-            self.store = store
+    def __init__(self, store):
+        """
+        Initialize OtterAdmin.
+        """
+        self.store = store
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
-    @fails_with(exception_codes)
-    @succeeds_with(200)
-    def root(self, request, log):
+    def root(self, request):
         """
-        Root response for admin API.
+        Root response for OtterAdmin.
         """
         return ''
 
-    @app.route('/metrics', methods=['GET'])
+    @app.route('/metrics/', branch=True)
     @with_transaction_id()
-    @fails_with(exception_codes)
-    @succeeds_with(200)
-    def list_metrics(self, request, log):
+    def metrics(self, request, log):
         """
-        Get a list of metrics from cassandra.
-
-        Example response::
-
-            {
-                "metrics": [
-                    {
-                        "id": "otter.metrics.scaling_groups",
-                        "value": 3207,
-                        "time": 13120497123
-                    },
-                    {
-                        "id": "otter.metrics.scaling_policies",
-                        "value": 2790,
-                        "time": 13139792343
-                    }
-                ]
-            }
+        Routes related to metrics are delegated to OtterMetrics.
         """
-        def format_data(results):
-            """
-            :param results: Results from running the collect_metrics call.
-
-            :return: Correctly formatted data to be jsonified.
-            """
-            metrics = []
-            for key, value in results.iteritems():
-                metrics.append(dict(
-                    id="otter.metrics.{0}".format(key),
-                    value=value,
-                    time=timestamp.now()))
-
-            return {'metrics': metrics}
-
-        deferred = self.store.get_metrics(log)
-        deferred.addCallback(format_data)
-        deferred.addCallback(json.dumps)
-        return deferred
+        return OtterMetrics(self.store, log).app.resource()
