@@ -1023,6 +1023,19 @@ class CassAdmin(object):
         """
         see :meth:`otter.models.interface.IAdmin.get_metrics`
         """
+        def _format_data(results):
+            """
+            :param results: Results from running the collect_metrics call.
+
+            :return: Correctly formatted data to be jsonified.
+            """
+            metrics = []
+            for key, value in results.iteritems():
+                metrics.append(dict(
+                    id="otter.metrics.{0}".format(key),
+                    value=value,
+                    time=timestamp.now()))
+            return metrics
 
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
         deferred = [self.connection.execute(_cql_count_all.format(cf=field), {},
@@ -1030,7 +1043,7 @@ class CassAdmin(object):
                     for field in fields]
 
         d = defer.gatherResults(deferred)
-        d.addCallback(lambda results: [r[0]['count'] for r in results])
         d.addCallback(lambda results: dict(zip(
-            ('groups', 'policies', 'webhooks'), results)))
+            ('groups', 'policies', 'webhooks'), [r[0]['count'] for r in results])))
+        d.addCallback(_format_data)
         return d

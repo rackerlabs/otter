@@ -6,7 +6,6 @@ import json
 from otter.rest.decorators import fails_with, succeeds_with
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
-from otter.util import timestamp
 
 
 class OtterMetrics(object):
@@ -46,22 +45,6 @@ class OtterMetrics(object):
                 ]
             }
         """
-        def format_data(results):
-            """
-            :param results: Results from running the collect_metrics call.
-
-            :return: Correctly formatted data to be jsonified.
-            """
-            metrics = []
-            for key, value in results.iteritems():
-                metrics.append(dict(
-                    id="otter.metrics.{0}".format(key),
-                    value=value,
-                    time=timestamp.now()))
-
-            return {'metrics': metrics}
-
         deferred = self.store.get_metrics(self.log)
-        deferred.addCallback(format_data)
-        deferred.addCallback(json.dumps)
+        deferred.addCallback(lambda metrics: json.dumps({'metrics': metrics}))
         return deferred

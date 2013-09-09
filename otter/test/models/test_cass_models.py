@@ -2125,21 +2125,37 @@ class CassAdminTestCase(TestCase):
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
 
-    def test_get_metrics(self):
+    @mock.patch('otter.models.cass.timestamp')
+    def test_get_metrics(self, timestamp):
         """
         Check get_metrics returns dictionary in proper format
         """
+        timestamp.now.return_value = '1234567890'
+
         self.returns = [
             [{'count': 190}],
             [{'count': 191}],
             [{'count': 192}],
         ]
 
-        expectedResults = {
-            "groups": 190,
-            "policies": 191,
-            "webhooks": 192
-        }
+        # These are now reversed for an unknown reason.
+        expectedResults = [
+            {
+                'id': 'otter.metrics.webhooks',
+                'value': 192,
+                'time': '1234567890'
+            },
+            {
+                'id': 'otter.metrics.policies',
+                'value': 191,
+                'time': '1234567890'
+            },
+            {
+                'id': 'otter.metrics.groups',
+                'value': 190,
+                'time': '1234567890'
+            }
+        ]
         config_query = ('SELECT COUNT(*) FROM scaling_config;')
         policy_query = ('SELECT COUNT(*) FROM scaling_policies;')
         webhook_query = ('SELECT COUNT(*) FROM policy_webhooks;')
