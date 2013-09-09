@@ -1,38 +1,43 @@
 """
+Tests for the OtterAdmin application.
 """
+import json
 import mock
 
+from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.test.rest.request import RequestTestMixin
-
-from otter.rest.admin import OtterAdmin
+from otter.test.rest.request import AdminRestAPITestMixin
 
 
-class OtterAdminTestCase(RequestTestMixin, TestCase):
+class AdminEndpointsTestCase(AdminRestAPITestMixin, TestCase):
     """
+    Tests against the OtterAdmin endpoints.
     """
+    endpoint = '/'
 
-    def __init__(self, *args, **kwargs):
-        oa = OtterAdmin()
-        self.root = oa.app.resource()
-
-        super(OtterAdminTestCase, self).__init__(*args, **kwargs)
-
-    def test_root_endpoint_empty(self):
+    def test_root_endpoint_exists(self):
         """
-        Sanity test to ensure root endpoint exists and contains no data.
+        Ensures the root endpoint exists, and has headers 'X-Request-ID'
+        and 'content-type' set.
         """
-        self.endpoint = '/'
+        response_body = self.assert_status_code(200)
+        self.assertEqual('', response_body)
 
-        request_body = self.assert_status_code(200)
-        self.assertEqual('', request_body)
-
-    def test_metrics_endpoint_contains_metrics_string(self):
+    @mock.patch('otter.rest.admin.OtterMetrics')
+    def test_metrics_endpoint_delegates(self, OtterMetrics):
         """
-        '/metrics' should contains 'metrics'
+        '/metrics' should return the OtterMetrics resource, and an empty
+        list of metrics.
         """
         self.endpoint = '/metrics'
 
-        request_body = self.assert_status_code(200)
-        self.assertIn('metrics', request_body)
+        metrics = {'metrics': []}
+
+        otter_app = OtterMetrics().app
+        otter_app.resource.return_value = defer.succeed(json.dumps(metrics))
+
+        response_body = json.loads(self.assert_status_code(200))
+        self.assertEqual(metrics, response_body)
+
+        OtterMetrics.assert_called_with(self.mock_store, mock.ANY)

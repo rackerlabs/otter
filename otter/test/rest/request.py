@@ -15,8 +15,9 @@ from twisted.web import server, http
 from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
 
-from otter.models.interface import IScalingGroup, IScalingGroupCollection
+from otter.models.interface import IAdmin, IScalingGroup, IScalingGroupCollection
 from otter.rest.application import Otter
+from otter.rest.admin import OtterAdmin
 from otter.test.utils import iMock, patch
 
 
@@ -276,3 +277,25 @@ class RestAPITestMixin(RequestTestMixin):
         """
         for method in self.invalid_methods:
             self.assert_status_code(405, method=method)
+
+
+class AdminRestAPITestMixin(RequestTestMixin):
+    """
+    Mixin for setting up tests against the OtterAdmin REST API
+    endpoints.
+    """
+
+    def setUp(self):
+        """
+        Mock out the data store and logger.
+        """
+        self.mock_store = iMock(IAdmin)
+
+        #self.mock_store = MockAdmin()
+        #self.root = OtterAdmin(self.mock_store).app.resource()
+
+        self.mock_generate_transaction_id = patch(
+            self, 'otter.rest.decorators.generate_transaction_id',
+            return_value='a-wild-transaction-id')
+
+        self.root = OtterAdmin(self.mock_store).app.resource()

@@ -19,7 +19,8 @@ class OtterAdmin(object):
         self.store = store
 
     @app.route('/', methods=['GET'])
-    def root(self, request):
+    @with_transaction_id()
+    def root(self, request, log):
         """
         Root response for OtterAdmin.
         """
