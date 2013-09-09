@@ -57,9 +57,9 @@ if environ.get('DOCKER'):
     )
 # These options should be set before the docker build
 else:
-    try:
+    if 'OTTER_ID_PASSWORD' in environ:
         config_json['identity']['password'] = environ.get('OTTER_ID_PASSWORD')
-    except KeyError:
+    else:
         print("Must set OTTER_ID_PASSWORD environment variable")
         exit(1)
 
