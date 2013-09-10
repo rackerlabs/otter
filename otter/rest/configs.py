@@ -215,6 +215,6 @@ class OtterLaunch(object):
         Users may have an invalid configuration based on dependencies.
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = get_supervisor().validate_launch_config(log, tenant_id, data)
+        deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
         deferred.addCallback(lambda _: rec.update_launch_config(data))
         return deferred

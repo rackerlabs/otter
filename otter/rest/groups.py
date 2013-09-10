@@ -298,17 +298,13 @@ class OtterGroups(object):
         if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
             raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
-        deferred = get_supervisor().validate_launch_config(log, tenant_id, data['launchConfiguration'])
+        deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data['launchConfiguration'])
 
         deferred.addCallback(
-            lambda _: get_store().create_scaling_group(log, tenant_id,
-                                                       data['groupConfiguration'],
-                                                       data['launchConfiguration'],
-                                                       data.get('scalingPolicies', None)))
-
-        deferred = self.store.create_scaling_group(
-            self.log, self.tenant_id, data['groupConfiguration'], data['launchConfiguration'],
-            data.get('scalingPolicies', None))
+            lambda _: self.store.create_scaling_group(self.log, self.tenant_id,
+                                                      data['groupConfiguration'],
+                                                      data['launchConfiguration'],
+                                                      data.get('scalingPolicies', None)))
 
         def _do_obey_config_change(result):
             group_id = result['id']

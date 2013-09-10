@@ -94,10 +94,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': None,
             'metadata': {}
         }
-        self.launch_config = {
-            "type": "launch_server",
-            "args": {"server": {"these are": "some args"}}
-        }
+        self.launch_config = group_examples.launch_server_config()[0]
         self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
             self.mock_log, self.tenant_id, self.group_id, self.collection,
