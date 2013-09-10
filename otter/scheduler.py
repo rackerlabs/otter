@@ -11,8 +11,6 @@ from croniter import croniter
 from twisted.internet import defer
 from twisted.application.internet import TimerService
 
-from silverberg.lock import BasicLock, BusyLockError, with_lock
-
 from otter.util.hashkey import generate_transaction_id
 from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
 from otter.log import log as otter_log
@@ -42,8 +40,6 @@ class SchedulerService(TimerService):
                     :class:`silverberg.cluster.RoundRobinCassandraCluster` instance used to get lock
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
-        from otter.models.cass import LOCK_TABLE_NAME
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.store = store
         self.clock = clock
@@ -62,69 +58,57 @@ class SchedulerService(TimerService):
             return None
 
         def _do_check():
-            d = with_lock(self.lock, self.fetch_and_process, batchsize)
-            d.addCallback(check_for_more)
+            # utcnow because of cass serialization issues
+            utcnow = datetime.utcnow().replace(seconds=0, microseconds=0)
+            d = self.store.fetch_and_delete(utcnow, batchsize)
             d.addErrback(ignore_and_log, BusyLockError, self.log,
-                         "Couldn't get lock to process events")
+                         "Couldn't get lock to fetch events")
+            d.addCallback(self.process_events, utcnow)
+            d.addCallback(check_for_more)
             d.addErrback(self.log.err)
             return d
 
         return _do_check()
 
-    def fetch_and_process(self, batchsize):
+    def process_events(self, events, now):
         """
         Fetch the events to be processed and process them.
         Also delete/update after processing them
 
         :return: a deferred that fires with list of events processed
         """
-        def process_events(events):
+        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=now)
 
-            if not len(events):
-                return events, set()
+        if not events:
+            return events
 
-            log.msg('Processing events', num_events=len(events))
+        log.msg('Processing {num_events} events', num_events=len(events))
 
-            deleted_policy_ids = set()
+        deleted_policy_ids = set()
 
-            deferreds = [
-                self.execute_event(log, event, deleted_policy_ids)
-                for event in events
-            ]
-            d = defer.gatherResults(deferreds, consumeErrors=True)
-            return d.addCallback(lambda _: (events, deleted_policy_ids))
+        deferreds = [
+            self.execute_event(log, event, deleted_policy_ids)
+            for event in events
+        ]
+        d = defer.gatherResults(deferreds, consumeErrors=True)
+        return d.addCallback(lambda _: self.add_cron_events(log, events, deleted_policy_ids))
 
-        def update_delete_events((events, deleted_policy_ids)):
-            """
-            Update events with cron entry with next trigger time
-            Delete other events
-            """
-            if not len(events):
-                return events
+    def add_cron_events(self, log, events, deleted_policy_ids):
+        """
+        Update events with cron entry with next trigger time
+        """
+        if not events:
+            return events
 
-            events_to_delete, events_to_update = [], []
-            for event in events:
-                if event['cron'] and event['policyId'] not in deleted_policy_ids:
-                    event['trigger'] = next_cron_occurrence(event['cron'])
-                    events_to_update.append(event)
-                else:
-                    events_to_delete.append(event['policyId'])
+        new_cron_event = []
+        for event in events:
+            if event['cron'] and event['policyId'] not in deleted_policy_ids:
+                event['trigger'] = next_cron_occurrence(event['cron'])
+                new_cron_event.append(event)
 
-            log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
-            log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
-            d = self.store.update_delete_events(events_to_delete, events_to_update)
-
-            return d.addCallback(lambda _: events)
-
-        # utcnow because of cass serialization issues
-        utcnow = datetime.utcnow()
-        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
-        log.msg('Checking for events')
-        deferred = self.store.fetch_batch_of_events(utcnow, batchsize)
-        deferred.addCallback(process_events)
-        deferred.addCallback(update_delete_events)
-        deferred.addErrback(log.err)
-        return deferred
+        log.msg('Adding {new_cron_events} cron events', new_cron_events=len(new_cron_events))
+        d = self.store.add_cron_events(new_cron_events)
+        return d.addCallback(lambda _: events)
 
     def execute_event(self, log, event, deleted_policy_ids):
         """

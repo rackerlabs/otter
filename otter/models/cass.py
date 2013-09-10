@@ -74,12 +74,13 @@ _cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyI
                                'trigger, cron) '
                                'VALUES (:tenantId, :groupId, {name}Id, '
                                '{name}Trigger, {name}cron)')
-_cql_insert_event_batch = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
-                           'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
-                           '{name}trigger, {name}cron);')
+_cql_insert_cron_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
+                          'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
+                          '{name}trigger, {name}cron);')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM {cf} WHERE '
-    'trigger <= :now LIMIT :size ALLOW FILTERING;')
+    'trigger == :now LIMIT :size;')
+_cql_delete_events = 'DELETE FROM {cf} WHERE trigger = :trigger AND "policyId" IN ({policy_ids});'
 _cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -190,7 +191,9 @@ def _build_schedule_policy(policy, event_table, queries, data, polname):
     """
     if 'at' in policy["args"]:
         queries.append(_cql_insert_event.format(cf=event_table, name=':' + polname))
-        data[polname + "Trigger"] = timestamp.from_timestamp(policy["args"]["at"])
+        at_time = timestamp.from_timestamp(policy["args"]["at"]).replace(seconds=0,
+                                                                         microseconds=0)
+        data[polname + "Trigger"] = at_time
     elif 'cron' in policy["args"]:
         queries.append(_cql_insert_event_with_cron.format(cf=event_table, name=':' + polname))
         cron = policy["args"]["cron"]
@@ -943,36 +946,44 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def fetch_batch_of_events(self, now, size=100):
+    def fetch_and_delete(self, log, now, size=100):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
+        Fetch events to be occurring now and delete them after fetching
         """
-        d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
-                                    {"size": size, "now": now},
-                                    get_consistency_level('list', 'event'))
-        return d
+        def _fetch_and_delete(now, size):
+            d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
+                                        {"size": size, "now": now},
+                                        get_consistency_level('list', 'event'))
+            return d.addCallback(delete_events)
 
-    def update_delete_events(self, delete_policy_ids, update_events):
-        """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.update_delete_events`
-        """
-        # First delete all events
-        all_delete_ids = delete_policy_ids + [event['policyId'] for event in update_events]
-        query, data = _delete_many_query_and_params(self.event_table, '"policyId"', all_delete_ids)
-        d = self.connection.execute(query, data, get_consistency_level('delete', 'event'))
+        def delete_events(events):
+            # delete events
+            policy_ids = [event['policyId'] for event in events]
+            cql, data = '', {}
+            for i, policy_id in enumerate(policy_ids):
+                cql += ':policyid{},'.format(i)
+                data['policyid{}'.format(i)] = policy_id
+            cql = cql.rstrip(',')
+            d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
+                                                                  policy_ids=cql),
+                                        {'trigger': now, 'policy_ids': data},
+                                        get_consistency_level('delete', 'event'))
+            return d.addCallback(lambda _: events)
 
-        # Then insert rows for trigger times to be updated. This is because trigger cannot be
-        # updated on an existing row since it is part of primary key
-        def _do_update(_):
-            queries, data = list(), dict()
-            for i, event in enumerate(update_events):
-                polname = 'policy{}'.format(i)
-                queries.append(_cql_insert_event_batch.format(cf=self.event_table, name=':' + polname))
-                data.update({polname + key: event[key] for key in event})
-            b = Batch(queries, data, get_consistency_level('insert', 'event'))
-            return b.execute(self.connection)
+        lock = BasicLock(self.connection, LOCK_TABLE_NAME, now.isoformat(), max_retry=0)
+        return with_lock(lock, _fetch_and_delete, now, size)
 
-        return update_events and d.addCallback(_do_update) or d
+    def add_cron_events(self, cron_events):
+        """
+        Add cron events to event table
+        """
+        queries, data = list(), dict()
+        for i, event in enumerate(update_events):
+            polname = 'policy{}'.format(i)
+            queries.append(_cql_insert_cron_event.format(cf=self.event_table, name=':' + polname))
+            data.update({polname + key: event[key] for key in event})
+        b = Batch(queries, data, get_consistency_level('insert', 'event'))
+        return b.execute(self.connection)
 
     def webhook_info_by_hash(self, log, capability_hash):
         """
