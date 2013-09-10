@@ -2,8 +2,9 @@
 Client objects for all the bobby api calls
 """
 from bobby.models.bobby_response import BobbyGroup, ServerGroup, Policies
-from bobby.models.bobby_requests import BobbyGroup_Request, ServerGroup_Request, \
-    BobbyPolicies_Request, Update_BobbyPolicies_Request
+from bobby.models.bobby_requests import (
+    BobbyGroup_Request, ServerGroup_Request,
+    BobbyPolicies_Request, Update_BobbyPolicies_Request)
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
 

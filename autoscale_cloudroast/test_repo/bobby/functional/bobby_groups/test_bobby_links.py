@@ -1,9 +1,10 @@
 """
 Test the bobby links in the response objects
 """
+import unittest
+
 from test_repo.bobby.fixtures import BobbyFixture
 from cloudcafe.common.tools.datagen import rand_name
-import unittest
 
 
 @unittest.skip('AUTO-553')

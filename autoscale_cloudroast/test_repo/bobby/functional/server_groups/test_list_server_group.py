@@ -6,6 +6,7 @@ from cloudcafe.common.tools.datagen import rand_name
 
 
 class ListServerGroupTest(BobbyFixture):
+
     """
     Tests for list server group
     """
@@ -28,9 +29,9 @@ class ListServerGroupTest(BobbyFixture):
         self.validate_headers(list_group_response.headers)
         server_group_id_list = [
             each_group.serverId for each_group in list_group_response.entity]
-        self.assertTrue(server_id_1 in server_group_id_list, msg='Server Group with id'
-                        '{0} does not exist when listing server groups: '
-                        ' {1}'.format(server_id_1, server_group_id_list))
-        self.assertTrue(server_id_2 in server_group_id_list, msg='Server Group with id'
-                        '{0} does not exist when listing server groups: '
-                        ' {1}'.format(server_id_2, server_group_id_list))
+        self.assertIn(server_id_1, server_group_id_list, msg='Server Group with id'
+                      '{0} does not exist when listing server groups: '
+                      ' {1}'.format(server_id_1, server_group_id_list))
+        self.assertIn(server_id_2, server_group_id_list, msg='Server Group with id'
+                      '{0} does not exist when listing server groups: '
+                      ' {1}'.format(server_id_2, server_group_id_list))
