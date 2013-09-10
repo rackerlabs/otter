@@ -87,9 +87,9 @@ class LaunchConfigTests(SupervisorTests):
 
         self.auth_function.assert_called_once_with(11111)
 
-    def test_execute_config_propogates_auth_error(self):
+    def test_execute_config_propagates_auth_error(self):
         """
-        execute_config will propogate any errors from the authentication
+        execute_config will propagate any errors from the authentication
         function.
         """
         expected = ValueError('auth failure')
@@ -211,9 +211,9 @@ class DeleteServerTests(SupervisorTests):
 
         self.auth_function.assert_called_once_with(11111)
 
-    def test_execute_delete_propogates_auth_error(self):
+    def test_execute_delete_propagates_auth_error(self):
         """
-        ``execute_delete_server`` will propogate any errors from the
+        ``execute_delete_server`` will propagate any errors from the
         authentication function.
         """
         expected = ValueError('auth failure')
@@ -254,9 +254,9 @@ class ValidateLaunchConfigTests(SupervisorTests):
         self.validate_launch_server_config.assert_called_once_with(
             self.log.bind(), 'ORD', self.service_catalog, self.auth_token, 'launch_args')
 
-    def test_invalid_config_error_propogates(self):
+    def test_invalid_config_error_propagates(self):
         """
-        Invalid launch config error is propogated
+        Invalid launch config error is propagated
         """
         self.validate_launch_server_config.return_value = fail(ValueError('huh'))
         d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
