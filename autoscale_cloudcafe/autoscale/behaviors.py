@@ -202,21 +202,17 @@ class AutoscaleBehaviors(BaseBehavior):
                                        check_metadata=None, target_alias=None,
                                        target_hostname=None, target_resolver=None):
         """
-        :summary: creates a monitoring policy for the given schedule
+        :summary: creates a monitoring policy for the given check type, target.
         :return: returns the newly created policy object
         :rtype: returns the policy object
         """
         sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
-        check_label = check_label or rand_name('scaling_group_check')
         sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
-        check_type = check_type or self.autoscale_config.check_type
-        check_url = check_url or self.autoscale_config.check_url
-        check_method = check_method or self.autoscale_config.check_method
+        check_label = check_label or rand_name('scaling_group_check')
         check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
         check_period = check_period or int(self.autoscale_config.check_period)
         alarm_criteria = alarm_criteria or self.autoscale_config.alarm_criteria
-        monitoring_zones = ['mzord', 'mzdfw', 'mziad']
-        target_alias = target_alias or self.autoscale_config.target_alias
+        monitoring_zones = monitoring_zones or ['mzord', 'mzdfw', 'mziad']
         if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,
@@ -432,7 +428,7 @@ class AutoscaleBehaviors(BaseBehavior):
                         pass
                     try:
                         if policy_type.args.check.label:
-                            policy['check_type'] = policy_type.args.check.label
+                            policy['check_label'] = policy_type.args.check.label
                     except AttributeError:
                         pass
                     try:

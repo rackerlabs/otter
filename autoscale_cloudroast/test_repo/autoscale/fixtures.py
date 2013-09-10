@@ -86,7 +86,7 @@ class AutoscaleFixture(BaseTestFixture):
         cls.check_method = cls.autoscale_config.check_method
         cls.check_timeout = cls.autoscale_config.check_timeout
         cls.check_period = cls.autoscale_config.check_period
-        cls.monitoring_zones = cls.autoscale_config.monitoring_zones
+        cls.monitoring_zones = ['mzord', 'mzdfw', 'mziad']
         cls.target_alias = cls.autoscale_config.target_alias
         cls.alarm_criteria = cls.autoscale_config.alarm_criteria
         cls.upd_sp_change = int(cls.autoscale_config.upd_sp_change)
