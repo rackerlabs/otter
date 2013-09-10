@@ -25,7 +25,8 @@ class GetScalingPolicy(ScalingGroupPolicyFixture):
         Verify the get policy call for response code 200, headers and data
         """
         self.assertEquals(self.get_policy_response.status_code, 200,
-                          msg='Get scaling policy failed with {0}'
-                          .format(self.get_policy_response.status_code))
+                          msg='Get scaling policy failed with {0} for group'
+                          ' {1}'.format(self.get_policy_response.status_code,
+                                        self.group.id))
         self.validate_headers(self.get_policy_response.headers)
         self.assert_get_policy(self.policy, self.get_policy)

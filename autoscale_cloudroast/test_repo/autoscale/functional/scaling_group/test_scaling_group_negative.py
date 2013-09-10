@@ -212,17 +212,18 @@ class ScalingGroupNegative(AutoscaleFixture):
             group_id=group.id)
         self.assertEquals(
             create_resp.status_code, 201, msg='create group failed')
-        self.assertEquals(del_resp.status_code, 204, msg='Delete group failed')
+        self.assertEquals(del_resp.status_code, 204, msg='Delete group failed'
+                          ' for group {0}'.format(group.id))
         expected_status_code = HttpStatusCodes.NOT_FOUND
         error_create_resp = self.autoscale_client.view_manifest_config_for_scaling_group(
             group_id=group.id)
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: {0}'
-                          .format(error_create_resp.status_code))
+                          msg='View manifest succeeded after group {0} was deleted: '
+                          '{1}'.format(group.id, error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: {0}'
-                        .format(create_error))
+                        msg='View manifest returned response {0} for deleted group:'
+                        ' {1}'.format(create_error, group.id))
 
     def test_update_group_after_deletion(self):
         """
@@ -234,7 +235,8 @@ class ScalingGroupNegative(AutoscaleFixture):
             group_id=group.id)
         self.assertEquals(
             create_resp.status_code, 201, msg='create group failed')
-        self.assertEquals(del_resp.status_code, 204, msg='Delete group failed')
+        self.assertEquals(del_resp.status_code, 204, msg='Delete group failed'
+                          ' for group {0}'.format(group.id))
         expected_status_code = HttpStatusCodes.NOT_FOUND
         error_create_resp = self.autoscale_client.update_group_config(
             group_id=group.id,
@@ -245,8 +247,8 @@ class ScalingGroupNegative(AutoscaleFixture):
             metadata={})
         create_error = error_create_resp.entity
         self.assertEquals(error_create_resp.status_code, expected_status_code,
-                          msg='Create group succeeded with invalid request: {0}, groupid: {1}'
-                          .format(error_create_resp.status_code, group.id))
+                          msg='Update group succeeded after group {0} was deleted: '
+                          '{1}'.format(group.id, error_create_resp.status_code))
         self.assertTrue(create_error is None,
-                        msg='Create group with invalid request returned: {0}'
-                        .format(create_error))
+                        msg='Update group returned response {0} for deleted group:'
+                        ' {1}'.format(create_error, group.id))
