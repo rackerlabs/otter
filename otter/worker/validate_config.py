@@ -15,8 +15,7 @@ class InvalidLaunchConfiguration(Exception):
     """
     Represents an invalid launch configuration
     """
-    def __init__(self, message):
-        super(Exception, self).__init__(message)
+    pass
 
 
 def get_service_endpoint(service_catalog, region):
