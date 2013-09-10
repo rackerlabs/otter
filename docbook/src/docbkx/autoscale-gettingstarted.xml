@@ -79,7 +79,7 @@ format="SVG" scale="60"/>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial Unlimited Availability release.</para>
+                            <para>Initial Early Access release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -100,7 +100,7 @@ format="SVG" scale="60"/>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial draft for preview
+                            <para>Initial internal draft for preview
                                 release.</para>
                         </listitem>
                     </itemizedlist>
@@ -175,8 +175,7 @@ format="SVG" scale="60"/>
                     <para>
                         Create load balancers by using Cloud Load
                         Balancers. For more information see the <link
-                        xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html"
-                        >Rackspace Cloud Load Balancers Developers
+                        xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html">Rackspace Cloud Load Balancers Developers
                         Guide</link>.
                     </para>
                 </listitem>
@@ -553,7 +552,7 @@ format="SVG" scale="60"/>
             </tip>
         </para>
         <section xml:id="Authenticate">
-            <title>Step 1: Authenticate</title>
+            <title>Authenticate</title>
             <para>As with all Rackspace APIs, before you can use the
                 Autoscale API you must authenticate with your
                 Rackspace credentials. </para>
@@ -593,7 +592,7 @@ format="SVG" scale="60"/>
             </tip>
         </section>
         <section xml:id="Save_Image">
-            <title>Step 2: Create a Server and Save its Image</title>
+            <title>Save an Image</title>
             <para>After authenticating to the Web service you create a
                 cloud server using one of the following
                 methods:</para>
@@ -612,16 +611,19 @@ format="SVG" scale="60"/>
                     </listitem>
                 </itemizedlist>
             </para>
-            <para> With the Cloud Servers API, you can use a <link
-                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
-                    >List Images</link> request to retrieve a list of
-                options available for configuring your server. <example>
+            <para> With the Cloud Servers API, you can use a 
+                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html">List Images</link>
+                request to retrieve a list of options available for configuring your server. 
+                <example>
                     <title>Requesting a List of Cloud Server
                         Images</title>
                     <para>The following example shows how to request a list cloud server images.</para>
-                    <screen>
-$ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}" https://ord.servers.api.rackspacecloud.com/v2/{Tenant-id}/images?type=SNAPSHOT | python -mjson.tool
-                    </screen>
+                    <programlisting language="bash">
+                        $ curl -X GET \
+                        -H "Content-Type: application/json" \
+                        -H "X-Auth-token:{auth-token}" \
+                        https://ord.servers.api.rackspacecloud.com/v2/{tenant-id}/images?type=SNAPSHOT | python -mjson.tool
+                    </programlisting>
                 </example>
             </para>
             <para>After creating your server you customize it so that
@@ -632,7 +634,7 @@ $ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}"
                 save its image and record the imageID. </para>
         </section>
         <section xml:id="Create_Group">
-            <title>Step 3: Create and Manage a Scaling Group</title>
+            <title>Create and Manage a Scaling Group</title>
             <para>You can use the Autoscale API to create and manage
                 your scaling group.</para>
             <example>
@@ -647,23 +649,17 @@ $ curl -X GET -H "Content-Type: application/json" -H "X-Auth-token:{auth-token}"
                     servers to the specified load balancer. If the
                     pOST request is successful, no response body will
                     be returned.</para>
-                <screen>
-POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
-                </screen>
-                <programlisting language="json">
-<xi:include href="./samples/reqCreateGroup.json" parse="text"/>
-</programlisting>
+                <programlisting>POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
+                </programlisting>
+                <programlisting language="json"><xi:include href="./samples/reqCreateGroup.json" parse="text"/></programlisting>
             </example>
             <example>
                 <title>List all Scaling Groups</title>
                 <para>The following example shows how to list all the
                     scaling groups for a specific tenantID. </para>
-                <screen>
-GET /{tenantId}/groups
-                </screen>
-                <programlisting language="json">
-<xi:include href="./samples/resGetGroups.json" parse="text"/>
-</programlisting>
+                <programlisting>GET /{tenantId}/groups
+                </programlisting>
+                <programlisting language="json"><xi:include href="./samples/resGetGroups.json" parse="text"/></programlisting>
             </example>
             <example>
                 <title>Manifested View of a Scaling Group
@@ -673,31 +669,26 @@ GET /{tenantId}/groups
                     the launch configuration, and the scaling
                     policies. The data is returned in the body of the
                     response in JSON format.</para>
-                <screen>
-GET /{tenantId}/groups/{groupId}
-                </screen>
-                <programlisting language="json">
-<xi:include href="./samples/resGetGroupManifest.json" parse="text"/>
-</programlisting>
+                <programlisting>GET /{tenantId}/groups/{groupId}</programlisting>
+                <programlisting language="json"><xi:include href="./samples/resGetGroupManifest.json" parse="text"/></programlisting>
             </example>
             <example>
-                <title>Get the Current State of a Scaling Group</title>
+                <title>Get the Current State of a Scaling
+                    Group</title>
                 <para>The following example shows how to obtain the
                     current date of a scaling group, including the
                     current set of active entities, the number of
                     pending entities, and the desired number of
                     entities. This data is returned in the body of the
                     response in JSON format. </para>
-                <screen>
-GET /{tenantId}/groups/{groupId}
-                </screen>
+                <programlisting>GET /{tenantId}/groups/{groupId}</programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetGroupState.json" parse="text"/>
 </programlisting>
             </example>
         </section>
         <section xml:id="Manage_Launch_Configuration">
-            <title>Step 4: Manage the Launch Configuration for your
+            <title>Manage the Launch Configuration for your
                 Scaling Group</title>
             <para>You can use the Autoscale API to view and update the
                 launch configuration for your scaling group.</para>
@@ -709,7 +700,7 @@ GET /{tenantId}/groups/{groupId}
                     of entities, global cooldown, and other metadata.
                     This data is returned in the body of the response
                     in JSON format. </para>
-                <screen>GET /{tenantId}/groups/{groupId}/config</screen>
+                <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
 </programlisting>
@@ -736,7 +727,7 @@ GET /{tenantId}/groups/{groupId}
                     to, what networks to add it to, and other
                     metadata. This data is returned in the body of the
                     response in JSON format. </para>
-                <screen> GET /{tenantId}/groups/{groupId}/launch</screen>
+                <programlisting> GET /{tenantId}/groups/{groupId}/launch</programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
 </programlisting>
@@ -750,26 +741,26 @@ GET /{tenantId}/groups/{groupId}
                     networks to add it to, and other metadata. If the
                     PUT request is successful, no response body will
                     be returned. </para>
-                <screen> PUT /{tenantId}/groups/{groupId}/launch </screen>
+                <programlisting> PUT /{tenantId}/groups/{groupId}/launch </programlisting>
                 <programlisting language="json">
 </programlisting>
             </example>
             <example>
                 <title>Pause Execution of all Policies for a Scaling Group</title>
                 <para>The following example shows how to pause execution of all policies for a specific scaling group. </para>
-                <screen> POST /{tenantId}/groups/{groupId}/pause</screen>
+                <programlisting> POST /{tenantId}/groups/{groupId}/pause</programlisting>
            
             </example>
             <example>
                 <title>Resume Execution of all Policies for a Scaling Group</title>
                 <para>The following example shows how to resume execution of all policies for a specific scaling group. </para>
-                <screen> POST /{tenantId}/groups/{groupId}/resume</screen>
+                <programlisting> POST /{tenantId}/groups/{groupId}/resume</programlisting>
                 
             </example>
   
         </section>
         <section xml:id="Create_Policy">
-            <title>Step 5: Create Scaling Policies</title>
+            <title>Create Scaling Policies</title>
             <para>You can use the Autoscale API to create and manage
                 the scaling policies for your scaling group. Create a
                 scaling policy by submitting a POST request that
@@ -802,9 +793,9 @@ GET /{tenantId}/groups/{groupId}
                     request is successful, an array of scaling
                     policies is provided in the request body in JSON
                     format. </para>
-                <screen>
+                <programlisting>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resCreatePolicies.json" parse="text"/>
 </programlisting>
@@ -813,9 +804,9 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
                 <title>Obtaining a List of Scaling Policies</title>
                 <para>The following example demonstrates how to obtain a list of scaling policies in the group. Each policy describes an id,
                     name, type, adjustment, cooldown, and links. </para>
-                <screen>
+                <programlisting>
 GET /{tenantId}/groups/{groupId}/policies
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetPolicies.json" parse="text"/>
 </programlisting>
@@ -824,9 +815,9 @@ GET /{tenantId}/groups/{groupId}/policies
                 <title>Getting an Individual Scaling Policy</title>
                 <para>The following example demonstrates how to get a scaling policy which describes an id, name, type, adjustment, and
                     cooldown, and links. </para>
-                <screen>
+                <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetPolicy.json" parse="text"/>
 </programlisting>
@@ -841,9 +832,9 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}
                     by 2 servers with a cooldown phase of 150 seconds.
                     If the PUT request is successful, no response body
                     will be returned. </para>
-                <screen>
+                <programlisting>
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 </programlisting>
             </example>
@@ -852,14 +843,14 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}
                 <para>The following example shows how to delete a
                     scaling policy. If the DELETE request is
                     successful, no response body will be returned. </para>
-                <screen>
+                <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
-                </screen>
+                </programlisting>
            
             </example>
         </section>
         <section xml:id="Create_Webhooks">
-            <title>Step 6: Create and Manage Webhooks</title>
+            <title>Create and Manage Webhooks</title>
             <para> After creating your policy, you need to specify a
                 webhook to you tie your <link linkend="Create_Policy"
                     >scaling policy</link> to events. Webhooks are
@@ -871,9 +862,9 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
                 <title>Creating a Scaling Webhook: Request</title>
                 <para>The following example shows how to create two
                     webhooks for a scaling policy.</para>
-                <screen>
+                <programlisting>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/reqPutWebhook.json" parse="text"/>
 </programlisting>
@@ -890,9 +881,9 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
                 <para>The following example shows how to obtain a list
                     of all scaling webhooks and their corresponding
                     ids.</para>
-                <screen>
+                <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetWebhooks.json" parse="text"/>
 </programlisting>
@@ -902,9 +893,9 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                 <para>The following example shows how to modify a
                     scaling webhook. If the PUT request is successful,
                     no response body will be returned. </para>
-                <screen>
+                <programlisting>
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/reqPutWebhook.json" parse="text"/>
 </programlisting>
@@ -913,9 +904,9 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 <title>Get Information about a Specific Webhook</title>
                 <para>The following example shows how to obtain
                     details about a specific webhook.</para>
-                <screen>
+                <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/resGetWebhook.json" parse="text"/>
 </programlisting>
@@ -926,22 +917,22 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                     DELETE request with the tenandID, groupID,
                     policyID, and the webhookID. If the DELETE request
                     is successful, no response body will be returned. </para>
-                <screen>
+                <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-                </screen>
+                </programlisting>
   
             </example>
         </section>
         <section xml:id="Execute_Policy">
-            <title>Step 7: Execute a Scaling Policy</title>
+            <title>Execute a Scaling Policy</title>
             <para> After you define a <link linkend="Create_Policy"
                     >policy</link>, you can activate that policy by
                 issuing a POST request against its URL. </para>
             <example>
                 <title>Activating a Scaling Policy</title>
-                <screen>
+                <programlisting>
  POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute 
-                </screen>
+                </programlisting>
             </example>
             <para> The POST request causes the <link
                     linkend="Create_Policy">scaling policy</link> to
@@ -957,7 +948,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 the scaling policy is executed. </para>
         </section>
         <section xml:id="Delete_Group">
-            <title>Step 8: Deactivate and Delete a Scaling
+            <title>Deactivate and Delete the Scaling
                 Group</title>
             <para> You can stop a <link linkend="Create_Group">scaling
                     group</link> from scaling by configuring both its
@@ -966,9 +957,9 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 prevents the scaling group from expanding. </para>
             <example>
                 <title>Deactivating a Scaling Group</title>
-                <screen>
+                <programlisting>
 PUT /{tenantId}/groups/{groupId}/config
-                </screen>
+                </programlisting>
                 <programlisting language="json">
 <xi:include href="./samples/groupConfiguration-size0.json" parse="text"/>
 </programlisting>
@@ -983,9 +974,9 @@ PUT /{tenantId}/groups/{groupId}/config
             <para> When a group contains no servers, you can eliminate
                 the group by sending a &DELETE; request to its group
                 ID. </para>
-            <screen>
+            <programlisting>
 DELETE /{tenantId}/groups/{groupId}
-            </screen>
+            </programlisting>
         </section>
     </chapter>
     <chapter xml:id="F_A_Q">
