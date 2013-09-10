@@ -1,7 +1,5 @@
 """
 Contains code to validate launch config
-
-TODO: Apart from this, add schema validation to a minimum extent
 """
 
 from twisted.internet import defer
@@ -19,7 +17,6 @@ class InvalidLaunchConfiguration(Exception):
     """
     def __init__(self, message):
         super(Exception, self).__init__(message)
-        self.message = message
 
 
 def get_service_endpoint(service_catalog, region):
