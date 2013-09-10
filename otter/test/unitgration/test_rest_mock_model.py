@@ -21,7 +21,7 @@ from otter.json_schema.group_examples import config, launch_server_config, polic
 from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
 from otter.models.mock import MockScalingGroupCollection
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
 from otter.supervisor import set_supervisor
 
 from otter.test.rest.request import request
@@ -63,7 +63,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         Replace the store every time with a clean one.
         """
         store = MockScalingGroupCollection()
-        set_store(store)
+        self.root = Otter(store).app.resource()
         set_config_data({'url_root': 'http://127.0.0.1'})
         self.addCleanup(set_config_data, {})
 
@@ -105,7 +105,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
             "launchConfiguration": launch_server_config()[0]
         }
         wrapper = self.successResultOf(request(
-            root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body)))
+            self.root, 'POST', '/v1.0/11111/groups/', body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
@@ -122,7 +122,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         # now make sure the Location header points to something good!
         path = _strip_base_url(headers[0])
 
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200, path)
 
         response = json.loads(wrapper.content)
@@ -133,7 +133,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         # make sure the created group has enough pending entities, and is
         # not paused
         wrapper = self.successResultOf(
-            request(root, 'GET', path + 'state/'))
+            request(self.root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -146,16 +146,16 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         Deleting a scaling group returns with a 204 no content.  The next
         attempt to view the scaling group should return a 404 not found.
         """
-        wrapper = self.successResultOf(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(self.root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
         wrapper = self.successResultOf(
-            request(root, 'GET', path + 'state/'))
+            request(self.root, 'GET', path + 'state/'))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -166,7 +166,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         Asserts that there are ``number`` number of scaling groups
         """
         wrapper = self.successResultOf(
-            request(root, 'GET', '/v1.0/11111/groups/'))
+            request(self.root, 'GET', '/v1.0/11111/groups/'))
         self.assertEqual(200, wrapper.response.code)
 
         response = json.loads(wrapper.content)
@@ -199,7 +199,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         edited_launch = launch_server_config()[1]
 
         wrapper = self.successResultOf(
-            request(root, 'PUT', path, body=json.dumps(edited_launch)))
+            request(self.root, 'PUT', path, body=json.dumps(edited_launch)))
 
         self.assertEqual(wrapper.response.code, 204,
                          "Edit failed: {0}".format(wrapper.content))
@@ -207,7 +207,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
 
         # now try to view again - the config should be the edited config
         wrapper = self.successResultOf(
-            request(root, 'GET', path))
+            request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
         self.assertEqual(json.loads(wrapper.content),
                          {'launchConfiguration': edited_launch})
@@ -232,7 +232,6 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
             store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
         self.group_id = manifest['id']
-        set_store(store)
 
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
             tenant=self.tenant_id, group=self.group_id)
@@ -243,6 +242,8 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
             GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
         self.addCleanup(controller_patcher.stop)
 
+        self.root = Otter(store).app.resource()
+
         set_config_data({'url_root': 'http://127.0.0.1'})
         self.addCleanup(set_config_data, {})
 
@@ -251,7 +252,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         Asserts that there are ``number`` number of scaling policies
         """
         wrapper = self.successResultOf(
-            request(root, 'GET', self.policies_url))
+            request(self.root, 'GET', self.policies_url))
         self.assertEqual(200, wrapper.response.code)
 
         response = json.loads(wrapper.content)
@@ -268,7 +269,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         """
         request_body = policy()[:-1]  # however many of them there are minus one
         wrapper = self.successResultOf(request(
-            root, 'POST', self.policies_url, body=json.dumps(request_body)))
+            self.root, 'POST', self.policies_url, body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
@@ -305,13 +306,13 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         """
         request_body = policy()[-1]  # the one that was not created
         wrapper = self.successResultOf(
-            request(root, 'PUT', path, body=json.dumps(request_body)))
+            request(self.root, 'PUT', path, body=json.dumps(request_body)))
         self.assertEqual(wrapper.response.code, 204,
                          "Update failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -332,13 +333,13 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         Deleting a scaling policy returns with a 204 no content.  The next
         attempt to view the scaling policy should return a 404 not found.
         """
-        wrapper = self.successResultOf(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(self.root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -381,7 +382,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         self.assert_number_of_scaling_policies(len(first_policies))
 
         wrapper = self.successResultOf(
-            request(root, 'POST', first_policies[0] + 'execute/'))
+            request(self.root, 'POST', first_policies[0] + 'execute/'))
         self.assertEqual(wrapper.response.code, 202,
                          "Execute failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "{}")
@@ -395,7 +396,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
             NoSuchPolicyError('11111', '1', '2'))
 
         wrapper = self.successResultOf(
-            request(root, 'POST', self.policies_url + '1/execute/'))
+            request(self.root, 'POST', self.policies_url + '1/execute/'))
         self.assertEqual(wrapper.response.code, 404,
                          "Execute did not fail as expected: {0}".format(wrapper.content))
 
@@ -431,7 +432,6 @@ class MockStoreRestWebhooksTestCase(TestCase):
                 "cooldown": 3,
                 "type": "webhook"
             }])).keys()[0]
-        set_store(store)
 
         self.webhooks_url = (
             '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks/'.format(
@@ -445,6 +445,8 @@ class MockStoreRestWebhooksTestCase(TestCase):
 
         self.mock_controller.maybe_execute_scaling_policy.side_effect = _mock_maybe_execute
 
+        self.root = Otter(store).app.resource()
+
         set_config_data({'url_root': 'http://127.0.0.1'})
         self.addCleanup(set_config_data, {})
 
@@ -453,7 +455,7 @@ class MockStoreRestWebhooksTestCase(TestCase):
         Asserts that there are ``number`` number of scaling policies
         """
         wrapper = self.successResultOf(
-            request(root, 'GET', self.webhooks_url))
+            request(self.root, 'GET', self.webhooks_url))
         self.assertEqual(200, wrapper.response.code)
 
         response = json.loads(wrapper.content)
@@ -473,7 +475,7 @@ class MockStoreRestWebhooksTestCase(TestCase):
             {'name': 'second', 'metadata': {'notes': 'second webhook'}}
         ]
         wrapper = self.successResultOf(request(
-            root, 'POST', self.webhooks_url, body=json.dumps(request_body)))
+            self.root, 'POST', self.webhooks_url, body=json.dumps(request_body)))
 
         self.assertEqual(wrapper.response.code, 201,
                          "Create failed: {0}".format(wrapper.content))
@@ -514,13 +516,13 @@ class MockStoreRestWebhooksTestCase(TestCase):
         """
         request_body = {'name': 'updated_webhook', 'metadata': {'foo': 'bar'}}
         wrapper = self.successResultOf(
-            request(root, 'PUT', path, body=json.dumps(request_body)))
+            request(self.root, 'PUT', path, body=json.dumps(request_body)))
         self.assertEqual(wrapper.response.code, 204,
                          "Update failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 200)
 
         response = json.loads(wrapper.content)
@@ -545,13 +547,13 @@ class MockStoreRestWebhooksTestCase(TestCase):
         Deleting a webhook returns with a 204 no content.  The next attempt to
         view the webhook should return a 404 not found.
         """
-        wrapper = self.successResultOf(request(root, 'DELETE', path))
+        wrapper = self.successResultOf(request(self.root, 'DELETE', path))
         self.assertEqual(wrapper.response.code, 204,
                          "Delete failed: {0}".format(wrapper.content))
         self.assertEqual(wrapper.content, "")
 
         # now try to view
-        wrapper = self.successResultOf(request(root, 'GET', path))
+        wrapper = self.successResultOf(request(self.root, 'GET', path))
         self.assertEqual(wrapper.response.code, 404)
 
         # flush any logged errors
@@ -591,12 +593,12 @@ class MockStoreRestWebhooksTestCase(TestCase):
         self.assert_number_of_webhooks(0)
         first_webhooks = self.create_and_view_webhooks()
 
-        wrapper = self.successResultOf(request(root, 'GET', first_webhooks[0]))
+        wrapper = self.successResultOf(request(self.root, 'GET', first_webhooks[0]))
         webhook = json.loads(wrapper.content)['webhook']
         links = {link['rel']: link['href'] for link in webhook['links']}
         cap_path = _strip_base_url(links['capability'])
 
-        wrapper = self.successResultOf(request(root, 'POST', cap_path))
+        wrapper = self.successResultOf(request(self.root, 'POST', cap_path))
         self.assertEqual(wrapper.response.code, 202)
 
     def test_execute_non_existant_webhook_by_hash(self):
@@ -606,5 +608,5 @@ class MockStoreRestWebhooksTestCase(TestCase):
         self.assert_number_of_webhooks(0)
 
         wrapper = self.successResultOf(
-            request(root, 'POST', '/v1.0/execute/1/1/'))
+            request(self.root, 'POST', '/v1.0/execute/1/1/'))
         self.assertEqual(wrapper.response.code, 202)

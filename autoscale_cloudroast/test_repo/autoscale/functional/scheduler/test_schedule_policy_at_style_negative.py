@@ -15,7 +15,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
         Create a scaling group with minentities=0
         """
         super(ScheduleScalingPolicyNegative, self).setUp()
-        self.create_group_response = self.autoscale_behaviors.create_scaling_group_min()
+        self.create_group_response = self.autoscale_behaviors.create_scaling_group_min(
+        )
         self.group = self.create_group_response.entity
         self.resources.add(self.group.id,
                            self.autoscale_client.delete_scaling_group)
@@ -32,8 +33,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule policy via at style with a different date format'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_different_date_format_2(self):
         """
@@ -47,8 +49,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule policy via at style with a different date format'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_no_z_in_date(self):
         """
@@ -63,8 +66,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule policy via at style with no Z in date'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_no_z_or_t_in_date(self):
         """
@@ -79,8 +83,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule policy via at style with no Z or T in date'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_date_in_the_past(self):
         """
@@ -95,8 +100,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with date in the past'
-                          'results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_only_date(self):
         """
@@ -110,8 +116,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with only date results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_integers(self):
         """
@@ -125,8 +131,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with time as random'
-                          'integers results in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'integers results in {0} for group {1}'.format(
+                              schedule_policy_at_style['status_code'],
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_only_time(self):
         """
@@ -140,8 +147,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with only time results'
-                          'in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          'in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                        self.group.id))
 
     def test_schedule_at_style_policy_blank_date(self):
         """
@@ -155,8 +162,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change, policy_type='schedule', args=args)
         self.assertEquals(create_schedule_at_style_response.status_code, 400,
                           msg='Create schedule policy passed given blank for date'
-                          ' with {0} for group {1}'
-                          .format(create_schedule_at_style_response.status_code, self.group.id))
+                          ' with {0} for group {1}'.format(
+                              create_schedule_at_style_response.status_code,
+                              self.group.id))
 
     def test_schedule_at_style_policy_date_as_whitespace(self):
         """
@@ -170,8 +178,9 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             change=self.sp_change, policy_type='schedule', args=args)
         self.assertEquals(create_schedule_at_style_response.status_code, 400,
                           msg='Create schedule policy passed given whitespace as date'
-                          ' with {0} for group {1} (at style)'
-                          .format(create_schedule_at_style_response.status_code, self.group.id))
+                          ' with {0} for group {1} (at style)'.format(
+                              create_schedule_at_style_response.status_code,
+                              self.group.id))
 
     def test_schedule_at_style_policy_with_cron_value(self):
         """
@@ -185,8 +194,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with cron as value passed'
-                          ': {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ': {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                       self.group.id))
 
     def test_schedule_at_style_policy_with_string_as_date(self):
         """
@@ -200,8 +209,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with string, results in'
-                          '{0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          '{0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                     self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_month_in_date(self):
         """
@@ -215,8 +224,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid month results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_year(self):
         """
@@ -230,8 +239,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid year results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_day(self):
         """
@@ -245,8 +254,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid day results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_hour(self):
         """
@@ -260,8 +269,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid hour results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_minute(self):
         """
@@ -275,8 +284,8 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid minute results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))
 
     def test_schedule_at_style_policy_with_invalid_second(self):
         """
@@ -290,5 +299,5 @@ class ScheduleScalingPolicyNegative(AutoscaleFixture):
             schedule_at=schedule_value)
         self.assertEquals(schedule_policy_at_style['status_code'], 400,
                           msg='Create schedule scaling at style policy with invalid second results'
-                          ' in {0} for group {1}'
-                          .format(schedule_policy_at_style['status_code'], self.group.id))
+                          ' in {0} for group {1}'.format(schedule_policy_at_style['status_code'],
+                                                         self.group.id))

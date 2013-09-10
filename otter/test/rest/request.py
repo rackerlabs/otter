@@ -16,7 +16,7 @@ from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
 
 from otter.models.interface import IScalingGroup, IScalingGroupCollection
-from otter.rest.application import root, set_store
+from otter.rest.application import Otter
 from otter.test.utils import iMock, patch
 
 
@@ -159,6 +159,18 @@ class RequestTestMixin(object):
         # but I don't have a good idea for how best to discover them.
         #
         headers = response_wrapper.response.headers
+
+        error_message = [
+            "Got status {0} but expected {1}".format(
+                response_wrapper.response.code, expected_status),
+            "Request URI: {0}".format(response_wrapper.request.uri),
+            "Response: {0}".format(response_wrapper.content)]
+        if message:
+            error_message.insert(0, message)
+
+        self.assertEqual(response_wrapper.response.code, expected_status,
+                         "\n".join(error_message))
+
         if expected_status not in [405, 301]:
             self.assertNotEqual(headers.getRawHeaders('X-Response-ID'), None)
             self.assertEqual(headers.getRawHeaders('Content-Type'),
@@ -166,16 +178,6 @@ class RequestTestMixin(object):
         else:
             content_type = headers.getRawHeaders('Content-Type')[0]
             self.assertIn('text/html', content_type)
-
-        error_message = [
-            "Got status {0} but expected {1}".format(
-                response_wrapper.response.code, expected_status),
-            "Response: {0}".format(response_wrapper.content)]
-        if message:
-            error_message.insert(0, message)
-
-        self.assertEqual(response_wrapper.response.code, expected_status,
-                         "\n".join(error_message))
 
     def get_location_header(self, response_wrapper):
         """
@@ -197,7 +199,8 @@ class RequestTestMixin(object):
         return locations[0]
 
     def assert_status_code(self, expected_status, endpoint=None,
-                           method="GET", body="", location=None):
+                           method="GET", body="", location=None,
+                           root=None):
         """
         Asserts that the status code of a particular request with the given
         endpoint, request method, request body results in the provided status
@@ -221,6 +224,12 @@ class RequestTestMixin(object):
 
         :return: the response body as a string
         """
+        if root is None:
+            if not hasattr(self, 'root'):
+                root = Otter(iMock(IScalingGroupCollection)).app.resource()
+            else:
+                root = self.root
+
         response_wrapper = self.successResultOf(
             request(root, method, endpoint or self.endpoint, body=body))
 
@@ -250,9 +259,6 @@ class RestAPITestMixin(RequestTestMixin):
             self, 'otter.rest.decorators.generate_transaction_id',
             return_value='transaction-id')
 
-        set_store(self.mock_store)
-        self.addCleanup(set_store, None)
-
         # mock out modify state
         self.mock_state = mock.MagicMock(spec=[])  # so nothing can call it
 
@@ -261,6 +267,7 @@ class RestAPITestMixin(RequestTestMixin):
             return defer.succeed(None)
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
+        self.root = Otter(self.mock_store).app.resource()
 
     def test_invalid_methods_are_405(self):
         """

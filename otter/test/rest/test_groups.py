@@ -27,7 +27,7 @@ from otter.rest.groups import format_state_dict
 from otter.test.rest.request import DummyException, RestAPITestMixin
 from otter.test.utils import patch
 
-from otter.rest.application import set_bobby
+from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
 from otter.supervisor import set_supervisor
@@ -42,7 +42,7 @@ class FormatterHelpers(TestCase):
         """
         Patch url root
         """
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
     def test_format_state_dict_has_active_and_pending(self):
         """
@@ -98,7 +98,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         super(AllGroupsEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
         # Patch supervisor
         self.supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -269,7 +269,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(resp_body)
         self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):
         """
         Tries to create a scaling group with the given request body (which
@@ -446,7 +446,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
 
         super(AllGroupsBobbyEndpointTestCase, self).setUp()
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
-        patch(self, 'otter.rest.application.get_url_root', return_value="")
+        patch(self, 'otter.util.http.get_url_root', return_value="")
 
         # Patch supervisor
         supervisor = mock.Mock(spec=['validate_launch_config'])
@@ -460,7 +460,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         set_bobby(None)
         set_supervisor(None)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))
     def test_group_create_bobby(self, create_group, get_url_root):
         """
@@ -533,7 +533,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_view_manifest(self, url_root):
         """
         Viewing the manifest of an existant group returns whatever the
