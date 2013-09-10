@@ -208,11 +208,17 @@ class AutoscaleBehaviors(BaseBehavior):
         """
         sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
         sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
+        check_type = check_type or self.autoscale_config.check_type
         check_label = check_label or rand_name('scaling_group_check')
         check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
         check_period = check_period or int(self.autoscale_config.check_period)
         alarm_criteria = alarm_criteria or self.autoscale_config.alarm_criteria
         monitoring_zones = monitoring_zones or ['mzord', 'mzdfw', 'mziad']
+        if check_type == 'remote.http':
+            check_url = self.autoscale_config.check_url
+            check_method = self.autoscale_config.check_method
+        if not target_hostname or target_resolver or target_alias:
+            target_alias = self.autoscale_config.target_alias
         if sp_change_percent is not None:
             create_response = self.autoscale_client.create_policy(
                 group_id=group_id,

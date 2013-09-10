@@ -1,5 +1,5 @@
 """
-Test to create and verify a cloyd monitoring policy
+Test to create and verify a cloud monitoring policy
 """
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 from cloudcafe.common.tools.datagen import rand_name
@@ -27,7 +27,8 @@ class CreateMaasScalingPolicy(ScalingGroupFixture):
             group_id=self.group.id, check_disabled=check_disabled,
             check_url=check_url, check_method=check_method,
             check_metadata=check_metadata, sp_name=sp_name,
-            target_hostname=target_hostname, target_resolver=target_resolver)
+            target_hostname=target_hostname, target_resolver=target_resolver,
+            check_type=check_type)
         self.assertEquals(monitoring_policy['status_code'], 201,
                           msg='Create schedule scaling policy failed with {0} for group '
                           '{1}'.format(monitoring_policy['status_code'], self.group.id))
@@ -93,9 +94,8 @@ class CreateMaasScalingPolicy(ScalingGroupFixture):
         check_metadata = {'monitoring': 'autoscale'}
         target_alias = 'default'
         monitoring_policy = self.autoscale_behaviors.create_monitoring_policy_given(
-            group_id=self.group.id, check_disabled=check_disabled,
-            check_metadata=check_metadata,
-            target_alias=target_alias)
+            group_id=self.group.id, check_type=check_type, check_disabled=check_disabled,
+            check_metadata=check_metadata, target_alias=target_alias)
         self.assertEquals(monitoring_policy['status_code'], 201,
                           msg='Create schedule scaling policy failed with {0} for group '
                           '{1}'.format(monitoring_policy['status_code'], self.group.id))
