@@ -26,7 +26,7 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         Verify the update launch config call for response code, headers and data.
         """
         lc_name = rand_name('upd_server_name')
-        lc_image_ref = 'XYZ'
+        lc_image_ref = self.lc_image_ref_alt
         lc_flavor_ref = 4
         lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
         lc_disk_config = 'AUTO'
@@ -49,40 +49,47 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             self.group.id)
         updated_launchconfig = launchconfig_response.entity
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with {0} as against a 204'
-                          .format(update_lc_response.status_code))
+                          msg='Update launch config failed with {0} as against a 204 for group'
+                          ' {1}'.format(update_lc_response.status_code, self.group.id))
         self.validate_headers(update_lc_response.headers)
         self.assertEquals(updated_launchconfig.server.name, lc_name,
-                          msg='Prefix/Suffix server name in the launch config did not update')
+                          msg='Prefix/Suffix server name in the launch config did not update '
+                          'for group {0}'.format(self.group.id))
         self.assertEquals(
             updated_launchconfig.server.flavorRef, lc_flavor_ref,
-            msg='Server flavor in the launch config did not update')
+            msg='Server flavor in the launch config did not update '
+            'for group {0}'.format(self.group.id))
         self.assertEquals(
             updated_launchconfig.server.imageRef, lc_image_ref,
-            msg='Server ImageRef in the launch config did not update')
+            msg='Server ImageRef in the launch config did not update '
+            'for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.personality_list(
                 updated_launchconfig.server.personality),
             self.autoscale_behaviors.personality_list(
                 lc_personality),
-            msg='Server personality in the launch config did not update')
+            msg='Server personality in the launch config did not update '
+            'for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.to_data(
                 updated_launchconfig.server.metadata),
             lc_metadata,
-            msg='Server metadata in the launch config did not update')
+            msg='Server metadata in the launch config did not update '
+            'for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(
                 updated_launchconfig.server.networks),
             self.autoscale_behaviors.network_uuid_list(
                 lc_networks),
-            msg='Server networks did not update')
+            msg='Server networks did not update '
+            'for group {0}'.format(self.group.id))
         self.assertEquals(
             self.autoscale_behaviors.lbaas_list(
                 updated_launchconfig.loadBalancers),
             self.autoscale_behaviors.lbaas_list(
                 lc_load_balancers),
-            msg='Load balancers in the launch config did not update')
+            msg='Load balancers in the launch config did not update '
+            'for group {0}'.format(self.group.id))
 
     def test_partial_update_launch_config(self):
         """
@@ -91,7 +98,7 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
         """
         lc_name = rand_name('upd_server_name')
         lc_image_ref = self.lc_image_ref_alt
-        lc_flavor_ref = 6
+        lc_flavor_ref = 4
         lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
         lc_disk_config = 'AUTO'
         lc_personality = [{'path': '/root/.ssh/authorized_keys',
@@ -110,8 +117,8 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             networks=lc_networks,
             load_balancers=lc_load_balancers)
         self.assertEquals(update_lc_response.status_code, 204,
-                          msg='Update launch config failed with {0} as against a 204, success'
-                          .format(update_lc_response.status_code))
+                          msg='Update launch config failed with {0} as against a 204, success for'
+                          ' group {1}'.format(update_lc_response.status_code, self.group.id))
         lc_name = "test_upd_lc"
         image_ref = self.lc_image_ref
         flavor_ref = "8"
@@ -121,4 +128,5 @@ class UpdateLaunchConfigTest(AutoscaleFixture):
             image_ref=image_ref,
             flavor_ref=flavor_ref)
         self.assertEquals(update_launchconfig_response.status_code, 204,
-                          msg="Update launch config does not allow partial requests")
+                          msg='Update launch config does not allow partial requests'
+                          ' for group {0}'.format(self.group.id))
