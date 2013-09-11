@@ -1,21 +1,45 @@
+HTTP/1.1 201 Created
+Content-Type: application/json
+Date: Wed, 11 Sep 2013 00:23:05 GMT
+Location: https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.2)
+x-response-id: 4a72feaa-8085-45d8-aeb5-8c3a1cb38894
+
 {
     "webhooks": [
         {
-            "id": "de94fb86-1cf5-41cc-913a-84a33a7d37f5",
+            "id": "152054a3-e0ab-445b-941d-9f8e360c9eed",
             "links": [
                 {
-                    "href": "https://autoscale.api.rackspacecloud.com/v1.0/384776/groups/1ce13f33-39c4-46ea-823e-c3726b294df9/policies/33aeaf8e-8a0f-45ca-8275-b3727dea48cf/webhooks/de94fb86-1cf5-41cc-913a-84a33a7d37f5/",
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/152054a3-e0ab-445b-941d-9f8e360c9eed/",
                     "rel": "self"
                 },
                 {
-                    "href": "https://autoscale.api.rackspacecloud.com/v1.0/execute/1/bd9ba9620b2564c49352e49ce12c81efb64522cdedead2830ce2aee649dca0b7/",
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/0077882e9626d83ef30e1ca379c8654d86cd34df3cd49ac8da72174668315fe8/",
                     "rel": "capability"
                 }
             ],
             "metadata": {
-                "notes": "This is is note about a webhook. In the response, look above this line to the href to see the webhook's endpoint."
+                "notes": "PagerDuty will fire this webhook"
             },
-            "name": "gus"
+            "name": "PagerDuty"
+        },
+        {
+            "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
+                    "rel": "self"
+                },
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
+                    "rel": "capability"
+                }
+            ],
+            "metadata": {},
+            "name": "Nagios"
         }
     ]
 }
