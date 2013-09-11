@@ -48,6 +48,8 @@ Running Tests
 
          **cafe-runner autoscale CONFIG(minus .config) PARAMS**
 
+         **cafe-runner bobby CONFIG(minus .config) PARAMS** (for bobby tests)
+
 Example:
          *cafe-runner autoscale dev -p functional --parallel*    (executes all the autoscale tests under the functional folder, in parallel)
 
@@ -61,6 +63,7 @@ autoscale_cloudcafe
    :maxdepth: 3
 
    autoscale
+   bobby
 
 *(This documentation is automatically generated from our code comments.
 If this area is empty, please build on your local machine with
