@@ -53,6 +53,7 @@ Vagrant::Config.run do |config|
   end
 
   config.vm.share_folder "otter", "/mnt/shared/otter", "./"
+  config.vm.share_folder "docker_logs", "/mnt/shared/docker_logs", "~/docker_logs"
 end
 
 

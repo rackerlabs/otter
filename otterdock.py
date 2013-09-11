@@ -159,7 +159,7 @@ def ready_log_dir(log_dir, basename):
 
 
 @command
-def start(run_tag="dev", log_dir="~/docker_logs"):
+def start(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
         volumes = ready_log_dir(log_dir, "start")
@@ -168,7 +168,7 @@ def start(run_tag="dev", log_dir="~/docker_logs"):
 
 
 @command
-def unit_tests(run_tag="dev", log_dir="~/docker_logs"):
+def unit_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
         volumes = ready_log_dir(log_dir, "unit_tests")
@@ -179,7 +179,7 @@ def unit_tests(run_tag="dev", log_dir="~/docker_logs"):
 
 
 @command
-def run_tests(run_tag="dev", log_dir="~/docker_logs"):
+def run_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
         ready_log_dir(log_dir, "unit_integration")

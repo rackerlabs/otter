@@ -20,3 +20,6 @@ subunit-output.txt
 *.pydev*
 .DS_Store
 docbook/target
+
+.vagrant
+_docker_logs
