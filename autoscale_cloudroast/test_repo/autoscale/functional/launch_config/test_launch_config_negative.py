@@ -17,12 +17,12 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         super(LaunchConfigNegtaiveTest, self).setUp()
         self.lc_name = rand_name('negative_launch_config')
-        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', 8888, 1, -4, None]
-        self.invalid_image_ids = ['INVALID-IMAGE-ID', 1111, self.lc_image_ref + 'Z', None]
+        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '1', '-4', None]
+        self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111', self.lc_image_ref + 'Z', None]
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
         """
-        Verify update luanch config fails with a 400 when the new launch config
+        Verify update launch config fails with a 400 when the new launch config
         has an invalid imageId.
         """
         group = self._create_group()
@@ -38,7 +38,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     def test_update_scaling_group_launch_config_to_invalid_flavorid(self):
         """
-        Verify update luanch config fails with a 400 when the new launch config
+        Verify update launch config fails with a 400 when the new launch config
         has an invalid flavorId.
         """
         group = self._create_group()
