@@ -336,7 +336,7 @@ format="SVG" scale="60"/>
                 units="linecolumn" coords="15 20"/>
             </areaspec>
             <programlisting language="json">
-<xi:include href="samples/credentials-20.json" parse="text"/>
+              <xi:include href="samples/reqAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>
@@ -376,7 +376,7 @@ format="SVG" scale="60"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
             <programlisting language="json">
-<xi:include href="samples/auth-20.json" parse="text"/>
+              <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>

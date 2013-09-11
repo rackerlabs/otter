@@ -14,19 +14,3 @@ X-Auth-token: dfab7b6a37f046549f29018e42af78a6
     "minEntities": 2,
     "name": "myFirstAutoscalingGroup"
 }
-
-HTTP/1.1 400 Bad Request
-Connection: close
-Content-Type: application/json
-Date: Fri, 26 Jul 2013 22:12:29 GMT
-Server: Jetty(8.0.y.z-SNAPSHOT)
-Transfer-Encoding: chunked
-Via: 1.1 Repose (Repose/2.8.0)
-x-response-id: ed3dd918-a277-4979-9038-4435352d3aa8
-
-{
-    "code": 400,
-    "details": "",
-    "message": "minEntities must be less than or equal to maxEntities",
-    "type": "InvalidMinEntities"
-}

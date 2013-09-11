@@ -961,7 +961,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 PUT /{tenantId}/groups/{groupId}/config
                 </programlisting>
                 <programlisting language="json">
-<xi:include href="./samples/groupConfiguration-size0.json" parse="text"/>
+<xi:include href="./samples/reqPutGroupConfig-size0.json" parse="text"/>
 </programlisting>
             </example>
             <note>

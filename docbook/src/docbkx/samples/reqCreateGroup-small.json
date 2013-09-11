@@ -1,0 +1,57 @@
+POST /v1.0/676873/groups/ HTTP/1.1
+Accept: application/json
+Accept-Encoding: gzip, deflate, compress
+Content-Length: 233
+Content-Type: application/json; charset=utf-8
+Host: dfw.autoscale.api.rackspacecloud.com
+User-Agent: HTTPie/0.6.0
+X-Auth-token: xxxxxxxxxxxxxxxxxxxx
+
+{
+    "groupConfiguration": {
+        "cooldown": 60,
+        "maxEntities": 0,
+        "minEntities": 0,
+        "name": "smallest possible group config"
+    },
+    "launchConfiguration": {
+        "args": {
+            "server": {}
+        },
+        "type": "launch_server"
+    }
+}
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+Date: Tue, 10 Sep 2013 23:34:46 GMT
+Location: https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/847ef1f1-cf4a-4db3-b9ad-9a7424d5e17f/
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.2)
+x-response-id: 66b7d0eb-6f57-4130-8d6e-60231e42ab20
+
+{
+    "group": {
+        "groupConfiguration": {
+            "cooldown": 60,
+            "maxEntities": 0,
+            "minEntities": 0,
+            "name": "smallest possible group config"
+        },
+        "id": "847ef1f1-cf4a-4db3-b9ad-9a7424d5e17f",
+        "launchConfiguration": {
+            "args": {
+                "server": {}
+            },
+            "type": "launch_server"
+        },
+        "links": [
+            {
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/847ef1f1-cf4a-4db3-b9ad-9a7424d5e17f/",
+                "rel": "self"
+            }
+        ],
+        "scalingPolicies": []
+    }
+}
