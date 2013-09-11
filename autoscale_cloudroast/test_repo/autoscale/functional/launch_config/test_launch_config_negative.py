@@ -1,10 +1,13 @@
 """
 Test to negative cases for launch config.
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
+@unittest.skip('AUTO-561 to be merged')
 class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     """
