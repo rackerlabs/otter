@@ -2125,12 +2125,12 @@ class CassAdminTestCase(TestCase):
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.timestamp')
-    def test_get_metrics(self, timestamp):
+    @mock.patch('otter.models.cass.time')
+    def test_get_metrics(self, time):
         """
         Check get_metrics returns dictionary in proper format
         """
-        timestamp.now.return_value = '1234567890'
+        time.time.return_value = 1234567890
 
         self.returns = [
             [{'count': 190}],
@@ -2143,17 +2143,17 @@ class CassAdminTestCase(TestCase):
             {
                 'id': 'otter.metrics.webhooks',
                 'value': 192,
-                'time': '1234567890'
+                'time': 1234567890
             },
             {
                 'id': 'otter.metrics.policies',
                 'value': 191,
-                'time': '1234567890'
+                'time': 1234567890
             },
             {
                 'id': 'otter.metrics.groups',
                 'value': 190,
-                'time': '1234567890'
+                'time': 1234567890
             }
         ]
         config_query = ('SELECT COUNT(*) FROM scaling_config;')
