@@ -1,14 +1,15 @@
-System Tests
-==================
+Autoscale System Tests
+======================
 
 .. toctree::
 
     test_repo.autoscale.system.group
     test_repo.autoscale.system.integration
     test_repo.autoscale.system.policies
+    test_repo.autoscale.system.schedule_policies
 
-Functional Tests
-==================
+Autoscale Functional Tests
+==========================
 
 .. toctree::
 
@@ -17,3 +18,13 @@ Functional Tests
     test_repo.autoscale.functional.scaling_policy
     test_repo.autoscale.functional.webhooks
     test_repo.autoscale.functional.scheduler
+
+Bobby Functional Tests
+======================
+
+.. toctree::
+
+    test_repo.bobby.functional.bobby_groups
+    test_repo.bobby.functional.policy_groups
+    test_repo.bobby.functional.server_groups
+
