@@ -107,11 +107,34 @@ def start_cassandra(run_tag="dev"):
 
 
 @command
-def build(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
+def build_java():
+    s.build(
+        tag='java',
+        path="docker/java"
+    )
+
+
+@command
+def build_cassandra():
+    s.build(
+        tag='cassandra',
+        path="docker/cassandra"
+    )
+
+
+@command
+def build_otter(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
     s.build(
         tag='otter:dev',
         fobj=get_dockerfile(pip_mirror=pip_mirror)
     )
+
+
+@command
+def build_all(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
+    build_java()
+    build_cassandra()
+    build_otter(pip_mirror)
 
 
 @command
