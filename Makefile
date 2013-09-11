@@ -15,10 +15,20 @@ CONTROL_KEYSPACE ?= OTTER
 REPLICATION_FACTOR ?= 3
 CLOUDCAFE ?= $(shell which cafe-runner)
 
+ifneq ($(OTTER_LOGS), )
+	OUTPUT_DIR=${OTTER_LOGS}
+else
+	OUTPUT_DIR=.
+endif
+
 test: unit integration
 
 run:
+ifneq ($(OTTER_LOGS), )
+	twistd --logfile=${OTTER_LOGS}/otter.log -n --logger=otter.log.observer_factory_debug otter-api
+else
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
+endif
 
 run_docker: rewrite_config run
 
@@ -36,10 +46,14 @@ lint:
 
 unit:
 ifneq ($(JENKINS_URL), )
-	trial --random 0 --reporter=subunit ${UNITTESTS} | tee subunit-output.txt
-	tail -n +3 subunit-output.txt | subunit2junitxml > test-report.xml
+	trial --temp-directory=${OUTPUT_DIR}/_trial_temp --random 0 --reporter=subunit ${UNITTESTS} | tee ${OUTPUT_DIR}/subunit-output.txt
+	tail -n +3 ${OUTPUT_DIR}/subunit-output.txt | subunit2junitxml > ${OUTPUT_DIR}/test-report.xml
+else
+ifneq ($(OTTER_LOGS), )
+	trial --temp-directory=${OUTPUT_DIR}/_trial_temp --random 0 ${UNITTESTS} > ${OTTER_LOGS}/trial_output.txt
 else
 	trial --random 0 ${UNITTESTS}
+endif
 endif
 
 integration:
