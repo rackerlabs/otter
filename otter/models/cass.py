@@ -14,7 +14,6 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.scheduler import next_cron_occurrence
-from otter.log import DEBUG
 
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BasicLock, with_lock
@@ -466,7 +465,7 @@ class CassScalingGroup(object):
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
                          max_retry=5, retry_wait=random.uniform(3, 5),
-                         log=log.bind(level=DEBUG, category='locking'))
+                         log=log.bind(category='locking'))
 
         return with_lock(lock, _modify_state)
 
@@ -799,7 +798,7 @@ class CassScalingGroup(object):
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
                          max_retry=5, retry_wait=random.uniform(3, 5),
-                         log=log.bind(level=DEBUG, category='locking'))
+                         log=log.bind(category='locking'))
 
         return with_lock(lock, _delete_group)
 
