@@ -1,0 +1,6 @@
+{
+        "change": 1,
+        "cooldown": 1800,
+        "name": "scale up by one server",
+        "type": "webhook"
+}
