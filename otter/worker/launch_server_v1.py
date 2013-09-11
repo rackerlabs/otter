@@ -290,13 +290,11 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
 
-    name_parts = [generate_server_name()]
-
-    server_name_suffix = server_config.get('name')
-    if server_name_suffix:
-        name_parts.append(server_name_suffix)
-
-    server_config['name'] = '-'.join(name_parts)
+    if server_config.get('name'):
+        server_name = server_config.get('name')
+        server_config['name'] = '{0}-{1}'.format(server_name, generate_server_name())
+    else:
+        server_config['name'] = generate_server_name()
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:

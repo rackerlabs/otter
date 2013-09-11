@@ -607,6 +607,7 @@ class LbaasAPIClient(AutoMarshallingRestClient):
     """
     Client object for the list node lbaas api call
     """
+
     def __init__(self, url, auth_token, serialize_format=None,
                  deserialize_format=None):
         super(LbaasAPIClient, self).__init__(serialize_format,
