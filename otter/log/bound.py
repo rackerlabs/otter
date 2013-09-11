@@ -5,9 +5,6 @@ Utility for doing bound logging with twisted.
 import functools
 
 
-DEBUG = 7
-
-
 class BoundLog(object):
     """
     BoundLog manages a partially applied copy of msg and err.
@@ -32,12 +29,3 @@ class BoundLog(object):
         err = functools.partial(self.err, **kwargs)
 
         return self.__class__(msg, err)
-
-    def debug(self, msg, **kwargs):
-        """
-        Log the message as debug message by calling `self.msg` with level=DEBUG
-
-        :param str msg: message to be logged
-        :param dict **kwargs: Keyword arguments accepted by :py:func:`log.msg`
-        """
-        return self.msg(msg, level=DEBUG, **kwargs)
