@@ -62,10 +62,10 @@ _cql_view_manifest = ('SELECT group_config, launch_config, active, '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
-_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused)')
-_cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", "groupName", active, pending, '
+                           '"groupTouched", "policyTouched", paused) VALUES(:tenantId, :groupId, '
+                           ':active, :pending, :groupTouched, :policyTouched, :paused)')
+_cql_view_group_state = ('SELECT "tenantId", "groupId", "groupName", active, pending, "groupTouched", '
                          '"policyTouched", paused, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
@@ -98,7 +98,7 @@ _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
-_cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+_cql_list_states = ('SELECT "tenantId", "groupId", "groupName", active, pending, "groupTouched", '
                     '"policyTouched", paused, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
@@ -299,6 +299,7 @@ def _jsonloads_data(raw_data):
 def _unmarshal_state(state_dict):
     return GroupState(
         state_dict['tenantId'], state_dict['groupId'],
+        state_dict["groupName"],
         _jsonloads_data(state_dict["active"]),
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
@@ -450,6 +451,7 @@ class CassScalingGroup(object):
             params = {
                 'tenantId': new_state.tenant_id,
                 'groupId': new_state.group_id,
+                'groupName': new_state.group_name,
                 'active': serialize_json_data(new_state.active, 1),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
@@ -875,6 +877,7 @@ class CassScalingGroupCollection:
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
+                "groupName": config["name"],
                 "group_config": serialize_json_data(config, 1),
                 "launch_config": serialize_json_data(launch, 1),
                 "active": '{}',

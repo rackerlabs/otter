@@ -218,6 +218,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.tenant_id = '11111'
         self.group_id = '12345678g'
+        self.group_name = 'test'
         self.config = _de_identify({
             'name': 'a',
             'cooldown': 0,
@@ -294,13 +295,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Test that you can call view state and receive a valid parsed response
         """
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.group_name,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
-        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+        expectedCql = ('SELECT "tenantId", "groupId", "groupName", active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
@@ -308,8 +309,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       {'A': 'R'}, {'P': 'R'}, '123',
-                                       {'PT': 'R'}, False))
+                                       self.group_name, {'A': 'R'},
+                                       {'P': 'R'}, '123', {'PT': 'R'}, False))
 
     def test_view_state_no_such_group(self):
         """
@@ -327,13 +328,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         NoSuchScalingGroupError is returned and that row's deletion is triggered
         """
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.group_name,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
         self.returns = [cass_response, None]
         d = self.group.view_state()
         self.failureResultOf(d, NoSuchScalingGroupError)
-        viewCql = ('SELECT "tenantId", "groupId", active, pending, '
+        viewCql = ('SELECT "tenantId", "groupId", "groupName", active, pending, '
                    '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
                    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group '
@@ -349,7 +350,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         paused group.
         """
         cass_response = _cassandrify_data([
-            {'tenantId': self.tenant_id, 'groupId': self.group_id,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.group_name,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
 
@@ -357,8 +358,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       {'A': 'R'}, {'P': 'R'}, '123',
-                                       {'PT': 'R'}, True))
+                                       self.group_name, {'A': 'R'}, {'P': 'R'},
+                                       '123', {'PT': 'R'}, True))
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
@@ -367,19 +368,20 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, self.group_name, {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
         expectedCql = (
-            'INSERT INTO scaling_group("tenantId", "groupId", active, '
+            'INSERT INTO scaling_group("tenantId", "groupId", "groupName", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
             ':policyTouched, :paused)')
 
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
+                        "groupName": self.group_name,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
@@ -425,7 +427,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         `modify_state` gets lock by retrying with different wait intervals each time
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, self.group_name, {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -463,7 +465,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         tenant id
         """
         def modifier(group, state):
-            return GroupState('tid', self.group_id, {}, {}, None, {}, True)
+            return GroupState('tid', self.group_id, 'name', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -479,7 +481,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         group id
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, 'gid', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, 'gid', 'name', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -1477,7 +1479,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         group state is not empty
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, {'1': {}}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {'1': {}}, {}, None, {}, False))
         self.failureResultOf(self.group.delete_group(), GroupNotEmptyError)
 
         # nothing else called except view
@@ -1495,7 +1497,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         It uses naive list policies to figure out what events to delete.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed({'policyA': {}, 'policyB': {}})
 
         self.returns = [None]
@@ -1532,7 +1534,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         It uses naive list policies to figure out what events to delete.
         """
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
         mock_naive.return_value = defer.succeed({})
 
         self.returns = [None]
@@ -1565,7 +1567,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.side_effect = acquire
 
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, self.group_name, {}, {}, None, {}, False))
 
         d = self.group.delete_group()
         result = self.failureResultOf(d)
@@ -1764,6 +1766,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
+            'groupName': 'blah',
             'groupId': '12345678',
             'tenantId': '123',
             "active": '{}',
@@ -1808,6 +1811,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
+            'groupName': 'blah',
             'groupId': '12345678',
             'tenantId': '123',
             "active": '{}',
@@ -1856,6 +1860,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
             'groupId': '1',
+            'groupName': 'blah',
             'tenantId': '123',
             "active": '{}',
             "pending": '{}',
@@ -1910,6 +1915,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[{
             'tenantId': '123',
             'groupId': 'group{}'.format(i),
+            'groupName': 'test',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1919,7 +1925,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         } for i in range(2)]]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+        expectedCql = ('SELECT "tenantId", "groupId", "groupName", active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -1927,8 +1933,8 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, [
-            GroupState('123', 'group0', {}, {}, '0001-01-01T00:00:00Z', {}, False),
-            GroupState('123', 'group1', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
+            GroupState('123', 'group0', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False),
+            GroupState('123', 'group1', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
     def test_list_empty(self):
         """
@@ -1938,7 +1944,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[]]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+        expectedCql = ('SELECT "tenantId", "groupId", "groupName", active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
@@ -1955,6 +1961,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         group_dicts = [{
             'tenantId': '123',
             'groupId': 'group123',
+            'groupName': 'test123',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1964,6 +1971,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }, {
             'tenantId': '23',
             'groupId': 'group23',
+            'groupName': 'test23',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1974,14 +1982,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [group_dicts, None]
 
         expectedData = {'tenantId': '123'}
-        expectedCql = ('SELECT "tenantId", "groupId", active, pending, '
+        expectedCql = ('SELECT "tenantId", "groupId", "groupName", active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_args_list[0],
                          mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
         self.assertEqual(r, [
-            GroupState('123', 'group123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
+            GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
         self.mock_log.msg.assert_called_once_with('Resurrected rows', tenant_id='123',
                                                   rows=[_de_identify(group_dicts[1])])
 
@@ -1993,6 +2001,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         group_dicts = [{
             'tenantId': '123',
             'groupId': 'group123',
+            'groupName': 'test123',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -2002,6 +2011,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }, {
             'tenantId': '23',
             'groupId': 'group23',
+            'groupName': 'test23',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -2018,7 +2028,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(self.connection.execute.call_args_list[1],
                          mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
         self.assertEqual(r, [
-            GroupState('123', 'group123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
+            GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
     def test_get_scaling_group(self):
         """
