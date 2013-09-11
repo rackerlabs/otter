@@ -5,7 +5,7 @@ Content-Length: 171
 Content-Type: application/json; charset=utf-8
 Host: dfw.autoscale.api.rackspacecloud.com
 User-Agent: HTTPie/0.6.0
-X-Auth-Token: 7022f6b04fa64d03a11dacc09f759f88
+X-Auth-Token: 
 
 [
     {
