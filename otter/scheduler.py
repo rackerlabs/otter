@@ -14,7 +14,6 @@ from twisted.application.internet import TimerService
 from silverberg.lock import BasicLock, BusyLockError, with_lock
 
 from otter.util.hashkey import generate_transaction_id
-from otter.rest.application import get_store
 from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
 from otter.log import log as otter_log
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
@@ -33,7 +32,7 @@ class SchedulerService(TimerService):
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, slv_client, clock=None):
+    def __init__(self, batchsize, interval, slv_client, store, clock=None):
         """
         Initializes the scheduler service with batch size and interval
 
@@ -46,6 +45,7 @@ class SchedulerService(TimerService):
         from otter.models.cass import LOCK_TABLE_NAME
         self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
+        self.store = store
         self.clock = clock
         self.log = otter_log.bind(system='otter.scheduler')
 
@@ -112,7 +112,7 @@ class SchedulerService(TimerService):
 
             log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
             log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
-            d = get_store().update_delete_events(events_to_delete, events_to_update)
+            d = self.store.update_delete_events(events_to_delete, events_to_update)
 
             return d.addCallback(lambda _: events)
 
@@ -120,7 +120,7 @@ class SchedulerService(TimerService):
         utcnow = datetime.utcnow()
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
         log.msg('Checking for events')
-        deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
+        deferred = self.store.fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
         deferred.addCallback(update_delete_events)
         deferred.addErrback(log.err)
@@ -139,7 +139,7 @@ class SchedulerService(TimerService):
         tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
         log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
         log.msg('Executing policy')
-        group = get_store().get_scaling_group(log, tenant_id, group_id)
+        group = self.store.get_scaling_group(log, tenant_id, group_id)
         d = group.modify_state(partial(maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))

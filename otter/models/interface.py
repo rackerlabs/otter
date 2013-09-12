@@ -616,3 +616,24 @@ class IScalingGroupCollection(Interface):
         :return: a :class:`twisted.internet.defer.Deferred` containing current
             count of tenants policies, webhooks and groups as ``dict``
         """
+
+
+class IAdmin(Interface):
+    """
+    Interface to administrative information and actions.
+    """
+
+    def get_metrics(self, log):
+        """
+        Returns total current count of policies, webhooks and groups in the
+        following format::
+
+            {
+                "groups": 100,
+                "policies": 100,
+                "webhooks": 100
+            }
+
+        :return: a :class:`twisted.internet.defer.Deferred` containing current
+            count of tenants policies, webhooks and groups as ``dict``
+        """

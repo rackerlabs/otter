@@ -61,10 +61,10 @@ def server_details(server_endpoint, auth_token, server_id):
 
     :return: A dict of the server details.
     """
-    d = treq.get(append_segments(server_endpoint, 'servers', server_id),
-                 headers=headers(auth_token))
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.get(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_details')
+    d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -142,11 +142,11 @@ def create_server(server_endpoint, auth_token, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
-    d = treq.post(append_segments(server_endpoint, 'servers'),
-                  headers=headers(auth_token),
+    path = append_segments(server_endpoint, 'servers')
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_create')
+    d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
 
 
@@ -170,14 +170,13 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
 
-    d = treq.post(path,
-                  headers=headers(auth_token),
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({"nodes": [{"address": ip_address,
                                               "port": port,
                                               "condition": "ENABLED",
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'add')
+    d.addErrback(wrap_request_error, path, 'add')
 
     def when_done(result):
         undo.push(remove_from_load_balancer,
@@ -291,13 +290,11 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
 
-    name_parts = [generate_server_name()]
-
-    server_name_suffix = server_config.get('name')
-    if server_name_suffix:
-        name_parts.append(server_name_suffix)
-
-    server_config['name'] = '-'.join(name_parts)
+    if server_config.get('name'):
+        server_name = server_config.get('name')
+        server_config['name'] = '{0}-{1}'.format(server_name, generate_server_name())
+    else:
+        server_config['name'] = generate_server_name()
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
@@ -398,7 +395,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
     d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'remove')
+    d.addErrback(wrap_request_error, path, 'remove')
     d.addCallback(lambda _: None)
     return d
 
@@ -495,10 +492,10 @@ def verified_delete(log,
     del_log = log.bind(instance_id=server_id)
     del_log.msg('Deleting server')
 
-    d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                    headers=headers(auth_token))
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [204])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+    d.addErrback(wrap_request_error, path, 'server_delete')
 
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor

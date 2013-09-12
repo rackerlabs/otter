@@ -23,15 +23,15 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
             sp_change=self.sp_change,
             schedule_at=self.at_value)
         self.assertEquals(self.at_style_policy['status_code'], 201,
-                          msg='Create schedule policy (at style) failed with {0} for group {1}'
-                          .format(self.at_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (at style) failed with {0} for group '
+                          '{1}'.format(self.at_style_policy['status_code'], self.group.id))
         self.cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_change=self.sp_change,
             schedule_cron=self.cron_value)
         self.assertEquals(self.cron_style_policy['status_code'], 201,
-                          msg='Create schedule policy (cron style) failed with {0} for group {1}'
-                          .format(self.cron_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (cron style) failed with {0} for group '
+                          '{1}'.format(self.cron_style_policy['status_code'], self.group.id))
 
     def test_delete_at_style_scheduler(self):
         """
@@ -43,10 +43,9 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
             policy_id=self.at_style_policy['id'])
         self.assertEquals(delete_at_style_policy.status_code, 204,
                           msg='Delete scheduler policy (at style) failed with {0}'
-                          'for group {1}'
-                          .format(delete_at_style_policy.status_code, self.group.id))
+                          'for group {1}'.format(delete_at_style_policy.status_code, self.group.id))
         self.assertTrue(delete_at_style_policy.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(delete_at_style_policy.headers)
         self.assertTrue(self.at_style_policy['id'] not in self._policy_list_for_group(self.group.id))
         self.assertTrue(self.cron_style_policy['id'] in self._policy_list_for_group(self.group.id))
@@ -61,10 +60,9 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
             policy_id=self.cron_style_policy['id'])
         self.assertEquals(delete_at_style_policy.status_code, 204,
                           msg='Delete scheduler policy (at style) failed with {0}'
-                          'for group {1}'
-                          .format(delete_at_style_policy.status_code, self.group.id))
+                          'for group {1}'.format(delete_at_style_policy.status_code, self.group.id))
         self.assertTrue(delete_at_style_policy.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(delete_at_style_policy.headers)
         self.assertTrue(self.at_style_policy['id'] in self._policy_list_for_group(self.group.id))
         self.assertTrue(self.cron_style_policy['id'] not in self._policy_list_for_group(self.group.id))

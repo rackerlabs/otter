@@ -895,7 +895,7 @@ class ConfigPreparationTests(TestCase):
         suffix.
         """
         test_config = {'server': {'name': 'web.example.com'}}
-        expected_name = 'as000000-web.example.com'
+        expected_name = 'web.example.com-as000000'
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
