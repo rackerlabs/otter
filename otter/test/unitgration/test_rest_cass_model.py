@@ -265,6 +265,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         self.config['minEntities'] = 2
         self.config['maxEntities'] = 25
         self.config['metadata'] = {}
+        self.config['name'] = 'name'
         self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
 
         wrapper = yield request(self.root, 'PUT', config_path,

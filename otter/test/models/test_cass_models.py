@@ -377,7 +377,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", "groupName", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
-            ':tenantId, :groupId, :active, :pending, :groupTouched, '
+            ':tenantId, :groupId, :groupName, :active, :pending, :groupTouched, '
             ':policyTouched, :paused)')
 
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
