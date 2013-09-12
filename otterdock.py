@@ -35,9 +35,6 @@ RUN pip install {devreqs}
 # Some way to expose logs
 VOLUME ["/opt/logs"]
 
-# Make cloudcafe write logs here too
-RUN sed -i "s|^log_directory=.*$|log_directory=/opt/logs|g" /root/.cloudcafe/configs/engine.config
-
 {otter}
 WORKDIR /opt/otter
 
@@ -138,21 +135,16 @@ def build_all(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
 
 
 @command
-def run_otter(command, run_tag="dev", pythonpaths=None, volumes=None):
+def run_otter(command, dev=True, run_tag=None, volumes=None):
     cass_ip = start_cassandra(run_tag)
-
-    if pythonpaths is None:
-        pythonpaths = PYTHONPATHS
-    else:
-        pythonpaths = PYTHONPATHS + pythonpaths
 
     otter_env = format_docker_env({
         'CASSANDRA_HOST': cass_ip,
-        'PYTHONPATH': ":".join(pythonpaths),
-        'OTTER_LOGS': "/opt/logs"
+        'PYTHONPATH': ":".join(PYTHONPATHS),
+        'OTTER_LOGS': "/opt/logs/{0}".format(run_tag)
     })
 
-    if run_tag == "dev":
+    if dev:
         if volumes is None:
             volumes = ['/mnt/shared/otter:/opt/otter']
         else:
@@ -162,8 +154,7 @@ def run_otter(command, run_tag="dev", pythonpaths=None, volumes=None):
         image='otter:dev',
         command=command,
         environment=otter_env,
-        volumes=volumes,
-        once=True
+        volumes=volumes
     )
 
     if len(container_id) == 0:
@@ -173,30 +164,25 @@ def run_otter(command, run_tag="dev", pythonpaths=None, volumes=None):
     return container_id[0]
 
 
-def ready_log_dir(log_dir, basename):
-    """
-    Ensure that the log dir exists, and then return the volume mapping
-    """
-    log_dir = os.path.join(log_dir, basename)
-    return ['{0}:/opt/logs'.format(log_dir)]
-
-
 @command
-def start(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
+def start(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
-        volumes = ready_log_dir(log_dir, "start")
+        volumes = ['{0}:/opt/logs'.format(log_dir)]
 
     run_otter('make run_otter', run_tag, volumes=volumes)
 
 
 @command
-def unit_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
+def unit_tests(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
-        volumes = ready_log_dir(log_dir, "unit_tests")
+        volumes = ['{0}:/opt/logs'.format(log_dir)]
 
-    container_id = run_otter('make unit', run_tag, volumes=volumes)
+    if run_tag is None:
+        run_tag = time.strftime("%Y-%m-%d_%H.%M.%S.unit_test")
+
+    container_id = run_otter('make unit', run_tag=run_tag, volumes=volumes)
     exit_code = s.wait(container_id)
     exit(exit_code[0][1]['StatusCode'])
 
@@ -205,7 +191,7 @@ def unit_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
 def run_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
-        ready_log_dir(log_dir, "unit_integration")
+        volumes = ['{0}:/opt/logs'.format(log_dir)]
 
     run_otter('make tests', run_tag, volumes=volumes)
 

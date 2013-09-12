@@ -25,6 +25,7 @@ test: unit integration
 
 run:
 ifneq ($(OTTER_LOGS), )
+	mkdir -p ${OTTER_LOGS}
 	twistd --logfile=${OTTER_LOGS}/otter.log -n --logger=otter.log.observer_factory_debug otter-api
 else
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
@@ -46,10 +47,14 @@ lint:
 
 unit:
 ifneq ($(JENKINS_URL), )
+ifneq ($(OTTER_LOGS), )
+	mkdir -p ${OTTER_LOGS}
+endif
 	trial --temp-directory=${OUTPUT_DIR}/_trial_temp --random 0 --reporter=subunit ${UNITTESTS} | tee ${OUTPUT_DIR}/subunit-output.txt
 	tail -n +3 ${OUTPUT_DIR}/subunit-output.txt | subunit2junitxml > ${OUTPUT_DIR}/test-report.xml
 else
 ifneq ($(OTTER_LOGS), )
+	mkdir -p ${OTTER_LOGS}
 	trial --temp-directory=${OUTPUT_DIR}/_trial_temp --random 0 ${UNITTESTS} > ${OTTER_LOGS}/trial_output.txt
 else
 	trial --random 0 ${UNITTESTS}
