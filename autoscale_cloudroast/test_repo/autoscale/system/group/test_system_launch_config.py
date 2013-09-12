@@ -1,6 +1,8 @@
 """
 System tests for launch config
 """
+from time import sleep
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
@@ -151,7 +153,7 @@ class LaunchConfigTest(AutoscaleFixture):
             self.assertTrue(
                 group.launchConfiguration.server.name in server.name)
 
-    @tags(speed='slow')
+    @tags(speed='quick')
     def test_system_launchconfig_without_server_name(self):
         """
         Create a scaling group with a scaling policy, without server name in the launch config.
@@ -165,13 +167,14 @@ class LaunchConfigTest(AutoscaleFixture):
             lc_flavor_ref=self.lc_flavor_ref)
         group = group_response.entity
         self.resources.add(group, self.empty_scaling_group)
-        servers_on_group = self.wait_for_expected_number_of_active_servers(
-            group.id, self.gc_min_entities_alt)
-        list_servers_on_tenant = self.server_client.list_servers().entity
-        servers_on_tenant = [each_server.id for each_server in list_servers_on_tenant]
-        for each_server in servers_on_group:
-            self.assertIn(each_server, servers_on_tenant, msg='Group {0} does not contain active '
-                          'servers when launch config did not contain a server name'.format(group.id))
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+        sleep(5)  # time for the create call to propogate from autoscale to nova
+        expected_servers = self.get_server_count_for_group_from_server_metadata(group.id)
+        self.assertEquals(expected_servers, self.gc_min_entities_alt,
+                          msg='Expecting {0} servers to have the been built, but only {1} have '
+                          'the group id in the metadata for group {2}'.format(self.gc_min_entities_alt,
+                                                                              expected_servers,
+                                                                              group.id))
 
     @tags(speed='quick')
     def test_system_update_launchconfig_while_group_building(self):
