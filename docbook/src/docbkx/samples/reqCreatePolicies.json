@@ -1,4 +1,4 @@
-OST /v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies HTTP/1.1
+POST /v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies HTTP/1.1
 Accept: application/json
 Accept-Encoding: gzip, deflate, compress
 Content-Length: 716
