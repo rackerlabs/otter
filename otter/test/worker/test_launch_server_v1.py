@@ -34,7 +34,7 @@ from otter.util.deferredutils import unwrap_first_error, TimedOutError
 from otter.test.utils import iMock
 from otter.undo import IUndoStack
 
-from otter.rest.application import set_bobby
+from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
 fake_config = {

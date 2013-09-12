@@ -31,7 +31,7 @@ from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (repeating_interval, transient_errors_except,
                               TransientRetryError)
-from otter.rest.application import get_bobby
+from otter.rest.bobby import get_bobby
 
 
 class UnexpectedServerStatus(Exception):
