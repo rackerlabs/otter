@@ -110,7 +110,7 @@ def validate_key_pairs(log, auth_token, server_endpoint, key_pairs):
     Validate key pairs
     """
     # TODO
-    return defer.suceed(True)
+    return defer.succeed(True)
 
 
 def validate_personality(log, auth_token, server_endpoint, personality):
@@ -118,4 +118,4 @@ def validate_personality(log, auth_token, server_endpoint, personality):
     Validate personality
     """
     # TODO
-    return defer.suceed(True)
+    return defer.succeed(True)
