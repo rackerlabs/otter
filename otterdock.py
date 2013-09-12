@@ -2,7 +2,6 @@
 
 from __future__ import print_function
 
-import os
 import StringIO
 from sys import exit
 import time
@@ -31,9 +30,6 @@ RUN apt-get install -y build-essential git python-dev libxml2-dev libxslt1-dev p
 RUN pip install {reqs}
 # Dev requirements
 RUN pip install {devreqs}
-
-# Some way to expose logs
-VOLUME ["/opt/logs"]
 
 {otter}
 WORKDIR /opt/otter
@@ -85,22 +81,51 @@ def format_docker_env(env_dict):
 
 
 @command
-def start_cassandra(run_tag="dev"):
+def start_cassandra(dev=True):
     """
     Starts Cassandra if it hasn't been started with that tag already and
     returns the running container's IP
     """
-    cass = s.run(
-        image='cassandra',
-        command='RUN_REASON={0} /opt/cassandra/bin/cassandra -f'.format(
-            run_tag),
-        hostname='cassandra',
-        once=True)
-    if len(cass) == 0:
-        print("Cassandra failed to start")
-        exit(1)
+    with open('schema/__version__') as f:
+        schema_version = f.readlines()[0].strip()
 
-    return s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
+    # terrible hack to get the schema version in the command
+    command = '/opt/cassandra/bin/cassandra -f > {0}.txt'.format(
+        schema_version)
+    cass = s.containers(image="cassandra", command=command)
+
+    if len(cass) == 0:
+        cass = s.run(
+            image='cassandra',
+            command=command,
+            hostname='cassandra')
+        if len(cass) == 0:
+            print("Cassandra failed to start")
+            exit(1)
+
+        cass_ip = s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
+
+        # wait until cassandra is listening
+        schema = None
+        for i in range(2):
+            if schema is None:
+                schema = run_otter(cass_ip, 'make load-dev-schema', dev=dev)
+            else:
+                s.start(schema)
+
+            if s.wait(schema)[0][1]['StatusCode'] == 0:
+                print("Successfully loaded schema version {0}".format(
+                    schema_version))
+                return cass_ip
+            else:
+                time.sleep(5)
+
+        print("Unable to connect to cassandra after 100 seconds")
+        exit(1)
+    else:
+        return s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
+
+
 
 
 @command
@@ -137,13 +162,10 @@ def build_all(sha="dev",
 
 
 @command
-def run_otter(command, dev=True, run_tag=None, volumes=None):
-    cass_ip = start_cassandra(run_tag)
-
+def run_otter(cass_ip, command, dev=True, volumes=None):
     otter_env = format_docker_env({
         'CASSANDRA_HOST': cass_ip,
-        'PYTHONPATH': ":".join(PYTHONPATHS),
-        'OTTER_LOGS': "/opt/logs/{0}".format(run_tag)
+        'PYTHONPATH': ":".join(PYTHONPATHS)
     })
 
     if dev:
@@ -167,17 +189,14 @@ def run_otter(command, dev=True, run_tag=None, volumes=None):
 
 
 @command
-def unit_tests(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
-    volumes = None
-    if log_dir is not None:
-        volumes = ['{0}:/opt/logs'.format(log_dir)]
+def unit_tests(dev=True, run_tag=None):
+    # if run_tag is None:
+    #     run_tag = time.strftime("%Y-%m-%d_%H.%M.%S.unit_test")
+    cass_ip = start_cassandra(schema_version)
+    container_id = run_otter(cass_ip, 'make unit', volumes=volumes)
 
-    if run_tag is None:
-        run_tag = time.strftime("%Y-%m-%d_%H.%M.%S.unit_test")
-
-    container_id = run_otter('make unit', run_tag=run_tag, volumes=volumes)
-    exit_code = s.wait(container_id)
-    exit(exit_code[0][1]['StatusCode'])
+    # exit_code = s.wait(container_id)
+    # exit(exit_code[0][1]['StatusCode'])
 
 
 @command
