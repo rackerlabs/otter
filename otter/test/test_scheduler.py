@@ -114,7 +114,7 @@ class SchedulerTestCase(TestCase):
         No policies are executed when ``fetch_batch_of_events`` return empty list
         i.e. no events are there before now
         """
-        mock_datetime.utcnow.return_value = time = datetime(
+        mock_datetime.utcnow.return_value = datetime(
             2012, 10, 10, 03, 20, 30, 0, None)
         self.returns = [[]]
 
