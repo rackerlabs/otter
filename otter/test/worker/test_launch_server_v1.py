@@ -5,7 +5,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import CancelledError, Deferred, fail, succeed
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -26,10 +26,10 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch
+from otter.test.utils import DummyException, mock_log, patch, CheckFailure
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
-from otter.util.deferredutils import unwrap_first_error
+from otter.util.deferredutils import unwrap_first_error, TimedOutError
 
 from otter.test.utils import iMock
 from otter.undo import IUndoStack
@@ -616,9 +616,7 @@ class ServerTests(TestCase):
         self.assertNoResult(d)
 
         clock.advance(1)
-        self.failureResultOf(d, CancelledError)
-        # instance id was previously bound by launch_server
-        self.log.msg.assert_called_with(mock.ANY, timeout=6, time_building=6)
+        self.failureResultOf(d, TimedOutError)
 
         # the loop has stopped
         clock.advance(5)
@@ -897,7 +895,7 @@ class ConfigPreparationTests(TestCase):
         suffix.
         """
         test_config = {'server': {'name': 'web.example.com'}}
-        expected_name = 'as000000-web.example.com'
+        expected_name = 'web.example.com-as000000'
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
@@ -1196,9 +1194,8 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.log.err.assert_called_once_with(
-            None, instance_id="serverId", why=mock.ANY, timeout=11,
-            time_delete=11)
+        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
+                                             instance_id='serverId')
 
         # the loop has stopped
         clock.advance(5)

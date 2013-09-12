@@ -1,6 +1,8 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
+import time
+
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -9,7 +11,8 @@ from jsonschema import ValidationError
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, IScalingScheduleCollection)
+    NoSuchWebhookError, UnrecognizedCapabilityError,
+    IScalingScheduleCollection, IAdmin)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -110,6 +113,8 @@ _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} W
                            '"webhookKey" = :webhookKey;')
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
+
+_cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
 # Store consistency levels
@@ -1013,4 +1018,43 @@ class CassScalingGroupCollection:
         d.addCallback(lambda results: [r[0]['count'] for r in results])
         d.addCallback(lambda results: dict(zip(
             ('groups', 'policies', 'webhooks'), results)))
+        return d
+
+
+@implementer(IAdmin)
+class CassAdmin(object):
+    """
+    .. autointerface:: otter.models.interface.IAdmin
+    """
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def get_metrics(self, log):
+        """
+        see :meth:`otter.models.interface.IAdmin.get_metrics`
+        """
+        def _format_data(results):
+            """
+            :param results: Results from running the collect_metrics call.
+
+            :return: Correctly formatted data to be jsonified.
+            """
+            metrics = []
+            for key, value in results.iteritems():
+                metrics.append(dict(
+                    id="otter.metrics.{0}".format(key),
+                    value=value,
+                    time=int(time.time())))
+            return metrics
+
+        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        deferred = [self.connection.execute(_cql_count_all.format(cf=field), {},
+                                            get_consistency_level('count', 'group'))
+                    for field in fields]
+
+        d = defer.gatherResults(deferred)
+        d.addCallback(lambda results: dict(zip(
+            ('groups', 'policies', 'webhooks'), [r[0]['count'] for r in results])))
+        d.addCallback(_format_data)
         return d

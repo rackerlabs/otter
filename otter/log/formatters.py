@@ -3,24 +3,32 @@ Composable log observers for use with Twisted's log module.
 """
 import json
 import time
+from datetime import datetime
 
 from twisted.python.failure import Failure
 
 
-class ReprFallbackEncoder(json.JSONEncoder):
+class LoggingEncoder(json.JSONEncoder):
     """
-    A JSONEncoder that will use the repr(obj) as the default serialization
-    for objects that the base JSONEncoder does not know about.
+    A JSONEncoder that will decide how to serialize objects that the base
+    JSONEncoder does not know about. It defaults to repr(obj) when it does not
+    know about the object
 
     This will ensure that even log messages that include unserializable objects
     (like from 3rd party libraries) will still have reasonable representations
     in the logged JSON and will actually be logged and not discarded by the
     logging system because of a formatting error.
     """
+    serializers = [(datetime, lambda obj: obj.isoformat()),
+                   (Failure, str)]
+
     def default(self, obj):
         """
-        Serialize obj as repr(obj).
+        Serialize obj using `serializers` above and fallback to repr
         """
+        for _type, serializer in self.serializers:
+            if isinstance(obj, _type):
+                return serializer(obj)
         return repr(obj)
 
 
@@ -34,7 +42,7 @@ def JSONObserverWrapper(observer, **kwargs):
     :rtype: ILogObserver
     """
     def JSONObserver(eventDict):
-        observer({'message': (json.dumps(eventDict, cls=ReprFallbackEncoder, **kwargs),)})
+        observer({'message': (json.dumps(eventDict, cls=LoggingEncoder, **kwargs),)})
 
     return JSONObserver
 

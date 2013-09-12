@@ -14,6 +14,7 @@ from otter.json_schema import group_examples
 from otter.models.cass import (
     CassScalingGroup,
     CassScalingGroupCollection,
+    CassAdmin,
     serialize_json_data,
     get_consistency_level,
     verified_view)
@@ -2131,6 +2132,77 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                  mock.call(webhook_query, expectedData, ConsistencyLevel.TWO)]
 
         d = self.collection.get_counts(self.mock_log, '123')
+        result = self.successResultOf(d)
+        self.assertEquals(result, expectedResults)
+        self.connection.execute.assert_has_calls(calls)
+
+
+class CassAdminTestCase(TestCase):
+    """
+    Tests for :class:`CassAdmin`
+    """
+
+    def setUp(self):
+        """ Setup mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+
+        self.returns = [None]
+
+        def _responses(*args):
+            result = _de_identify(self.returns.pop(0))
+            if isinstance(result, Exception):
+                return defer.fail(result)
+            return defer.succeed(result)
+
+        self.connection.execute.side_effect = _responses
+
+        self.mock_log = mock.MagicMock()
+
+        self.collection = CassAdmin(self.connection)
+
+        patch(self, 'otter.models.cass.get_consistency_level',
+              return_value=ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.time')
+    def test_get_metrics(self, time):
+        """
+        Check get_metrics returns dictionary in proper format
+        """
+        time.time.return_value = 1234567890
+
+        self.returns = [
+            [{'count': 190}],
+            [{'count': 191}],
+            [{'count': 192}],
+        ]
+
+        # These are now reversed for an unknown reason.
+        expectedResults = [
+            {
+                'id': 'otter.metrics.webhooks',
+                'value': 192,
+                'time': 1234567890
+            },
+            {
+                'id': 'otter.metrics.policies',
+                'value': 191,
+                'time': 1234567890
+            },
+            {
+                'id': 'otter.metrics.groups',
+                'value': 190,
+                'time': 1234567890
+            }
+        ]
+        config_query = ('SELECT COUNT(*) FROM scaling_config;')
+        policy_query = ('SELECT COUNT(*) FROM scaling_policies;')
+        webhook_query = ('SELECT COUNT(*) FROM policy_webhooks;')
+
+        calls = [mock.call(config_query, {}, ConsistencyLevel.TWO),
+                 mock.call(policy_query, {}, ConsistencyLevel.TWO),
+                 mock.call(webhook_query, {},  ConsistencyLevel.TWO)]
+
+        d = self.collection.get_metrics(self.mock_log)
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)

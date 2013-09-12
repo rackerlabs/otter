@@ -20,7 +20,7 @@ import json
 import itertools
 from copy import deepcopy
 
-from twisted.internet.defer import CancelledError, gatherResults, maybeDeferred
+from twisted.internet.defer import gatherResults, maybeDeferred
 
 import treq
 
@@ -61,10 +61,10 @@ def server_details(server_endpoint, auth_token, server_id):
 
     :return: A dict of the server details.
     """
-    d = treq.get(append_segments(server_endpoint, 'servers', server_id),
-                 headers=headers(auth_token))
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.get(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_details')
+    d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -121,24 +121,15 @@ def wait_for_active(log,
         sd.addCallback(check_status)
         return sd
 
-    d = retry_and_timeout(
+    timeout_description = ("Waiting for server <{0}> to change from BUILD "
+                           "state to ACTIVE state").format(server_id)
+
+    return retry_and_timeout(
         poll, timeout,
         can_retry=transient_errors_except(UnexpectedServerStatus),
         next_interval=repeating_interval(interval),
-        clock=clock)
-
-    def on_error(f):
-        if f.check(CancelledError):
-            time_building = clock.seconds() - start_time
-            log.msg(('Server {instance_id} failed to change from BUILD state '
-                     'to ACTIVE within a {timeout} second timeout (it has been '
-                     '{time_building} seconds).'),
-                    timeout=timeout, time_building=time_building)
-        return f
-
-    d.addErrback(on_error)
-
-    return d
+        clock=clock,
+        deferred_description=timeout_description)
 
 
 def create_server(server_endpoint, auth_token, server_config):
@@ -151,11 +142,11 @@ def create_server(server_endpoint, auth_token, server_config):
 
     :return: Deferred that fires with the CreateServer response as a dict.
     """
-    d = treq.post(append_segments(server_endpoint, 'servers'),
-                  headers=headers(auth_token),
+    path = append_segments(server_endpoint, 'servers')
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({'server': server_config}))
     d.addCallback(check_success, [202])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_create')
+    d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
 
 
@@ -179,14 +170,13 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
 
-    d = treq.post(path,
-                  headers=headers(auth_token),
+    d = treq.post(path, headers=headers(auth_token),
                   data=json.dumps({"nodes": [{"address": ip_address,
                                               "port": port,
                                               "condition": "ENABLED",
                                               "type": "PRIMARY"}]}))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'add')
+    d.addErrback(wrap_request_error, path, 'add')
 
     def when_done(result):
         undo.push(remove_from_load_balancer,
@@ -300,13 +290,11 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
 
-    name_parts = [generate_server_name()]
-
-    server_name_suffix = server_config.get('name')
-    if server_name_suffix:
-        name_parts.append(server_name_suffix)
-
-    server_config['name'] = '-'.join(name_parts)
+    if server_config.get('name'):
+        server_name = server_config.get('name')
+        server_config['name'] = '{0}-{1}'.format(server_name, generate_server_name())
+    else:
+        server_config['name'] = generate_server_name()
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
@@ -407,7 +395,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
     d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, endpoint, 'remove')
+    d.addErrback(wrap_request_error, path, 'remove')
     d.addCallback(lambda _: None)
     return d
 
@@ -476,7 +464,7 @@ def verified_delete(log,
                     auth_token,
                     server_id,
                     interval=5,
-                    timeout=120,
+                    timeout=3660,
                     clock=None):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
@@ -493,19 +481,21 @@ def verified_delete(log,
     :param str auth_token: Keystone Auth token.
     :param str server_id: Opaque nova server id.
     :param int interval: Deletion interval in seconds - how long until
-        verifying a delete is retried. Default: 2.
+        verifying a delete is retried. Default: 5.
     :param int timeout: Seconds after which the deletion will be logged as a
-        failure, if Nova fails to return a 404,
+        failure, if Nova fails to return a 404.  Default is 3660, because if
+        the server is building, the delete will not happen until immediately
+        after it has finished building.
 
     :return: Deferred that fires when the expected status has been seen.
     """
     del_log = log.bind(instance_id=server_id)
     del_log.msg('Deleting server')
 
-    d = treq.delete(append_segments(server_endpoint, 'servers', server_id),
-                    headers=headers(auth_token))
+    path = append_segments(server_endpoint, 'servers', server_id)
+    d = treq.delete(path, headers=headers(auth_token))
     d.addCallback(check_success, [204])
-    d.addErrback(wrap_request_error, server_endpoint, 'server_delete')
+    d.addErrback(wrap_request_error, path, 'server_delete')
 
     if clock is None:  # pragma: no cover
         from twisted.internet import reactor
@@ -521,11 +511,13 @@ def verified_delete(log,
 
         start_time = clock.seconds()
 
-        # this is treating all errors as transient, so the only error that can
-        # occur is a CancelledError from timing out
+        timeout_description = (
+            "Waiting for Nova to actually delete server {0}".format(server_id))
+
         verify_d = retry_and_timeout(check_status, timeout,
                                      next_interval=repeating_interval(interval),
-                                     clock=clock)
+                                     clock=clock,
+                                     deferred_description=timeout_description)
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
@@ -533,15 +525,7 @@ def verified_delete(log,
                         time_delete=time_delete)
 
         verify_d.addCallback(on_success)
-
-        def on_timeout(_):
-            time_delete = clock.seconds() - start_time
-            del_log.err(None, timeout=timeout, time_delete=time_delete,
-                        why=('Server {instance_id} failed to be deleted within '
-                             'a {timeout} second timeout (it has been '
-                             '{time_delete} seconds).'))
-
-        verify_d.addErrback(on_timeout)
+        verify_d.addErrback(del_log.err)
 
     d.addCallback(verify)
     return d
