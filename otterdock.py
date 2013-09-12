@@ -107,7 +107,7 @@ def start_cassandra(dev=True):
 
         # wait until cassandra is listening
         schema = None
-        for i in range(2):
+        for i in range(10):
             if schema is None:
                 schema = run_otter(cass_ip, 'make load-dev-schema', dev=dev)
             else:
@@ -120,7 +120,7 @@ def start_cassandra(dev=True):
             else:
                 time.sleep(5)
 
-        print("Unable to connect to cassandra after 100 seconds")
+        print("Unable to connect to cassandra after 50 seconds")
         exit(1)
     else:
         return s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
@@ -189,10 +189,10 @@ def run_otter(cass_ip, command, dev=True, volumes=None):
 
 
 @command
-def unit_tests(dev=True, run_tag=None):
+def unit_tests(dev=True):
     # if run_tag is None:
     #     run_tag = time.strftime("%Y-%m-%d_%H.%M.%S.unit_test")
-    cass_ip = start_cassandra(schema_version)
+    cass_ip = start_cassandra(dev)
     container_id = run_otter(cass_ip, 'make unit', volumes=volumes)
 
     # exit_code = s.wait(container_id)
