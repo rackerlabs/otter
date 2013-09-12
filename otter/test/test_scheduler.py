@@ -12,7 +12,7 @@ from silverberg.lock import BusyLockError
 from silverberg.cassandra.ttypes import TimedOutException
 
 from otter.scheduler import SchedulerService
-from otter.test.utils import iMock, patch, CheckFailure
+from otter.test.utils import iMock, patch, CheckFailure, mock_log
 from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.rest.application import set_store
@@ -75,14 +75,14 @@ class SchedulerTestCase(TestCase):
         self.mock_with_lock.side_effect = _mock_with_lock
         self.slv_client = mock.MagicMock()
 
+        otter_log = patch(self, 'otter.scheduler.otter_log')
+        self.log = mock_log()
+        otter_log.bind.return_value = self.log
+
         self.clock = Clock()
         self.scheduler_service = SchedulerService(100, 1, self.slv_client, self.clock)
 
-        self.otter_log = patch(self, 'otter.scheduler.otter_log')
-        self.otter_log.bind.assert_called_once_with(system='otter.scheduler')
-        self.log = self.otter_log.bind.return_value
-        self.log.bind.assert_called_once_with(category='locking')
-        self.lock_log = self.log.bind()
+        otter_log.bind.assert_called_once_with(system='otter.scheduler')
 
         self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence')
         self.next_cron_occurrence.return_value = 'newtrigger'
@@ -116,8 +116,7 @@ class SchedulerTestCase(TestCase):
         d = self.scheduler_service.check_for_events(100)
         self.validate_calls(d, [[]], None)
         self.assertFalse(self.mock_store.update_delete_events.called)
-        self.log.bind.assert_called_once_with(scheduler_run_id=mock.ANY, utcnow=mock.ANY)
-        self.log.bind.return_value.msg.assert_called_once_with('Checking for events')
+        self.assertFalse(self.log.msg.called)
 
     def test_one(self):
         """
@@ -131,7 +130,27 @@ class SchedulerTestCase(TestCase):
 
         self.validate_calls(d, [events], [(['pol44'], [])])
 
-    def test_policy_exec_logs(self):
+    def test_logging(self):
+        """
+        All the necessary messages are logged
+        """
+        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
+                   'trigger': 'now', 'cron': None}]
+        self.returns = [events]
+
+        self.scheduler_service.check_for_events(100)
+
+        calls = [('Processing {num_events} events', dict(num_events=1)),
+                 ('Executing policy', dict(tenant_id='1234', policy_id='pol44',
+                                           scaling_group_id='scal44')),
+                 ('Deleting {policy_ids_deleting} events', dict(policy_ids_deleting=1)),
+                 ('Updating {policy_ids_updating} events', dict(policy_ids_updating=0))]
+
+        self.log.msg.assert_has_calls(
+            [mock.call(msg, scheduler_run_id='transaction-id', utcnow=mock.ANY, **kwargs)
+             for msg, kwargs in calls])
+
+    def test_policy_exec_err_logs(self):
         """
         The scheduler logs `CannotExecutePolicyError` as msg instead of err
         """
@@ -144,13 +163,13 @@ class SchedulerTestCase(TestCase):
         d = self.scheduler_service.check_for_events(100)
 
         self.assertIsNone(self.successResultOf(d))
-        self.log.bind.return_value.bind(tenant_id='1234', scaling_group_id='scal44',
-                                        policy_id='pol44')
-        self.log.bind.return_value.bind.return_value.msg.assert_has_calls(
-            [mock.call('Executing policy'),
-             mock.call('Cannot execute policy',
-                       reason=CheckFailure(CannotExecutePolicyError))])
-        self.assertFalse(self.log.bind.return_value.bind.return_value.err.called)
+        kwargs = dict(scheduler_run_id='transaction-id', utcnow=mock.ANY, tenant_id='1234',
+                      scaling_group_id='scal44', policy_id='pol44')
+        self.assertEqual(
+            self.log.msg.mock_calls[2],
+            mock.call('Cannot execute policy',
+                      reason=CheckFailure(CannotExecutePolicyError), **kwargs))
+        self.assertFalse(self.log.err.called)
 
     def test_many(self):
         """
@@ -224,7 +243,7 @@ class SchedulerTestCase(TestCase):
         self.returns = [events1, events2]
 
         self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=self.lock_log)
+                                               max_retry=0, log=mock.ANY)
 
         d = self.scheduler_service.check_for_events(100)
 
@@ -248,7 +267,7 @@ class SchedulerTestCase(TestCase):
         self.returns = [events1, events2]
 
         self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=self.lock_log)
+                                               max_retry=0, log=mock.ANY)
         with_lock_impl = lambda *args: defer.fail(BusyLockError(LOCK_TABLE_NAME, 'schedule'))
         self.mock_with_lock.side_effect = with_lock_impl
 
@@ -258,8 +277,9 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
-        self.lock_log.msg.assert_called_once_with("Couldn't get lock to process events",
-                                                  reason=CheckFailure(BusyLockError))
+        self.log.msg.assert_called_once_with("Couldn't get lock to process events",
+                                             reason=CheckFailure(BusyLockError),
+                                             category='locking')
 
     def test_does_nothing_on_no_lock_second_time(self):
         """
@@ -273,7 +293,7 @@ class SchedulerTestCase(TestCase):
         self.returns = [events1, events2]
 
         self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=self.lock_log)
+                                               max_retry=0, log=mock.ANY)
 
         _with_lock_first_time = [True]
 
@@ -291,9 +311,9 @@ class SchedulerTestCase(TestCase):
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
-        print self.lock_log.msg.call_args_list
-        self.lock_log.msg.assert_called_once_with("Couldn't get lock to process events",
-                                                  reason=CheckFailure(BusyLockError))
+        self.log.msg.assert_called_with("Couldn't get lock to process events",
+                                        reason=CheckFailure(BusyLockError),
+                                        category='locking')
 
     def test_cron_updates(self):
         """
