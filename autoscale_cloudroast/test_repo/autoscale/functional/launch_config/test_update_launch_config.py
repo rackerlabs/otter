@@ -1,30 +1,33 @@
 """
 Test to update launch config.
 """
-from test_repo.autoscale.fixtures import ScalingGroupFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
-class UpdateLaunchConfigTest(ScalingGroupFixture):
+class UpdateLaunchConfigTest(AutoscaleFixture):
 
     """
     Verify update launch config.
     """
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         """
         Create a scaling group.
         """
-        super(UpdateLaunchConfigTest, cls).setUpClass()
+        super(UpdateLaunchConfigTest, self).setUp()
+        group_response = self.autoscale_behaviors.create_scaling_group_min()
+        self.group = group_response.entity
+        self.resources.add(self.group.id,
+                           self.autoscale_client.delete_scaling_group)
 
     def test_update_launch_config_response(self):
         """
         Verify the update launch config call for response code, headers and data.
         """
         lc_name = rand_name('upd_server_name')
-        lc_image_ref = 'XYZ'
-        lc_flavor_ref = 4
+        lc_image_ref = self.lc_image_ref_alt
+        lc_flavor_ref = '4'
         lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
         lc_disk_config = 'AUTO'
         lc_personality = [{'path': '/root/.ssh/authorized_keys',
@@ -94,8 +97,8 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
         the launch config as per the latest request
         """
         lc_name = rand_name('upd_server_name')
-        lc_image_ref = 'XYZ'
-        lc_flavor_ref = 4
+        lc_image_ref = self.lc_image_ref_alt
+        lc_flavor_ref = '4'
         lc_load_balancers = [{'loadBalancerId': 1234, 'port': 8181}]
         lc_disk_config = 'AUTO'
         lc_personality = [{'path': '/root/.ssh/authorized_keys',
@@ -116,9 +119,9 @@ class UpdateLaunchConfigTest(ScalingGroupFixture):
         self.assertEquals(update_lc_response.status_code, 204,
                           msg='Update launch config failed with {0} as against a 204, success for'
                           ' group {1}'.format(update_lc_response.status_code, self.group.id))
-        lc_name = "test_upd_lc"
-        image_ref = "88876868"
-        flavor_ref = "0"
+        lc_name = 'test_upd_lc'
+        image_ref = self.lc_image_ref
+        flavor_ref = '8'
         update_launchconfig_response = self.autoscale_client.update_launch_config(
             group_id=self.group.id,
             name=lc_name,
