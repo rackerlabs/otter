@@ -35,8 +35,6 @@ from otter.util.timestamp import from_timestamp
 
 from otter.scheduler import next_cron_occurrence
 
-from otter.log import DEBUG
-
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
 from silverberg.lock import BusyLockError
@@ -443,9 +441,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertTrue(3 <= second_retry_wait <= 5)
         self.assertNotEqual(first_retry_wait, second_retry_wait)
 
-    def test_modify_state_lock_debug_log(self):
+    def test_modify_state_lock_log_category_locking(self):
         """
-        `modify_state` locks with debug log
+        `modify_state` locks with log with category as locking
         """
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
@@ -457,7 +455,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group.modify_state(modifier)
 
         log.bind.assert_called_once_with(system='CassScalingGroup.modify_state')
-        log.bind().bind.assert_called_once_with(level=DEBUG, category='locking')
+        log.bind().bind.assert_called_once_with(category='locking')
         self.basic_lock_mock.assert_called_once_with(
             self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=mock.ANY,
             log=log.bind().bind())
@@ -1611,9 +1609,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
     @mock.patch('otter.models.cass.random.uniform')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_lock_with_debug_log(self, mock_view_state, mock_rand_uniform):
+    def test_delete_lock_with_log_category_locking(self, mock_view_state, mock_rand_uniform):
         """
-        The lock is created with debug log
+        The lock is created with log with category as locking
         """
         mock_rand_uniform.return_value = 3.56
         log = self.group.log = mock.Mock()
@@ -1621,7 +1619,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.group.delete_group()
 
         log.bind.assert_called_once_with(system='CassScalingGroup.delete_group')
-        log.bind().bind.assert_called_once_with(level=DEBUG, category='locking')
+        log.bind().bind.assert_called_once_with(category='locking')
         self.basic_lock_mock.assert_called_once_with(
             self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=3.56,
             log=log.bind().bind())
