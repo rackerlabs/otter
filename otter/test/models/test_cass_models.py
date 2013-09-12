@@ -293,8 +293,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         Test that you can call view state and receive a valid parsed response
         """
+        self.config = json.dumps(self.config)
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.config['name'],
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
         self.returns = [cass_response]
@@ -308,7 +309,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       self.config['name'], {'A': 'R'},
+                                       'a', {'A': 'R'},
                                        {'P': 'R'}, '123', {'PT': 'R'}, False))
 
     def test_view_state_no_such_group(self):
@@ -327,7 +328,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         NoSuchScalingGroupError is returned and that row's deletion is triggered
         """
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.config['name'],
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
         self.returns = [cass_response, None]
@@ -348,8 +349,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         view_state returns a dictionary with a key paused equal to True for a
         paused group.
         """
+        self.config = json.dumps(self.config)
         cass_response = _cassandrify_data([
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'groupName': self.config['name'],
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
 
@@ -357,7 +359,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
-                                       self.config['name'], {'A': 'R'}, {'P': 'R'},
+                                       'a', {'A': 'R'}, {'P': 'R'},
                                        '123', {'PT': 'R'}, True))
 
     @mock.patch('otter.models.cass.serialize_json_data',
@@ -367,7 +369,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, self.config['name'], {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, self.config, {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -420,12 +422,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
 
+
     def test_modify_state_lock_with_different_retry(self):
         """
         `modify_state` gets lock by retrying with different wait intervals each time
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, self.config['name'], {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, self.config, {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -1565,7 +1568,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.side_effect = acquire
 
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, self.config['name'], {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, self.config, {}, {}, None, {}, False))
 
         d = self.group.delete_group()
         result = self.failureResultOf(d)
@@ -1755,7 +1758,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # 'serializing' something just wraps it with a _S
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
-
+    
     def test_create(self):
         """
         Test that you can create a group, and if successful the group ID is
@@ -1764,7 +1767,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
-            'groupName': 'blah',
             'groupId': '12345678',
             'tenantId': '123',
             "active": '{}',
@@ -1809,7 +1811,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
-            'groupName': 'blah',
             'groupId': '12345678',
             'tenantId': '123',
             "active": '{}',
@@ -1858,7 +1859,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'group_config': _S(self.config),
             'launch_config': _S(self.launch),
             'groupId': '1',
-            'groupName': 'blah',
             'tenantId': '123',
             "active": '{}',
             "pending": '{}',
@@ -1913,7 +1913,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[{
             'tenantId': '123',
             'groupId': 'group{}'.format(i),
-            'groupName': 'test',
+            'group_config': '{"name": "test"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1959,7 +1959,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         group_dicts = [{
             'tenantId': '123',
             'groupId': 'group123',
-            'groupName': 'test123',
+            'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1969,7 +1969,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }, {
             'tenantId': '23',
             'groupId': 'group23',
-            'groupName': 'test23',
+            'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -1999,7 +1999,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         group_dicts = [{
             'tenantId': '123',
             'groupId': 'group123',
-            'groupName': 'test123',
+            'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,
@@ -2009,7 +2009,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }, {
             'tenantId': '23',
             'groupId': 'group23',
-            'groupName': 'test23',
+            'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
             'groupTouched': None,

@@ -299,7 +299,7 @@ def _jsonloads_data(raw_data):
 def _unmarshal_state(state_dict):
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
-        state_dict["groupName"],
+        _jsonloads_data(state_dict["group_config"])["name"],
         _jsonloads_data(state_dict["active"]),
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
@@ -876,7 +876,6 @@ class CassScalingGroupCollection:
 
         data = {"tenantId": tenant_id,
                 "groupId": scaling_group_id,
-                "groupName": config['name'],
                 "group_config": serialize_json_data(config, 1),
                 "launch_config": serialize_json_data(launch, 1),
                 "active": '{}',
