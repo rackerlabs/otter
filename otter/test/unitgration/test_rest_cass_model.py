@@ -320,7 +320,8 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
             self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
-                GroupState(self.tenant_id, self.group_id, self._config['name'], {}, {}, 'date', {}, False))
+                GroupState(self.tenant_id, self.group_id,
+                           self._config['name'], {}, {}, 'date', {}, False))
 
         mock_log = mock.MagicMock()
         d = store.create_scaling_group(mock_log, self.tenant_id,

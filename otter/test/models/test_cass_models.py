@@ -422,7 +422,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.assert_called_once_with()
         self.assertEqual(self.lock.release.call_count, 0)
 
-
     def test_modify_state_lock_with_different_retry(self):
         """
         `modify_state` gets lock by retrying with different wait intervals each time
@@ -1758,7 +1757,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         # 'serializing' something just wraps it with a _S
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
                                  side_effect=lambda *args: _S(args[0]))
-    
+
     def test_create(self):
         """
         Test that you can create a group, and if successful the group ID is
