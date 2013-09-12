@@ -2,7 +2,9 @@
 
 from __future__ import print_function
 
+import os
 import StringIO
+import subprocess
 from sys import exit
 import time
 
@@ -163,6 +165,10 @@ def build_all(sha="dev",
 
 @command
 def run_otter(cass_ip, command, dev=True, volumes=None):
+    """
+    Starts up an otter container with the provided volumes, pointing to a
+    particular cassandra host
+    """
     otter_env = format_docker_env({
         'CASSANDRA_HOST': cass_ip,
         'PYTHONPATH': ":".join(PYTHONPATHS)
@@ -188,15 +194,40 @@ def run_otter(cass_ip, command, dev=True, volumes=None):
     return container_id[0]
 
 
-@command
-def unit_tests(dev=True):
-    # if run_tag is None:
-    #     run_tag = time.strftime("%Y-%m-%d_%H.%M.%S.unit_test")
-    cass_ip = start_cassandra(dev)
-    container_id = run_otter(cass_ip, 'make unit', volumes=volumes)
+def make_logdir(log_dir, prefix):
+    """
+    Creates a log directory in which logs are kept.  Store it in the folder
+    [prefix]-<timestamp>
+    """
+    folder = os.path.expanduser(os.path.join(
+        log_dir, prefix, time.strftime("%Y-%m-%d_%H.%M.%S")))
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    return folder
 
-    # exit_code = s.wait(container_id)
-    # exit(exit_code[0][1]['StatusCode'])
+
+@command
+def unit_tests(dev=True, log_dir="_docker_logs"):
+    """
+    Run unit tests, and copy the logs over if this is not the dev
+    """
+    cass_ip = start_cassandra(dev)
+    container = run_otter(cass_ip, 'make unit')
+    subprocess.call(["docker", "attach", container.id])
+    exit_code = s.wait(container)
+    if not dev and log_dir is not None:
+        try:
+            folder = make_logdir(log_dir, "unit_tests")
+            subprocess.call([
+                "docker", "cp",
+                "{0}:/opt/otter/_trial_temp".format(container.id),
+                folder])
+        except:
+            import traceback
+            traceback.print_exc()
+            print("Unable to copy logs")
+
+    exit(exit_code[0][1]['StatusCode'])
 
 
 @command
