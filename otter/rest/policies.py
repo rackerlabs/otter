@@ -10,9 +10,11 @@ import json
 
 from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, log_arguments)
+                                   succeeds_with, log_arguments,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
+from otter.rest.webhooks import OtterWebhooks
 from otter.util.http import get_autoscale_links, transaction_id
 from otter import controller
 
@@ -302,3 +304,12 @@ class OtterPolicies(object):
                                        policy_id=policy_id))
         d.addCallback(lambda _: "{}")  # Return value TBD
         return d
+
+    @app.route('/<string:policy_id>/webhooks/', branch=True)
+    @with_transaction_id()
+    def webhooks(self, request, log, policy_id):
+        """
+        webhook routes handled by OtterWebhooks
+        """
+        return OtterWebhooks(self.store, log, self.tenant_id,
+                             self.scaling_group_id, policy_id).app.resource()
