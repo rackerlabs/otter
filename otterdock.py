@@ -120,18 +120,20 @@ def build_cassandra():
 
 
 @command
-def build_otter(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
+def build_otter(sha="dev",
+                pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
     s.build(
-        tag='otter:dev',
-        fobj=get_dockerfile(pip_mirror=pip_mirror)
+        tag='otter:{0}'.format(sha),
+        fobj=get_dockerfile(dev=(sha == 'dev'), pip_mirror=pip_mirror)
     )
 
 
 @command
-def build_all(pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
+def build_all(sha="dev",
+              pip_mirror='http://pypi0.prod.ord.as.rax.io:3145/pypi'):
     build_java()
     build_cassandra()
-    build_otter(pip_mirror)
+    build_otter(sha, pip_mirror)
 
 
 @command
@@ -165,15 +167,6 @@ def run_otter(command, dev=True, run_tag=None, volumes=None):
 
 
 @command
-def start(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
-    volumes = None
-    if log_dir is not None:
-        volumes = ['{0}:/opt/logs'.format(log_dir)]
-
-    run_otter('make run_otter', run_tag, volumes=volumes)
-
-
-@command
 def unit_tests(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
@@ -188,7 +181,16 @@ def unit_tests(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
 
 
 @command
-def run_tests(run_tag="dev", log_dir="/mnt/shared/docker_logs"):
+def start(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
+    volumes = None
+    if log_dir is not None:
+        volumes = ['{0}:/opt/logs'.format(log_dir)]
+
+    run_otter('make run_otter', run_tag, volumes=volumes)
+
+
+@command
+def run_tests(dev=True, run_tag="dev", log_dir="/mnt/shared/docker_logs"):
     volumes = None
     if log_dir is not None:
         volumes = ['{0}:/opt/logs'.format(log_dir)]
