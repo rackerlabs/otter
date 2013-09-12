@@ -86,7 +86,7 @@ def format_docker_env(env_dict):
 def start_cassandra(dev=True):
     """
     Starts Cassandra if it hasn't been started with that tag already and
-    returns the running container's IP
+    returns the running container
     """
     with open('schema/__version__') as f:
         schema_version = f.readlines()[0].strip()
@@ -100,32 +100,32 @@ def start_cassandra(dev=True):
         cass = s.run(
             image='cassandra',
             command=command,
-            hostname='cassandra')
+            hostname='cassandra',
+            detailed=True)
         if len(cass) == 0:
             print("Cassandra failed to start")
             exit(1)
-
-        cass_ip = s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
 
         # wait until cassandra is listening
         schema = None
         for i in range(10):
             if schema is None:
-                schema = run_otter(cass_ip, 'make load-dev-schema', dev=dev)
+                schema = run_otter('make load-dev-schema', dev=dev,
+                                   env={'CASSANDRA_HOST': cass[0].ip})
             else:
                 s.start(schema)
 
             if s.wait(schema)[0][1]['StatusCode'] == 0:
                 print("Successfully loaded schema version {0}".format(
                     schema_version))
-                return cass_ip
+                return cass[0]
             else:
                 time.sleep(5)
 
         print("Unable to connect to cassandra after 50 seconds")
         exit(1)
     else:
-        return s.inspect(cass[0])[0]['NetworkSettings']['IPAddress']
+        return s.inspect(cass[0])[0]
 
 
 
@@ -164,15 +164,14 @@ def build_all(sha="dev",
 
 
 @command
-def run_otter(cass_ip, command, dev=True, volumes=None):
+def run_otter(command, dev=True, volumes=None, env=None):
     """
     Starts up an otter container with the provided volumes, pointing to a
     particular cassandra host
     """
-    otter_env = format_docker_env({
-        'CASSANDRA_HOST': cass_ip,
-        'PYTHONPATH': ":".join(PYTHONPATHS)
-    })
+    otter_env = {'PYTHONPATH': ":".join(PYTHONPATHS)}
+    if env is not None:
+        otter_env.update(env)
 
     if dev:
         if volumes is None:
@@ -183,7 +182,7 @@ def run_otter(cass_ip, command, dev=True, volumes=None):
     container_id = s.run(
         image='otter:dev',
         command=command,
-        environment=otter_env,
+        environment=format_docker_env(otter_env),
         volumes=volumes
     )
 
@@ -211,10 +210,11 @@ def unit_tests(dev=True, log_dir="_docker_logs"):
     """
     Run unit tests, and copy the logs over if this is not the dev
     """
-    cass_ip = start_cassandra(dev)
-    container = run_otter(cass_ip, 'make unit')
+    cass = start_cassandra(dev)
+    container = run_otter('make unit', env={'CASSANDRA_HOST': cass.ip})
     subprocess.call(["docker", "attach", container.id])
     exit_code = s.wait(container)
+    # can't copy files over if dev, because otter is a shared volume
     if not dev and log_dir is not None:
         try:
             folder = make_logdir(log_dir, "unit_tests")
@@ -231,12 +231,28 @@ def unit_tests(dev=True, log_dir="_docker_logs"):
 
 
 @command
-def start(dev=True, run_tag=None, log_dir="/mnt/shared/docker_logs"):
-    volumes = None
-    if log_dir is not None:
-        volumes = ['{0}:/opt/logs'.format(log_dir)]
+def start(otter_id_password, dev=True, region="ORD", log_dir="_docker_logs",
+          otter_id_url='https://identity.api.rackspacecloud.com/v2.0',
+          otter_id_admin_url='https://identity.api.rackspacecloud.com/v2.0',
+          background=True):
+    cass = start_cassandra(dev)
 
-    run_otter('make run_otter', run_tag, volumes=volumes)
+    env = {
+        'DOCKER': '/tmp/config.json',
+        'OTTER_SEED_HOSTS': cass.ip,
+        'OTTER_INTERFACE': 'eth0',
+        'OTTER_REGION': region.strip().upper(),
+        'OTTER_ID_URL': otter_id_url,
+        'OTTER_ID_ADMIN_URL': otter_id_admin_url,
+        'OTTER_ID_PASSWORD': otter_id_password
+    }
+    # redirect to both stdout and a logfile which can be copied once the
+    # container is shut down
+    container = run_otter('make run_docker > >(tee /var/log/otter-api.log)',
+                          dev=dev, env=env)
+    if not background:
+        subprocess.call(["docker", "attach", container.id])
+    return container
 
 
 @command

@@ -20,10 +20,14 @@ test: unit integration
 run:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
-run_docker: rewrite_config run
+run_docker:
+	./scripts/rewrite_config.py
+	# re-write to a particular config file, which is specified in the
+	# environment variable "DOCKER".  Also, redirect to both stdout and a
+	# logfile that can be copied
+	twistd -n --logger=otter.log.observer_factory_debug otter-api -c ${DOCKER} | tee /var/log/otter-api.log
 
 rewrite_config:
-	./scripts/rewrite_config.py
 
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock

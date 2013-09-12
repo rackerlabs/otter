@@ -30,7 +30,7 @@ with open("config.json") as f:
 # These options can only be set up sensibly inside the docker container
 if environ.get('DOCKER'):
     seed_hosts = environ.get(
-        'OTTER_SEED_HOSTS', ['127.0.0.1']
+        'OTTER_SEED_HOSTS', '127.0.0.1'
     ).split(";")
     seed_hosts = ["tcp:%s:9160" % x for x in seed_hosts]
     config_json['cassandra']['seed_hosts'] = seed_hosts
@@ -55,6 +55,10 @@ if environ.get('DOCKER'):
         'OTTER_ID_ADMIN_URL',
         'https://staging.identity.api.rackspacecloud.com/v2.0'
     )
+
+    with open(environ.get('DOCKER'), 'w') as f:
+        f.write(json.dumps(config_json, sort_keys=True, indent=2))
+
 # These options should be set before the docker build
 else:
     if 'OTTER_ID_PASSWORD' in environ:
@@ -63,5 +67,5 @@ else:
         print("Must set OTTER_ID_PASSWORD environment variable")
         exit(1)
 
-with open("config.json", 'w') as f:
-    f.write(json.dumps(config_json, sort_keys=True, indent=2))
+    with open("config.json", 'w') as f:
+        f.write(json.dumps(config_json, sort_keys=True, indent=2))
