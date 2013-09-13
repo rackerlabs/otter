@@ -114,6 +114,12 @@ group_state = _openstackify_schema("group", {
             'type': 'boolean',
             'required': True
         },
+        'name': {
+            'type': 'string',
+            "maxLength": 256,
+            'uniqueItems': True,
+            'required': True
+        },
         'active': {
             'type': 'array',
             'items': _link_objects,
