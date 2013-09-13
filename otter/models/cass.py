@@ -1,6 +1,8 @@
 """
 Cassandra implementation of the store for the front-end scaling groups engine
 """
+import time
+
 from zope.interface import implementer
 
 from twisted.internet import defer
@@ -1034,7 +1036,7 @@ class CassAdmin(object):
                 metrics.append(dict(
                     id="otter.metrics.{0}".format(key),
                     value=value,
-                    time=timestamp.now()))
+                    time=int(time.time())))
             return metrics
 
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']

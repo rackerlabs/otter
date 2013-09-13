@@ -1,3 +1,11 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Fri, 26 Jul 2013 21:54:36 GMT
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.0)
+x-response-id: 17357fba-91cc-4c36-b72f-e2745a450908
+
 {
     "groups": [
         {

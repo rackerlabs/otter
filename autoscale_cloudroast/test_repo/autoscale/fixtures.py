@@ -237,6 +237,17 @@ class AutoscaleFixture(BaseTestFixture):
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
 
+    def get_server_count_for_group_from_server_metadata(self, group_id):
+        """
+        Given the group id, returns the count of servers with that group id in the
+        metadata of the servers on the tenant
+        """
+        list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
+        metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
+                         in list_servers_on_tenant]
+        group_ids_list_from_metadata = [each['rax:auto_scaling_group_id'] for each in metadata_list]
+        return group_ids_list_from_metadata.count(group_id)
+
     def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
                                                    interval_time=None, timeout=None):
         """
