@@ -162,7 +162,7 @@
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/listGroups.json"/>
+                    <xsdxt:code href="../docbkx/samples/resGetGroups.json"/>
                 </doc>
             </representation>
         </response>

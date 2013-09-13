@@ -1,6 +1,8 @@
 """
 System tests for launch config
 """
+from time import sleep
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.common.tools.datagen import rand_name
@@ -148,7 +150,31 @@ class LaunchConfigTest(AutoscaleFixture):
                 server.flavor.id, group.launchConfiguration.server.flavorRef)
             self.assertEquals(metadata['rax:auto_scaling_group_id'],
                               expected_metadata['rax:auto_scaling_group_id'])
-            self.assertTrue(group.launchConfiguration.server.name in server.name)
+            self.assertTrue(
+                group.launchConfiguration.server.name in server.name)
+
+    @tags(speed='quick')
+    def test_system_launchconfig_without_server_name(self):
+        """
+        Create a scaling group with a scaling policy, without server name in the launch config.
+        Ensure servers were created on the scaling_group.
+        """
+        group_response = self.autoscale_client.create_scaling_group(
+            gc_name='test',
+            gc_cooldown=self.gc_cooldown,
+            gc_min_entities=self.gc_min_entities_alt,
+            lc_image_ref=self.lc_image_ref,
+            lc_flavor_ref=self.lc_flavor_ref)
+        group = group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+        sleep(5)  # time for the create call to propogate from autoscale to nova
+        expected_servers = self.get_server_count_for_group_from_server_metadata(group.id)
+        self.assertEquals(expected_servers, self.gc_min_entities_alt,
+                          msg='Expecting {0} servers to have the been built, but only {1} have '
+                          'the group id in the metadata for group {2}'.format(self.gc_min_entities_alt,
+                                                                              expected_servers,
+                                                                              group.id))
 
     @tags(speed='quick')
     def test_system_update_launchconfig_while_group_building(self):
@@ -246,7 +272,8 @@ class LaunchConfigTest(AutoscaleFixture):
         servers_list_on_upd_group = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
-        self.assertEquals(set(servers_list_on_upd_group), set(servers_after_scale_up))
+        self.assertEquals(
+            set(servers_list_on_upd_group), set(servers_after_scale_up))
         self._verify_server_list_for_launch_config(
             servers_list_on_upd_group, self.upd_server_name, self.upd_image_ref,
             self.upd_flavor_ref)

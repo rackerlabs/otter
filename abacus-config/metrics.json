@@ -1,0 +1,13 @@
+[
+  {
+    "name": "Auto Scale",
+    "value":  "autoscale",
+    "template": "graphite.html",
+    "graphite": [
+      {
+        "name": "Combined Metrics",
+        "url": "https://graph0.prod.ord.as.rax.io/render?target=otter.metrics.*"
+      }
+    ]
+  }
+]
