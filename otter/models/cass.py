@@ -62,9 +62,9 @@ _cql_view_manifest = ('SELECT group_config, launch_config, active, '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
                       'VALUES (:tenantId, :groupId, {name}Id, {name})')
-_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, '
-                           '"groupTouched", "policyTouched", paused) VALUES(:tenantId, :groupId, '
-                           ':active, :pending, :groupTouched, :policyTouched, :paused)')
+_cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
+                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
+                           ':pending, :groupTouched, :policyTouched, :paused)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                          '"policyTouched", paused, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')

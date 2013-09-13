@@ -293,9 +293,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         Test that you can call view state and receive a valid parsed response
         """
-        self.config = json.dumps(self.config)
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
         self.returns = [cass_response]
@@ -328,7 +327,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         NoSuchScalingGroupError is returned and that row's deletion is triggered
         """
         cass_response = [
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
         self.returns = [cass_response, None]
@@ -349,9 +348,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         view_state returns a dictionary with a key paused equal to True for a
         paused group.
         """
-        self.config = json.dumps(self.config)
         cass_response = _cassandrify_data([
-            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': self.config,
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
 
@@ -427,7 +425,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         `modify_state` gets lock by retrying with different wait intervals each time
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, self.config, {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -1567,7 +1565,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.side_effect = acquire
 
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, self.config, {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, False))
 
         d = self.group.delete_group()
         result = self.failureResultOf(d)
