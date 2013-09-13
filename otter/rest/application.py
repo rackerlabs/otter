@@ -5,7 +5,6 @@ from twisted.web.server import Request
 
 from otter.rest.decorators import with_transaction_id
 from otter.rest.otterapp import OtterApp
-from otter.rest.configs import OtterLaunch
 from otter.rest.groups import OtterGroups
 from otter.rest.policies import OtterPolicies
 from otter.rest.webhooks import OtterExecute
@@ -30,14 +29,6 @@ class Otter(object):
         :returns: Empty string
         """
         return ''
-
-    @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch/')
-    @with_transaction_id()
-    def launch(self, request, log, tenant_id, group_id):
-        """
-        launch route handled by OtterLaunch
-        """
-        return OtterLaunch(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/', branch=True)
     @with_transaction_id()
