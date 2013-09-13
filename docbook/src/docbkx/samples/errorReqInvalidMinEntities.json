@@ -1,0 +1,16 @@
+PUT /v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/config HTTP/1.1
+Accept: application/json
+Accept-Encoding: gzip, deflate, compress
+Content-Length: 103
+Content-Type: application/json; charset=utf-8
+Host: dfw.autoscale.api.rackspacecloud.com
+User-Agent: HTTPie/0.6.0
+X-Auth-token: XXXXXXXXXXXXXXXX
+
+{
+    "cooldown": 60,
+    "maxEntities": 1,
+    "metadata": {},
+    "minEntities": 2,
+    "name": "myFirstAutoscalingGroup"
+}
