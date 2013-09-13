@@ -446,7 +446,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         `modify_state` locks with log with category as locking
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
