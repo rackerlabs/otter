@@ -210,6 +210,18 @@ def make_logdir(log_dir, prefix):
         os.makedirs(folder)
     return folder
 
+def copy_from_container(container, container_filepath, dst_folder):
+    try:
+        subprocess.call([
+            "docker", "cp",
+            "{0}:{1}".format(container.id, container_filepath),
+            dst_folder])
+    except:
+        import traceback
+        traceback.print_exc()
+        print("Unable to copy {0} from {1} to {2}".format(
+            container_filepath, container, dst_folder))
+
 
 @command
 def unit_tests(dev=True, log_dir="_docker_logs"):
@@ -222,16 +234,8 @@ def unit_tests(dev=True, log_dir="_docker_logs"):
     exit_code = s.wait(container)
     # can't copy files over if dev, because otter is a shared volume
     if not dev and log_dir is not None:
-        try:
-            folder = make_logdir(log_dir, "unit_tests")
-            subprocess.call([
-                "docker", "cp",
-                "{0}:/opt/otter/_trial_temp".format(container.id),
-                folder])
-        except:
-            import traceback
-            traceback.print_exc()
-            print("Unable to copy logs")
+        folder = make_logdir(log_dir, "unit_tests")
+        copy_from_container(container, '/opt/otter/_trial_temp', folder)
 
     exit(exit_code[0][1]['StatusCode'])
 
@@ -244,24 +248,38 @@ def start(dev=True, background=True):
     cass = start_cassandra(dev)
 
     env = {'HOSTS_TO_WRITE': "cassandra={0}".format(cass.ip)}
-    # redirect to both stdout and a logfile which can be copied once the
-    # container is shut down
-    container = run_otter('make run_docker > >(tee /var/log/otter-api.log)',
-                          dev=dev, env=env)
+    container = run_otter('make run_docker', dev=dev, env=env)
     if not background:
         subprocess.call(["docker", "attach", container.id])
     return container
 
 
 @command
-def run_cloudcafe(cloudcafe_args, otter_id_password, log_dir="_docker_logs",
-                  **kwargs):
+def run_cloudcafe(cloudcafe_args, dev=True, log_dir="_docker_logs"):
     """
     Runs the cloudcafe tests with the particular arguments.  The kwargs are
     all the kwargs that get passed to starting otter.
     """
-    otter = start(otter_id_password, **kwargs)
-    run_otter('make tests', run_tag, volumes=volumes)
+    otter = start(dev)
+    otter_ip = s.inspect(otter)[0]['NetworkSettings']['IPAddress']
+    env = {'HOSTS_TO_WRITE': "otter={0}".format(otter_ip)}
+    command = 'cafe-runner autoscale {0}'.format(cloudcafe_args)
+
+    cloudcafe = run_otter(command, dev=dev, env=env)
+    subprocess.call(["docker", "attach", cloudcafe.id])
+    exit_code = s.wait(cloudcafe)
+
+    if log_dir is not None:
+        folder = make_logdir(log_dir, "cloudcafe_tests")
+        with open(os.path.join(folder, 'command.txt'), 'wb') as f:
+            f.write(command)
+        copy_from_container(cloudcafe, "/root/.cloudcafe/logs/autoscale", folder)
+        os.rename(os.path.join(folder, "autoscale"),
+                  os.path.join(folder, "cloudcafe_logs"))
+        copy_from_container(otter, '/var/log/otter-api.log', folder)
+
+    s.stop(otter)
+    exit(exit_code[0][1]['StatusCode'])
 
 
 @command
