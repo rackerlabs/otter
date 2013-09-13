@@ -367,7 +367,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, self.config, {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
