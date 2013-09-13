@@ -9,8 +9,9 @@ from otter import controller
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.rest.configs import OtterConfig
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   log_arguments)
+                                   log_arguments, with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
@@ -551,3 +552,11 @@ class OtterGroups(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
+
+    @app.route('/<string:group_id>/config/')
+    @with_transaction_id()
+    def config(self, request, log, group_id):
+        """
+        config route handled by OtterConfig
+        """
+        return OtterConfig(self.store, log, self.tenant_id, group_id).app.resource()
