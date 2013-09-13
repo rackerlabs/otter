@@ -15,7 +15,7 @@ class GetMaasScalingPolicy(ScalingGroupFixture):
         Create a monitoring scaling policy
         """
         super(GetMaasScalingPolicy, self).setUp()
-        self.policy = self.autoscale_behaviors.create_get_maas_policy.iven(
+        self.policy = self.autoscale_behaviors.create_monitoring_policy_given(
             group_id=self.group.id)
 
     def test_get_monitoring_policy(self):
