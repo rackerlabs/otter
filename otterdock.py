@@ -36,9 +36,11 @@ RUN pip install {devreqs}
 {otter}
 WORKDIR /opt/otter
 
-# Expose the otter port and set a default command
+# Expose the otter port
+
+#Add the configuration directory
 EXPOSE 9000
-CMD ["make", "run_docker"]
+{config}
 """
 
 PYTHONPATHS = [
@@ -51,7 +53,7 @@ PYTHONPATHS = [
 s = Shipper()
 
 
-def get_dockerfile(dev=True, pip_mirror=None):
+def get_dockerfile(dev=True, config_dir='/opt/configs', pip_mirror=None):
     """
     Formats base Dockerfile string with values, and returns a file handle
     whose contents are the formatted Dockerfile.
@@ -64,8 +66,10 @@ def get_dockerfile(dev=True, pip_mirror=None):
 
     if dev:
         kwargs['otter'] = 'VOLUME ["/opt/otter"]'
+        kwargs['config'] = 'VOLUME ["/opt/configs"]'
     else:
         kwargs['otter'] = 'ADD . /opt/otter'
+        kwargs['config'] = 'ADD . {0}'.format(config_dir)
 
     if pip_mirror is not None:
         kwargs['pip_mirror'] = (
@@ -175,9 +179,11 @@ def run_otter(command, dev=True, volumes=None, env=None):
 
     if dev:
         if volumes is None:
-            volumes = ['/mnt/shared/otter:/opt/otter']
+            volumes = ['/mnt/shared/otter:/opt/otter',
+                       '/opt/configs:/opt/configs']
         else:
             volumes.append('/mnt/shared/otter:/opt/otter')
+            volumes.append['/opt/configs:/opt/configs']
 
     container_id = s.run(
         image='otter:dev',
@@ -231,21 +237,13 @@ def unit_tests(dev=True, log_dir="_docker_logs"):
 
 
 @command
-def start(otter_id_password, dev=True, region="ORD", log_dir="_docker_logs",
-          otter_id_url='https://identity.api.rackspacecloud.com/v2.0',
-          otter_id_admin_url='https://identity.api.rackspacecloud.com/v2.0',
-          background=True):
+def start(dev=True, background=True):
+    """
+    Start the otter-api
+    """
     cass = start_cassandra(dev)
 
-    env = {
-        'DOCKER': '/tmp/config.json',
-        'OTTER_SEED_HOSTS': cass.ip,
-        'OTTER_INTERFACE': 'eth0',
-        'OTTER_REGION': region.strip().upper(),
-        'OTTER_ID_URL': otter_id_url,
-        'OTTER_ID_ADMIN_URL': otter_id_admin_url,
-        'OTTER_ID_PASSWORD': otter_id_password
-    }
+    env = {'HOSTS_TO_WRITE': "cassandra={0}".format(cass.ip)}
     # redirect to both stdout and a logfile which can be copied once the
     # container is shut down
     container = run_otter('make run_docker > >(tee /var/log/otter-api.log)',
@@ -256,11 +254,13 @@ def start(otter_id_password, dev=True, region="ORD", log_dir="_docker_logs",
 
 
 @command
-def run_tests(dev=True, run_tag="dev", log_dir="/mnt/shared/docker_logs"):
-    volumes = None
-    if log_dir is not None:
-        volumes = ['{0}:/opt/logs'.format(log_dir)]
-
+def run_cloudcafe(cloudcafe_args, otter_id_password, log_dir="_docker_logs",
+                  **kwargs):
+    """
+    Runs the cloudcafe tests with the particular arguments.  The kwargs are
+    all the kwargs that get passed to starting otter.
+    """
+    otter = start(otter_id_password, **kwargs)
     run_otter('make tests', run_tag, volumes=volumes)
 
 
