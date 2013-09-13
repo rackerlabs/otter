@@ -47,7 +47,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             response_entity_type=Limits)
 
     def create_scaling_group(self, gc_name, gc_cooldown, gc_min_entities,
-                             lc_name, lc_image_ref=None, lc_flavor_ref=None,
+                             lc_image_ref, lc_flavor_ref, lc_name=None,
                              gc_max_entities=None, gc_metadata=None,
                              lc_personality=None, lc_metadata=None,
                              lc_disk_config=None, lc_networks=None,
