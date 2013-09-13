@@ -1025,27 +1025,29 @@ class CassAdmin(object):
         """
         see :meth:`otter.models.interface.IAdmin.get_metrics`
         """
-        def _format_data(results):
+        def _get_metric(field, label):
             """
-            :param results: Results from running the collect_metrics call.
+            Execute a CQL statement and return a formatted result
+            """
+            def _format_result(result, label):
+                """
+                :param result: Result from metric collection
+                :param label: Label for the metric
 
-            :return: Correctly formatted data to be jsonified.
-            """
-            metrics = []
-            for key, value in results.iteritems():
-                metrics.append(dict(
-                    id="otter.metrics.{0}".format(key),
-                    value=value,
-                    time=int(time.time())))
-            return metrics
+                :return: dict of metric label, value and time
+                """
+                return dict(
+                    id="otter.metrics.{0}".format(label),
+                    value=result[0]['count'],
+                    time=int(time.time()))
+
+            dc = self.connection.execute(_cql_count_all.format(cf=field), {},
+                                         get_consistency_level('count', 'group'))
+            dc.addCallback(_format_result, label)
+            return dc
 
         fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
-        deferred = [self.connection.execute(_cql_count_all.format(cf=field), {},
-                                            get_consistency_level('count', 'group'))
-                    for field in fields]
+        labels = ['groups', 'policies', 'webhooks']
 
-        d = defer.gatherResults(deferred)
-        d.addCallback(lambda results: dict(zip(
-            ('groups', 'policies', 'webhooks'), [r[0]['count'] for r in results])))
-        d.addCallback(_format_data)
-        return d
+        deferreds = [_get_metric(k, v) for k, v in zip(fields, labels)]
+        return defer.gatherResults(deferreds)
