@@ -6,7 +6,6 @@ from twisted.web.server import Request
 from otter.rest.decorators import with_transaction_id
 from otter.rest.otterapp import OtterApp
 from otter.rest.groups import OtterGroups
-from otter.rest.policies import OtterPolicies
 from otter.rest.webhooks import OtterExecute
 
 Request.defaultContentType = 'application/json'
@@ -29,14 +28,6 @@ class Otter(object):
         :returns: Empty string
         """
         return ''
-
-    @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/policies/', branch=True)
-    @with_transaction_id()
-    def policies(self, request, log, tenant_id, group_id):
-        """
-        policies routes handled by OtterPolicies
-        """
-        return OtterPolicies(self.store, log, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/', branch=True)
     @with_transaction_id()

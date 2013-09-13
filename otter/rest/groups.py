@@ -13,7 +13,7 @@ from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    log_arguments, with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.policies import policy_dict_to_list
+from otter.rest.policies import OtterPolicies, policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -568,3 +568,11 @@ class OtterGroups(object):
         launch route handled by OtterLaunch
         """
         return OtterLaunch(self.store, log, self.tenant_id, group_id).app.resource()
+
+    @app.route('/<string:group_id>/policies/', branch=True)
+    @with_transaction_id()
+    def policies(self, request, log, group_id):
+        """
+        policies routes handled by OtterPolicies
+        """
+        return OtterPolicies(self.store, log, self.tenant_id, group_id).app.resource()
