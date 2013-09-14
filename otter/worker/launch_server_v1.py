@@ -31,7 +31,6 @@ from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (repeating_interval, transient_errors_except,
                               TransientRetryError)
-from otter.rest.bobby import get_bobby
 
 
 class UnexpectedServerStatus(Exception):
@@ -384,6 +383,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
 
         d = client.create_server(scaling_group.tenant_id, scaling_group.uuid, server["server"]["id"])
         return d.addCallback(lambda _: result)
+
+    from otter.rest.bobby import get_bobby
 
     bobby = get_bobby()
     if bobby is not None:
