@@ -9,10 +9,13 @@ policy.
 from functools import partial
 import json
 
+from otter.log import log
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
-from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   log_arguments)
+from otter.rest.decorators import (validate_body, fails_with,
+                                   succeeds_with, log_arguments,
+                                   log_non_data_arguments,
+                                   with_own_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -49,14 +52,18 @@ class OtterWebhooks(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id, policy_id):
+    def __init__(self, store, tenant_id, group_id, policy_id):
+        self.log = log.bind(system='otter.rest.webhooks',
+                            tenant_id=tenant_id,
+                            group_id=group_id,
+                            policy_id=policy_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
 
     @app.route('/', methods=['GET'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_webhooks(self, request):
@@ -126,6 +133,7 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/', methods=['POST'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_webhooks_request)
@@ -213,9 +221,10 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['GET'])
+    @with_own_transaction_id()
+    @log_non_data_arguments()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
     def get_webhook(self, request, webhook_id):
         """
         Get a webhook which has a name, some arbitrary metdata, and a capability
@@ -254,10 +263,11 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['PUT'])
+    @with_own_transaction_id()
+    @log_non_data_arguments()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
-    @log_arguments
     def update_webhook(self, request, webhook_id, data):
         """
         Update a particular webhook.
@@ -279,6 +289,8 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/<string:webhook_id>/', methods=['DELETE'])
+    @with_own_transaction_id()
+    @log_non_data_arguments()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments
