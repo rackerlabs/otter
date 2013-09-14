@@ -367,7 +367,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -425,7 +425,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         `modify_state` gets lock by retrying with different wait intervals each time
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -446,7 +446,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         `modify_state` locks with log with category as locking
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
         self.returns = [None, None]
@@ -1584,7 +1584,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.lock.acquire.side_effect = acquire
 
         mock_view_state.return_value = defer.succeed(GroupState(
-            self.tenant_id, self.group_id, '{"name": "a"}', {}, {}, None, {}, False))
+            self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False))
 
         d = self.group.delete_group()
         result = self.failureResultOf(d)
