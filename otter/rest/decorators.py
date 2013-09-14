@@ -123,6 +123,47 @@ def log_arguments(f):
     return _
 
 
+def log_non_data_arguments():
+    """
+    Binds all arguments that are not 'self' or 'request' to self.log,
+    and ignores all POST data.
+    """
+    def wrapper(f):
+        @wraps(f)
+        def _(self, request, *args, **kwargs):
+            no_data = kwargs.copy()
+            if no_data.get('data'):
+                del no_data['data']
+            self.log = self.log.bind(**no_data)
+            return f(self, request, *args, **kwargs)
+        return _
+    return wrapper
+
+
+def with_own_transaction_id():
+    """
+    Adds a transaction id to the request, and update application log.
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(self, request, *args, **kwargs):
+            transaction_id = generate_transaction_id()
+            request.setHeader('X-Response-Id', transaction_id)
+            self.log = self.log.bind(
+                system=reflect.fullyQualifiedName(f),
+                transaction_id=transaction_id)
+            self.log.bind(
+                method=request.method,
+                uri=request.uri,
+                clientproto=request.clientproto,
+                referer=request.getHeader("referer"),
+                useragent=request.getHeader("user-agent")
+            ).msg("Received request")
+            return f(self, request, *args, **kwargs)
+        return _
+    return decorator
+
+
 def with_transaction_id():
     """
     Generates a request txnid
