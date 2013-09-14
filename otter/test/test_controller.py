@@ -1246,7 +1246,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.assertEqual(written[0], s)
 
         self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind().err.assert_called_once_with(f)
+        self.log.bind().msg.assert_called_with('Job failed', reason=f)
 
     def test_modify_state_failure_logged(self):
         """
@@ -1410,14 +1410,14 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+        self.log.bind.return_value.msg.assert_called_once_with(
+            'Job failed', reason=CheckFailure(DummyException))
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
         If the job failed, but the job ID is no longer in pending, the job id
         is not removed (and hence no error occurs).  The only error logged is
-        the failure.  Nothing else in the state changes.
+        the failure. Nothing else in the state changes.
         """
         self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
@@ -1430,8 +1430,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+        self.log.bind.return_value.msg.assert_called_with(
+            'Job failed', reason=CheckFailure(DummyException))
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
