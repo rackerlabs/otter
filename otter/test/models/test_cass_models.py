@@ -2156,7 +2156,7 @@ class CassAdminTestCase(TestCase):
                 'time': 1234567890
             }
         ]
-        config_query = ('SELECT COUNT(*) FROM scaling_config;')
+        config_query = ('SELECT COUNT(*) FROM scaling_group;')
         policy_query = ('SELECT COUNT(*) FROM scaling_policies;')
         webhook_query = ('SELECT COUNT(*) FROM policy_webhooks;')
 

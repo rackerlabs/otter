@@ -1046,7 +1046,7 @@ class CassAdmin(object):
             dc.addCallback(_format_result, label)
             return dc
 
-        tables = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        tables = ['scaling_group', 'scaling_policies', 'policy_webhooks']
         labels = ['groups', 'policies', 'webhooks']
         mapping = zip(tables, labels)
 
