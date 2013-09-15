@@ -1025,7 +1025,7 @@ class CassAdmin(object):
         """
         see :meth:`otter.models.interface.IAdmin.get_metrics`
         """
-        def _get_metric(field, label):
+        def _get_metric(table, label):
             """
             Execute a CQL statement and return a formatted result
             """
@@ -1041,13 +1041,14 @@ class CassAdmin(object):
                     value=result[0]['count'],
                     time=int(time.time()))
 
-            dc = self.connection.execute(_cql_count_all.format(cf=field), {},
+            dc = self.connection.execute(_cql_count_all.format(cf=table), {},
                                          get_consistency_level('count', 'group'))
             dc.addCallback(_format_result, label)
             return dc
 
-        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
+        tables = ['scaling_config', 'scaling_policies', 'policy_webhooks']
         labels = ['groups', 'policies', 'webhooks']
+        mapping = zip(tables, labels)
 
-        deferreds = [_get_metric(k, v) for k, v in zip(fields, labels)]
+        deferreds = [_get_metric(table, label) for table, label in mapping]
         return defer.gatherResults(deferreds)
