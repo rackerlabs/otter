@@ -1051,4 +1051,4 @@ class CassAdmin(object):
         mapping = zip(tables, labels)
 
         deferreds = [_get_metric(table, label) for table, label in mapping]
-        return defer.gatherResults(deferreds)
+        return defer.gatherResults(deferreds, consumeErrors=True)
