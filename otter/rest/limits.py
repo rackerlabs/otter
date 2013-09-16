@@ -26,6 +26,9 @@ class OtterLimits(object):
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_limits(self, request):
+        """
+        returns application limits
+        """
         data = {
             "limits": {
                 "absolute": {
@@ -51,4 +54,3 @@ class OtterLimits(object):
             return etree.tostring(xml, encoding="UTF-8", xml_declaration=True)
 
         return json.dumps(data)
-

@@ -11,6 +11,7 @@ from otter.test.rest.request import RestAPITestMixin, request
 from otter.test.utils import iMock
 from otter.models.interface import IScalingGroupCollection
 
+
 class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/limits``
@@ -21,6 +22,10 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     invalid_methods = ("DELETE", "PUT", "POST")
 
     def test_list_limits_json(self):
+        """
+        the api returns a json blob containing the absolute
+        limits in the correct format
+        """
         data = {
             "limits": {
                 "absolute": {
@@ -34,9 +39,19 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(body)
         self.assertEqual(resp, data)
 
-
     def test_list_limits_xml(self):
-        data = '''<?xml version='1.0' encoding='UTF-8'?>\n<limits xmlns="http://docs.openstack.org/common/api/v1.0"><absolute><limit name="maxGroups" value="1000"/><limit name="maxPoliciesPerGroup" value="1000"/><limit name="maxWebhooksPerPolicy" value="1000"/></absolute></limits>'''
+        """
+        the api returns a xml blob containing the absolute
+        limits in the correct format, if the "Accept" header
+        specifies xml
+        """
+        data = ("<?xml version='1.0' encoding='UTF-8'?>\n"
+                '<limits xmlns="http://docs.openstack.org/common/api/v1.0">'
+                '<absolute>'
+                '<limit name="maxGroups" value="1000"/>'
+                '<limit name="maxPoliciesPerGroup" value="1000"/>'
+                '<limit name="maxWebhooksPerPolicy" value="1000"/>'
+                '</absolute></limits>')
 
         root = Otter(iMock(IScalingGroupCollection)).app.resource()
         headers = {"Accept": ["application/xml"]}
