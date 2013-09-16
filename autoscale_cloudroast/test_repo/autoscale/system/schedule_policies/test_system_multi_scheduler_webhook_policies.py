@@ -76,7 +76,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
 
-    @tags(speed='test')
+    @tags(speed='quick')
     def test_system_all_types_webhook_and_scheduler_policies(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
@@ -99,7 +99,7 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
 
-    @tags(speed='test')
+    @tags(speed='quick')
     def test_system_all_types_webhook_and_scheduler_policies_negative(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
