@@ -383,10 +383,12 @@ class ScalingGroupFixture(AutoscaleFixture):
             lc_image_ref = cls.lc_image_ref
         cls.create_group_response = cls.autoscale_client.\
             create_scaling_group(
-                gc_name, gc_cooldown,
-                gc_min_entities,
-                lc_name, lc_image_ref,
-                lc_flavor_ref,
+                gc_name=gc_name,
+                gc_cooldown=gc_cooldown,
+                gc_min_entities=gc_min_entities,
+                lc_name=lc_name,
+                lc_image_ref=lc_image_ref,
+                lc_flavor_ref=lc_flavor_ref,
                 gc_max_entities=gc_max_entities,
                 gc_metadata=gc_metadata,
                 lc_personality=lc_personality,
