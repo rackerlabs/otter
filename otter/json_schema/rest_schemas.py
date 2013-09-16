@@ -176,7 +176,7 @@ list_policies_response = _openstackify_schema("policies", _view_policies_list,
 
 create_policies_request = {
     "type": "array",
-    "items": [policy]
+    "items": policy
 }
 
 create_policies_response = _openstackify_schema("policies", _view_policies_list)
