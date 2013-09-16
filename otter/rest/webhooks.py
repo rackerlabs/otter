@@ -14,7 +14,7 @@ from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with,
                                    succeeds_with, log_arguments,
-                                   log_non_data_arguments,
+                                   log_ignore_arguments,
                                    with_own_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
@@ -222,7 +222,7 @@ class OtterWebhooks(object):
 
     @app.route('/<string:webhook_id>/', methods=['GET'])
     @with_own_transaction_id()
-    @log_non_data_arguments()
+    @log_arguments
     @fails_with(exception_codes)
     @succeeds_with(200)
     def get_webhook(self, request, webhook_id):
@@ -264,7 +264,7 @@ class OtterWebhooks(object):
 
     @app.route('/<string:webhook_id>/', methods=['PUT'])
     @with_own_transaction_id()
-    @log_non_data_arguments()
+    @log_ignore_arguments('data')
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
@@ -290,7 +290,6 @@ class OtterWebhooks(object):
 
     @app.route('/<string:webhook_id>/', methods=['DELETE'])
     @with_own_transaction_id()
-    @log_non_data_arguments()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments

@@ -14,7 +14,7 @@ from twisted.python.failure import Failure
 
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
-    with_transaction_id, log_arguments)
+    with_transaction_id, log_arguments, log_ignore_arguments)
 from otter.test.utils import patch
 
 
@@ -468,3 +468,28 @@ class LogArgumentsTestCase(TestCase):
         self.successResultOf(d)
 
         self.mockLog.bind.assert_called_once_with(**kwargs)
+
+    def test_items_ignored(self):
+        """
+        Arguments to the decorator will be ignored and not bound to the
+        log.
+        """
+        class FakeApp(object):
+            log = self.mockLog
+
+            @log_ignore_arguments('ignored', 'truth')
+            def doWork(self, request, **kwargs):
+                return defer.succeed('')
+
+        kwargs = {'truth': 42,
+                  'list': [1, 2, 3],
+                  'dict': {'one': 1, 'two': 2},
+                  'ignored': 'too-much-data'}
+
+        d = FakeApp().doWork(self.mockRequest, **kwargs)
+        self.successResultOf(d)
+
+        ignored_kwargs = kwargs.copy()
+        del ignored_kwargs['ignored']
+        del ignored_kwargs['truth']
+        self.mockLog.bind.assert_called_once_with(**ignored_kwargs)

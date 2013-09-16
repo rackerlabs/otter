@@ -123,18 +123,20 @@ def log_arguments(f):
     return _
 
 
-def log_non_data_arguments():
+def log_ignore_arguments(*ignore):
     """
-    Binds all arguments that are not 'self' or 'request' to self.log,
-    and ignores all POST data.
+    Binds all arguments that are not 'self' or 'request' to self.log
+
+    :param ignore: parameters to be ignored when logging
     """
     def wrapper(f):
         @wraps(f)
         def _(self, request, *args, **kwargs):
-            no_data = kwargs.copy()
-            if no_data.get('data'):
-                del no_data['data']
-            self.log = self.log.bind(**no_data)
+            revised_kwargs = kwargs
+            if ignore:
+                revised_kwargs = {key: kwargs[key]
+                        for key in kwargs if key not in ignore}
+            self.log = self.log.bind(**revised_kwargs)
             return f(self, request, *args, **kwargs)
         return _
     return wrapper
