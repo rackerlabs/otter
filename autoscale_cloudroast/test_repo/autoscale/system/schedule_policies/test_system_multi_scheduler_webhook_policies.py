@@ -76,34 +76,30 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         self.verify_group_state(group1.id, 3 * self.change)
         self.verify_group_state(group2.id, 3 * self.change)
 
-    @tags(speed='quick')
+    @tags(speed='test')
     def test_system_all_types_webhook_and_scheduler_policies(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
         is successful.
         """
-        wb_policy_cp = {i: self.wb_policy[i] for i in self.wb_policy if i != 'change'}
+        wb_policy_cp = self._unchanged_policy(self.wb_policy)
         wb_policy_cp['changePercent'] = 100
-        wb_policy_dc = {i: self.wb_policy[i] for i in self.wb_policy if i != 'change'}
+        wb_policy_dc = self._unchanged_policy(self.wb_policy)
         wb_policy_dc['desiredCapacity'] = 1
-        at_style_policy_cp = {i: self.at_style_policy[i] for i in self.at_style_policy
-                              if i != 'change'}
+        at_style_policy_cp = self._unchanged_policy(self.at_style_policy)
         at_style_policy_cp['changePercent'] = 100
-        at_style_policy_dc = {i: self.at_style_policy[i] for i in self.at_style_policy
-                              if i != 'change'}
+        at_style_policy_dc = self._unchanged_policy(self.at_style_policy)
         at_style_policy_dc['desiredCapacity'] = 1
-        cron_style_policy_cp = {i: self.cron_style_policy[i] for i in self.cron_style_policy
-                                if i != 'change'}
+        cron_style_policy_cp = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_cp['changePercent'] = 100
-        cron_style_policy_dc = {i: self.cron_style_policy[i] for i in self.cron_style_policy
-                                if i != 'change'}
+        cron_style_policy_dc = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_dc['desiredCapacity'] = 1
         self._create_multi_policy_group(
             1, 201, self.wb_policy, self.at_style_policy, self.cron_style_policy,
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
 
-    @tags(speed='quick')
+    @tags(speed='test')
     def test_system_all_types_webhook_and_scheduler_policies_negative(self):
         """
         Creating a group with scheduler and webhook policies for all types of changes
@@ -111,27 +107,26 @@ class MultipleSchedulerWebhookPoliciesTest(AutoscaleFixture):
         400 is returned.
         """
         invalid_item = 0.0001
-        wb_policy_cp = {i: self.wb_policy[i] for i in self.wb_policy if i != 'change'}
+        wb_policy_cp = self._unchanged_policy(self.wb_policy)
         wb_policy_cp['changePercent'] = invalid_item
-        wb_policy_dc = {i: self.wb_policy[i] for i in self.wb_policy if i != 'change'}
+        wb_policy_dc = self._unchanged_policy(self.wb_policy)
         wb_policy_dc['desiredCapacity'] = invalid_item
-        at_style_policy_cp = {i: self.at_style_policy[i] for i in self.at_style_policy
-                              if i != 'change'}
+        at_style_policy_cp = self._unchanged_policy(self.at_style_policy)
         at_style_policy_cp['changePercent'] = invalid_item
-        at_style_policy_dc = {i: self.at_style_policy[i] for i in self.at_style_policy
-                              if i != 'change'}
+        at_style_policy_dc = self._unchanged_policy(self.at_style_policy)
         at_style_policy_dc['desiredCapacity'] = invalid_item
         at_style_policy_dc['args']['at'] = '2013-12-05T03:12Z'
-        cron_style_policy_cp = {i: self.cron_style_policy[i] for i in self.cron_style_policy
-                                if i != 'change'}
+        cron_style_policy_cp = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_cp['changePercent'] = invalid_item
-        cron_style_policy_dc = {i: self.cron_style_policy[i] for i in self.cron_style_policy
-                                if i != 'change'}
+        cron_style_policy_dc = self._unchanged_policy(self.cron_style_policy)
         cron_style_policy_dc['desiredCapacity'] = invalid_item
         self._create_multi_policy_group(
             1, 400, self.wb_policy, self.at_style_policy, self.cron_style_policy,
             wb_policy_cp, at_style_policy_cp, cron_style_policy_cp,
             wb_policy_dc, at_style_policy_dc, cron_style_policy_dc)
+
+    def _unchanged_policy(self, policy_list):
+        return {i: policy_list[i] for i in policy_list if i != 'change'}
 
     def _create_multi_policy_group(self, multi_num, response, *args):
         """
