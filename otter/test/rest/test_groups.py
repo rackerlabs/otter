@@ -60,7 +60,7 @@ class FormatterHelpers(TestCase):
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
         translated = format_state_dict(
-            GroupState('11111', 'one', active, pending, None, {}, True))
+            GroupState('11111', 'one', 'test', active, pending, None, {}, True))
 
         # sort so it can be compared
         translated['active'].sort(key=lambda x: x['id'])
@@ -71,6 +71,7 @@ class FormatterHelpers(TestCase):
                 {'id': '2', 'links': ['links2']},
                 {'id': '3', 'links': ['links3']}
             ],
+            'name': 'test',
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
@@ -140,8 +141,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         list of states that are all formatted
         """
         states = [
-            GroupState('11111', '2', {}, {}, None, {}, False),
-            GroupState('11111', '2', {}, {}, None, {}, False)
+            GroupState('11111', '2', '', {}, {}, None, {}, False),
+            GroupState('11111', '2', '', {}, {}, None, {}, False)
         ]
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(states)
@@ -161,7 +162,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         so long as format returns the right value
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', '1', {}, {1: {}}, None, {}, False)]
+            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False)]
         )
 
         body = self.assert_status_code(200)
@@ -170,6 +171,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {
             "groups": [{
                 'active': [],
+                'name': '',
                 'activeCapacity': 0,
                 'pendingCapacity': 1,
                 'desiredCapacity': 1,
