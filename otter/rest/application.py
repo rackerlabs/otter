@@ -9,6 +9,7 @@ from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.groups import OtterGroups
 from otter.rest.policies import OtterPolicies
 from otter.rest.webhooks import OtterExecute, OtterWebhooks
+from otter.rest.limits import OtterLimits
 
 Request.defaultContentType = 'application/json'
 
@@ -80,3 +81,11 @@ class Otter(object):
         """
         return OtterExecute(self.store, log, capability_version,
                             capability_hash).app.resource()
+
+    @app.route('/v1.0/<string:tenant_id>/limits')
+    @with_transaction_id()
+    def limits(self, request, log, tenant_id):
+        """
+        return group limit maximums
+        """
+        return OtterLimits(self.store, log, tenant_id).app.resource()
