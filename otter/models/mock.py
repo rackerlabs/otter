@@ -13,7 +13,8 @@ from twisted.internet import defer
 from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
-    UnrecognizedCapabilityError, IScalingScheduleCollection)
+    UnrecognizedCapabilityError, IScalingScheduleCollection,
+    IAdmin)
 from otter.util.hashkey import generate_capability
 
 
@@ -97,7 +98,7 @@ class MockScalingGroup:
         self.tenant_id = tenant_id
         self.uuid = uuid
 
-        self.state = GroupState(self.tenant_id, self.uuid, {}, {}, None, {}, False)
+        self.state = GroupState(self.tenant_id, self.uuid, "", {}, {}, None, {}, False)
 
         self._collection = collection
 
@@ -453,3 +454,16 @@ class MockScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_counts`
         """
         return defer.succeed(None)
+
+
+@implementer(IAdmin)
+class MockAdmin(object):
+    """
+    .. autointerface:: otter.models.interface.IAdmin
+    """
+
+    def get_metrics(self, log):
+        """
+        see :meth:`otter.models.cass.CassAdmin.get_metrics`
+        """
+        return defer.succeed({})

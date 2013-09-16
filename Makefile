@@ -1,6 +1,7 @@
 CODEDIR=otter
 TESTDIR1=autoscale_cloudroast/test_repo
 TESTDIR2=autoscale_cloudcafe/autoscale
+TESTDIR3=autoscale_cloudcafe/bobby
 SCRIPTSDIR=scripts
 PYTHONLINT=${SCRIPTSDIR}/python-lint.py
 PYDIRS=${CODEDIR} ${SCRIPTSDIR} autoscale_cloudcafe autoscale_cloudroast
@@ -60,6 +61,7 @@ docs: cleandocs
 	sphinx-apidoc -F -T -o _builddoc ${CODEDIR}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR2}
 	sphinx-apidoc -F -T -o _builddoc ${TESTDIR1}
+	sphinx-apidoc -F -T -o _builddoc ${TESTDIR3}
 	sphinx-build -b html _builddoc htmldoc
 	rm -rf _builddoc
 

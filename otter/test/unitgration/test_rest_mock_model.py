@@ -83,7 +83,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
 
         def _mock_obey_config_change(log, trans, config, group, state):
             return defer.succeed(GroupState(
-                state.tenant_id, state.group_id, *self.active_pending_etc))
+                state.tenant_id, state.group_id, state.group_name, *self.active_pending_etc))
 
         self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
 
@@ -232,6 +232,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
             store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
         self.group_id = manifest['id']
+        self.group_name = 'name'
 
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
             tenant=self.tenant_id, group=self.group_id)
@@ -239,7 +240,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         controller_patcher = mock.patch('otter.rest.policies.controller')
         self.mock_controller = controller_patcher.start()
         self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
-            GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
+            GroupState(self.tenant_id, self.group_id, self.group_name, {}, {}, 'date', {}, False))
         self.addCleanup(controller_patcher.stop)
 
         self.root = Otter(store).app.resource()

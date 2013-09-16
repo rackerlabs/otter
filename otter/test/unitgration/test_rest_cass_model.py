@@ -97,7 +97,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
 
         self.config = config()[0]
         self.config['minEntities'] = 0
-        self.active_pending_etc = ({}, {}, 'date', {}, False)
+        self.active_pending_etc = (self.config['name'], {}, {}, 'date', {}, False)
 
         # patch both the config and the groups
         self.mock_controller = patch(self, 'otter.rest.configs.controller',
@@ -272,7 +272,8 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         self.config['minEntities'] = 2
         self.config['maxEntities'] = 25
         self.config['metadata'] = {}
-        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
+        self.config['name'] = 'next_name'
+        self.active_pending_etc = (self.config['name'], {}, {'1': {}, '2': {}}, 'date', {}, False)
 
         wrapper = yield request(self.root, 'PUT', config_path,
                                 body=json.dumps(self.config))
@@ -287,7 +288,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Create a scaling group with >0 min entities calls obey config changes
         """
         self.config['minEntities'] = 2
-        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
+        self.active_pending_etc = (self.config['name'], {}, {'1': {}, '2': {}}, 'date', {}, False)
 
         path = yield self.create_scaling_group()
         yield self.assert_state(path, 2, False)
@@ -326,7 +327,8 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
             self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
-                GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
+                GroupState(self.tenant_id, self.group_id,
+                           self._config['name'], {}, {}, 'date', {}, False))
 
         mock_log = mock.MagicMock()
         d = store.create_scaling_group(mock_log, self.tenant_id,
@@ -392,7 +394,6 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
                      for link in pol["links"] if link["rel"] == "self"
                      for pol in response["policies"]]
             return links
-
         d = request(self.root, 'POST', self.policies_url,
                     body=json.dumps(request_body))
         return d.addCallback(_verify_create_response)

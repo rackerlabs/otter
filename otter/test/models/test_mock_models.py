@@ -7,7 +7,8 @@ from twisted.trial.unittest import TestCase
 
 from otter.json_schema import group_examples
 from otter.models.mock import (
-    generate_entity_links, MockScalingGroup, MockScalingGroupCollection)
+    generate_entity_links, MockScalingGroup, MockScalingGroupCollection,
+    MockAdmin)
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
@@ -136,7 +137,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``view_state`` a group state with empty info
         """
         result = self.successResultOf(self.group.view_state())
-        self.assertEqual(result, GroupState(self.tenant_id, '1', {}, {},
+        self.assertEqual(result, GroupState(self.tenant_id, '1', '', {}, {},
                                             None, {}, False))
 
     def test_modify_state(self):
@@ -144,7 +145,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``modify_state`` saves the new state returned by the function if the
         tenant ids and group ids match
         """
-        new_state = GroupState(self.tenant_id, self.group_id, {1: {}}, {},
+        new_state = GroupState(self.tenant_id, self.group_id, 'aname', {1: {}}, {},
                                'date', {}, True)
 
         def modifier(group, state):
@@ -159,7 +160,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         the tenant IDs do not match
         """
         def modifier(group, state):
-            return GroupState('tid', self.group_id, {}, {}, 'date', {}, True)
+            return GroupState('tid', self.group_id, 'aname', {}, {}, 'date', {}, True)
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)
@@ -171,7 +172,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         the tenant IDs do not match
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, 'meh', {}, {}, 'date', {}, True)
+            return GroupState(self.tenant_id, 'meh', 'aname', {}, {}, 'date', {}, True)
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)
@@ -806,7 +807,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.view_launch_config(),
             group.view_state(),
             group.update_config({
-                'name': '1',
+                'name': 'aname',
                 'minEntities': 0,
                 'cooldown': 0,
                 'maxEntities': None,
@@ -858,3 +859,21 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         for deferred in failed_deferreds:
             self.failureResultOf(deferred, NoSuchScalingGroupError)
+
+
+class MockAdminTestCase(TestCase):
+    """
+    Tests for :class:`MockAdmin`
+    """
+
+    def setUp(self):
+        """ Setup mocks """
+        self.collection = MockAdmin()
+        self.mock_log = mock.MagicMock()
+
+    def test_get_metrics_returns_mock_metrics(self):
+        """
+        Getting mock metrics will return an empty dict.
+        """
+        deferred = self.collection.get_metrics(self.mock_log)
+        self.assertEqual(self.successResultOf(deferred), {})
