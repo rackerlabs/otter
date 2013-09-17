@@ -10,8 +10,7 @@ import json
 
 from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, log_arguments,
-                                   with_transaction_id)
+                                   succeeds_with, with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.webhooks import OtterWebhooks
@@ -236,7 +235,6 @@ class OtterPolicy(object):
     @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
     def get_policy(self, request):
         """
         Get a scaling policy which describes an id, name, type, adjustment, and
@@ -277,7 +275,6 @@ class OtterPolicy(object):
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
-    @log_arguments
     def update_policy(self, request, data):
         """
         Updates a scaling policy. Scaling policies must include a name, type,
@@ -301,7 +298,6 @@ class OtterPolicy(object):
     @app.route('/', methods=['DELETE'])
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
     def delete_policy(self, request):
         """
         Delete a scaling policy. If successful, no response body will be returned.
@@ -313,7 +309,6 @@ class OtterPolicy(object):
     @app.route('/execute/', methods=['POST'])
     @fails_with(exception_codes)
     @succeeds_with(202)
-    @log_arguments
     def execute_policy(self, request):
         """
         Execute this scaling policy.

@@ -11,7 +11,7 @@ from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   log_arguments, with_transaction_id)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
@@ -359,7 +359,6 @@ class OtterGroup(object):
     @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
     def view_manifest_config_for_scaling_group(self, request):
         """
         View manifested view of the scaling group configuration, including the
@@ -483,7 +482,6 @@ class OtterGroup(object):
     @app.route('/', methods=['DELETE'])
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
     def delete_scaling_group(self, request):
         """
         Delete a scaling group if there are no entities belonging to the scaling
@@ -495,7 +493,6 @@ class OtterGroup(object):
     @app.route('/state/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
     def get_scaling_group_state(self, request):
         """
         Get the current state of the scaling group, including the current set of
@@ -554,7 +551,6 @@ class OtterGroup(object):
     @app.route('/pause/', methods=['POST'])
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
     def pause_scaling_group(self, request):
         """
         Pause a scaling group.  This means that no scaling policies will get
@@ -567,7 +563,6 @@ class OtterGroup(object):
     @app.route('/resume/', methods=['POST'])
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
     def resume_scaling_group(self, request):
         """
         Resume a scaling group.  This means that scaling policies will now get
