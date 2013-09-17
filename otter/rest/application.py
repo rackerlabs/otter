@@ -32,12 +32,11 @@ class Otter(object):
         return ''
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/config/')
-    @with_transaction_id()
-    def config(self, request, log, tenant_id, group_id):
+    def config(self, request, tenant_id, group_id):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, log, tenant_id, group_id).app.resource()
+        return OtterConfig(self.store, tenant_id, group_id).app.resource()
 
     @app.route('/v1.0/<string:tenant_id>/groups/<string:group_id>/launch/')
     @with_transaction_id()
