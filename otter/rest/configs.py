@@ -110,13 +110,16 @@ class OtterLaunch(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id):
+        self.log = log.bind(system='otter.rest.launch',
+                            tenant_id=tenant_id,
+                            group_id=group_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
 
     @app.route('/', methods=['GET'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def view_launch_config(self, request):
@@ -168,6 +171,7 @@ class OtterLaunch(object):
         return deferred
 
     @app.route('/', methods=['PUT'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.launch_config)
