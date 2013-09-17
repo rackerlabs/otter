@@ -9,8 +9,11 @@ from functools import partial
 import json
 
 from otter.json_schema import rest_schemas, group_schemas
+from otter.log import log
 from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, log_arguments)
+                                   succeeds_with, log_arguments,
+                                   log_ignore_arguments,
+                                   with_own_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -38,13 +41,16 @@ class OtterPolicies(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, scaling_group_id):
+    def __init__(self, store, tenant_id, scaling_group_id):
+        self.log = log.bind(system='otter.rest.policies',
+                            tenant_id=tenant_id,
+                            group_id=scaling_group_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
 
     @app.route('/', methods=['GET'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_policies(self, request):
@@ -129,6 +135,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/', methods=['POST'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_policies_request)
@@ -208,6 +215,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['GET'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @log_arguments
@@ -246,10 +254,11 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['PUT'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
-    @log_arguments
+    @log_ignore_arguments('data')
     def update_policy(self, request, policy_id, data):
         """
         Updates a scaling policy. Scaling policies must include a name, type,
@@ -271,6 +280,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['DELETE'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments
@@ -283,6 +293,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/execute/', methods=['POST'])
+    @with_own_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(202)
     @log_arguments
