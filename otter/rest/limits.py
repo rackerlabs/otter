@@ -9,6 +9,7 @@ from lxml import etree
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import fails_with, succeeds_with
 from otter.rest.errors import exception_codes
+from otter.utils.config import config_value
 
 
 class OtterLimits(object):
@@ -29,16 +30,7 @@ class OtterLimits(object):
         """
         returns application limits
         """
-        data = {
-            "limits": {
-                "absolute": {
-                    "maxGroups": 1000,
-                    "maxPoliciesPerGroup": 1000,
-                    "maxWebhooksPerPolicy": 1000,
-                }
-            }
-        }
-
+        data = {"limits": {"absolute": config_value("limits")}}
         accept = request.getHeader("accept")
 
         if accept and 'xml' in accept:
