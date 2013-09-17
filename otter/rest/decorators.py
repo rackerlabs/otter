@@ -132,10 +132,8 @@ def log_ignore_arguments(*ignore):
     def wrapper(f):
         @wraps(f)
         def _(self, request, *args, **kwargs):
-            revised_kwargs = kwargs
-            if ignore:
-                revised_kwargs = {key: kwargs[key] for key in kwargs
-                                  if key not in ignore}
+            revised_kwargs = {key: kwargs[key] for key in kwargs
+                              if key not in ignore}
             self.log = self.log.bind(**revised_kwargs)
             return f(self, request, *args, **kwargs)
         return _
