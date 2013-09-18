@@ -81,10 +81,10 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
     """
     Validate Image by getting the image information. It ensures that image is active
     """
-    d = treq.get(append_segments(server_endpoint, 'images', image_ref),
-                 headers=headers(auth_token))
+    url = append_segments(server_endpoint, 'images', image_ref)
+    d = treq.get(url, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'get_image')
+    d.addErrback(wrap_request_error, url, 'get_image')
 
     def is_image_active(image_detail):
         if image_detail['image']['status'] != 'ACTIVE':
@@ -98,10 +98,13 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     """
     Validate flavor by getting its information
     """
-    d = treq.get(append_segments(server_endpoint, 'flavors', flavor_ref),
-                 headers=headers(auth_token))
+    url = append_segments(server_endpoint, 'flavors', flavor_ref)
+    d = treq.get(url, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, server_endpoint, 'get_flavor')
+    # Extracting the content to avoid a strange bug in twisted/treq where next
+    # subsequent call to nova hangs indefintely
+    d.addCallback(treq.content)
+    d.addErrback(wrap_request_error, url, 'get_flavor')
     return d
 
 
