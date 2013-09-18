@@ -118,7 +118,7 @@ _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
 def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
-                   last_seen=None):
+                    last_seen=None):
     """
     :param tenant_id: the tenant ID - if this is all that is provided, this
         function returns cql to list all groups
@@ -973,7 +973,7 @@ class CassScalingGroupCollection:
         })
         return d
 
-    def list_scaling_group_states(self, log, tenant_id, limit=100, last_seen='abc'):
+    def list_scaling_group_states(self, log, tenant_id, limit=100, last_seen=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
