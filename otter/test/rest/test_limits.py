@@ -6,10 +6,7 @@ group limits
 import json
 from twisted.trial.unittest import TestCase
 
-from otter.rest.application import Otter
 from otter.test.rest.request import RestAPITestMixin, request
-from otter.test.utils import iMock
-from otter.models.interface import IScalingGroupCollection
 from otter.util.config import set_config_data
 from otter.util.config import config_value
 
@@ -66,11 +63,10 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
                 '</absolute></limits>')
 
         data = data.format(number)
-        root = Otter(iMock(IScalingGroupCollection)).app.resource()
         headers = {"Accept": ["application/xml"]}
 
         response_wrapper = self.successResultOf(
-            request(root, "GET", self.endpoint, headers=headers))
+            request(self.root, "GET", self.endpoint, headers=headers))
 
         self.assertEqual(response_wrapper.response.headers.getRawHeaders('Content-Type'),
                          ['application/xml'])
