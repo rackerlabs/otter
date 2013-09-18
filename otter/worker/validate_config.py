@@ -41,9 +41,7 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
 
     validate_functions = [
         (validate_image, 'imageRef'),
-        (validate_flavor, 'flavorRef'),
-        (validate_key_pairs, 'keypair'),
-        (validate_personality, 'personality')
+        (validate_flavor, 'flavorRef')
     ]
 
     def collect_errors(results):
@@ -106,19 +104,3 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     d.addCallback(treq.content)
     d.addErrback(wrap_request_error, url, 'get_flavor')
     return d
-
-
-def validate_key_pairs(log, auth_token, server_endpoint, key_pairs):
-    """
-    Validate key pairs
-    """
-    # TODO
-    return defer.succeed(True)
-
-
-def validate_personality(log, auth_token, server_endpoint, personality):
-    """
-    Validate personality
-    """
-    # TODO
-    return defer.succeed(True)

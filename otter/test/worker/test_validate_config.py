@@ -27,13 +27,11 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.launch_config = {
             'server': {
                 'imageRef': 'imagekdfj',
-                'flavorRef': 'flavoreor',
-                'keypair': 'key',
-                'personality': 'perso'
+                'flavorRef': 'flavoreor'
             }
         }
-        self.func_suffixes = ['image', 'flavor', 'key_pairs', 'personality']
-        self.properties = ['imageRef', 'flavorRef', 'keypair', 'personality']
+        self.func_suffixes = ['image', 'flavor']
+        self.properties = ['imageRef', 'flavorRef']
         for func_suffix in self.func_suffixes:
             setattr(self, 'validate_{}'.format(func_suffix), patch(
                 self, 'otter.worker.validate_config.validate_{}'.format(func_suffix),
@@ -105,15 +103,16 @@ class ValidateLaunchServerConfigTests(TestCase):
             'Validation of "imageRef" property in launchConfiguration failed',
             reason=f)
 
-    def test_no_personality(self):
+    def test_optional_property(self):
         """
-        If any of the optional properties like personality is not available, it does not validate
+        If any of the optional properties is not available, it does not validate
         those and continues validating others
         """
-        del self.launch_config['server']['personality']
+        # Note: flavorRef is actually mandatory. It is used only for testing purpose
+        del self.launch_config['server']['flavorRef']
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         self.successResultOf(d)
-        self.assertFalse(self.validate_personality.called)
+        self.assertFalse(self.validate_flavor.called)
 
 
 class ValidateImageTests(TestCase):
