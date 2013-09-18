@@ -10,6 +10,14 @@ from otter.rest.application import Otter
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.test.utils import iMock
 from otter.models.interface import IScalingGroupCollection
+from otter.util.config import set_config_data
+from otter.util.config import config_value
+
+number = 2
+
+fake_config = {"limits": {"absolute": {}}}
+for i in ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]:
+    fake_config["limits"]["absolute"][i] = number
 
 
 class OtterLimitsTestCase(RestAPITestMixin, TestCase):
@@ -21,20 +29,26 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
 
     invalid_methods = ("DELETE", "PUT", "POST")
 
+    def setUp(self):
+        """
+        setup fake config data
+        """
+        super(OtterLimitsTestCase, self).setUp()
+        set_config_data(fake_config)
+
+    def tearDown(self):
+        """
+        remove fake config data
+        """
+        super(OtterLimitsTestCase, self).tearDown()
+        set_config_data({})
+
     def test_list_limits_json(self):
         """
         the api returns a json blob containing the absolute
         limits in the correct format
         """
-        data = {
-            "limits": {
-                "absolute": {
-                    "maxGroups": 1000,
-                    "maxPoliciesPerGroup": 1000,
-                    "maxWebhooksPerPolicy": 1000,
-                }
-            }
-        }
+        data = {"limits": config_value("limits")}
         body = self.assert_status_code(200)
         resp = json.loads(body)
         self.assertEqual(resp, data)
@@ -48,11 +62,12 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         data = ("<?xml version='1.0' encoding='UTF-8'?>\n"
                 '<limits xmlns="http://docs.openstack.org/common/api/v1.0">'
                 '<absolute>'
-                '<limit name="maxGroups" value="1000"/>'
-                '<limit name="maxPoliciesPerGroup" value="1000"/>'
-                '<limit name="maxWebhooksPerPolicy" value="1000"/>'
+                '<limit name="maxGroups" value="{0}"/>'
+                '<limit name="maxPoliciesPerGroup" value="{0}"/>'
+                '<limit name="maxWebhooksPerPolicy" value="{0}"/>'
                 '</absolute></limits>')
 
+        data = data.format(number)
         root = Otter(iMock(IScalingGroupCollection)).app.resource()
         headers = {"Accept": ["application/xml"]}
 
