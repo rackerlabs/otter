@@ -2179,8 +2179,8 @@ class CassAdminTestCase(TestCase):
         # These are now reversed for an unknown reason.
         expectedResults = [
             {
-                'id': 'otter.metrics.webhooks',
-                'value': 192,
+                'id': 'otter.metrics.groups',
+                'value': 190,
                 'time': 1234567890
             },
             {
@@ -2189,12 +2189,12 @@ class CassAdminTestCase(TestCase):
                 'time': 1234567890
             },
             {
-                'id': 'otter.metrics.groups',
-                'value': 190,
+                'id': 'otter.metrics.webhooks',
+                'value': 192,
                 'time': 1234567890
             }
         ]
-        config_query = ('SELECT COUNT(*) FROM scaling_config;')
+        config_query = ('SELECT COUNT(*) FROM scaling_group;')
         policy_query = ('SELECT COUNT(*) FROM scaling_policies;')
         webhook_query = ('SELECT COUNT(*) FROM policy_webhooks;')
 

@@ -45,12 +45,12 @@ class AutoscaleBehaviors(BaseBehavior):
         if lc_flavor_ref is None:
             lc_flavor_ref = self.autoscale_config.lc_flavor_ref
         create_response = self.autoscale_client.create_scaling_group(
-            gc_name,
-            gc_cooldown,
-            gc_min_entities,
-            lc_name,
-            lc_image_ref,
-            lc_flavor_ref)
+            gc_name=gc_name,
+            gc_cooldown=gc_cooldown,
+            gc_min_entities=gc_min_entities,
+            lc_name=lc_name,
+            lc_image_ref=lc_image_ref,
+            lc_flavor_ref=lc_flavor_ref)
         return create_response
 
     def create_scaling_group_given(self, gc_name=None, gc_cooldown=None,
