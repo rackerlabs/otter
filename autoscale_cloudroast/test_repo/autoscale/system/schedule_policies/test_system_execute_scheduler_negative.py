@@ -2,6 +2,8 @@
 Test negative scenarios for execution of at style and
 cron style scheduler policies
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
 from cafe.drivers.unittest.decorators import tags
@@ -122,7 +124,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    @tags(speed='slow')
+    @unittest.skip('AUTO-628')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
