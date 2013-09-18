@@ -1955,8 +1955,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': 23
         } for i in range(2)]]
 
-        expectedData = {'tenantId': '123',
-                        'limit': 100}
+        expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
@@ -1975,8 +1974,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [[]]
 
-        expectedData = {'tenantId': '123',
-                        'limit': 100}
+        expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
@@ -1992,8 +1990,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         ``list_scaling_group_states`` only requests the requested number.
         """
         self.returns = [[]]
-        expectedData = {'tenantId': '123',
-                        'limit': 5}
+        expectedData = {'tenantId': '123', 'limit': 5}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
@@ -2007,9 +2004,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         If a last_seen is provided, it is passed into the CQL as a where clause
         """
         self.returns = [[]]
-        expectedData = {'tenantId': '123',
-                        'limit': 100,
-                        'last_seen': '345'}
+        expectedData = {'tenantId': '123', 'limit': 100, 'last_seen': '345'}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId AND '
