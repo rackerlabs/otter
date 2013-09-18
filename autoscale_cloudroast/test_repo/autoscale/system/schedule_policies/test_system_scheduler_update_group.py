@@ -97,7 +97,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         then schedule an at style policy to scale down and verify the servers remaining
         are of the latest launch config.
         """
-        group = self._create_group(minentities=self.sp_change)
+        group = self._create_group(minentities=self.sp_change, cooldown=0)
         active_list_b4_upd = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
@@ -125,7 +125,7 @@ class UpdateSchedulerScalingPolicy(AutoscaleFixture):
         then schedule another cron style policy to scale down and verify the servers remaining
         are of the latest launch config.
         """
-        group = self._create_group(minentities=self.sp_change)
+        group = self._create_group(minentities=self.sp_change, cooldown=0)
         active_list_b4_upd = self.wait_for_expected_number_of_active_servers(
             group_id=group.id,
             expected_servers=group.groupConfiguration.minEntities)
