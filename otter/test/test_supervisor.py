@@ -252,7 +252,8 @@ class ValidateLaunchConfigTests(SupervisorTests):
         self.successResultOf(d)
         self.auth_function.assert_called_once_with(self.group.tenant_id)
         self.validate_launch_server_config.assert_called_once_with(
-            self.log.bind(), 'ORD', self.service_catalog, self.auth_token, 'launch_args')
+            self.log.bind.return_value, 'ORD', self.service_catalog,
+            self.auth_token, 'launch_args')
 
     def test_invalid_config_error_propagates(self):
         """

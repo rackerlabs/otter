@@ -275,20 +275,13 @@ class ServerLaunchConfigTestCase(TestCase):
 class LaunchConfigServerPayloadValidationTests(TestCase):
     """
     Tests to verify json schema of 'server' attribute used to create servers
+    Valid tests are already done in ServerLaunchConfigTestCase.test_valid_examples_validate
     """
     def setUp(self):
         """
         Keep valid payload
         """
         self.server = group_examples.launch_server_config()[0]['args']['server']
-
-    def test_valid(self):
-        """
-        Successfully validate correct server json
-        """
-        # Not required since it is already done in
-        # ServerLaunchConfigTestCase.test_valid_examples_validate.
-        pass
 
     def test_invalid_image(self):
         """
