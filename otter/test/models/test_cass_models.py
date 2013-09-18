@@ -1955,10 +1955,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': 23
         } for i in range(2)]]
 
-        expectedData = {'tenantId': '123'}
+        expectedData = {'tenantId': '123',
+                        'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
-                       'scaling_group WHERE "tenantId" = :tenantId;')
+                       'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -1974,12 +1975,47 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         self.returns = [[]]
 
-        expectedData = {'tenantId': '123'}
+        expectedData = {'tenantId': '123',
+                        'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
-                       'scaling_group WHERE "tenantId" = :tenantId;')
+                       'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(r, [])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_list_states_respects_limit(self):
+        """
+        If there are more than the requested number of states,
+        ``list_scaling_group_states`` only requests the requested number.
+        """
+        self.returns = [[]]
+        expectedData = {'tenantId': '123',
+                        'limit': 5}
+        expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
+                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
+        self.collection.list_scaling_group_states(self.mock_log, '123', limit=5)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_list_states_offsets_by_last_seen(self):
+        """
+        If a last_seen is provided, it is passed into the CQL as a where clause
+        """
+        self.returns = [[]]
+        expectedData = {'tenantId': '123',
+                        'limit': 100,
+                        'last_seen': '345'}
+        expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
+                       '"groupTouched", "policyTouched", paused, created_at FROM '
+                       'scaling_group WHERE "tenantId" = :tenantId AND '
+                       '"groupId" > :last_seen LIMIT :limit;')
+        self.collection.list_scaling_group_states(self.mock_log, '123',
+                                                  last_seen='345')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -2012,10 +2048,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }]
         self.returns = [group_dicts, None]
 
-        expectedData = {'tenantId': '123'}
+        expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
-                       'scaling_group WHERE "tenantId" = :tenantId;')
+                       'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_args_list[0],
                          mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
