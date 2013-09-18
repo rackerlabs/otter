@@ -15,11 +15,6 @@ from otter.util.config import config_value
 
 number = 2
 
-fake_config = {"limits": {"absolute": {}}}
-for i in ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]:
-    fake_config["limits"]["absolute"][i] = number
-
-
 class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/limits``
@@ -33,8 +28,11 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         """
         setup fake config data
         """
+        limits = ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]
+        data = {"limits": {"absolute": {limit: number for limit in limits}}}
+
         super(OtterLimitsTestCase, self).setUp()
-        set_config_data(fake_config)
+        set_config_data(data)
 
     def tearDown(self):
         """
