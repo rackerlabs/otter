@@ -15,6 +15,8 @@ class GroupState(object):
 
     :ivar str group_id: the ID of the scaling group whose state this
         object represents
+    :ivar str group_name: the name of the scaling group whose state this
+        object represents
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar bool paused: whether the scaling group is paused in scaling activities
@@ -27,10 +29,11 @@ class GroupState(object):
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, active, pending, group_touched,
+    def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
                  policy_touched, paused, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.group_name = group_name
         self.active = active
         self.pending = pending
         self.paused = paused
@@ -47,7 +50,7 @@ class GroupState(object):
         Two states are equal if all of the parameters are equal (except for
         the now callable)
         """
-        params = ('tenant_id', 'group_id', 'active', 'pending', 'paused',
+        params = ('tenant_id', 'group_id', 'group_name', 'active', 'pending', 'paused',
                   'policy_touched', 'group_touched')
         return all((getattr(self, param) == getattr(other, param)
                     for param in params))
@@ -62,8 +65,8 @@ class GroupState(object):
         """
         Prints out a representation of self
         """
-        return "GroupState({}, {}, {}, {}, {}, {}, {})".format(
-            self.tenant_id, self.group_id, repr(self.active),
+        return "GroupState({}, {}, {}, {}, {}, {}, {}, {})".format(
+            self.tenant_id, self.group_id, self.group_name, repr(self.active),
             repr(self.pending), self.group_touched, repr(self.policy_touched),
             self.paused
         )
@@ -612,6 +615,27 @@ class IScalingGroupCollection(Interface):
 
         :param tenant_id: the tenant ID of the scaling groups
         :type tenant_id: ``str``
+
+        :return: a :class:`twisted.internet.defer.Deferred` containing current
+            count of tenants policies, webhooks and groups as ``dict``
+        """
+
+
+class IAdmin(Interface):
+    """
+    Interface to administrative information and actions.
+    """
+
+    def get_metrics(self, log):
+        """
+        Returns total current count of policies, webhooks and groups in the
+        following format::
+
+            {
+                "groups": 100,
+                "policies": 100,
+                "webhooks": 100
+            }
 
         :return: a :class:`twisted.internet.defer.Deferred` containing current
             count of tenants policies, webhooks and groups as ``dict``

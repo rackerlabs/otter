@@ -47,7 +47,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             response_entity_type=Limits)
 
     def create_scaling_group(self, gc_name, gc_cooldown, gc_min_entities,
-                             lc_name, lc_image_ref, lc_flavor_ref,
+                             lc_image_ref, lc_flavor_ref, lc_name=None,
                              gc_max_entities=None, gc_metadata=None,
                              lc_personality=None, lc_metadata=None,
                              lc_disk_config=None, lc_networks=None,
@@ -607,6 +607,7 @@ class LbaasAPIClient(AutoMarshallingRestClient):
     """
     Client object for the list node lbaas api call
     """
+
     def __init__(self, url, auth_token, serialize_format=None,
                  deserialize_format=None):
         super(LbaasAPIClient, self).__init__(serialize_format,

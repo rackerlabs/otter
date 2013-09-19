@@ -1,63 +1,48 @@
+POST /v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies HTTP/1.1
+Accept: application/json
+Accept-Encoding: gzip, deflate, compress
+Content-Length: 716
+Content-Type: application/json; charset=utf-8
+Host: dfw.autoscale.api.rackspacecloud.com
+User-Agent: HTTPie/0.6.0
+X-Auth-Token: 
+
 [
-  {
-    "name": "scale up by one server",
-    "change": 1,
-    "cooldown": 1800,
-    "type": "webhook"
-  },
-  {
-    "name": "scale down by 5.5 percent",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "webhook"
-  },
-  {
-    "name": "set group to 5 servers",
-    "desiredCapacity": 5,
-    "cooldown": 1800,
-    "type": "webhook"
-  },
-  {
-    "name": "scale down by 5.5 percent at 11pm",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "schedule",
-    "args": {
-      "cron": "23 * * * *"
-    }
-  },
-  {
-    "name": "scale down by 5.5 percent on the 5th",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "schedule",
-    "args": {
-      "at": "2013-06-05T03:12Z"
-    }
-  },
-  {
-    "name": "scale down by 5.5 percent",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "cloud_monitoring",
-    "args": {
-          "check": {
-            "label": "Website check 1",
-            "type": "remote.http",
-            "details": {
-                "url": "http://www.foo.com",
-                "method": "GET"
-            },
-            "monitoring_zones_poll": [
-                "mzA"
-            ],
-            "timeout": 30,
-            "period": 100,
-            "target_alias": "default"
+    {
+        "change": 1,
+        "cooldown": 1800,
+        "name": "scale up by one server",
+        "type": "webhook"
+    },
+    {
+        "changePercent": -5.5,
+        "cooldown": 1800,
+        "name": "scale down by 5.5 percent",
+        "type": "webhook"
+    },
+    {
+        "cooldown": 1800,
+        "desiredCapacity": 5,
+        "name": "set group to 5 servers",
+        "type": "webhook"
+    },
+    {
+        "args": {
+            "cron": "23 * * * *"
         },
-        "alarm_criteria": {
-            "criteria": "if (metric[\"duration\"] >= 2) { return new AlarmStatus(OK); } return new AlarmStatus(CRITICAL);"
-        }
-     }
+        "changePercent": -5.5,
+        "cooldown": 1800,
+        "name": "scale down by 5.5 percent at 11pm",
+        "type": "schedule"
+    },
+    {
+        "args": {
+            "at": "2013-12-05T03:12:00Z"
+        },
+        "changePercent": -5.5,
+        "cooldown": 1800,
+        "name": "scale down by 5.5 percent on the 5th",
+        "type": "schedule"
     }
 ]
+

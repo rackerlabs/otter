@@ -86,7 +86,7 @@ format="SVG" scale="60"/>
               <revdescription>
                   <itemizedlist spacing="compact">
                       <listitem>
-                          <para>Initial Unlimited Availability release.</para>
+                          <para>Initial Early Access release.</para>
                       </listitem>
                   </itemizedlist>
               </revdescription>
@@ -96,8 +96,8 @@ format="SVG" scale="60"/>
                 <revdescription>
                     <itemizedlist spacing="compact">
                         <listitem>
-                            <para>Initial public draft of full developer guide for Early Access
-                                release.</para>
+                            <para>Initial internal draft of full
+                developer guide for Early Access release.</para>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
@@ -125,19 +125,24 @@ format="SVG" scale="60"/>
 <chapter xml:id="Overview">
     <title>Overview</title>
     <para> The &PRODNAME; service responds to events by changing
-      capacity to meet current needs. This ability to change an
-      autoscaling group's configuration in response to changing
-      workloads means that you can begin with a minimal cloud
+      capacity to meet current needs. </para>
+  <para>
+      To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
+      Then you define cloud monitoring alerts to watch the group's activity, 
+      and you define scaling rules to change the scaling group's configuration in response to alerts. 
+      Because you can change a
+      scaling group's configuration in response to changing
+      workloads, you can begin with a minimal cloud
       configuration and grow only when the cost of that growth is
       justified. </para>
-    <para> Autoscale is a web service that automatically scales
+    <para> &PROD; is a web service that automatically scales
       resources in response to an increase or decrease in overall
       workload based on user-defined thresholds. You can set up a
-      schedule for launching Autoscale or define an event that is
+      schedule for launching &PROD; or define an event that is
       triggered by Cloud Monitoring. You can also specify a minimum
       and maximum number of cloud servers, the amount of resources
       that you want to increase or decrease, and the thresholds in
-      Cloud Monitoring that trigger the scaling activities. Autoscale
+      Cloud Monitoring that trigger the scaling activities. &PROD; 
       requires the following services to work together: <itemizedlist>
         <listitem>
           <para> Cloud Monitoring </para>
@@ -331,7 +336,7 @@ format="SVG" scale="60"/>
                 units="linecolumn" coords="15 20"/>
             </areaspec>
             <programlisting language="json">
-<xi:include href="samples/credentials-20.json" parse="text"/>
+              <xi:include href="samples/reqAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>
@@ -371,7 +376,7 @@ format="SVG" scale="60"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
             <programlisting language="json">
-<xi:include href="samples/auth-20.json" parse="text"/>
+              <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>

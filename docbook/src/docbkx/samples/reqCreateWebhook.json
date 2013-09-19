@@ -1,11 +1,21 @@
+POST /v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks HTTP/1.1
+Accept: application/json
+Accept-Encoding: gzip, deflate, compress
+Content-Length: 171
+Content-Type: application/json; charset=utf-8
+Host: dfw.autoscale.api.rackspacecloud.com
+User-Agent: HTTPie/0.6.0
+X-Auth-Token: 
+
 [
     {
-        "name": "alice",
         "metadata": {
-            "notes": "this is for Alice"
-        }
+            "notes": "PagerDuty will fire this webhook"
+        },
+        "name": "PagerDuty"
     },
     {
-        "name": "bob"
+        "name": "Nagios"
     }
 ]
+

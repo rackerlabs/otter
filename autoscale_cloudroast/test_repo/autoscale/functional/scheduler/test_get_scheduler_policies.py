@@ -23,15 +23,15 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             sp_change=self.sp_change,
             schedule_at=self.at_value)
         self.assertEquals(self.at_style_policy['status_code'], 201,
-                          msg='Create schedule policy (at style) failed with {0} for group {1}'
-                          .format(self.at_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (at style) failed with {0} for group '
+                          '{1}'.format(self.at_style_policy['status_code'], self.group.id))
         self.cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             sp_change=self.sp_change,
             schedule_cron=self.cron_value)
         self.assertEquals(self.cron_style_policy['status_code'], 201,
-                          msg='Create schedule policy (cron style) failed with {0} for group {1}'
-                          .format(self.cron_style_policy['status_code'], self.group.id))
+                          msg='Create schedule policy (cron style) failed with {0} for group '
+                          '{1}'.format(self.cron_style_policy['status_code'], self.group.id))
 
     def test_get_at_style_scaling_policy(self):
         """
@@ -41,11 +41,11 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             self.group.id,
             self.at_style_policy['id'])
         self.assertEquals(get_at_style_policy_response.status_code, 200,
-                          msg='Get scaling policy (at style) failed with {0} for group {1}'
-                          .format(get_at_style_policy_response.status_code,
-                                  self.group.id))
+                          msg='Get scaling policy (at style) failed with {0} for group '
+                          '{1}'.format(get_at_style_policy_response.status_code,
+                                       self.group.id))
         self.assertTrue(get_at_style_policy_response.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(get_at_style_policy_response.headers)
         self.assert_get_policy(self.at_style_policy,
                                get_at_style_policy_response.entity,
@@ -59,11 +59,11 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             self.group.id,
             self.cron_style_policy['id'])
         self.assertEquals(get_cron_style_policy_response.status_code, 200,
-                          msg='Get scaling policy (cron style) failed with {0} for group {1}'
-                          .format(get_cron_style_policy_response.status_code,
-                                  self.group.id))
+                          msg='Get scaling policy (cron style) failed with {0} for group '
+                          '{1}'.format(get_cron_style_policy_response.status_code,
+                                       self.group.id))
         self.assertTrue(get_cron_style_policy_response.headers is not None,
-                        msg='The headers are not as expected')
+                        msg='The headers are not as expected for group {0}'.format(self.group.id))
         self.validate_headers(get_cron_style_policy_response.headers)
         self.assert_get_policy(self.cron_style_policy,
                                get_cron_style_policy_response.entity,
@@ -78,14 +78,14 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             group_id=self.group.id,
             policy_id=self.cron_style_policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete at-style policy failed')
+            del_resp.status_code, 204, msg='Delete at-style policy failed for group'
+            ' {0}'.format(self.group.id))
         get_cron_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
             self.cron_style_policy['id'])
         self.assertEquals(get_cron_style_policy_response.status_code, 404,
-                          msg='get deleted scheduler policy succeeded with: {0},'
-                          'policy/groupid: {1} / {2}'
-                          .format(
+                          msg='get deleted scheduler policy succeeded with: {0}, policy/groupid: '
+                          ' {1} / {2}'.format(
                               get_cron_style_policy_response.status_code, self.group.id,
                               self.cron_style_policy['id']))
 
@@ -98,13 +98,13 @@ class GetSchedulerScalingPolicy(ScalingGroupFixture):
             group_id=self.group.id,
             policy_id=self.at_style_policy['id'])
         self.assertEquals(
-            del_resp.status_code, 204, msg='Delete at-style policy failed')
+            del_resp.status_code, 204, msg='Delete at-style policy failed for group'
+            ' {0}'.format(self.group.id))
         get_at_style_policy_response = self.autoscale_client.get_policy_details(
             self.group.id,
             self.at_style_policy['id'])
         self.assertEquals(get_at_style_policy_response.status_code, 404,
                           msg='get deleted scheduler policy succeeded with: {0},'
-                          'policy/groupid: {1} / {2}'
-                          .format(
+                          ' policy/groupid: {1} / {2}'.format(
                               get_at_style_policy_response.status_code, self.group.id,
                               self.at_style_policy['id']))
