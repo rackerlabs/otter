@@ -7,16 +7,17 @@ from twisted.trial.unittest import TestCase
 from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Cooperator
 
+from zope.interface.verify import verifyObject
+
 from otter.models.interface import IScalingGroup
-from otter.supervisor import Supervisor
-from otter.test.utils import iMock, patch, DummyException
+from otter.supervisor import ISupervisor, SupervisorService
+from otter.test.utils import iMock, patch
 from otter.util.config import set_config_data
-from otter.util.deferredutils import DeferredPool
 
 
 class SupervisorTests(TestCase):
     """
-    Common stuff for tests in supervisor
+    Common stuff for tests in SupervisorService
     """
 
     def setUp(self):
@@ -43,11 +44,19 @@ class SupervisorTests(TestCase):
 
         self.cooperator = mock.Mock(spec=Cooperator)
 
-        self.supervisor = Supervisor(self.auth_function, self.cooperator.coiterate)
+        self.supervisor = SupervisorService(
+            self.auth_function, self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
+
+
+    def test_provides_ISupervisor(self):
+        """
+        SupervisorService provides ISupervisor
+        """
+        verifyObject(ISupervisor, self.supervisor)
 
 
 class LaunchConfigTests(SupervisorTests):
@@ -159,60 +168,43 @@ class LaunchConfigTests(SupervisorTests):
         The launch config job deferred is added to a deferred pool, if it is
         provided to the constructor
         """
-        pool = DeferredPool()
-        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
-                                pool)
         self.launch_server.return_value = Deferred()  # block forward progress
 
         # the pool starts off empty
-        self.successResultOf(pool.notify_when_empty())  # the pool starts empty
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
 
-        supervisor.execute_config(self.log, 'transaction-id',
-                                  self.group, self.launch_config)
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
 
         # the pool is now not empty, since the job has been added
-        empty = pool.notify_when_empty()
+        empty = self.supervisor.deferred_pool.notify_when_empty()
         self.assertNoResult(empty)  # the pool is not empty now
 
         # after launch server returns, the pool empties
         self.launch_server.return_value.callback((self.fake_server_details, {}))
         self.successResultOf(empty)
 
-    def test_deferred_pool_does_not_interfere_with_success_result(self):
+    def test_will_not_stop_until_pool_empty(self):
         """
-        Adding a job to the deferred pool does not interfere with the success
-        result being propagated to completion deferred
+        The deferred returned by stopService will not fire until the deferred
+        pool is empty.
         """
-        pool = DeferredPool()
-        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
-                                pool)
+        self.launch_server.return_value = Deferred()  # block forward progress
 
-        # does not interfere with the result of completed_d
-        d = supervisor.execute_config(self.log, 'transaction-id',
-                                      self.group, self.launch_config)
-        (job_id, completed_d) = self.successResultOf(d)
-        self.assertEqual(
-            self.successResultOf(completed_d),
-            {'id': 'server_id', 'links': ['links'],
-             'name': 'meh', 'lb_info': {}})
+        # the pool starts off empty
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
 
-    def test_deferred_pool_does_not_interfere_with_failure_result(self):
-        """
-        Adding a job to the deferred pool does not interfere with the failure
-        result being propagated to completion deferred
-        """
-        pool = DeferredPool()
-        supervisor = Supervisor(self.auth_function, self.cooperator.coiterate,
-                                pool)
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
 
-        self.launch_server.return_value = fail(DummyException(':('))
+        sd = self.supervisor.stopService()
 
-        d = supervisor.execute_config(self.log, 'transaction-id',
-                                      self.group, self.launch_config)
+        self.assertFalse(self.supervisor.running)
+        self.assertNoResult(sd)
 
-        (job_id, completed_d) = self.successResultOf(d)
+        self.launch_server.return_value.callback((self.fake_server_details, {}))
 
-        self.failureResultOf(completed_d, DummyException)
+        self.successResultOf(sd)
 
 
 class DeleteServerTests(SupervisorTests):

@@ -2,33 +2,25 @@
 The Otter Supervisor manages a number of workers to execute a launch config.
 """
 
+from twisted.application.service import Service
 from twisted.internet.defer import Deferred, succeed
-from otter.util.hashkey import generate_job_id
 
+from zope.interface import Interface, implementer
+
+from otter.util.deferredutils import DeferredPool
+from otter.util.hashkey import generate_job_id
 from otter.util.config import config_value
 from otter.worker import launch_server_v1
 from otter.undo import InMemoryUndoStack
 
 
-class Supervisor(object):
+class ISupervisor(Interface):
     """
-    Manages execution of launch configurations.
-
-    :ivar callable auth_function: authentication function to use to obtain an
-        auth token and service catalog.  Should accept a tenant ID.
-
-    :ivar callable coiterate: coiterate function that will be passed to
-        InMemoryUndoStack.
-
-    :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
-        should be waited on
+    Supervisor that manages launch configuration execution jobs and server
+    deletion jobs.
     """
-    def __init__(self, auth_function, coiterate, deferred_pool=None):
-        self.auth_function = auth_function
-        self.coiterate = coiterate
-        self.deferred_pool = deferred_pool
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def execute_config(log, transaction_id, scaling_group, launch_config):
         """
         Executes a single launch config.
 
@@ -43,6 +35,47 @@ class Supervisor(object):
         :returns: A deferred that fires with a 3-tuple of job_id, completion deferred,
             and job_info (a dict)
         :rtype: ``Deferred``
+        """
+
+    def execute_delete_server(log, transaction_id, scaling_group, server):
+        """
+        Executes a single delete server
+
+        :param log: Bound logger.
+        :param str transaction_id: Transaction ID.
+        :param IScalingGroup scaling_group: Scaling Group.
+        :param dict server: The server details (containing the ID, and what
+            load balancers it has been added to) so that it can be deleted
+
+        :returns: ``Deferred`` that callbacks with None after the server
+            has been deleted successfully.  None is also callback(ed) when
+            server deletion fails in which case the error is logged
+            before callback(ing).
+        """
+
+
+@implementer(ISupervisor)
+class SupervisorService(object, Service):
+    """
+    A service which manages execution of launch configurations.
+
+    :ivar callable auth_function: authentication function to use to obtain an
+        auth token and service catalog.  Should accept a tenant ID.
+
+    :ivar callable coiterate: coiterate function that will be passed to
+        InMemoryUndoStack.
+
+    :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
+        should be waited on
+    """
+    def __init__(self, auth_function, coiterate):
+        self.auth_function = auth_function
+        self.coiterate = coiterate
+        self.deferred_pool = DeferredPool()
+
+    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+        """
+        see :meth:`ISupervisor.execute_config`
         """
         job_id = generate_job_id(scaling_group.uuid)
         completion_d = Deferred()
@@ -104,13 +137,8 @@ class Supervisor(object):
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
-        Executes a single delete server
-
-        Return a Deferred that callbacks with None after the server deleted successfully.
-        None is also callback(ed) when server deletion fails in which case the error is logged
-        before callback(ing).
+        see :meth:`ISupervisor.execute_config`
         """
-
         log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
@@ -130,6 +158,14 @@ class Supervisor(object):
         d.addErrback(log.err, 'Server deletion failed')
 
         return d
+
+    def stopService(self):
+        """
+        Returns a deferred that succeeds when the :class:`DeferredPool` is
+        empty
+        """
+        super(SupervisorService, self).stopService()
+        return self.deferred_pool.notify_when_empty()
 
 
 _supervisor = None

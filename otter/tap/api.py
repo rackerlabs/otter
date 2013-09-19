@@ -11,17 +11,16 @@ from twisted.internet.task import coiterate
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
-from twisted.application.service import MultiService, Service
+from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
 from otter.rest.application import root, set_store, set_bobby
 from otter.util.config import set_config_data, config_value
-from otter.util.deferredutils import DeferredPool
 from otter.models.cass import CassScalingGroupCollection
 from otter.scheduler import SchedulerService
 
-from otter.supervisor import Supervisor, set_supervisor
+from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
 
@@ -76,25 +75,6 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-class DeferredPoolWaitingService(object, Service):
-    """
-    Class that takes a DeferredPool, and on receiving SIGTERM, prevents
-    shutdown until the DeferredPool is empty.
-    """
-    def __init__(self, deferred_pool, name=None):
-        self.pool = deferred_pool
-        if name:
-            self.name = name
-
-    def stopService(self):
-        """
-        Returns a deferred that succeeds when the :class:`DeferredPool` is
-        empty
-        """
-        super(DeferredPoolWaitingService, self).stopService()
-        return self.pool.notify_when_empty()
-
-
 def makeService(config):
     """
     Set up the otter-api service.
@@ -134,20 +114,8 @@ def makeService(config):
 
     s = MultiService()
 
-    # by default, shutdown only when the supervisor's jobs are done.  No further
-    # jobs should be added, since the scheduler service shuts down without
-    # waiting (as it should) and the API service is also shut down without
-    # waiting (as it should)
-    if (config_value('delayed_shutdown') is None or config_value('delayed_shutdown')):
-        supervisor_pool = DeferredPool()
-        supervisor_service = DeferredPoolWaitingService(supervisor_pool,
-                                                        'supervisor')
-        supervisor_service.setServiceParent(s)
-
-        supervisor = Supervisor(authenticator.authenticate_tenant, coiterate,
-                                supervisor_pool)
-    else:
-        supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
+    supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
+    supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
 

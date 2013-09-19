@@ -5,13 +5,12 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
-from twisted.internet import reactor, defer
+from twisted.internet import reactor
 
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
 from otter.tap.api import Options, DeferredPoolWaitingService, makeService
-from otter.util.deferredutils import DeferredPool
 from otter.test.utils import patch
 
 
@@ -72,38 +71,6 @@ class APIOptionsTests(TestCase):
         self.assertFalse(config['mock'])
         config.parseOptions(['-m'])
         self.assertTrue(config['mock'])
-
-
-class DeferredPoolWaitingServiceTests(TestCase):
-    """
-    Tests for :class:`DeferredPoolWaitingService`
-    """
-    def test_will_not_stop_until_pool_empty(self):
-        """
-        The deferred returned by stopService will not fire until the pool is
-        empty.
-        """
-        pool = DeferredPool()
-        d = defer.Deferred()
-        pool.add(d)
-
-        dpws = DeferredPoolWaitingService(pool)
-        sd = dpws.stopService()
-
-        self.assertFalse(dpws.running)
-        self.assertNoResult(sd)
-
-        d.callback(None)
-
-        self.successResultOf(sd)
-
-    def test_may_have_name(self):
-        """
-        If a name is passed, the service is named
-        """
-        pool = DeferredPool()
-        dpws = DeferredPoolWaitingService(pool, 'my_name')
-        self.assertEqual(dpws.name, 'my_name')
 
 
 class APIMakeServiceTests(TestCase):
