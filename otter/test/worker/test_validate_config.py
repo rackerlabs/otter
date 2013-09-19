@@ -6,12 +6,12 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.test.utils import mock_log, patch, mock_treq
+from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
 from otter.util.config import set_config_data
 
-from otter.worker.validate_config import (validate_launch_server_config, validate_image,
-                                          validate_flavor, get_service_endpoint,
-                                          InvalidLaunchConfiguration)
+from otter.worker.validate_config import (
+    validate_launch_server_config, validate_image, validate_flavor, get_service_endpoint,
+    InvalidLaunchConfiguration, UnknownImage, InactiveImage, UnknownFlavor)
 
 
 class ValidateLaunchServerConfigTests(TestCase):
@@ -26,7 +26,7 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.log = mock_log()
         self.launch_config = {
             'server': {
-                'imageRef': 'imagekdfj',
+                'imageRef': 'imagegood',
                 'flavorRef': 'flavoreor'
             }
         }
@@ -56,10 +56,21 @@ class ValidateLaunchServerConfigTests(TestCase):
         """
         Invalid image causes InvalidLaunchConfiguration
         """
-        self.validate_image.return_value = defer.fail(InvalidLaunchConfiguration(':('))
+        self.validate_image.return_value = defer.fail(UnknownImage('meh'))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         f = self.failureResultOf(d, InvalidLaunchConfiguration)
-        self.assertEqual(f.value.message, ':(')
+        self.assertEqual(f.value.message, ('Following problems with launch configuration:\n' +
+                                           'Invalid imageRef "meh" in launchConfiguration'))
+
+    def test_inactive_image(self):
+        """
+        Image that is not in 'ACTIVE' state causes InvalidLaunchConfiguration
+        """
+        self.validate_image.return_value = defer.fail(InactiveImage('meh'))
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
+        self.assertEqual(f.value.message, ('Following problems with launch configuration:\n' +
+                                           'Inactive imageRef "meh" in launchConfiguration'))
 
     def test_invalid_flavor(self):
         """
@@ -68,7 +79,7 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.validate_flavor.return_value = defer.fail(InvalidLaunchConfiguration(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         f = self.failureResultOf(d, InvalidLaunchConfiguration)
-        self.assertEqual(f.value.message, ':(')
+        self.assertEqual(f.value.message, 'Following problems with launch configuration:\n:(')
 
     def test_invalid_image_and_flavor(self):
         """
@@ -90,7 +101,9 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.validate_image.return_value = defer.fail(ValueError(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         f = self.failureResultOf(d, InvalidLaunchConfiguration)
-        self.assertEqual(f.value.message, 'Invalid "imageRef" in launchConfiguration')
+        self.assertEqual(f.value.message,
+                         ('Following problems with launch configuration:\n'
+                          'Invalid imageRef "imagegood" in launchConfiguration'))
 
     def test_validation_error_logged(self):
         """
@@ -98,10 +111,10 @@ class ValidateLaunchServerConfigTests(TestCase):
         """
         self.validate_image.return_value = defer.fail(InvalidLaunchConfiguration(':('))
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
-        f = self.failureResultOf(d, InvalidLaunchConfiguration)
+        self.failureResultOf(d, InvalidLaunchConfiguration)
         self.log.msg.assert_called_once_with(
-            'Validation of "imageRef" property in launchConfiguration failed',
-            reason=f)
+            'Invalid imageRef "imagegood" in launchConfiguration',
+            reason=CheckFailure(InvalidLaunchConfiguration))
 
     def test_optional_property(self):
         """
@@ -144,26 +157,25 @@ class ValidateImageTests(TestCase):
 
     def test_inactive_image(self):
         """
-        `InvalidLaunchConfiguration` is raised if given image is inactive
+        `InactiveImage` is raised if given image is inactive
         """
         self.treq.json_content.return_value = defer.succeed({'image': {'status': 'INACTIVE'}})
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
-        f = self.failureResultOf(d, InvalidLaunchConfiguration)
-        self.assertEqual(f.value.message, 'Image "image_ref" is not active')
+        self.failureResultOf(d, InactiveImage)
 
     def test_unknown_image(self):
         """
-        Errbacks if imageRef is unknown
+        `UnknownImage` is raised if imageRef is unknown
         """
-        self.treq.get.return_value = defer.succeed(mock.MagicMock(code=404))
+        self.treq.get.return_value = defer.succeed(mock.Mock(code=404))
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
-        self.failureResultOf(d)
+        self.failureResultOf(d, UnknownImage)
 
     def test_unexpected_http_status(self):
         """
         Errbacks if unexpected HTTP status is returned
         """
-        self.treq.get.return_value = defer.succeed(mock.MagicMock(code=500))
+        self.treq.get.return_value = defer.succeed(mock.Mock(code=500))
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.failureResultOf(d)
 
@@ -195,10 +207,18 @@ class ValidateFlavorTests(TestCase):
 
     def test_unknown_flavor(self):
         """
-        Errbacks if flavor is unknown
+        UnknownFlavor is raised if flavor is unknown
         """
         self.treq.get.return_value = defer.succeed(mock.Mock(code=404))
         d = validate_flavor(self.log, 'token', 'endpoint', 'flavornum')
+        self.failureResultOf(d, UnknownFlavor)
+
+    def test_unexpected_http_status(self):
+        """
+        Errbacks if unexpected HTTP status is returned
+        """
+        self.treq.get.return_value = defer.succeed(mock.Mock(code=500))
+        d = validate_flavor(self.log, 'token', 'endpoint', 'flavor_some')
         self.failureResultOf(d)
 
 

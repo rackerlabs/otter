@@ -18,6 +18,36 @@ class InvalidLaunchConfiguration(Exception):
     pass
 
 
+class UnknownImage(InvalidLaunchConfiguration):
+    """
+    Unknown imageRef in launch configuration
+    """
+    def __init__(self, image_ref):
+        super(UnknownImage, self).__init__(
+            'Invalid imageRef "{}" in launchConfiguration'.format(image_ref))
+        self.image_ref = image_ref
+
+
+class InactiveImage(InvalidLaunchConfiguration):
+    """
+    imageRef status is not active
+    """
+    def __init__(self, image_ref):
+        super(InactiveImage, self).__init__(
+            'Inactive imageRef "{}" in launchConfiguration'.format(image_ref))
+        self.image_ref = image_ref
+
+
+class UnknownFlavor(InvalidLaunchConfiguration):
+    """
+    Unknown flavorRef in launch configuration
+    """
+    def __init__(self, flavor_ref):
+        super(UnknownFlavor, self).__init__(
+            'Invalid flavorRef "{}" in launchConfiguration'.format(flavor_ref))
+        self.flavor_ref = flavor_ref
+
+
 def get_service_endpoint(service_catalog, region):
     """
     Get the service endpoint used to connect cloud services
@@ -48,31 +78,38 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         failures = [result for succeeded, result in results if not succeeded]
         if not failures:
             return None
-        if len(failures) > 1:
-            msg = ('Following problems with launch configuration:\n' +
-                   '\n'.join([failure.value.message for failure in failures]))
-            raise InvalidLaunchConfiguration(msg)
-        else:
-            return failures[0]
+        msg = ('Following problems with launch configuration:\n' +
+               '\n'.join([failure.value.message for failure in failures]))
+        raise InvalidLaunchConfiguration(msg)
 
-    def raise_validation_error(failure, prop):
-        log.msg('Validation of "{}" property in launchConfiguration failed'.format(prop),
-                reason=failure)
+    def raise_validation_error(failure, prop_name, prop_value):
+        msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name, prop_value)
+        log.msg(msg, reason=failure)
         if failure.check(InvalidLaunchConfiguration):
             return failure
         else:
-            raise InvalidLaunchConfiguration('Invalid "{}" in launchConfiguration'.format(prop))
+            raise InvalidLaunchConfiguration(msg)
 
     service_endpoint = get_service_endpoint(service_catalog, region)
     deferreds = []
-    for validate, prop in validate_functions:
-        prop_value = server.get(prop)
+    for validate, prop_name in validate_functions:
+        prop_value = server.get(prop_name)
         if prop_value:
             d = validate(log, auth_token, service_endpoint, prop_value)
-            d.addErrback(raise_validation_error, prop)
+            d.addErrback(raise_validation_error, prop_name, prop_value)
             deferreds.append(d)
 
     return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
+
+
+def raise_error(failure, code, error):
+    """
+    Raise `error` if given `code` in failure.reason's exception matches
+    To be called as errback handler after wraping the request error with RequestError
+    """
+    if failure.value.reason.value.code == code:
+        raise error
+    return failure
 
 
 def validate_image(log, auth_token, server_endpoint, image_ref):
@@ -83,10 +120,11 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
     d = treq.get(url, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, url, 'get_image')
+    d.addErrback(raise_error, 404, UnknownImage(image_ref))
 
     def is_image_active(image_detail):
         if image_detail['image']['status'] != 'ACTIVE':
-            raise InvalidLaunchConfiguration('Image "{}" is not active'.format(image_ref))
+            raise InactiveImage(image_ref)
 
     d.addCallback(treq.json_content)
     return d.addCallback(is_image_active)
@@ -99,8 +137,10 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     url = append_segments(server_endpoint, 'flavors', flavor_ref)
     d = treq.get(url, headers=headers(auth_token))
     d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_request_error, url, 'get_flavor')
+    d.addErrback(raise_error, 404, UnknownFlavor(flavor_ref))
+
     # Extracting the content to avoid a strange bug in twisted/treq where next
     # subsequent call to nova hangs indefintely
     d.addCallback(treq.content)
-    d.addErrback(wrap_request_error, url, 'get_flavor')
     return d
