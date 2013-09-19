@@ -68,6 +68,8 @@ class SupervisorService(object, Service):
     :ivar DeferredPool deferred_pool: a pool in which to store deferreds that
         should be waited on
     """
+    name = "supervisor"
+
     def __init__(self, auth_function, coiterate):
         self.auth_function = auth_function
         self.coiterate = coiterate

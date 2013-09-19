@@ -10,7 +10,8 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
-from otter.tap.api import Options, DeferredPoolWaitingService, makeService
+from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
+from otter.tap.api import Options, makeService
 from otter.test.utils import patch
 
 
@@ -226,29 +227,14 @@ class APIMakeServiceTests(TestCase):
                                                   self.LoggingCQLClient.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
 
-    @mock.patch('otter.tap.api.Supervisor')
+    @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
         """
-        By default, a supervisor service that waits on supervisor deferreds is
-        added to the Multiservice as a service named 'supervisor'
+        A SupervisorService service is added to the Multiservice, and set as
+        default supervisor
         """
+        self.addCleanup(lambda: set_supervisor(None))
         parent = makeService(test_config)
         supervisor_service = parent.getServiceNamed('supervisor')
-        self.assertIsInstance(supervisor_service, DeferredPoolWaitingService)
 
-        supervisor.assert_called_once_with(mock.ANY, mock.ANY,
-                                           supervisor_service.pool)
-
-    @mock.patch('otter.tap.api.Supervisor')
-    def test_supervisor_service_not_created_if_negative_flag(self, supervisor):
-        """
-        If the config value `delayed_shutdown` is set to False, specifically,
-        the supervisor is created without a DeferredPool, and no
-        DeferredPoolWaitingService is added to the MultiService
-        """
-        mock_config = test_config.copy()
-        mock_config['delayed_shutdown'] = False
-        parent = makeService(mock_config)
-
-        self.assertRaises(KeyError, parent.getServiceNamed, 'supervisor')
-        supervisor.assert_called_once_with(mock.ANY, mock.ANY)
+        self.assertEqual(get_supervisor(), supervisor_service)
