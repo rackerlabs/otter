@@ -344,7 +344,7 @@ class OtterExecute(object):
                          NoSuchPolicyError,
                          NoSuchScalingGroupError)
             self.log.msg("Non-fatal error during webhook execution: {exc!r}",
-                        exc=failure.value)
+                         exc=failure.value)
 
         def execute_policy((tenant_id, group_id, policy_id)):
             self.log = self.log.bind(tenant_id=tenant_id,
