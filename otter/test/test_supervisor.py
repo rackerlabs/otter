@@ -51,7 +51,6 @@ class SupervisorTests(TestCase):
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
 
-
     def test_provides_ISupervisor(self):
         """
         SupervisorService provides ISupervisor
