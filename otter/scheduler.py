@@ -43,10 +43,9 @@ class SchedulerService(TimerService):
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
         from otter.models.cass import LOCK_TABLE_NAME
+        self.lock_table = LOCK_TABLE_NAME
+        self.slv_client = slv_client
         self.log = otter_log.bind(system='otter.scheduler')
-        self.lock_log = self.log.bind(category='locking')
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0,
-                              log=self.lock_log)
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.store = store
         self.clock = clock
@@ -64,9 +63,12 @@ class SchedulerService(TimerService):
             return None
 
         def _do_check():
-            d = with_lock(self.lock, self.fetch_and_process, batchsize)
+            lock_log = self.log.bind(category='locking')
+            lock = BasicLock(self.slv_client, self.lock_table, 'schedule', max_retry=0,
+                             log=lock_log)
+            d = with_lock(lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            d.addErrback(ignore_and_log, BusyLockError, self.lock_log,
+            d.addErrback(ignore_and_log, BusyLockError, lock_log,
                          "Couldn't get lock to process events")
             d.addErrback(self.log.err)
             return d
