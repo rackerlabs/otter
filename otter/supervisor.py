@@ -130,8 +130,7 @@ class SupervisorService(object, Service):
 
         d.addCallback(when_launch_server_completed)
 
-        if self.deferred_pool is not None:
-            self.deferred_pool.add(d)
+        self.deferred_pool.add(d)
 
         d.chainDeferred(completion_d)
 
