@@ -1,9 +1,12 @@
 """
 Test to delete and verify a cloud monitoring policy
 """
+import unittest
+
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 
 
+@unittest.skip('Not yet implemented')
 class DeleteMaasScalingPolicy(ScalingGroupFixture):
 
     """

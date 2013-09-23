@@ -1,10 +1,13 @@
 """
 Test to create and verify a cloud monitoring policy
 """
+import unittest
+
 from test_repo.autoscale.fixtures import ScalingGroupFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
+@unittest.skip('Not yet implemented')
 class CreateMaasScalingPolicy(ScalingGroupFixture):
     """
     Verify create cloud monitoring policy
