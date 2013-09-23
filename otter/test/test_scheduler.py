@@ -248,16 +248,15 @@ class SchedulerTestCase(TestCase):
                     'trigger': 'now', 'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=mock.ANY)
-
         d = self.scheduler_service.check_for_events(100)
 
         self.validate_calls(d, [events1, events2],
                             [(['pol44'] * 100, []), (['pol45'] * 20, [])])
 
+        self.assertEqual(self.mock_lock.mock_calls,
+                         [mock.call(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+                                    max_retry=0, log=mock.ANY)] * 2)
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.call_count, 2)
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
 
@@ -272,17 +271,17 @@ class SchedulerTestCase(TestCase):
                     'trigger': 'now', 'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=mock.ANY)
         with_lock_impl = lambda *args: defer.fail(BusyLockError(LOCK_TABLE_NAME, 'schedule'))
         self.mock_with_lock.side_effect = with_lock_impl
 
         d = self.scheduler_service.check_for_events(100)
 
         self.validate_calls(d, [], None)
+        self.mock_lock.assert_called_once_with(
+            self.slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0, log=mock.ANY)
         lock = self.mock_lock.return_value
-        self.assertEqual(self.mock_with_lock.mock_calls,
-                         [mock.call(lock, self.scheduler_service.fetch_and_process, 100)])
+        self.mock_with_lock.assert_called_once_with(
+            lock, self.scheduler_service.fetch_and_process, 100)
         self.log.msg.assert_called_once_with("Couldn't get lock to process events",
                                              reason=CheckFailure(BusyLockError),
                                              category='locking')
@@ -298,9 +297,6 @@ class SchedulerTestCase(TestCase):
                     'trigger': 'now', 'cron': None} for i in range(20)]
         self.returns = [events1, events2]
 
-        self.mock_lock.assert_called_once_with(self.slv_client, LOCK_TABLE_NAME, 'schedule',
-                                               max_retry=0, log=mock.ANY)
-
         _with_lock_first_time = [True]
 
         def _with_lock(lock, func, *args, **kwargs):
@@ -314,6 +310,9 @@ class SchedulerTestCase(TestCase):
         d = self.scheduler_service.check_for_events(100)
 
         self.validate_calls(d, [events1], [(['pol44'] * 100, [])])
+        self.assertEqual(self.mock_lock.mock_calls,
+                         [mock.call(self.slv_client, LOCK_TABLE_NAME, 'schedule',
+                                    max_retry=0, log=mock.ANY)] * 2)
         lock = self.mock_lock.return_value
         self.assertEqual(self.mock_with_lock.mock_calls,
                          [mock.call(lock, self.scheduler_service.fetch_and_process, 100)] * 2)
