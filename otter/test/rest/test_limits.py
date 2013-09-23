@@ -12,6 +12,7 @@ from otter.util.config import config_value
 
 number = 2
 
+
 class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     """
     Tests for ``/{tenantId}/limits``
