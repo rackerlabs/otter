@@ -19,6 +19,8 @@ from otter.models.interface import NoSuchPolicyError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.rest.bobby import set_bobby
+from otter.bobby import BobbyClient
 
 
 class AllPoliciesTestCase(RestAPITestMixin, TestCase):
@@ -122,6 +124,101 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.create_policies_response)
 
         expected_policy = policy_examples()[0]
+        expected_policy['id'] = '5'
+        expected_policy['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5/'
+            }
+        ]
+        self.assertEqual(resp, {"policies": [expected_policy]})
+
+
+class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
+    """
+    endpoint = "/v1.0/11111/groups/1/policies/"
+    invalid_methods = ("PUT", "DELETE")
+
+    def setUp(self):
+        """
+        Set up mock Bobby client
+        """
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
+
+        super(AllBobbyPoliciesTestCase, self).setUp()
+
+    def tearDown(self):
+        """
+        Revert mock Bobby client
+        """
+        set_bobby(None)
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby_null(self, create_policy, mock_url):
+        """
+        Tries to create a set of policies.
+        """
+
+        self.mock_group.create_policies.return_value = defer.succeed({
+            '5': policy_examples()[0]
+        })
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps(policy_examples()[:1]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies/')
+
+        self.assertFalse(create_policy.called)
+
+        self.mock_group.create_policies.assert_called_once_with(
+            policy_examples()[:1])
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_policies_response)
+
+        expected_policy = policy_examples()[0]
+        expected_policy['id'] = '5'
+        expected_policy['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5/'
+            }
+        ]
+        self.assertEqual(resp, {"policies": [expected_policy]})
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby(self, create_policy, mock_url):
+        """
+        Tries to create a set of policies.
+        """
+
+        bobby_policy = {
+            "name": "Schedule policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring"
+        }
+        self.mock_group.create_policies.return_value = defer.succeed({
+            '5': bobby_policy.copy()
+        })
+
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps([bobby_policy]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies/')
+
+        self.mock_group.create_policies.assert_called_once_with(
+            [bobby_policy])
+
+        create_policy.assert_called_once_with("11111", "1", "5", {}, "")
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_policies_response)
+
+        expected_policy = bobby_policy
         expected_policy['id'] = '5'
         expected_policy['links'] = [
             {

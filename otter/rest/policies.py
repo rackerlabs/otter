@@ -7,6 +7,7 @@ the scaling policies associated with a particular scaling group.
 
 from functools import partial
 import json
+from twisted.internet import defer
 
 from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import (validate_body, fails_with,
@@ -202,8 +203,22 @@ class OtterPolicies(object):
 
             return {'policies': policy_list}
 
+        def _add_to_bobby(policy_dict, client):
+            d = defer.succeed(policy_dict)
+            for policy_uuid, policy_item in policy_dict.iteritems():
+                if policy_item['type'] == 'cloud_monitoring':
+                    client.create_policy(self.tenant_id, self.scaling_group_id, policy_uuid, {}, "")
+            return d.addCallback(lambda _: policy_dict)
+
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.create_policies(data)
+
+        from otter.rest.bobby import get_bobby
+
+        bobby = get_bobby()
+        if bobby is not None:
+            deferred.addCallback(_add_to_bobby, bobby)
+
         deferred.addCallback(format_policies_and_send_redirect)
         deferred.addCallback(json.dumps)
         return deferred

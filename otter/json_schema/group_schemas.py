@@ -257,7 +257,7 @@ _policy_base_type = {
 # Hence, this dirty hack: It creates all possible types
 _policy_types = []
 for change in ['change', 'changePercent', 'desiredCapacity']:
-    for _type in ['schedule', 'webhook']:
+    for _type in ['schedule', 'webhook', 'cloud_monitoring']:
         _policy_type = deepcopy(_policy_base_type)
         _policy_type['properties'][change] = {'required': True}
         _policy_type['properties']['type'] = {'pattern': _type}
@@ -327,7 +327,7 @@ policy = {
             "required": True
         },
         "type": {
-            "enum": ["webhook", "schedule"],
+            "enum": ["webhook", "schedule", "cloud_monitoring"],
             "required": True
         },
         "args": {
