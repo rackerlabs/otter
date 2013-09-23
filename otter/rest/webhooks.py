@@ -12,7 +12,7 @@ import json
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   log_arguments)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -212,11 +212,36 @@ class OtterWebhooks(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:webhook_id>/', methods=['GET'])
+    @app.route('/<string:webhook_id>/', branch=True)
+    @with_transaction_id()
+    def webhook(self, request, log, webhook_id):
+        """
+        Delegate routes for specific webhooks to OtterWebhook.
+        """
+        return OtterWebhook(self.store, log, self.tenant_id,
+                            self.group_id, self.policy_id,
+                            webhook_id).app.resource()
+
+
+class OtterWebhook(object):
+    """
+    REST endpoints for managing a specific scaling group webhook.
+    """
+    app = OtterApp()
+
+    def __init__(self, store, log, tenant_id, group_id, policy_id,
+                 webhook_id):
+        self.store = store
+        self.log = log
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+        self.policy_id = policy_id
+        self.webhook_id = webhook_id
+
+    @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
-    def get_webhook(self, request, webhook_id):
+    def get_webhook(self, request):
         """
         Get a webhook which has a name, some arbitrary metdata, and a capability
         URL.  This data is returned in the body of the response in JSON format.
@@ -242,23 +267,22 @@ class OtterWebhooks(object):
             }
         """
         def format_one_webhook(webhook_model):
-            result = _format_webhook(webhook_id, webhook_model,
+            result = _format_webhook(self.webhook_id, webhook_model,
                                      self.tenant_id, self.group_id,
                                      self.policy_id)
             return {'webhook': result}
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.get_webhook(self.policy_id, webhook_id)
+        deferred = rec.get_webhook(self.policy_id, self.webhook_id)
         deferred.addCallback(format_one_webhook)
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:webhook_id>/', methods=['PUT'])
+    @app.route('/', methods=['PUT'])
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
-    @log_arguments
-    def update_webhook(self, request, webhook_id, data):
+    def update_webhook(self, request, data):
         """
         Update a particular webhook.
         A webhook may (but do not need to) include some arbitrary medata, and must
@@ -275,20 +299,19 @@ class OtterWebhooks(object):
             }
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.update_webhook(self.policy_id, webhook_id, data)
+        deferred = rec.update_webhook(self.policy_id, self.webhook_id, data)
         return deferred
 
-    @app.route('/<string:webhook_id>/', methods=['DELETE'])
+    @app.route('/', methods=['DELETE'])
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
-    def delete_webhook(self, request, webhook_id):
+    def delete_webhook(self, request):
         """
         Deletes a particular webhook.
         If successful, no response body will be returned.
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.delete_webhook(self.policy_id, webhook_id)
+        deferred = rec.delete_webhook(self.policy_id, self.webhook_id)
         return deferred
 
 

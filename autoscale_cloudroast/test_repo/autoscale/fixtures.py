@@ -257,7 +257,7 @@ class AutoscaleFixture(BaseTestFixture):
         list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
         metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
                          in list_servers_on_tenant]
-        group_ids_list_from_metadata = [each['rax:auto_scaling_group_id'] for each in metadata_list]
+        group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each in metadata_list]
         return group_ids_list_from_metadata.count(group_id)
 
     def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
@@ -398,10 +398,12 @@ class ScalingGroupFixture(AutoscaleFixture):
             lc_image_ref = cls.lc_image_ref
         cls.create_group_response = cls.autoscale_client.\
             create_scaling_group(
-                gc_name, gc_cooldown,
-                gc_min_entities,
-                lc_name, lc_image_ref,
-                lc_flavor_ref,
+                gc_name=gc_name,
+                gc_cooldown=gc_cooldown,
+                gc_min_entities=gc_min_entities,
+                lc_name=lc_name,
+                lc_image_ref=lc_image_ref,
+                lc_flavor_ref=lc_flavor_ref,
                 gc_max_entities=gc_max_entities,
                 gc_metadata=gc_metadata,
                 lc_personality=lc_personality,

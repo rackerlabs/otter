@@ -67,7 +67,7 @@ _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data)
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused)')
-_cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+_cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                          '"policyTouched", paused, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
 _cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
@@ -100,7 +100,7 @@ _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
-_cql_list_states = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
+_cql_list_states = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                     '"policyTouched", paused, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
@@ -300,7 +300,8 @@ def _jsonloads_data(raw_data):
 
 def _unmarshal_state(state_dict):
     return GroupState(
-        state_dict['tenantId'], state_dict['groupId'],
+        state_dict["tenantId"], state_dict["groupId"],
+        _jsonloads_data(state_dict["group_config"])["name"],
         _jsonloads_data(state_dict["active"]),
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
@@ -446,6 +447,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
+        log = self.log.bind(system='CassScalingGroup.modify_state')
+
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
                     new_state.group_id == self.uuid)
@@ -465,8 +468,11 @@ class CassScalingGroup(object):
             d = self.view_state()
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
+
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5))
+                         max_retry=5, retry_wait=random.uniform(3, 5),
+                         log=log.bind(category='locking'))
+
         return with_lock(lock, _modify_state)
 
     def update_config(self, data):
@@ -759,6 +765,8 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.delete_group`
         """
+        log = self.log.bind(system='CassScalingGroup.delete_group')
+
         # Events can only be deleted by policy id, since that and trigger are
         # the only parts of the compound key
         def _delete_everything(policies):
@@ -795,7 +803,9 @@ class CassScalingGroup(object):
             return d
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5))
+                         max_retry=5, retry_wait=random.uniform(3, 5),
+                         log=log.bind(category='locking'))
+
         return with_lock(lock, _delete_group)
 
 
@@ -1025,27 +1035,30 @@ class CassAdmin(object):
         """
         see :meth:`otter.models.interface.IAdmin.get_metrics`
         """
-        def _format_data(results):
+        def _get_metric(table, label):
             """
-            :param results: Results from running the collect_metrics call.
-
-            :return: Correctly formatted data to be jsonified.
+            Execute a CQL statement and return a formatted result
             """
-            metrics = []
-            for key, value in results.iteritems():
-                metrics.append(dict(
-                    id="otter.metrics.{0}".format(key),
-                    value=value,
-                    time=int(time.time())))
-            return metrics
+            def _format_result(result, label):
+                """
+                :param result: Result from metric collection
+                :param label: Label for the metric
 
-        fields = ['scaling_config', 'scaling_policies', 'policy_webhooks']
-        deferred = [self.connection.execute(_cql_count_all.format(cf=field), {},
-                                            get_consistency_level('count', 'group'))
-                    for field in fields]
+                :return: dict of metric label, value and time
+                """
+                return dict(
+                    id="otter.metrics.{0}".format(label),
+                    value=result[0]['count'],
+                    time=int(time.time()))
 
-        d = defer.gatherResults(deferred)
-        d.addCallback(lambda results: dict(zip(
-            ('groups', 'policies', 'webhooks'), [r[0]['count'] for r in results])))
-        d.addCallback(_format_data)
-        return d
+            dc = self.connection.execute(_cql_count_all.format(cf=table), {},
+                                         get_consistency_level('count', 'group'))
+            dc.addCallback(_format_result, label)
+            return dc
+
+        tables = ['scaling_group', 'scaling_policies', 'policy_webhooks']
+        labels = ['groups', 'policies', 'webhooks']
+        mapping = zip(tables, labels)
+
+        deferreds = [_get_metric(table, label) for table, label in mapping]
+        return defer.gatherResults(deferreds, consumeErrors=True)

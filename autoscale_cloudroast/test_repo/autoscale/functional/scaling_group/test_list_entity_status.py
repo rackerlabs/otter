@@ -37,6 +37,9 @@ class GetListEntityStatusTest(AutoscaleFixture):
         """
         Verify list status' data.
         """
+        self.assertEquals(self.group_state.name, self.group.groupConfiguration.name,
+                          msg='The group name does not match in group'
+                          ' state for group {0}'.format(self.group.id))
         self.assertEquals(len(self.group_state.active), self.group_state.activeCapacity)
         self.assertEquals(self.group_state.desiredCapacity,
                           self.group_state.activeCapacity + self.group_state.pendingCapacity)

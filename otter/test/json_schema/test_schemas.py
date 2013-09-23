@@ -668,15 +668,41 @@ class CreateScalingGroupTestCase(TestCase):
             'scalingPolicies': []
         }, rest_schemas.create_group_request)
 
-    def test_creation_with_scaling_policies_valid(self):
+    def test_creation_with_one_scaling_policy_valid(self):
         """
-        Creation with an array of scaling policies validates
+        Creation with an array of one scaling policy validates
         """
         validate({
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
             'scalingPolicies': [self.policy]
         }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_valid(self):
+        """
+        Creation with an array of many scaling policies
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': group_examples.policy()
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_invalid(self):
+        """
+        Creation with an array of many scaling policies validates each scaling policy.
+        It raises error if any of the policies is invalid
+        """
+        policy2 = deepcopy(self.policy)
+        policy2['type'] = 'junk'
+        invalid = {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': [self.policy, policy2]
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'scalingPolicies',
+            validate, invalid, rest_schemas.create_group_request)
 
     def test_creation_with_duplicate_scaling_policies_valid(self):
         """
