@@ -118,7 +118,7 @@
                 Create an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation creates an autoscaling group. To describe the group you wish to create, 
+                This method creates an autoscaling group. To create a scaling group,  
                 specify the scaling group
                 configuration, launch configuration, and optional scaling policies in the request body in JSON format. 
                 If the group is created successfuly, the response body describes the created group in JSON format. The response includes an ID and
@@ -150,14 +150,12 @@
     <method id="getGroups" name="GET">
         <doc title="List Scaling Groups" xml:lang="EN">
             <db:para role="shortdesc">
-                List the autoscaling groups available to the specified tenant.
+                This method lists the autoscaling groups that are available for the specified tenant.
             </db:para>
             <db:para>
-                For the tenant specified by
+                This method returns a list of autoscaling groups that have been created for the tenant specified by
                 <code>tenantID</code>
-                , 
-                this operation returns a list of autoscaling groups.
-            </db:para>
+            .</db:para>
         </doc>
         <response status="200">
             <representation mediaType="application/json">
@@ -172,7 +170,7 @@
     <method id="getGroupManifest" name="GET">
         <doc title="List All Group Details">
             <db:para role="shortdesc">
-                List detailed autoscaling group configuration.
+                This method returns details about the configuration for a specified autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 For the specified autoscaling group configuration,
@@ -193,12 +191,12 @@
     <method id="deleteGroup" name="DELETE">
         <doc title="Delete Group">
             <db:para role="shortdesc">
-                Delete autoscaling group.
+                This method deletes an  autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation deletes the specified autoscaling group if the group is empty. 
+                This method deletes the specified autoscaling group if the group is empty. 
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 is returned.
+                the group contains pending or active entities, deletion fails and a 409 error message is returned.
             </p>
         </doc>
         <response status="204"/>
@@ -208,10 +206,10 @@
     <method id="getGroupState" name="GET">
         <doc title="Get Group State">
             <db:para role="shortdesc">
-                Report autoscaling group state.
+               This method returns the state of an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation retrieves the current state of the specified autoscaling group.
+                This method retrieves the current state of the specified autoscaling group.
                 It describes the state of the group in terms of its 
                 current set of active entities, the number of pending entities, and
                 the desired number of entities. The description is returned in the response body
@@ -231,10 +229,10 @@
     <method id="getGroupConfig" name="GET">
         <doc title="Get Group Configuration">
             <db:para role="shortdesc">
-                List autoscaling group configuration.
+               This method lists the configuration for an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation lists the group's configuration. 
+                This method lists the configuration for a specified autoscaling group. 
                 The configuration describes the
                 minimum number of entities in the group, 
                 the maximum number of entities in the group, 
@@ -255,16 +253,16 @@
     <method id="putGroupConfig" name="PUT">
         <doc title="Replace Group Configuration">
             <db:para role="shortdesc">
-                Update autoscaling group configuration.
+                This method updates the configuration for the autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            This operation changes the configuration of an existing autoscaling group.
+            This method changes the configuration of an existing autoscaling group.
             To change the configuration, 
-            describe the new configuration in the request body in JSON format. 
-            Configuration elements you can describe include 
+            specify the new configuration in the request body in JSON format. 
+            Configuration elements include 
             the
             minimum number of entities, the maximum number of entities, the global
-            cooldown time, and other metadata. If the change is successful, no response body is
+            cooldown time, and other metadata. If the update is successful, no response body is
             returned.
             </p>
         </doc>
@@ -282,10 +280,10 @@
     <method id="getLaunchConfig" name="GET">
         <doc title="Get Launch Configuration">
             <db:para role="shortdesc">
-                List launch configuration.
+                This method lists the launch configuration.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation lists the group's launch configuration. 
+                This method lists the launch configuration for the specified autoscaling group. 
                 The launch configuration describes the details of how to create a server, 
                 from what image to create a server, 
                 which load
@@ -307,18 +305,18 @@
     <method id="putLaunchConfig" name="PUT">
         <doc title="Replace Launch Configuration">
             <db:para role="shortdesc">
-                Update launch group configuration.
+                This method updates the launch group configuration.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation changes an existing launch configuration for the specified autoscaling group.
+                This method changes an existing launch configuration for the specified autoscaling group.
                 To change the launch configuration, 
-                describe the new configuration in the request body in JSON format. 
-                Configuration elements you can describe include 
+                specify the new configuration in the request body in JSON format. 
+                Configuration elements include 
                 how to create a server, 
                 from what image to create a server, 
                 which load
                 balancers to join the server to, which networks to add the server to, and other
-                metadata. If the change is successful, no response body is returned.
+                metadata. If the update is successful, no response body is returned.
             </p>
         </doc>
         <request>
@@ -335,10 +333,10 @@
     <method id="pauseGroup" name="POST">
         <doc title="Pause Group Policy Execution">
             <db:para role="shortdesc">
-                Pause policy execution.
+                This method pauses the execution of a scaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation pauses all execution of autoscaling policies.
+                This method pauses the execution of all autoscaling policies for the specified autoscaling group.
             </p>
         </doc>
         <request>
@@ -353,10 +351,10 @@
     <method id="resumeGroup" name="POST">
         <doc title="Resume Group Policy Execution">
             <db:para role="shortdesc">
-                Resume policy execution.
+                This method resumes the execution of an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation resumes all execution of autoscaling policies.
+                This method resumes the execution of all autoscaling policies for the specified autoscaling group.
             </p>
         </doc>
         <request>
@@ -371,10 +369,10 @@
     <method name="GET" id="getPolicies">
         <doc title="Get Policies List">
             <db:para role="shortdesc">
-                List scaling policies in the autoscaling group.
+                This method lists scaling policies in the autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling group, this operation returns a list of the scaling policies that are available to the group. 
+            This method returns a list of the scaling policies that are available to the specified autoscaling group. 
             Each policy is described in terms of an ID, 
             name, type, adjustment, cooldown time, and links. These
             descriptions are returned in the response body in JSON format.
@@ -393,15 +391,15 @@
     <method name="POST" id="createPolicies">
         <doc title="Create Policy">
             <db:para role="shortdesc">
-                Create autoscaling policy.
+                This method creates an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling group, this operation creates one or multiple autoscaling policies. 
-            To create a policy, describe it in the request body in JSON format.
+            This method creates one or multiple autoscaling policies for the specified autoscaling group. 
+            To create a policy, specify it in the request body in JSON format.
             Each description must include a name, type, adjustment, and cooldown time.
             </p>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            Use the JSON response to obtain information about the newly-created policy or policies.
+            Use the JSON response to obtain information about the newly-created policy or policies:
             <ul>
                 <li>The response header points to the List Policies endpoint.</li>
                 <li>The response body provides an array of scaling policies.</li>
@@ -474,10 +472,10 @@
     <method name="GET" id="getPolicy">
         <doc title="Get Policy Details">
             <db:para role="shortdesc">
-                Describe one policy.
+                This method returns details for a specified autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling policy, this operation returns a description. 
+            This method returns a description for the specified autoscaling policy. 
             The description includes an ID, name, type,
             adjustment, cooldown time, and links. The description is returned in the
             response body in JSON format.
@@ -496,13 +494,12 @@
     <method id="putPolicy" name="PUT">
         <doc title="Replace Policy">
             <db:para role="shortdesc">
-                Update policy.
+                This method updates an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            This operation changes an existing autoscaling policy for the specified tenant.
-            To change the policy, describe the new policy in the request body in JSON format.
-            Updates a scaling policy. You must describe the policy's name,
-            type, adjustment, and cooldown time. If the change is successful, no response body
+            This method modifies an existing autoscaling policy for the specified tenant.
+            To update the policy, specify the policy's name,
+            type, adjustment, and cooldown time in the request body in JSON format. If the change is successful, no response body
             is returned.
             </p>
         </doc>
@@ -520,10 +517,10 @@
     <method id="deletePolicy" name="DELETE">
         <doc title="Delete Policy">
             <db:para role="shortdesc">
-                Delete policy.
+                This method deletes an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation deletes the specified autoscaling policy from the specified tenant. 
+                This method deletes the specified autoscaling policy from the specified tenant. 
                 If deletion is successful, no response body is returned.
             </p>
         </doc>
@@ -534,10 +531,10 @@
     <method id="executePolicy" name="POST">
         <doc title="Execute Policy">
             <db:para role="shortdesc">
-                Execute policy.
+                This method executes an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation executes the specified autoscaling policy. If execution is successful, a response body is
+                This method executes the specified autoscaling policy. If execution is successful, a response body is
             returned.
             </p>
         </doc>
@@ -553,10 +550,10 @@
     <method name="GET" id="getWebhooks">
         <doc title="Get a list of webhooks for the policy">
             <db:para role="shortdesc">
-                Get a list of webhooks for the policy.
+                This method obtains a list of webhooks for the autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get a list of webhooks and their IDs. This data is returned in
+                This method obtains a list of webhooks and their IDs for the specified autoscaling policy. This data is returned in
                 the response body in JSON format.
             </p>
         </doc>
@@ -573,12 +570,12 @@
     <method id="createWebhook" name="POST">
         <doc title="Create a webhook">
             <db:para role="shortdesc">
-                Create a Webhook.
+                This method creates a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Create one or more new scaling policy webhooks. Webhooks must
-            have a name. If successful, the created response body will contain
-            the IDs and links to the newly created webhooks. This data provided
+            This method create one or more webhooks for the specified autoscaling policy. Webhooks must
+            have a name. If successful, the response body will contain
+            the IDs and links to the newly created webhooks. This data is provided
             in the request body in JSON format.
             </p>
         </doc>
@@ -602,11 +599,10 @@
     <method id="getWebhook" name="GET">
         <doc title="View Webhook">
             <db:para role="shortdesc">
-                Describe one webhook.
+                This method returns the description for a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified tenant and the specified autoscaling policy, 
-            this operation returns a description of the specified webhook. 
+            This method returns a description of a webhook for the specified tenant and the specified autoscaling policy. 
             The description is returned in the response body in JSON format.
             </p>
         </doc>
@@ -623,12 +619,12 @@
     <method id="putWebhook" name="PUT">
         <doc title="Update Webhook">
             <db:para role="shortdesc">
-                Update webhook.
+                This method updates a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified tenant and policy, this operation changes the specified webhook. 
+            This method changes the specified webhook for a specified enant and autoscaling policy.
             If the specified webhook is not recognized, the change is ignored. 
-            If a URL is submitted, the URL is ignored but that does not invalidate the request. 
+            If you submit a URL, the URL is ignored but that does not invalidate the request. 
             If the change is successful, no
             response body is returned.
             </p>
@@ -647,10 +643,10 @@
     <method id="deleteWebhook" name="DELETE">
         <doc title="Delete Webhook">
             <db:para role="shortdesc">
-                Delete webhook.
+                This method deletes a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation deletes the specified autoscaling policy webhook. If deletion is successful, no response body
+                This method deletes the webhook for a specified autoscaling policy. If deletion is successful, no response body
                 is returned.
             </p>
         </doc>
@@ -661,9 +657,9 @@
     <method id="anonymousExecute" name="POST">
         <doc title="Execute Anonymous Webhook">
             <db:para role="shortdesc">
-                Execute anonymous webhook.
+                This method executes an anonymous webhook.
             </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">This operation executes an anonymous webhook.</p>
+            <p xmlns="http://www.w3.org/1999/xhtml">This method executes an anonymous webhook.</p>
         </doc>
         <request>
             <representation mediaType="application/json">
