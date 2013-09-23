@@ -3,7 +3,7 @@ HTTP utils, such as formulation of URLs
 """
 
 from itertools import chain
-from urllib import quote
+from urllib import quote, urlencode
 
 import treq
 
@@ -148,7 +148,7 @@ def get_url_root():
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                         webhook_id=None, capability_hash=None,
                         capability_version="1", format="json",
-                        api_version="1.0"):
+                        api_version="1.0", query_params=None):
     """
     Generates links into the autoscale system, based on the ids given.  If
     the format is "json", then a JSON blob will be given in the form of::
@@ -213,6 +213,9 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         segments.append('')
 
     url = append_segments(*segments)
+
+    if query_params is not None:
+        url = "{0}?{1}".format(url, urlencode(query_params))
 
     if format == "json":
         links = [

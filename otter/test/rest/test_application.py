@@ -251,6 +251,21 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
 
+    def test_query_params(self):
+        """
+        When query parameters are provided, a correct HTTP query string is
+        appended to the URL without adding an extra slash
+        """
+        query = get_autoscale_links(
+            '11111', group_id='1',
+            query_params=[('marco', 'polo'),
+                          ('ping', 'pong'),
+                          ('razzle', 'dazzle')],
+            format=None)
+        self.assertEqual(
+            query,
+            '/v1.0/11111/groups/1/?marco=polo&ping=pong&razzle=dazzle')
+
 
 class RouteTests(RequestTestMixin, TestCase):
     """
