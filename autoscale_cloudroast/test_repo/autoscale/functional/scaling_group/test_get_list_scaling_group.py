@@ -96,3 +96,17 @@ class ScalingGroupListTest(AutoscaleFixture):
             (self.third_scaling_group.id, self.third_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.third_scaling_group.id, group_id_list))
+
+    def test_list_scaling_group_in_sorted_order(self):
+        """
+        Verify the list group returns entities in sorted order by group ID
+        """
+        list_groups_response = self.autoscale_client.list_scaling_groups()
+        list_groups = list_groups_response.entity
+        self.assertEqual(200, list_groups_response.status_code,
+                         msg='The list scaling group call failed with: '
+                         '{0}'.format(list_groups_response.content))
+        self.validate_headers(list_groups_response.headers)
+        group_id_list = [group.id for group in list_groups]
+        sorted_group_id_list = sorted(group_id_list)
+        self.assertEquals(sorted_group_id_list, group_id_list)
