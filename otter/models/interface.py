@@ -558,7 +558,7 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
 
-    def list_scaling_group_states(log, tenant_id, limit=100, last_seen=None):
+    def list_scaling_group_states(log, tenant_id, limit=100, marker=None):
         """
         List the scaling groups states for this tenant ID
 
@@ -567,7 +567,7 @@ class IScalingGroupCollection(Interface):
 
         :param int limit: the maximum number of scaling group states to return
             (for pagination purposes)
-        :param str last_seen: the group ID of the last seen group (for
+        :param str marker: the group ID of the last seen group (for
             pagination purposes - page offsets)
 
         :return: a list of scaling group states

@@ -118,7 +118,7 @@ _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
 def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
-                    last_seen=None):
+                    marker=None):
     """
     :param tenant_id: the tenant ID - if this is all that is provided, this
         function returns cql to list all groups
@@ -131,7 +131,7 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
         if this is provided and groupID is not provided, the policy ID will be
         ignored and cql to list all groups will be returned.
 
-    :param last_seen: the ID of the last column of the provided keys. (e.g.
+    :param marker: the ID of the last column of the provided keys. (e.g.
         group_id, when listing groups, policy_id, when listing policies,
         and webhook_id, when listing webhooks)
 
@@ -143,7 +143,7 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
     The CQL will look like:
 
         SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND
-        "groupId" = :groupId AND "policyId" > :last_seen LIMIT 100;
+        "groupId" = :groupId AND "policyId" > :marker LIMIT 100;
 
     Note that the column family name still has to be inserted.
 
@@ -156,11 +156,11 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
     See http://cassandra.apache.org/doc/cql3/CQL.html#createTableOptions
     """
     params = {'tenantId': tenant_id, 'limit': limit}
-    last_seen_cql = ''
+    marker_cql = ''
 
-    if last_seen is not None:
-        last_seen_cql = " AND {0} > :last_seen"
-        params['last_seen'] = last_seen
+    if marker is not None:
+        marker_cql = " AND {0} > :marker"
+        params['marker'] = marker
 
     if group_id is not None:
         params['groupId'] = group_id
@@ -168,12 +168,12 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
         if policy_id is not None:
             params['policyId'] = group_id
             cql = [_cql_list_webhook.rstrip(';'),
-                   last_seen_cql.format('"webhookId"')]
+                   marker_cql.format('"webhookId"')]
         else:
             cql = [_cql_list_policy.rstrip(';'),
-                   last_seen_cql.format('"policyId"')]
+                   marker_cql.format('"policyId"')]
     else:
-        cql = [_cql_list_states.rstrip(';'), last_seen_cql.format('"groupId"')]
+        cql = [_cql_list_states.rstrip(';'), marker_cql.format('"groupId"')]
 
     cql.append(" LIMIT :limit;")
     return (''.join(cql), params)
@@ -973,7 +973,7 @@ class CassScalingGroupCollection:
         })
         return d
 
-    def list_scaling_group_states(self, log, tenant_id, limit=100, last_seen=None):
+    def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
@@ -1003,7 +1003,7 @@ class CassScalingGroupCollection:
                                            get_consistency_level('delete', 'group'))
 
         log = log.bind(tenant_id=tenant_id)
-        cql, params = _paginated_list(tenant_id, limit=limit, last_seen=last_seen)
+        cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
         d = self.connection.execute(cql.format(cf=self.group_table), params,
                                     get_consistency_level('list', 'group'))
         d.addCallback(_filter_resurrected)

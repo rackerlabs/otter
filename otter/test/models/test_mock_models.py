@@ -727,7 +727,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             self.collection.list_scaling_group_states(log, '1', limit=3))
         self.assertEqual([g.group_id for g in result], ['1', '2', '3'])
 
-    def test_list_scaling_group_offsets_by_last_seen(self):
+    def test_list_scaling_group_offsets_by_marker(self):
         """
         Listing all scaling groups will offset the list by the last seen
         parameter
@@ -737,7 +737,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             self.collection.create_scaling_group(log, '1', '', '', [])
 
         result = self.successResultOf(
-            self.collection.list_scaling_group_states(log, '1', last_seen='5'))
+            self.collection.list_scaling_group_states(log, '1', marker='5'))
         self.assertEqual([g.group_id for g in result], ['6', '7', '8', '9'])
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)

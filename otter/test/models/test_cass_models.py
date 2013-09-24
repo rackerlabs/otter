@@ -1999,18 +1999,18 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-    def test_list_states_offsets_by_last_seen(self):
+    def test_list_states_offsets_by_marker(self):
         """
-        If a last_seen is provided, it is passed into the CQL as a where clause
+        If a marker is provided, it is passed into the CQL as a where clause
         """
         self.returns = [[]]
-        expectedData = {'tenantId': '123', 'limit': 100, 'last_seen': '345'}
+        expectedData = {'tenantId': '123', 'limit': 100, 'marker': '345'}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" > :last_seen LIMIT :limit;')
+                       '"groupId" > :marker LIMIT :limit;')
         self.collection.list_scaling_group_states(self.mock_log, '123',
-                                                  last_seen='345')
+                                                  marker='345')
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

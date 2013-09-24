@@ -407,12 +407,12 @@ class MockScalingGroupCollection:
 
         return self.data[tenant][uuid].view_manifest()
 
-    def list_scaling_group_states(self, log, tenant, limit=100, last_seen=None):
+    def list_scaling_group_states(self, log, tenant, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
         states = [v.state for v in self.data.get(tenant, {}).values()
-                  if (last_seen is None or v.state.group_id > last_seen)]
+                  if (marker is None or v.state.group_id > marker)]
         states.sort(key=lambda v: v.group_id)
         return defer.succeed(states[:limit])
 
