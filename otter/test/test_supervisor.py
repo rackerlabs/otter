@@ -4,18 +4,20 @@ Tests for the worker supervisor.
 import mock
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import succeed, fail
+from twisted.internet.defer import succeed, fail, Deferred
 from twisted.internet.task import Cooperator
 
+from zope.interface.verify import verifyObject
+
 from otter.models.interface import IScalingGroup
-from otter.supervisor import Supervisor
+from otter.supervisor import ISupervisor, SupervisorService
 from otter.test.utils import iMock, patch
 from otter.util.config import set_config_data
 
 
 class SupervisorTests(TestCase):
     """
-    Common stuff for tests in supervisor
+    Common stuff for tests in SupervisorService
     """
 
     def setUp(self):
@@ -42,11 +44,18 @@ class SupervisorTests(TestCase):
 
         self.cooperator = mock.Mock(spec=Cooperator)
 
-        self.supervisor = Supervisor(self.auth_function, self.cooperator.coiterate)
+        self.supervisor = SupervisorService(
+            self.auth_function, self.cooperator.coiterate)
 
         self.InMemoryUndoStack = patch(self, 'otter.supervisor.InMemoryUndoStack')
         self.undo = self.InMemoryUndoStack.return_value
         self.undo.rewind.return_value = succeed(None)
+
+    def test_provides_ISupervisor(self):
+        """
+        SupervisorService provides ISupervisor
+        """
+        verifyObject(ISupervisor, self.supervisor)
 
 
 class LaunchConfigTests(SupervisorTests):
@@ -152,6 +161,49 @@ class LaunchConfigTests(SupervisorTests):
                                        self.group, self.launch_config)
 
         self.InMemoryUndoStack.assert_called_once_with(self.cooperator.coiterate)
+
+    def test_job_deferred_added_to_deferred_pool(self):
+        """
+        The launch config job deferred is added to a deferred pool, if it is
+        provided to the constructor
+        """
+        self.launch_server.return_value = Deferred()  # block forward progress
+
+        # the pool starts off empty
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
+
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
+
+        # the pool is now not empty, since the job has been added
+        empty = self.supervisor.deferred_pool.notify_when_empty()
+        self.assertNoResult(empty)  # the pool is not empty now
+
+        # after launch server returns, the pool empties
+        self.launch_server.return_value.callback((self.fake_server_details, {}))
+        self.successResultOf(empty)
+
+    def test_will_not_stop_until_pool_empty(self):
+        """
+        The deferred returned by stopService will not fire until the deferred
+        pool is empty.
+        """
+        self.launch_server.return_value = Deferred()  # block forward progress
+
+        # the pool starts off empty
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
+
+        self.supervisor.execute_config(self.log, 'transaction-id',
+                                       self.group, self.launch_config)
+
+        sd = self.supervisor.stopService()
+
+        self.assertFalse(self.supervisor.running)
+        self.assertNoResult(sd)
+
+        self.launch_server.return_value.callback((self.fake_server_details, {}))
+
+        self.successResultOf(sd)
 
 
 class DeleteServerTests(SupervisorTests):

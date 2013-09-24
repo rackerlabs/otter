@@ -23,7 +23,7 @@ from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.models.mock import MockAdmin, MockScalingGroupCollection
 from otter.scheduler import SchedulerService
 
-from otter.supervisor import Supervisor, set_supervisor
+from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
 
@@ -121,11 +121,12 @@ def makeService(config):
             config_value('identity.admin_url')),
         cache_ttl)
 
-    supervisor = Supervisor(authenticator.authenticate_tenant, coiterate)
+    s = MultiService()
+
+    supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
+    supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
-
-    s = MultiService()
 
     otter = Otter(store)
     site = Site(otter.app.resource())
