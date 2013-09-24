@@ -242,11 +242,19 @@ class AutoscaleFixture(BaseTestFixture):
         Given the group id, returns the count of servers with that group id in the
         metadata of the servers on the tenant
         """
-        list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-        metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                         in list_servers_on_tenant]
-        group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each in metadata_list]
-        return group_ids_list_from_metadata.count(group_id)
+        end_time = time.time() + 60
+        while time.time() < end_time:
+            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
+            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
+                             in list_servers_on_tenant]
+            group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
+                                            in metadata_list]
+            if group_id in group_ids_list_from_metadata:
+                return group_ids_list_from_metadata.count(group_id)
+            time.sleep(5)
+        else:
+            self.fail('Waited 60 seconds, but there was no server with group id : {0} in'
+                      ' the metadata'.format(group_id))
 
     def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
                                                    interval_time=None, timeout=None):
