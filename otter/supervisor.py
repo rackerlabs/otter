@@ -138,7 +138,7 @@ class SupervisorService(object, Service):
 
     def execute_delete_server(self, log, transaction_id, scaling_group, server):
         """
-        see :meth:`ISupervisor.execute_config`
+        see :meth:`ISupervisor.execute_delete_server`
         """
         log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
 
