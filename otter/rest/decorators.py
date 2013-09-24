@@ -175,3 +175,33 @@ def validate_body(schema):
 
         return _
     return decorator
+
+
+class InvalidQueryArgument(Exception):
+    """
+    Something is wrong with a query arg
+    """
+
+
+def paginatable(f):
+    """
+    Is a paginatable endpoint, which means that it accepts the limit and marker
+    query args.  This decorator validates them and puts them into a pagination
+    dictionary.
+    """
+    @wraps(f)
+    def _(self, request, *args, **kwargs):
+        paginate = {}
+        if 'limit' in request.args:
+            try:
+                paginate['limit'] = int(request.args['limit'][0])
+            except:
+                return defer.fail(InvalidQueryArgument(
+                    'Invalid query argument for "limit"'))
+
+        if 'marker' in request.args:
+            paginate['marker'] = request.args['marker'][0]
+
+        kwargs['paginate'] = paginate
+        return f(self, request, *args, **kwargs)
+    return _
