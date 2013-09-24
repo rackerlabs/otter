@@ -10,7 +10,7 @@ from zope.interface import Interface, implementer
 from otter.util.deferredutils import DeferredPool
 from otter.util.hashkey import generate_job_id
 from otter.util.config import config_value
-from otter.worker import launch_server_v1
+from otter.worker import launch_server_v1, validate_config
 from otter.undo import InMemoryUndoStack
 
 
@@ -159,6 +159,28 @@ class SupervisorService(object, Service):
         d.addErrback(log.err, 'Server deletion failed')
 
         return d
+
+    def validate_launch_config(self, log, tenant_id, launch_config):
+        """
+        Validate launch config for a tenant
+        """
+        def when_authenticated((auth_token, service_catalog)):
+            log.msg('Validating launch server config')
+            return validate_config.validate_launch_server_config(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                launch_config['args'])
+
+        if launch_config['type'] != 'launch_server':
+            raise NotImplementedError('Validating launch config for launch_server only')
+
+        log = log.bind(system='otter.supervisor.validate_launch_config',
+                       tenant_id=tenant_id)
+        d = self.auth_function(tenant_id)
+        log.msg('Authenticating for tenant')
+        return d.addCallback(when_authenticated)
 
     def stopService(self):
         """
