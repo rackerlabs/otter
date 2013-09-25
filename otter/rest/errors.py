@@ -10,6 +10,8 @@ from otter.models.interface import (
     GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError)
 
+from otter.worker.validate_config import InvalidLaunchConfiguration
+
 from otter.rest.decorators import InvalidJsonError
 
 
@@ -22,6 +24,7 @@ class InvalidMinEntities(Exception):
 exception_codes = {
     InvalidMinEntities: 400,
     ValidationError: 400,
+    InvalidLaunchConfiguration: 400,
     InvalidJsonError: 400,
     NoSuchScalingGroupError: 404,
     NoSuchPolicyError: 404,

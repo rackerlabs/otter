@@ -231,10 +231,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             'maxEntities': None,
             'metadata': {}
         })
-        self.launch_config = _de_identify({
-            "type": "launch_server",
-            "args": {"server": {"these are": "some args"}}
-        })
+        self.launch_config = _de_identify(group_examples.launch_server_config()[0])
         self.policies = []
         self.mock_log = mock.MagicMock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
