@@ -75,15 +75,17 @@ class HTTPUtilityTests(TestCase):
 
     def test_api_error(self):
         """
-        An APIError will be instantiated with an HTTP Code and an HTTP response
-        body and will expose these in public attributes and have a reasonable
-        string representation.
+        An APIError will be instantiated with an HTTP Code, an HTTP response
+        body, and HTTP headers, and will expose these in public attributes and
+        have a reasonable string representation.
         """
-        e = APIError(404, "Not Found.")
+        e = APIError(404, "Not Found.", Headers({'header': ['value']}))
 
         self.assertEqual(e.code, 404)
         self.assertEqual(e.body, "Not Found.")
-        self.assertEqual(str(e), "API Error code=404, body='Not Found.'")
+        self.assertEqual(
+            str(e),
+            "API Error code=404, body='Not Found.', Headers({'header': ['value']})")
 
     def test_check_success(self):
         """
@@ -102,6 +104,7 @@ class HTTPUtilityTests(TestCase):
         """
         response = mock.Mock()
         response.code = 404
+        response.headers = Headers({})
         self.treq.content.return_value = succeed('Not Found.')
 
         d = check_success(response, [200, 201])
@@ -110,6 +113,7 @@ class HTTPUtilityTests(TestCase):
         self.assertTrue(f.check(APIError))
         self.assertEqual(f.value.code, 404)
         self.assertEqual(f.value.body, 'Not Found.')
+        self.assertEqual(f.value.headers, Headers({}))
 
     def test_headers_content_type(self):
         """
