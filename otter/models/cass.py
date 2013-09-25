@@ -117,6 +117,69 @@ _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
+def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
+                    marker=None):
+    """
+    :param tenant_id: the tenant ID - if this is all that is provided, this
+        function returns cql to list all groups
+
+    :param group_id: the group ID - if this and tenant ID are all that is
+        provided, this function returns cql to list all policies.
+
+    :param policy_id: the policyID - if this and gorupID and tenant ID are
+        provided, this function returns cql to list all webhooks.  Note that
+        if this is provided and groupID is not provided, the policy ID will be
+        ignored and cql to list all groups will be returned.
+
+    :param marker: the ID of the last column of the provided keys. (e.g.
+        group_id, when listing groups, policy_id, when listing policies,
+        and webhook_id, when listing webhooks)
+
+    :param limit: is the number of items to fetch
+
+    :returns: a tuple of cql and a dict of the parameters to provide when
+        executing that CQL.
+
+    The CQL will look like:
+
+        SELECT "policyId", data FROM {cf} WHERE "tenantId" = :tenantId AND
+        "groupId" = :groupId AND "policyId" > :marker LIMIT 100;
+
+    Note that the column family name still has to be inserted.
+
+    Also, no ``ORDER BY`` is in the CQL, since for these are all primary keys
+    sorted by cluster order (e.g. if you get all scaling groups for a tenant,
+    the groups will be returned in ascending order of group ID, and if you get
+    all policies for a scaling group, they will be returned in ascending order
+    of policy ID)
+
+    See http://cassandra.apache.org/doc/cql3/CQL.html#createTableOptions
+    """
+    params = {'tenantId': tenant_id, 'limit': limit}
+    marker_cql = ''
+
+    if marker is not None:
+        marker_cql = " AND {0} > :marker"
+        params['marker'] = marker
+
+    if group_id is not None:
+        params['groupId'] = group_id
+
+        if policy_id is not None:
+            params['policyId'] = group_id
+            cql_parts = [_cql_list_webhook.rstrip(';'),
+                         marker_cql.format('"webhookId"')]
+        else:
+            cql_parts = [_cql_list_policy.rstrip(';'),
+                         marker_cql.format('"policyId"')]
+    else:
+        cql_parts = [_cql_list_states.rstrip(';'),
+                     marker_cql.format('"groupId"')]
+
+    cql_parts.append(" LIMIT :limit;")
+    return (''.join(cql_parts), params)
+
+
 # Store consistency levels
 _consistency_levels = {'event': {'list': ConsistencyLevel.QUORUM, 'insert': ConsistencyLevel.QUORUM,
                        'delete': ConsistencyLevel.QUORUM}}
@@ -911,7 +974,7 @@ class CassScalingGroupCollection:
         })
         return d
 
-    def list_scaling_group_states(self, log, tenant_id):
+    def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.list_scaling_group_states`
         """
@@ -941,8 +1004,8 @@ class CassScalingGroupCollection:
                                            get_consistency_level('delete', 'group'))
 
         log = log.bind(tenant_id=tenant_id)
-        d = self.connection.execute(_cql_list_states.format(cf=self.group_table),
-                                    {"tenantId": tenant_id},
+        cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
+        d = self.connection.execute(cql.format(cf=self.group_table), params,
                                     get_consistency_level('list', 'group'))
         d.addCallback(_filter_resurrected)
         d.addCallback(_build_states)
