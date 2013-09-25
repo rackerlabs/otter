@@ -181,7 +181,7 @@ def GELFObserverWrapper(observer, hostname, seconds=None):
 
         for key, value in eventDict.iteritems():
             if key not in IGNORE_FIELDS:
-                log_params["_%s" % (key, )] = value
+                log_params["%s" % (key, )] = value
 
         observer(log_params)
 

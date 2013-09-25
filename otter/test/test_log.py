@@ -362,12 +362,12 @@ class GELFObserverWrapperTests(TestCase):
 
     def test_includes_structured_data(self):
         """
-        The observer includes arbitrary structured data prefixed with an _.
+        The observer includes arbitrary structured data.
         """
         self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'_uri': Equals('http://example.com')})))
+            matches(ContainsDict({'uri': Equals('http://example.com')})))
 
     def test_includes_file(self):
         """
