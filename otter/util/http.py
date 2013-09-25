@@ -90,10 +90,10 @@ class APIError(Exception):
     :param str body: HTTP Response body for this error or None.
     :param Headers headers: HTTP Response headers for this error, or None
     """
-    def __init__(self, code, body, headers):
+    def __init__(self, code, body, headers=None):
         Exception.__init__(
             self,
-            'API Error code={0!r}, body={1!r}, {2!r}'.format(
+            'API Error code={0!r}, body={1!r}, headers={2!r}'.format(
                 code, body, headers))
 
         self.code = code

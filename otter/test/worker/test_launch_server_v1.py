@@ -1115,13 +1115,14 @@ class DeleteServerTests(TestCase):
         """
         clock = Clock()
         self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=500))
+            mock.Mock(spec=['code'], code=500, headers=None))
         self.treq.content.return_value = succeed(error_body)
         self.treq.head.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
         failure = self.failureResultOf(d, RequestError)
+        self.assertTrue(failure.value.reason.check(APIError))
         self.assertEqual(failure.value.reason.value.code, 500)
 
     def test_verified_delete_does_not_propagate_verification_failure(self):
