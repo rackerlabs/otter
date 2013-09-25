@@ -167,16 +167,17 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 
         if policy_id is not None:
             params['policyId'] = group_id
-            cql = [_cql_list_webhook.rstrip(';'),
-                   marker_cql.format('"webhookId"')]
+            cql_parts = [_cql_list_webhook.rstrip(';'),
+                         marker_cql.format('"webhookId"')]
         else:
-            cql = [_cql_list_policy.rstrip(';'),
-                   marker_cql.format('"policyId"')]
+            cql_parts = [_cql_list_policy.rstrip(';'),
+                         marker_cql.format('"policyId"')]
     else:
-        cql = [_cql_list_states.rstrip(';'), marker_cql.format('"groupId"')]
+        cql_parts = [_cql_list_states.rstrip(';'),
+                     marker_cql.format('"groupId"')]
 
-    cql.append(" LIMIT :limit;")
-    return (''.join(cql), params)
+    cql_parts.append(" LIMIT :limit;")
+    return (''.join(cql_parts), params)
 
 
 # Store consistency levels
