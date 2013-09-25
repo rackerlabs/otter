@@ -305,13 +305,12 @@ class PaginationQueryArgGenerationTestCase(TestCase):
         """
         New paginate query args uses default limits if no old limits provided
         """
+        self.addCleanup(set_config_data, {})
         set_config_data({'limit': {'pagination': 3}})
 
         result = get_new_paginate_query_args(
             {}, [{'id': str(i)} for i in range(3)])
         self.assertEqual(result.get('limit'), 3)
-
-        set_config_data({})
 
 
 class RouteTests(RequestTestMixin, TestCase):

@@ -490,7 +490,7 @@ class PaginatableTestCase(TestCase):
         self.app = FakeApp()
 
         set_config_data({'limit': {'pagination': 10}})
-        self.addCleanup(lambda: set_config_data(None))
+        self.addCleanup(set_config_data, {})
 
     def test_no_query_arguments(self):
         """
