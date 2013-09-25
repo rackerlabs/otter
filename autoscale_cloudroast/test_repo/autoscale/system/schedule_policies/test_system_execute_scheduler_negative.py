@@ -2,7 +2,6 @@
 Test negative scenarios for execution of at style and
 cron style scheduler policies
 """
-import unittest
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
@@ -124,7 +123,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         """
         pass
 
-    @unittest.skip('AUTO-628')
+    @tags(speed='quick')
     def test_system_scheduler_batch(self):
         """
         Create more number of policies than specified in scheduler batch size and verify all
@@ -144,7 +143,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='scheduler_batch_size_check', gc_cooldown=0,
             sp_list=at_style_policies_list)
-        self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
+        self.resources.add(
+            create_group_reponse.entity, self.empty_scaling_group)
         sleep(self.scheduler_interval * 2)
         self.verify_group_state(
             create_group_reponse.entity.id, self.scheduler_batch * size)
