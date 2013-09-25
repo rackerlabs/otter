@@ -1115,7 +1115,7 @@ class DeleteServerTests(TestCase):
         """
         clock = Clock()
         self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=500, headers=None))
+            mock.Mock(spec=['code', 'headers'], code=500, headers=None))
         self.treq.content.return_value = succeed(error_body)
         self.treq.head.return_value = Deferred()
 
