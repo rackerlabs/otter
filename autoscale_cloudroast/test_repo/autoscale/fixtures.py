@@ -249,16 +249,26 @@ class AutoscaleFixture(BaseTestFixture):
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
 
-    def get_server_count_for_group_from_server_metadata(self, group_id):
+    def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
-        Given the group id, returns the count of servers with that group id in the
-        metadata of the servers on the tenant
+        Asserts the expected count is the number of servers with the groupid
+        in the metadata. Fails if the count is not met in 60 seconds.
         """
-        list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-        metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                         in list_servers_on_tenant]
-        group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each in metadata_list]
-        return group_ids_list_from_metadata.count(group_id)
+        end_time = time.time() + 60
+        while time.time() < end_time:
+            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
+            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
+                             in list_servers_on_tenant]
+            group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
+                                            in metadata_list]
+            actual_count = group_ids_list_from_metadata.count(group_id)
+            if actual_count is expected_count:
+                break
+            time.sleep(5)
+        else:
+            self.fail('Waited 60 seconds, expecting {0} servers with group id : {1} in the '
+                      'metadata but has {2} servers'.format(expected_count, group_id,
+                                                            actual_count))
 
     def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
                                                    interval_time=None, timeout=None):
