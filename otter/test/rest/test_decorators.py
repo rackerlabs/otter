@@ -15,6 +15,7 @@ from twisted.python.failure import Failure
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
     with_transaction_id, log_arguments, paginatable, InvalidQueryArgument)
+from otter.util.config import set_config_data
 from otter.test.utils import patch
 
 
@@ -488,13 +489,16 @@ class PaginatableTestCase(TestCase):
 
         self.app = FakeApp()
 
+        set_config_data({'limit': {'pagination': 10}})
+        self.addCleanup(lambda: set_config_data(None))
+
     def test_no_query_arguments(self):
         """
         When there are no query arguments in the request, the paginate
-        dictionary is empty
+        dictionary contains only the default limit value.
         """
         d = self.app.paginate_me(self.mockRequest)
-        self.assertEqual(self.successResultOf(d), {})
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
 
     def test_integer_limit_value(self):
         """
@@ -520,7 +524,7 @@ class PaginatableTestCase(TestCase):
         """
         self.mockRequest.args['magnitude'] = ['pop', 'pop']
         d = self.app.paginate_me(self.mockRequest)
-        self.assertEqual(self.successResultOf(d), {})
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
 
     def test_multiple_query_values(self):
         """
@@ -528,5 +532,5 @@ class PaginatableTestCase(TestCase):
         """
         self.mockRequest.args['marker'] = ['1234', '5678']
         d = self.app.paginate_me(self.mockRequest)
-        self.assertEqual(self.successResultOf(d), {'marker': '1234'})
-
+        self.assertEqual(self.successResultOf(d),
+                         {'marker': '1234', 'limit': 10})

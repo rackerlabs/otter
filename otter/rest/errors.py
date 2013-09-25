@@ -12,14 +12,13 @@ from otter.models.interface import (
 
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
-from otter.rest.decorators import InvalidJsonError
+from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
 
 
 class InvalidMinEntities(Exception):
     """
     Something is wrong with the minEntities values.
     """
-
 
 exception_codes = {
     InvalidMinEntities: 400,
@@ -31,5 +30,6 @@ exception_codes = {
     NoSuchWebhookError: 404,
     GroupNotEmptyError: 403,
     CannotExecutePolicyError: 403,
-    NotImplementedError: 501
+    InvalidQueryArgument: 400,
+    NotImplementedError: 501,
 }

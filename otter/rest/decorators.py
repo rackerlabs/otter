@@ -9,6 +9,7 @@ from jsonschema import ValidationError
 
 from twisted.internet import defer
 from twisted.python import reflect
+from otter.util.config import config_value
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
 from otter.log import log
@@ -187,7 +188,8 @@ def paginatable(f):
     """
     Is a paginatable endpoint, which means that it accepts the limit and marker
     query args.  This decorator validates them and puts them into a pagination
-    dictionary.
+    dictionary.  It also sets a default limit based on the config value for
+    the pagination limit, if no query argument for limit is passed.
     """
     @wraps(f)
     def _(self, request, *args, **kwargs):
@@ -198,6 +200,8 @@ def paginatable(f):
             except:
                 return defer.fail(InvalidQueryArgument(
                     'Invalid query argument for "limit"'))
+        else:
+            paginate['limit'] = config_value('limit.pagination')
 
         if 'marker' in request.args:
             paginate['marker'] = request.args['marker'][0]
