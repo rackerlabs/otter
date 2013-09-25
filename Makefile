@@ -21,6 +21,13 @@ test: unit integration
 run:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api
 
+run_docker:
+	./scripts/write_hosts.py
+	# re-write to a particular config file, which is specified in the
+	# environment variable "DOCKER".  Also, redirect to both stdout and a
+	# logfile that can be copied
+	twistd -n --pidfile /tmp/twistd.pid --logger=otter.log.observer_factory_debug otter-api -c /opt/configs/config.json | tee /var/log/otter-api.log
+
 mockrun:
 	twistd -n --logger=otter.log.observer_factory_debug otter-api --mock
 
