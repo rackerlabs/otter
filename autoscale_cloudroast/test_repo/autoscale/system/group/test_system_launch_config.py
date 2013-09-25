@@ -151,7 +151,7 @@ class LaunchConfigTest(AutoscaleFixture):
             self.assertTrue(
                 group.launchConfiguration.server.name in server.name)
 
-    @tags(speed='test')
+    @tags(speed='quick')
     def test_system_launchconfig_without_server_name(self):
         """
         Create a scaling group with a scaling policy, without server name in the launch config.
@@ -166,12 +166,7 @@ class LaunchConfigTest(AutoscaleFixture):
         group = group_response.entity
         self.resources.add(group, self.empty_scaling_group)
         self.verify_group_state(group.id, self.gc_min_entities_alt)
-        expected_servers = self.get_server_count_for_group_from_server_metadata(group.id)
-        self.assertEquals(expected_servers, self.gc_min_entities_alt,
-                          msg='Expecting {0} servers to have the been built, but only {1} have '
-                          'the group id in the metadata for group {2}'.format(self.gc_min_entities_alt,
-                                                                              expected_servers,
-                                                                              group.id))
+        self.verify_server_count_using_server_metadata(group.id, self.gc_min_entities_alt)
 
     @tags(speed='quick')
     def test_system_update_launchconfig_while_group_building(self):
