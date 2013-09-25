@@ -15,5 +15,8 @@
     "scheduler": {
         "interval": 10,
         "batchsize": 100
+    },
+    "limits": {
+      "pagination": 100
     }
 }
