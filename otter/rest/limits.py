@@ -30,7 +30,7 @@ class OtterLimits(object):
         """
         returns application limits
         """
-        data = {"limits": config_value("limits")}
+        data = {"limits": {"absolute": config_value("limits.absolute")}}
         accept = request.getHeader("accept")
 
         if accept and 'xml' in accept:

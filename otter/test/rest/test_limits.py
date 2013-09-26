@@ -26,8 +26,13 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         """
         setup fake config data
         """
-        limits = ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]
-        data = {"limits": {"absolute": {limit: number for limit in limits}}}
+        self.limits = ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]
+        data = {
+            "limits": {
+                "pagination": 500,
+                "absolute": {limit: number for limit in self.limits}
+            }
+        }
 
         super(OtterLimitsTestCase, self).setUp()
         set_config_data(data)
@@ -42,9 +47,9 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     def test_list_limits_json(self):
         """
         the api returns a json blob containing the absolute
-        limits in the correct format
+        limits in the correct format, and ignores other limits in the config.
         """
-        data = {"limits": config_value("limits")}
+        data = {"limits": {"absolute": {limit: number for limit in self.limits}}}
         body = self.assert_status_code(200)
         resp = json.loads(body)
         self.assertEqual(resp, data)
