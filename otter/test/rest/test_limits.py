@@ -8,7 +8,6 @@ from twisted.trial.unittest import TestCase
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
-from otter.util.config import config_value
 
 number = 2
 
