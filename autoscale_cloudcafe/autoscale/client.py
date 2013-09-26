@@ -1,12 +1,14 @@
 """
 Client objects for all the autoscale api calls
 """
-from autoscale.models.response.autoscale_response import Group,\
-    Config, Policy, Webhook, ScalingGroup
+from autoscale.models.response.autoscale_response import (Group, Config,
+                                                          Policy, Webhook,
+                                                          ScalingGroup)
 from autoscale.models.response.limits_response import Limits
-from autoscale.models.request.autoscale_requests import \
-    Group_Request, Policy_Request, Webhook_Request, Config_Request, \
-    ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request
+from autoscale.models.request.autoscale_requests import (
+    Group_Request, Policy_Request, Webhook_Request, Config_Request,
+    ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request,
+    Maas_Policy_Request, Update_Maas_Policy_Request)
 from autoscale.models.lbaas import NodeList
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
@@ -321,7 +323,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
     def create_policy(self, group_id, name, cooldown,
                       change=None, change_percent=None,
                       desired_capacity=None, policy_type=None,
-                      args=None, requestslib_kwargs=None):
+                      args=None, check_label=None,
+                      check_type=None, check_url=None, check_method=None,
+                      monitoring_zones=None, check_timeout=None, check_period=None,
+                      alarm_criteria=None, check_disabled=None, check_metadata=None,
+                      target_alias=None, target_hostname=None,
+                      target_resolver=None, requestslib_kwargs=None):
         """
         :summary: Create scaling policy
         :param name: A unique name for the scaling policy
@@ -347,10 +354,24 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups/{groupId}/policy'
         """
         url = '%s/groups/%s/policies/' % (self.url, group_id)
-        policy = Policy_Request(name=name, cooldown=cooldown, change=change,
-                                change_percent=change_percent,
-                                desired_capacity=desired_capacity,
-                                policy_type=policy_type, args=args)
+        if policy_type is 'cloud_monitoring':
+            policy = Maas_Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type, check_label=check_label,
+                check_type=check_type, check_url=check_url, check_method=check_method,
+                monitoring_zones=monitoring_zones, check_timeout=check_timeout,
+                check_period=check_period, target_alias=target_alias,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_hostname=target_hostname,
+                target_resolver=target_resolver)
+        else:
+            policy = Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type, args=args)
         return self.request('POST', url,
                             response_entity_type=Policy,
                             request_entity=policy,
@@ -375,7 +396,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, args=None, requestslib_kwargs=None):
+                      policy_type=None, args=None,  check_label=None,
+                      check_type=None, check_url=None, check_method=None,
+                      monitoring_zones=None, check_timeout=None, check_period=None,
+                      target_alias=None, alarm_criteria=None,
+                      requestslib_kwargs=None):
         """
         :summary: Update/Create details of a specific scaling policy
         :param name: The name of the policy
@@ -392,12 +417,24 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             '/<string:tenantId>/groups/<groupId>/policy/<policyId>'
         """
         url = '%s/groups/%s/policies/%s/' % (self.url, group_id, policy_id)
-        policy = Update_Policy_Request(
-            name=name, cooldown=cooldown, change=change,
-            change_percent=change_percent,
-            desired_capacity=desired_capacity,
-            policy_type=policy_type,
-            args=args)
+        if policy_type is 'cloud_monitoring':
+            policy = Update_Maas_Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type, check_label=check_label,
+                check_type=check_type, check_url=check_url, check_method=check_method,
+                monitoring_zones=monitoring_zones, check_timeout=check_timeout,
+                check_period=check_period, target_alias=target_alias,
+                alarm_criteria=alarm_criteria
+            )
+        else:
+            policy = Update_Policy_Request(
+                name=name, cooldown=cooldown, change=change,
+                change_percent=change_percent,
+                desired_capacity=desired_capacity,
+                policy_type=policy_type,
+                args=args)
         return self.request('PUT', url,
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)

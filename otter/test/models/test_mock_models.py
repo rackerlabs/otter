@@ -18,7 +18,7 @@ from otter.test.models.test_interface import (
     IScalingGroupCollectionProviderMixin,
     IScalingScheduleCollectionProviderMixin)
 
-from otter.test.utils import patch
+from otter.test.utils import mock_log, patch
 
 
 class GenerateEntityLinksTestCase(TestCase):
@@ -95,10 +95,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': None,
             'metadata': {}
         }
-        self.launch_config = {
-            "type": "launch_server",
-            "args": {"server": {"these are": "some args"}}
-        }
+        self.launch_config = group_examples.launch_server_config()[0]
         self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
             self.mock_log, self.tenant_id, self.group_id, self.collection,
@@ -713,6 +710,32 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch, 'policies': policies})
+
+    def test_list_scaling_group_limits_number_of_groups(self):
+        """
+        Listing all scaling groups limits the number of groups by the limit
+        specified
+        """
+        log = mock_log()
+        for i in range(9):
+            self.collection.create_scaling_group(log, '1', '', '', [])
+
+        result = self.successResultOf(
+            self.collection.list_scaling_group_states(log, '1', limit=3))
+        self.assertEqual([g.group_id for g in result], ['1', '2', '3'])
+
+    def test_list_scaling_group_offsets_by_marker(self):
+        """
+        Listing all scaling groups will offset the list by the last seen
+        parameter
+        """
+        log = mock_log()
+        for i in range(9):
+            self.collection.create_scaling_group(log, '1', '', '', [])
+
+        result = self.successResultOf(
+            self.collection.list_scaling_group_states(log, '1', marker='5'))
+        self.assertEqual([g.group_id for g in result], ['6', '7', '8', '9'])
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):

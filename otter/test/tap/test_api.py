@@ -10,6 +10,7 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
+from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import Options, makeService
 from otter.test.utils import patch
 
@@ -82,7 +83,7 @@ class APIOptionsTests(TestCase):
 
     def test_short_store_options(self):
         """
-        The m shor toption should end up in the 'mock' key
+        The m short option should end up in the 'mock' key
         """
         config = Options()
         self.assertFalse(config['mock'])
@@ -254,3 +255,15 @@ class APIMakeServiceTests(TestCase):
                                                   self.LoggingCQLClient.return_value,
                                                   self.CassScalingGroupCollection.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
+
+    @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
+    def test_supervisor_service_set_by_default(self, supervisor):
+        """
+        A SupervisorService service is added to the Multiservice, and set as
+        default supervisor
+        """
+        self.addCleanup(lambda: set_supervisor(None))
+        parent = makeService(test_config)
+        supervisor_service = parent.getServiceNamed('supervisor')
+
+        self.assertEqual(get_supervisor(), supervisor_service)

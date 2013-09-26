@@ -12,7 +12,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter import controller
-from otter.supervisor import Supervisor
+from otter.supervisor import ISupervisor
 
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
@@ -764,7 +764,7 @@ class DeleteActiveServersTests(TestCase):
             self, 'otter.controller.find_servers_to_evict',
             return_value=[self.data[id] for id in ('1', '4', '3')])
 
-        self.supervisor = mock.Mock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.supervisor.execute_delete_server.side_effect = [
             defer.succeed(id) for id in range(3)]
 
@@ -1089,7 +1089,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
             self.execute_config_deferreds.append(d)
             return defer.succeed((str(len(self.execute_config_deferreds)), d))
 
-        self.supervisor = mock.Mock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.supervisor.execute_config.side_effect = fake_execute
 
         patch(self, 'otter.controller.get_supervisor', return_value=self.supervisor)
@@ -1284,7 +1284,7 @@ class PrivateJobHelperTestCase(TestCase):
         self.log = mock.MagicMock()
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.state = None
-        self.supervisor = mock.MagicMock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.completion_deferred = defer.Deferred()
 
         self.supervisor.execute_config.return_value = defer.succeed(

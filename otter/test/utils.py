@@ -4,6 +4,7 @@ Mixins and utilities to be used for testing.
 import json
 import mock
 import os
+import treq
 
 from silverberg.lock import BasicLock
 from twisted.internet import defer
@@ -187,6 +188,23 @@ def mock_log(*args, **kwargs):
     important than testing the exact logged message.
     """
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
+
+
+def mock_treq(code=200, json_content={}, method='get', content=''):
+    """
+    Return mocked treq instance configured based on arguments given
+
+    :param code: HTTP response code
+    :param json_content: A dict to be returned from treq.json_content
+    :param method: HTTP method
+    :param content: Str to be returned from treq.content
+    """
+    treq_mock = mock.MagicMock(spec=treq)
+    response = mock.MagicMock(code=code)
+    treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
+    treq_mock.json_content.return_value = defer.succeed(json_content)
+    treq_mock.content.return_value = defer.succeed(content)
+    return treq_mock
 
 
 class DummyException(Exception):

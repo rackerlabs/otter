@@ -51,6 +51,33 @@ metadata = {
     "additionalProperties": False
 }
 
+# nova server payload
+server = {
+    "type": "object",
+    # The schema for the create server attributes should come
+    # from Nova, or Nova should provide some no-op method to
+    # validate creating a server. Autoscale should not
+    # attempt to re-create Nova's validation. But since otter has decided
+    # to do some level of sanity checking, this schema validates subset of instance that
+    # is getting validated in code
+    "description": ("Attributes to provide to nova create server: "
+                    "http://docs.rackspace.com/servers/api/v2/"
+                    "cs-devguide/content/CreateServers.html."
+                    "Whatever attributes are passed here will apply to "
+                    "all new servers (including the name attribute)."),
+    "properties": {
+        "imageRef": {
+            "type": "string",
+            "required": True
+        },
+        "flavorRef": {
+            "type": "string",
+            "required": True
+        }
+    },
+    "required": True
+}
+
 launch_server = {
     "type": "object",
     "description": ("'Launch Server' launch configuration options.  This type "
@@ -64,20 +91,7 @@ launch_server = {
         },
         "args": {
             "properties": {
-                "server": {
-                    "type": "object",
-                    # The schema for the create server attributes should come
-                    # from Nova, or Nova should provide some no-op method to
-                    # validate creating a server.  Autoscale should not
-                    # attempt to re-create Nova's validation.
-                    "description": (
-                        "Attributes to provide to nova create server: "
-                        "http://docs.rackspace.com/servers/api/v2/"
-                        "cs-devguide/content/CreateServers.html."
-                        "Whatever attributes are passed here will apply to "
-                        "all new servers (including the name attribute)."),
-                    "required": True
-                },
+                "server": server,
                 "loadBalancers": {
                     "type": "array",
                     "description": (

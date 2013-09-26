@@ -17,7 +17,7 @@ def launch_server_config():
             "type": "launch_server",
             "args": {
                 "server": {
-                    "flavorRef": 3,
+                    "flavorRef": "3",
                     "name": "webhead",
                     "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
                     "OS-DCF:diskConfig": "AUTO",
@@ -49,7 +49,7 @@ def launch_server_config():
             "type": "launch_server",
             "args": {
                 "server": {
-                    "flavorRef": 2,
+                    "flavorRef": "2",
                     "name": "worker",
                     "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
                 },
@@ -69,7 +69,7 @@ def launch_server_config():
             "type": "launch_server",
             "args": {
                 "server": {
-                    "flavorRef": 2,
+                    "flavorRef": "2",
                     "name": "worker",
                     "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
                 }
