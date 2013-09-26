@@ -17,6 +17,9 @@
         "batchsize": 100
     },
     "limits": {
-      "pagination": 100
+        "pagination": 100,
+        "maxGroups": 1000,
+        "maxPoliciesPerGroup": 1000,
+        "maxWebhooksPerPolicy": 1000
     }
 }
