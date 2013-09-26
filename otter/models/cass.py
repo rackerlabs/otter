@@ -59,7 +59,7 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                      ':pending, :policyTouched, :paused, :created_at)')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
-_cql_view_manifest = ('SELECT group_config, launch_config, active, '
+_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -450,7 +450,7 @@ class CassScalingGroup(object):
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
-                'id': self.uuid
+                'state': _unmarshal_state(group)
             })
             return d
 
@@ -459,10 +459,10 @@ class CassScalingGroup(object):
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'group'),
+                          get_consistency_level('view', 'partial'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-
-        return d.addCallback(_get_policies)
+        d.addCallback(_get_policies)
+        return d
 
     def view_config(self):
         """
@@ -970,7 +970,6 @@ class CassScalingGroupCollection:
             'groupConfiguration': config,
             'launchConfiguration': launch,
             'scalingPolicies': outpolicies,
-            'id': scaling_group_id
         })
         return d
 

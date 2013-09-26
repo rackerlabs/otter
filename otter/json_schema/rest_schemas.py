@@ -207,10 +207,11 @@ create_and_manifest_response = _openstackify_schema("group", {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": _view_policies_list
+        "scalingPolicies": _view_policies_list,
+        "state": deepcopy(group_state)['properties']['group']
     },
     "additionalProperties": False
-}, include_id=True)
+})
 
 
 # ----- schemas for viewing configs

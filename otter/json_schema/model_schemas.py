@@ -9,7 +9,7 @@ so that all the correct data doesn't have to be mocked.
 Please delete from this file.
 """
 from copy import deepcopy
-from otter.json_schema import group_schemas
+from otter.json_schema import group_schemas, rest_schemas
 
 
 # unlike updating or inputing a group config, the returned config must actually
@@ -24,12 +24,9 @@ manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
-        "id": {
-            "type": "string",
-            "required": True
-        },
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
+        "state": {},
         "scalingPolicies": {
             "type": "object",
             "patternProperties": {

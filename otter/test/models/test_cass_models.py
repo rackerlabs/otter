@@ -1427,8 +1427,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         config, launch config, and scaling policies is returned.
         """
         verified_view.return_value = defer.succeed(
-            {'group_config': serialize_json_data(self.config, 1.0),
-             'launch_config': serialize_json_data(self.launch_config, 1.0)})
+            {'tenantId': self.tenant_id, "groupId": self.group_id,
+             'group_config': serialize_json_data(self.config, 1.0),
+             'launch_config': serialize_json_data(self.launch_config, 1.0),
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}
+         )
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed({}))
 
@@ -1436,12 +1440,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                          {'groupConfiguration': self.config,
                           'launchConfiguration': self.launch_config,
                           'scalingPolicies': {},
-                          'id': "12345678g"})
+                          'state':  GroupState(self.tenant_id, self.group_id,
+                                       'a', {'A': 'R'}, {'P': 'R'}, '123', {'PT': 'R'}, False)})
         self.group._naive_list_policies.assert_called_once_with()
 
-        view_cql = ('SELECT group_config, launch_config, active, '
-                    'pending, "groupTouched", "policyTouched", paused, created_at '
-                    'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
+                      'pending, "groupTouched", "policyTouched", paused, created_at '
+                      'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
         verified_view.assert_called_once_with(self.connection, view_cql, del_cql,
@@ -1817,8 +1822,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': {},
-            'id': self.mock_key.return_value
+            'scalingPolicies': {}
         })
 
         # Verify data argument seperately since data in actual call will have datetime.utcnow
@@ -1866,8 +1870,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': {self.mock_key.return_value: policy},
-            'id': self.mock_key.return_value
+            'scalingPolicies': {self.mock_key.return_value: policy}
         })
 
         called_data = self.connection.execute.call_args[0][1]
@@ -1923,8 +1926,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3'), policies)),
-            'id': '1'
+            'scalingPolicies': dict(zip(('2', '3'), policies))
         })
 
         called_data = self.connection.execute.call_args[0][1]

@@ -310,7 +310,7 @@ class OtterGroups(object):
                                                       data.get('scalingPolicies', None)))
 
         def _do_obey_config_change(result):
-            group_id = result['id']
+            group_id = result['state']['id']
             config = result['groupConfiguration']
             group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
             d = group.modify_state(partial(controller.obey_config_change, self.log,
@@ -320,7 +320,7 @@ class OtterGroups(object):
         deferred.addCallback(_do_obey_config_change)
 
         def _add_to_bobby(result, client):
-            d = client.create_group(self.tenant_id, result["id"])
+            d = client.create_group(self.tenant_id, result["state"]["id"])
             return d.addCallback(lambda _: result)
 
         bobby = get_bobby()
@@ -328,7 +328,9 @@ class OtterGroups(object):
             deferred.addCallback(_add_to_bobby, bobby)
 
         def _format_output(result):
-            uuid = result['id']
+            result["state"] = format_state_dict(result["state"])
+
+            uuid = result['state']['id']
             request.setHeader(
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
@@ -466,7 +468,6 @@ class OtterGroup(object):
         }
         """
         def openstack_formatting(data, uuid):
-            data["links"] = get_autoscale_links(self.tenant_id, uuid)
 
             policies = []
             for policy_id, policy in data["scalingPolicies"].iteritems():
@@ -475,6 +476,7 @@ class OtterGroup(object):
                 policies.append(policy)
 
             data["scalingPolicies"] = policies
+            data["state"] = format_state_dict(data["state"])
 
             return {"group": data}
 
