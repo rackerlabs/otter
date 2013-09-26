@@ -108,14 +108,14 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.supervisor.validate_launch_config.return_value = defer.succeed(None)
         set_supervisor(self.supervisor)
 
-        set_config_data({'limit': {'pagination': 100}})
+        set_config_data({'limits': {'pagination': 100}})
 
     def tearDown(self):
         """
         Reset the supervisor
         """
         set_supervisor(None)
-        set_config_data(None)
+        set_config_data({})
 
     def test_list_unknown_error_is_500(self):
         """
