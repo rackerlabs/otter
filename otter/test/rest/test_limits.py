@@ -23,12 +23,14 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         """
         setup fake config data
         """
-        self.limits = ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]
-        self.limit_number = 2
         data = {
             "limits": {
                 "pagination": 500,
-                "absolute": {limit: self.limit_number for limit in self.limits}
+                "absolute": {
+                    "maxGroups": 2,
+                    "maxPoliciesPerGroup": 3,
+                    "maxWebhooksPerPolicy": 4
+                }
             }
         }
 
@@ -49,7 +51,11 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         """
         data = {
             "limits": {
-                "absolute": {limit: self.limit_number for limit in self.limits}
+                "absolute": {
+                    "maxGroups": 2,
+                    "maxPoliciesPerGroup": 3,
+                    "maxWebhooksPerPolicy": 4
+                }
             }
         }
         body = self.assert_status_code(200)
@@ -65,12 +71,11 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         data = ("<?xml version='1.0' encoding='UTF-8'?>\n"
                 '<limits xmlns="http://docs.openstack.org/common/api/v1.0">'
                 '<absolute>'
-                '<limit name="maxGroups" value="{0}"/>'
-                '<limit name="maxPoliciesPerGroup" value="{0}"/>'
-                '<limit name="maxWebhooksPerPolicy" value="{0}"/>'
+                '<limit name="maxGroups" value="2"/>'
+                '<limit name="maxPoliciesPerGroup" value="3"/>'
+                '<limit name="maxWebhooksPerPolicy" value="4"/>'
                 '</absolute></limits>')
 
-        data = data.format(self.limit_number)
         headers = {"Accept": ["application/xml"]}
 
         response_wrapper = self.successResultOf(
