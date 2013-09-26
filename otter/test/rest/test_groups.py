@@ -221,8 +221,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         ``list_all_scaling_groups`` passes on the 'limit' query argument to
         the model
         """
-        self.mock_store.list_scaling_group_states.side_effect = (
-            lambda *args, **kwargs: defer.succeed([]))
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
         self.assert_status_code(
             200, endpoint="{0}?limit=5".format(self.endpoint))
         self.mock_store.list_scaling_group_states.assert_called_once_with(
@@ -242,12 +241,27 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         ``list_all_scaling_groups`` passes on the 'marker' query argument to
         the model
         """
-        self.mock_store.list_scaling_group_states.side_effect = (
-            lambda *args, **kwargs: defer.succeed([]))
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
         self.assert_status_code(
             200, endpoint="{0}?marker=123456".format(self.endpoint))
         self.mock_store.list_scaling_group_states.assert_called_once_with(
             mock.ANY, '11111', marker='123456', limit=100)
+
+    def test_list_groups_returns_next_link_formatted(self):
+        """
+        The "next" link should be formatted as link json with the rel 'next'
+        """
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([
+            GroupState('11111', 'one', 'test', {}, {}, None, {}, True)
+        ])
+        response_body = self.assert_status_code(
+            200, endpoint="{0}?limit=1".format(self.endpoint))
+        resp = json.loads(response_body)
+
+        validate(resp, rest_schemas.list_groups_response)
+        self.assertEqual(
+            resp['groups_links'],
+            [{'href': self.endpoint + '?marker=one&limit=1', 'rel': 'next'}])
 
     def test_group_create_bad_input_400(self):
         """
