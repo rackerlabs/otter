@@ -7,7 +7,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
-@unittest.skip('AUTO-561 to be merged')
 class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     """
@@ -20,7 +19,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         super(LaunchConfigNegtaiveTest, self).setUp()
         self.lc_name = rand_name('negative_launch_config')
-        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '1', '-4', None]
+        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '-4', None]
         self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111', self.lc_image_ref + 'Z', None]
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
@@ -52,8 +51,25 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                 image_ref=self.lc_image_ref,
                 flavor_ref=each_invalid_id)
             self.assertEquals(update_launch_config_response.status_code, 400,
-                              msg='Updating group with invalid server image id was successsful with'
+                              msg='Updating group with invalid flavor id was successsful with'
                               ' response {0}'.format(update_launch_config_response.status_code))
+
+    @unittest.skip('AUTO-622')
+    def test_update_scaling_group_launch_config_to_invalid_flavorid_1(self):
+        """
+        Verify update launch config fails with a 400 when the new launch config
+        has an flavorId of "1". This is special case where '1' flavor existed in Rackspace
+        and has been taken out. But it still returns valid flavor when requested.
+        """
+        group = self._create_group()
+        update_launch_config_response = self.autoscale_client.update_launch_config(
+            group_id=group.id,
+            name=self.lc_name,
+            image_ref=self.lc_image_ref,
+            flavor_ref='1')
+        self.assertEquals(update_launch_config_response.status_code, 400,
+                          msg='Updating group with invalid flavor id "1" was successsful with'
+                          ' response {0}'.format(update_launch_config_response.status_code))
 
     def test_create_scaling_group_invalid_imageid(self):
         """
@@ -86,7 +102,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                 lc_image_ref=self.lc_image_ref,
                 lc_flavor_ref=each_invalid_id)
             self.assertEquals(create_group_response.status_code, 400,
-                              msg='Create group with invalid server image id was successsful with'
+                              msg='Create group with invalid flavor id was successsful with'
                               ' response {0}'.format(create_group_response.status_code))
 
     def _create_group(self):

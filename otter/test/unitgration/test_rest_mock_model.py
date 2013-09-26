@@ -22,6 +22,7 @@ from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError, NoSuchWebhookError)
 from otter.models.mock import MockScalingGroupCollection
 from otter.rest.application import Otter
+from otter.supervisor import set_supervisor
 
 from otter.test.rest.request import request
 from otter.test.utils import patch
@@ -75,11 +76,22 @@ class MockStoreRestScalingGroupTestCase(TestCase):
                                      spec=['obey_config_change'])
         patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
 
+        # Patch supervisor
+        supervisor = mock.Mock(spec=['validate_launch_config'])
+        supervisor.validate_launch_config.return_value = defer.succeed(None)
+        set_supervisor(supervisor)
+
         def _mock_obey_config_change(log, trans, config, group, state):
             return defer.succeed(GroupState(
                 state.tenant_id, state.group_id, state.group_name, *self.active_pending_etc))
 
         self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
+
+    def tearDown(self):
+        """
+        reset supervisor
+        """
+        set_supervisor(None)
 
     def create_and_view_scaling_group(self):
         """

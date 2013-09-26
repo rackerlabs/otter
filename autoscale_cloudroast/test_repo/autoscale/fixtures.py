@@ -47,7 +47,8 @@ class AutoscaleFixture(BaseTestFixture):
 
         env = os.environ['OSTNG_CONFIG_FILE']
         if ('preprod' in env.lower()) or ('dev' in env.lower()):
-            cls.url = str(cls.autoscale_config.server_endpoint) + '/' + str(cls.tenant_id)
+            cls.url = str(cls.autoscale_config.server_endpoint) + \
+                '/' + str(cls.tenant_id)
         else:
             autoscale_service = access_data.get_service(
                 cls.autoscale_config.autoscale_endpoint_name)
@@ -80,6 +81,14 @@ class AutoscaleFixture(BaseTestFixture):
         cls.sp_change_percent = int(cls.autoscale_config.sp_change_percent)
         cls.sp_desired_capacity = int(cls.autoscale_config.sp_desired_capacity)
         cls.sp_policy_type = cls.autoscale_config.sp_policy_type
+        cls.check_type = cls.autoscale_config.check_type
+        cls.check_url = cls.autoscale_config.check_url
+        cls.check_method = cls.autoscale_config.check_method
+        cls.check_timeout = cls.autoscale_config.check_timeout
+        cls.check_period = cls.autoscale_config.check_period
+        cls.monitoring_zones = ['mzord', 'mzdfw', 'mziad']
+        cls.target_alias = cls.autoscale_config.target_alias
+        cls.alarm_criteria = cls.autoscale_config.alarm_criteria
         cls.upd_sp_change = int(cls.autoscale_config.upd_sp_change)
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
@@ -128,7 +137,8 @@ class AutoscaleFixture(BaseTestFixture):
         Given the group, updates the group to be of 0 minentities and maxentities.
         If delete is set to True, the scaling group is deleted.
         """
-        servers_on_group = (self.autoscale_client.list_status_entities_sgroups(group.id)).entity
+        servers_on_group = (
+            self.autoscale_client.list_status_entities_sgroups(group.id)).entity
         if servers_on_group.desiredCapacity is not 0:
             self.autoscale_client.update_group_config(
                 group_id=group.id,
@@ -194,15 +204,17 @@ class AutoscaleFixture(BaseTestFixture):
         else:
             self.fail(msg='Policy does not have a change type')
         if args is 'at_style':
-            self.assertEquals(get_policy.args.at, created_policy['schedule_value'],
-                              msg='At style schedule policy value not as expected')
+            self.assertEquals(
+                get_policy.args.at, created_policy['schedule_value'],
+                msg='At style schedule policy value not as expected')
         if args is 'cron_style':
-            self.assertEquals(get_policy.args.cron, created_policy['schedule_value'],
-                              msg='Cron style schedule policy value not as expected')
+            self.assertEquals(
+                get_policy.args.cron, created_policy['schedule_value'],
+                msg='Cron style schedule policy value not as expected')
 
-    def create_default_at_style_policy_wait_for_execution(self, group_id, delay=3,
-                                                          change=None,
-                                                          scale_down=None):
+    def create_default_at_style_policy_wait_for_execution(
+        self, group_id, delay=3,
+            change=None, scale_down=None):
         """
         Creates an at style scale up/scale down policy to execute at utcnow() + delay and waits
         the scheduler config seconds + delay, so that the policy is picked
@@ -237,16 +249,26 @@ class AutoscaleFixture(BaseTestFixture):
         filtered_servers = list_server_resp.entity
         return [server.id for server in filtered_servers]
 
-    def get_server_count_for_group_from_server_metadata(self, group_id):
+    def verify_server_count_using_server_metadata(self, group_id, expected_count):
         """
-        Given the group id, returns the count of servers with that group id in the
-        metadata of the servers on the tenant
+        Asserts the expected count is the number of servers with the groupid
+        in the metadata. Fails if the count is not met in 60 seconds.
         """
-        list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
-        metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
-                         in list_servers_on_tenant]
-        group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each in metadata_list]
-        return group_ids_list_from_metadata.count(group_id)
+        end_time = time.time() + 60
+        while time.time() < end_time:
+            list_servers_on_tenant = self.server_client.list_servers_with_detail().entity
+            metadata_list = [self.autoscale_behaviors.to_data(each_server.metadata) for each_server
+                             in list_servers_on_tenant]
+            group_ids_list_from_metadata = [each.get('rax:auto_scaling_group_id') for each
+                                            in metadata_list]
+            actual_count = group_ids_list_from_metadata.count(group_id)
+            if actual_count is expected_count:
+                break
+            time.sleep(5)
+        else:
+            self.fail('Waited 60 seconds, expecting {0} servers with group id : {1} in the '
+                      'metadata but has {2} servers'.format(expected_count, group_id,
+                                                            actual_count))
 
     def wait_for_expected_number_of_active_servers(self, group_id, expected_servers,
                                                    interval_time=None, timeout=None):
@@ -275,9 +297,10 @@ class AutoscaleFixture(BaseTestFixture):
             resp = self.autoscale_client.list_status_entities_sgroups(group_id)
             group_state = resp.entity
             active_list = group_state.active
-            self.assertNotEquals((group_state.activeCapacity + group_state.pendingCapacity), 0,
-                                 msg='Group Id {0} failed to attempt server creation. Group has no'
-                                 ' servers'.format(group_id))
+            self.assertNotEquals(
+                (group_state.activeCapacity + group_state.pendingCapacity), 0,
+                msg='Group Id {0} failed to attempt server creation. Group has no'
+                ' servers'.format(group_id))
             self.assertEquals(group_state.desiredCapacity, expected_servers,
                               msg='Group {0} should have {1} servers, but has reduced the build {2}'
                               'servers'.format(group_id, expected_servers, group_state.desiredCapacity))
@@ -290,8 +313,9 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
-    def check_for_expected_number_of_building_servers(self, group_id, expected_servers,
-                                                      desired_capacity=None, server_name=None):
+    def check_for_expected_number_of_building_servers(
+        self, group_id, expected_servers,
+            desired_capacity=None, server_name=None):
         """
         :summary: verify the desired capacity in group state is equal to expected servers
          and verifies for the specified number of servers with the name specified in the
@@ -324,7 +348,8 @@ class AutoscaleFixture(BaseTestFixture):
                 'Waited 2 mins for desired capacity/active server list to reach the'
                 ' server count of {0}. Has desired capacity {1} on the group {2}'
                 ' and {3} servers on the account' .format(desired_capacity,
-                group_state.desiredCapacity, group_id, len(server_list)))
+                                                          group_state.desiredCapacity, group_id,
+                                                          len(server_list)))
 
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """

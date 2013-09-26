@@ -137,6 +137,62 @@ class AutoscaleConfig(ConfigSectionInterface):
         return self.get('sp_desired_capacity')
 
     @property
+    def check_type(self):
+        """
+        maas scaling policy's check type
+        """
+        return self.get('check_type')
+
+    @property
+    def check_url(self):
+        """
+        maas scaling policy's check url
+        """
+        return self.get('check_url')
+
+    @property
+    def check_method(self):
+        """
+        maas scaling policy's check method
+        """
+        return self.get('check_method')
+
+    @property
+    def monitoring_zones(self):
+        """
+        maas scaling policy's monitoring zones
+        """
+        return self.get('monitoring_zones')
+
+    @property
+    def check_timeout(self):
+        """
+        maas scaling policy's check timeout
+        """
+        return self.get('check_timeout')
+
+    @property
+    def check_period(self):
+        """
+        maas scaling policy's check period
+        """
+        return self.get('check_period')
+
+    @property
+    def target_alias(self):
+        """
+        maas scaling policy's target alias
+        """
+        return self.get('target_alias')
+
+    @property
+    def alarm_criteria(self):
+        """
+        maas scaling policy's alarm criteria
+        """
+        return self.get('alarm_criteria')
+
+    @property
     def lc_load_balancers(self):
         """
         launch configuration for load balancers
