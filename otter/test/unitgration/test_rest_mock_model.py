@@ -64,7 +64,8 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         """
         store = MockScalingGroupCollection()
         self.root = Otter(store).app.resource()
-        set_config_data({'url_root': 'http://127.0.0.1'})
+        set_config_data({'url_root': 'http://127.0.0.1',
+                         'limit': {'pagination': 5}})
         self.addCleanup(set_config_data, {})
 
         self.config = config()[1]
