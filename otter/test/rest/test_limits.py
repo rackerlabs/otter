@@ -9,8 +9,6 @@ from twisted.trial.unittest import TestCase
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
 
-number = 2
-
 
 class OtterLimitsTestCase(RestAPITestMixin, TestCase):
     """
@@ -26,10 +24,11 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         setup fake config data
         """
         self.limits = ["maxGroups", "maxPoliciesPerGroup", "maxWebhooksPerPolicy"]
+        self.limit_number = 2
         data = {
             "limits": {
                 "pagination": 500,
-                "absolute": {limit: number for limit in self.limits}
+                "absolute": {limit: self.limit_number for limit in self.limits}
             }
         }
 
@@ -48,7 +47,11 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
         the api returns a json blob containing the absolute
         limits in the correct format, and ignores other limits in the config.
         """
-        data = {"limits": {"absolute": {limit: number for limit in self.limits}}}
+        data = {
+            "limits": {
+                "absolute": {limit: self.limit_number for limit in self.limits}
+            }
+        }
         body = self.assert_status_code(200)
         resp = json.loads(body)
         self.assertEqual(resp, data)
@@ -67,7 +70,7 @@ class OtterLimitsTestCase(RestAPITestMixin, TestCase):
                 '<limit name="maxWebhooksPerPolicy" value="{0}"/>'
                 '</absolute></limits>')
 
-        data = data.format(number)
+        data = data.format(self.limit_number)
         headers = {"Accept": ["application/xml"]}
 
         response_wrapper = self.successResultOf(
