@@ -59,7 +59,8 @@ class AutoscaleBehaviors(BaseBehavior):
                                    lc_image_ref=None, lc_flavor_ref=None,
                                    lc_personality=None, lc_metadata=None,
                                    lc_disk_config=None, lc_networks=None,
-                                   lc_load_balancers=None, sp_list=None):
+                                   lc_load_balancers=None, sp_list=None,
+                                   network_type=None):
         """
         Creates a scaling group with given parameters and default the other
         required fields if not already given
@@ -88,7 +89,8 @@ class AutoscaleBehaviors(BaseBehavior):
             lc_disk_config=lc_disk_config,
             lc_networks=lc_networks,
             lc_load_balancers=lc_load_balancers,
-            sp_list=sp_list)
+            sp_list=sp_list,
+            network_type=network_type)
         return create_response
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,

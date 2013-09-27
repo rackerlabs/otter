@@ -56,7 +56,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2,
                                                         self.load_balancer_3)
 
-    @tags(speed='slow')
+    @tags(speed='test')
     def test_update_launch_config_to_include_lbaas(self):
         """
         Update the launch config to add a load balancer to a group that did not
@@ -65,7 +65,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         policy_data = {'change': self.sp_change}
         group = (self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=self.gc_min_entities_alt)).entity
+            gc_min_entities=self.gc_min_entities_alt,
+            network_type='public')).entity
         active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
@@ -216,7 +217,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             lc_load_balancers=self._create_lbaas_list(*lbaas_ids),
-            gc_cooldown=0)
+            gc_cooldown=0, network_type='public')
         group = create_group_response.entity
         self.resources.add(group, self.empty_scaling_group)
         return group
