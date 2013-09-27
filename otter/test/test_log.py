@@ -289,8 +289,8 @@ class ObserverWrapperTests(TestCase):
         self.observer = mock.Mock()
         self.seconds = mock.Mock(return_value=0)
         self.wrapper = ObserverWrapper(self.observer,
-                                        hostname='localhost',
-                                        seconds=self.seconds)
+                                       hostname='localhost',
+                                       seconds=self.seconds)
 
     def test_formats_eventDict(self):
         """
@@ -323,8 +323,8 @@ class ObserverWrapperTests(TestCase):
         """
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
-            matches(
-                ContainsDict({'short_message': Equals(repr(ValueError()))})))
+            matches(ContainsDict({'short_message': Equals(repr(ValueError()))}))
+        )
 
     def test_isError_with_message_instead_of_failure(self):
         """
@@ -351,8 +351,8 @@ class ObserverWrapperTests(TestCase):
         The observer includes 'why' in the short_message when isError is true.
         """
         self.wrapper({'failure': Failure(ValueError()),
-                   'isError': True,
-                   'why': 'Everything is terrible.'})
+                     'isError': True,
+                     'why': 'Everything is terrible.'})
 
         self.observer.assert_called_once_with(
             matches(
