@@ -13,7 +13,7 @@ from testtools.matchers import Contains, ContainsDict, Equals
 
 from otter.log.bound import BoundLog
 
-from otter.log.formatters import GELFObserverWrapper
+from otter.log.formatters import ObserverWrapper
 from otter.log.formatters import JSONObserverWrapper
 from otter.log.formatters import PEP3101FormattingWrapper
 from otter.log.formatters import StreamObserverWrapper
@@ -278,9 +278,9 @@ class PEP3101FormattingWrapperTests(TestCase):
         })
 
 
-class GELFObserverWrapperTests(TestCase):
+class ObserverWrapperTests(TestCase):
     """
-    Test the GELFObserverWrapper.
+    Test the ObserverWrapper.
     """
     def setUp(self):
         """
@@ -288,16 +288,15 @@ class GELFObserverWrapperTests(TestCase):
         """
         self.observer = mock.Mock()
         self.seconds = mock.Mock(return_value=0)
-        self.gelf = GELFObserverWrapper(self.observer,
+        self.wrapper = ObserverWrapper(self.observer,
                                         hostname='localhost',
                                         seconds=self.seconds)
 
-    def test_formats_eventDict_as_gelf(self):
+    def test_formats_eventDict(self):
         """
-        GELFObserverWrapper calls the wrapped observer with a dictionary
-        in the GELF format.
+        ObserverWrapper calls the wrapped observer with a dictionary.
         """
-        self.gelf({'message': ('Hello',)})
+        self.wrapper({'message': ('Hello',)})
 
         self.observer.assert_called_once_with({
             'host': 'localhost',
@@ -313,7 +312,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer puts the traceback in the full_message key.
         """
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'full_message': Contains('Traceback')})))
@@ -322,7 +321,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer includes the repr of failure.value in short_message.
         """
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
         self.observer.assert_called_once_with(
             matches(
                 ContainsDict({'short_message': Equals(repr(ValueError()))})))
@@ -331,7 +330,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer should use message when there is no failure.
         """
-        self.gelf({'message': ('uh oh',), 'isError': True})
+        self.wrapper({'message': ('uh oh',), 'isError': True})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'short_message': Equals('uh oh'),
@@ -342,7 +341,7 @@ class GELFObserverWrapperTests(TestCase):
         The observer sets the level to 3 (syslog ERROR) when isError is true.
         """
 
-        self.gelf({'failure': Failure(ValueError()), 'isError': True})
+        self.wrapper({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'level': Equals(3)})))
@@ -351,7 +350,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer includes 'why' in the short_message when isError is true.
         """
-        self.gelf({'failure': Failure(ValueError()),
+        self.wrapper({'failure': Failure(ValueError()),
                    'isError': True,
                    'why': 'Everything is terrible.'})
 
@@ -364,7 +363,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer includes arbitrary structured data.
         """
-        self.gelf({'uri': 'http://example.com', 'message': 'hooray'})
+        self.wrapper({'uri': 'http://example.com', 'message': 'hooray'})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'uri': Equals('http://example.com')})))
@@ -373,7 +372,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer includes file if it is specified.
         """
-        self.gelf({'message': 'hello', 'file': 'test.py'})
+        self.wrapper({'message': 'hello', 'file': 'test.py'})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'file': Equals('test.py')})))
@@ -382,7 +381,7 @@ class GELFObserverWrapperTests(TestCase):
         """
         The observer includes line if it is specified.
         """
-        self.gelf({'line': 10, 'message': ''})
+        self.wrapper({'line': 10, 'message': ''})
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'line': Equals(10)})))
