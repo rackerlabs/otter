@@ -56,7 +56,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2,
                                                         self.load_balancer_3)
 
-    @tags(speed='test')
+    @tags(speed='slow')
     def test_update_launch_config_to_include_lbaas(self):
         """
         Update the launch config to add a load balancer to a group that did not
