@@ -386,7 +386,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     return d
 
 
-def delete_server(log, region, service_catalog, auth_token, instance_details):
+def delete_server(log, region, service_catalog, auth_token, server_id, lb_info):
     """
     Delete the server specified by instance_details.
 
@@ -416,9 +416,12 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                           cloudServersOpenStack,
                                           region)
 
-    (server_id, lb_details) = instance_details
-
-    return verified_delete(log, server_endpoint, auth_token, server_id)
+    if lb_info:
+        d = remove_from_load_balancers(log, region, service_catalog, auth_token, lb_info)
+        d.addCallback(lambda _: verified_delete(log, server_endpoint, auth_token, server_id))
+        return d
+    else:
+        return verified_delete(log, server_endpoint, auth_token, server_id)
 
 
 def remove_from_load_balancers(log, region, service_catalog, auth_token, lb_details):

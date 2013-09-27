@@ -16,12 +16,11 @@ class Supervisor(object):
     def __init__(self, auth_function):
         self.auth_function = auth_function
 
-    def execute_config(self, log, transaction_id, scaling_group, launch_config):
+    def launch_server(self, log, scaling_group, launch_config):
         """
         Executes a single launch config.
 
         :param log: Bound logger.
-        :param str transaction_id: Transaction ID.
         :param callable auth_function: A 1-argument callable that takes a tenant_id,
             and returns a Deferred that fires with a 2-tuple of auth_token and
             service_catalog.
@@ -75,7 +74,7 @@ class Supervisor(object):
 
         return succeed((job_id, completion_d))
 
-    def delete_server(self, log, transaction_id, scaling_group, server):
+    def delete_server(self, log, scaling_group, server_id, lb_info):
         """
         Executes a single delete server
 
@@ -94,7 +93,7 @@ class Supervisor(object):
                 config_value('region'),
                 service_catalog,
                 auth_token,
-                (server['id'], server['lb_info']))
+                server_id, lb_info)
 
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")
