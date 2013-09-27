@@ -103,7 +103,7 @@ class OtterGroups(object):
             ],
             "groups_links": [
               {
-                "href" : "http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/?limit=1&marker={groupId2}"
+                "href" : "http://dfw.<...>/v1.0/010101/groups/?limit=1&marker={groupId2}"
                 "rel" : "next"
               }
             ]
