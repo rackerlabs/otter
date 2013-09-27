@@ -130,8 +130,8 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         of them are executed in the batch size specified.
         """
         at_style_policies_list = []
-        size = 2
-        at_style_time = self.autoscale_behaviors.get_time_in_utc(3)
+        size = 1
+        at_style_time = self.autoscale_behaviors.get_time_in_utc(10)
         for policy in (range(self.scheduler_batch * size)):
             policy = {
                 'args': {'at': at_style_time},
@@ -140,14 +140,14 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
                 'name': 'multi_at_style{0}'.format(policy),
                 'change': 1}
             at_style_policies_list.append(policy)
-        create_group_reponse = self.autoscale_behaviors.create_scaling_group_given(
+        create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             lc_name='scheduler_batch_size_check', gc_cooldown=0,
             sp_list=at_style_policies_list)
-        self.resources.add(
-            create_group_reponse.entity, self.empty_scaling_group)
+        group = create_group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
         sleep(self.scheduler_interval * 2)
-        self.verify_group_state(
-            create_group_reponse.entity.id, self.scheduler_batch * size)
+        self.check_for_expected_number_of_building_servers(group.id, self.scheduler_batch * size)
+        self.verify_group_state(group.id, self.scheduler_batch * size)
 
     @tags(speed='slow')
     def test_create_multiple_scheduler_policies_to_execute_simaltaneously(self):
