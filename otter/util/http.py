@@ -88,14 +88,17 @@ class APIError(Exception):
 
     :param int code: HTTP Response code for this error.
     :param str body: HTTP Response body for this error or None.
+    :param Headers headers: HTTP Response headers for this error, or None
     """
-    def __init__(self, code, body):
+    def __init__(self, code, body, headers=None):
         Exception.__init__(
             self,
-            'API Error code={0!r}, body={1!r}'.format(code, body))
+            'API Error code={0!r}, body={1!r}, headers={2!r}'.format(
+                code, body, headers))
 
         self.code = code
         self.body = body
+        self.headers = headers
 
 
 def check_success(response, success_codes):
@@ -113,7 +116,7 @@ def check_success(response, success_codes):
     :return: response or a deferred that errbacks with an APIError.
     """
     def _raise_api_error(body):
-        raise APIError(response.code, body)
+        raise APIError(response.code, body, response.headers)
 
     if response.code not in success_codes:
         return treq.content(response).addCallback(_raise_api_error)
