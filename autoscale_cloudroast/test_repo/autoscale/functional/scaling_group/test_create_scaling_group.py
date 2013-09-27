@@ -51,7 +51,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             lc_disk_config=cls.lc_disk_config,
             lc_networks=cls.lc_networks,
             lc_load_balancers=cls.lc_load_balancers,
-            sp_list=cls.sp_list)
+            sp_list=cls.sp_list,
+            network_type='public')
         cls.scaling_group = cls.create_resp.entity
         cls.resources.add(cls.scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
