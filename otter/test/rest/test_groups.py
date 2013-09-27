@@ -33,6 +33,8 @@ from otter.bobby import BobbyClient
 from otter.supervisor import set_supervisor
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
+from otter.util.config import set_config_data
+
 
 class FormatterHelpers(TestCase):
     """
@@ -106,11 +108,14 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.supervisor.validate_launch_config.return_value = defer.succeed(None)
         set_supervisor(self.supervisor)
 
+        set_config_data({'limits': {'pagination': 100}})
+
     def tearDown(self):
         """
         Reset the supervisor
         """
         set_supervisor(None)
+        set_config_data({})
 
     def test_list_unknown_error_is_500(self):
         """
@@ -156,13 +161,14 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
         body = self.assert_status_code(200)
-        self.mock_store.list_scaling_group_states.assert_called_once_with(mock.ANY, '11111')
+        self.mock_store.list_scaling_group_states.assert_called_once_with(
+            mock.ANY, '11111', limit=100)
 
         resp = json.loads(body)
         self.assertEqual(resp, {"groups": [], "groups_links": []})
         validate(resp, rest_schemas.list_groups_response)
 
-    @mock.patch('otter.rest.groups.format_state_dict', return_value='formatted')
+    @mock.patch('otter.rest.groups.format_state_dict', return_value={'id': 'formatted'})
     def test_list_group_formats_gets_and_formats_all_states(self, mock_format):
         """
         ``list_all_scaling_groups`` translates a list of IScalingGroup to a
@@ -177,7 +183,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         self.assert_status_code(200)
         self.mock_store.list_scaling_group_states.assert_called_once_with(
-            mock.ANY, '11111')
+            mock.ANY, '11111', limit=100)
 
         mock_format.assert_has_calls([mock.call(state) for state in states])
         self.assertEqual(len(mock_format.mock_calls), 2)
@@ -186,7 +192,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 return_value=[{'href': 'hey', 'rel': 'self'}])
     def test_list_group_returns_valid_schema(self, *args):
         """
-        ``list_all_scaling_groups`` produces a repsonse has the correct schema
+        ``list_all_scaling_groups`` produces a response has the correct schema
         so long as format returns the right value
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
@@ -209,6 +215,53 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             }],
             "groups_links": []
         })
+
+    def test_list_group_passes_limit_query(self):
+        """
+        ``list_all_scaling_groups`` passes on the 'limit' query argument to
+        the model
+        """
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
+        self.assert_status_code(
+            200, endpoint="{0}?limit=5".format(self.endpoint))
+        self.mock_store.list_scaling_group_states.assert_called_once_with(
+            mock.ANY, '11111', limit=5)
+
+    def test_list_group_invalid_limit_query_400(self):
+        """
+        ``list_all_scaling_groups``, if passed an invalid query limit, returns
+        a 400
+        """
+        self.assert_status_code(
+            400, endpoint="{0}?limit=blargh".format(self.endpoint))
+        self.assertFalse(self.mock_store.list_scaling_group_states.called)
+
+    def test_list_group_passes_marker_query(self):
+        """
+        ``list_all_scaling_groups`` passes on the 'marker' query argument to
+        the model
+        """
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([])
+        self.assert_status_code(
+            200, endpoint="{0}?marker=123456".format(self.endpoint))
+        self.mock_store.list_scaling_group_states.assert_called_once_with(
+            mock.ANY, '11111', marker='123456', limit=100)
+
+    def test_list_groups_returns_next_link_formatted(self):
+        """
+        The "next" link should be formatted as link json with the rel 'next'
+        """
+        self.mock_store.list_scaling_group_states.return_value = defer.succeed([
+            GroupState('11111', 'one', 'test', {}, {}, None, {}, True)
+        ])
+        response_body = self.assert_status_code(
+            200, endpoint="{0}?limit=1".format(self.endpoint))
+        resp = json.loads(response_body)
+
+        validate(resp, rest_schemas.list_groups_response)
+        self.assertEqual(
+            resp['groups_links'],
+            [{'href': self.endpoint + '?marker=one&limit=1', 'rel': 'next'}])
 
     def test_group_create_bad_input_400(self):
         """
