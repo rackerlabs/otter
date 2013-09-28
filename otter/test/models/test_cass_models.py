@@ -1432,21 +1432,26 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
              'launch_config': serialize_json_data(self.launch_config, 1.0),
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}
-         )
+        )
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed({}))
 
-        self.assertEqual(self.validate_view_manifest_return_value(),
-                         {'groupConfiguration': self.config,
-                          'launchConfiguration': self.launch_config,
-                          'scalingPolicies': {},
-                          'state':  GroupState(self.tenant_id, self.group_id,
-                                       'a', {'A': 'R'}, {'P': 'R'}, '123', {'PT': 'R'}, False)})
+        self.assertEqual(self.validate_view_manifest_return_value(), {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': {},
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '123',
+                {'PT': 'R'}, False
+            )})
         self.group._naive_list_policies.assert_called_once_with()
 
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused, created_at '
-                      'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
+                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
         verified_view.assert_called_once_with(self.connection, view_cql, del_cql,
@@ -1482,7 +1487,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return_value=defer.succeed({}))
         r = self.group.view_manifest()
         self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = ('SELECT group_config, launch_config, active, '
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'

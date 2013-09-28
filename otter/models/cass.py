@@ -459,7 +459,7 @@ class CassScalingGroup(object):
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'partial'),
+                          get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
         d.addCallback(_get_policies)
         return d

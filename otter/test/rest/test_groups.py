@@ -233,7 +233,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
             'scalingPolicies': {},
-            'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
         })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
@@ -257,7 +257,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
             'scalingPolicies': {},
-            'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -280,6 +280,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         config = request_body['groupConfiguration']
         launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
+        state = GroupState('11111', '2', '', {}, {}, None, {}, False)
 
         expected_config = config.copy()
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
@@ -290,14 +291,13 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch,
             'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
                                         [p.copy() for p in policies])),
-            'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
-
+            'state': state
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
 
         response_body = self.assert_status_code(
-            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/1/')
+            201, None, 'POST', json.dumps(request_body), '/v1.0/11111/groups/2/')
 
         self.mock_store.create_scaling_group.assert_called_once_with(
             mock.ANY, '11111', expected_config, launch, policies or None)
@@ -312,14 +312,14 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {
             'group': {
                 'groupConfiguration': expected_config,
-                'launchConfiguration': launch
+                'launchConfiguration': launch,
+                'state': format_state_dict(state)
             }
         })
-
         resp_policies.sort(key=lambda dictionary: dictionary['id'])
         for pol in resp_policies:
             self.assertEqual(pol.pop('links'), [{
-                "href": "/v1.0/11111/groups/1/policies/{0}/".format(pol.pop('id')),
+                "href": "/v1.0/11111/groups/2/policies/{0}/".format(pol.pop('id')),
                 "rel": "self"
             }])
         self.assertEqual(resp_policies, policies)
@@ -419,7 +419,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': config,
             'launchConfiguration': launch,
             'scalingPolicies': {},
-            'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
         })
 
         self.assert_status_code(500, None, 'POST', body=json.dumps({
@@ -489,7 +489,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch,
             'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
                                         [p.copy() for p in policies])),
-            'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False)
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -553,20 +553,22 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.create_and_manifest_response)
 
         expected_policy = policy_examples()[0]
-        expected_policy.update({"id": "5",
+        expected_policy.update({
+            "id": "5",
             "links": [
                 {"href": "/v1.0/11111/groups/one/policies/5/", "rel": "self"},
-            ]}
-        )
+            ]
+        })
 
         expected = {
             'group': {
                 'groupConfiguration': config_examples()[0],
                 'launchConfiguration': launch_examples()[0],
                 'scalingPolicies': [expected_policy],
-                'state': format_state_dict(GroupState('11111', '2', '', {}, {}, None, {}, False))
+                'state': manifest['state']
             }
         }
+
         self.assertEqual(resp, expected)
 
         self.mock_store.get_scaling_group.assert_called_once_with(
