@@ -194,14 +194,21 @@ def paginatable(f):
     @wraps(f)
     def _(self, request, *args, **kwargs):
         paginate = {}
+        hard_limit = config_value('limit.pagination')
         if 'limit' in request.args:
             try:
                 paginate['limit'] = int(request.args['limit'][0])
             except:
                 return defer.fail(InvalidQueryArgument(
                     'Invalid query argument for "limit"'))
+
+            if (paginate['limit'] < 1 or paginate['limit'] > hard_limit):
+                return defer.fail(InvalidQueryArgument(
+                    'Query "limit" must be between 1 and {0} inclusive'.format(
+                        hard_limit)))
+
         else:
-            paginate['limit'] = config_value('limit.pagination')
+            paginate['limit'] = hard_limit
 
         if 'marker' in request.args:
             paginate['marker'] = request.args['marker'][0]
