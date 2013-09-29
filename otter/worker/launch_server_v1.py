@@ -189,7 +189,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
+def add_to_load_balancers(log, region, service_catalog, auth_token, server_id):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -202,16 +202,44 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address):
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
-    return gatherResults([
-        add_to_load_balancer(
-            endpoint,
-            auth_token,
-            lb_config,
-            ip_address).addCallback(
-                lambda response, lb_id: (lb_id, response),
-                lb_config['loadBalancerId'])
-        for lb_config in lb_configs
-    ], consumeErrors=True)
+    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
+    cloudLoadBalancers = config_value('cloudLoadBalancers')
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
+
+    log.msg("Looking for load balancer endpoint",
+            service_name=cloudLoadBalancers,
+            region=lb_region)
+
+    lb_endpoint = public_endpoint_url(service_catalog,
+                                      cloudLoadBalancers,
+                                      lb_region)
+
+    log.msg("Looking for cloud servers endpoint",
+            service_name=cloudServersOpenStack,
+            region=region)
+
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
+
+    lb_config = launch_config.get('loadBalancers', [])
+
+    d = server_details(server_endpoint, auth_token, server_id)
+
+    def add_to_lbs(server):
+        ip_address = private_ip_addresses(server)[0]
+        return gatherResults([
+            add_to_load_balancer(
+                endpoint,
+                auth_token,
+                lb_config,
+                ip_address).addCallback(
+                    lambda response, lb_id: (lb_id, response),
+                    lb_config['loadBalancerId'])
+            for lb_config in lb_configs
+        ], consumeErrors=True)
+
+    return d.addCallback(add_to_lbs)
 
 
 def endpoints(service_catalog, service_name, region):
@@ -318,17 +346,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-
-    log.msg("Looking for load balancer endpoint",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
-    lb_endpoint = public_endpoint_url(service_catalog,
-                                      cloudLoadBalancers,
-                                      lb_region)
 
     log.msg("Looking for cloud servers endpoint",
             service_name=cloudServersOpenStack,
@@ -338,32 +357,11 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token, launc
                                           cloudServersOpenStack,
                                           region)
 
-    lb_config = launch_config.get('loadBalancers', [])
-
     server_config = launch_config['server']
 
     log = log.bind(server_name=server_config['name'])
 
-    d = create_server(server_endpoint, auth_token, server_config)
-
-    def _wait_for_server(server):
-        ilog = log.bind(instance_id=server['server']['id'])
-        return wait_for_active(
-            ilog,
-            server_endpoint,
-            auth_token,
-            server['server']['id'])
-
-    d.addCallback(_wait_for_server)
-
-    def _add_lb(server):
-        ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(lb_endpoint, auth_token, lb_config, ip_address)
-        lbd.addCallback(lambda lb_response: (server, lb_response))
-        return lbd
-
-    d.addCallback(_add_lb)
-    return d
+    return create_server(server_endpoint, auth_token, server_config)
 
 
 def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):

@@ -103,9 +103,46 @@ class Supervisor(object):
 
         return d
 
-    def remove_from_load_balancers(self, log, transaction_id, scaling_group, server):
-        return launch_server_v1.remove_from_load_balancers(
-            log, config_value('region'), service_catalog, auth_token server['lb_info'])
+    def remove_from_load_balancers(self, log, scaling_group, server_id, lb_info):
+        """
+        Remove given server from load balancers
+        """
+        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+
+        # authenticate for tenant
+        def when_authenticated((auth_token, service_catalog)):
+            return launch_server_v1.remove_from_load_balancers(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                server_id, lb_info)
+
+        d = self.auth_function(scaling_group.tenant_id)
+        log.msg("Authenticating for tenant")
+        d.addCallback(when_authenticated)
+        return d
+
+    def add_to_load_balancers(self, log, scaling_group, server_id):
+        """
+        Add the specified IP to mulitple load balancer based on the configs in
+        lb_configs.
+        """
+        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+
+        # authenticate for tenant
+        def when_authenticated((auth_token, service_catalog)):
+            return launch_server_v1.add_to_load_balancers(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                server_id)
+
+        d = self.auth_function(scaling_group.tenant_id)
+        log.msg("Authenticating for tenant")
+        d.addCallback(when_authenticated)
+        return d
 
 
 _supervisor = None
