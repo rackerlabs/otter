@@ -432,7 +432,7 @@ class MockStoreRestWebhooksTestCase(TestCase):
                 "change": 10,
                 "cooldown": 3,
                 "type": "webhook"
-            }])).keys()[0]
+            }]))[0]['id']
 
         self.webhooks_url = (
             '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks/'.format(

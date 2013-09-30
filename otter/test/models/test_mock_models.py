@@ -706,10 +706,15 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assertEqual(self.mock_uuid.call_count, 3)  # 1 group, 3 policies
 
+        expected_policies = [
+            dict(id='2', **policies[0]),
+            dict(id='3', **policies[1])
+        ]
+
         self.assertEqual(manifest, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3'), policies)),
+            'scalingPolicies': expected_policies,
             'id': '1'
         })
 
@@ -787,7 +792,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
-        pol_uuid = pol_rec.keys()[0]
+        pol_uuid = pol_rec[0]['id']
 
         self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
@@ -816,7 +821,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
-        pol_uuid = pol_rec.keys()[0]
+        pol_uuid = pol_rec[0]['id']
 
         self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 

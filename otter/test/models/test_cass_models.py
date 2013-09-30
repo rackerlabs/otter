@@ -1513,7 +1513,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, '', {}, {}, None, {}, False))
-        mock_naive.return_value = defer.succeed({'policyA': {}, 'policyB': {}})
+        mock_naive.return_value = defer.succeed(
+            [{'id': 'policyA'}, {'id': 'policyB'}])
 
         self.returns = [None]
         result = self.successResultOf(self.group.delete_group())

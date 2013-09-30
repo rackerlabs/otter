@@ -845,7 +845,7 @@ class CassScalingGroup(object):
 
             if len(policies) > 0:
                 events_query, events_params = _delete_many_query_and_params(
-                    self.event_table, '"policyId"', policies.keys())
+                    self.event_table, '"policyId"', [p['id'] for p in policies])
                 queries.append(events_query)
                 params.update(events_params)
 
