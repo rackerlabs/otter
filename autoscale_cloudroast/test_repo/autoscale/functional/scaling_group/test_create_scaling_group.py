@@ -7,6 +7,7 @@ from cloudcafe.common.tools.datagen import rand_name
 
 
 class CreateScalingGroupTest(AutoscaleFixture):
+
     """
     Verify create group.
     """
@@ -50,7 +51,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             lc_disk_config=cls.lc_disk_config,
             lc_networks=cls.lc_networks,
             lc_load_balancers=cls.lc_load_balancers,
-            sp_list=cls.sp_list)
+            sp_list=cls.sp_list,
+            network_type='public')
         cls.scaling_group = cls.create_resp.entity
         cls.resources.add(cls.scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
@@ -60,11 +62,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Verify the response code for the create scaling group is 201
         """
         self.assertTrue(self.create_resp.ok,
-                        msg='Create scaling group call failed with API Response: {0}'
-                        .format(self.create_resp.content))
+                        msg='Create scaling group call failed with API Response: {0} for '
+                        'group {1}'.format(self.create_resp.content, self.scaling_group.id))
         self.assertEquals(self.create_resp.status_code, 201,
-                          msg='The create failed with {0}'
-                          .format(self.create_resp.status_code))
+                          msg='The create failed with {0} for group '
+                          '{1}'.format(self.create_resp.status_code, self.scaling_group.id))
         self.validate_headers(self.create_resp.headers)
 
     def test_create_scaling_group_fields(self):
@@ -72,9 +74,11 @@ class CreateScalingGroupTest(AutoscaleFixture):
         Verify the scaling group id and links exist in the response
         """
         self.assertTrue(self.scaling_group.id is not None,
-                        msg='Scaling Group id was not set in the response')
+                        msg='Scaling Group id was not set in the response'
+                        ' for group {0}'.format(self.scaling_group.id))
         self.assertTrue(self.scaling_group.links is not None,
-                        msg='Scaling Group links were not set in the response')
+                        msg='Scaling Group links were not set in the response'
+                        ' for group {0}'.format(self.scaling_group.id))
 
     def test_created_scaling_group_groupconfig_fields(self):
         """
@@ -82,20 +86,25 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         self.assertEqual(
             self.gc_name, self.scaling_group.groupConfiguration.name,
-            msg='Scaling group name did not match')
+            msg='Scaling group name did not match'
+            ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.gc_min_entities,
                          self.scaling_group.groupConfiguration.minEntities,
-                         msg='Scaling group minEntities did not match')
+                         msg='Scaling group minEntities did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.gc_max_entities,
                          self.scaling_group.groupConfiguration.maxEntities,
-                         msg='Scaling group maxEntities did not match')
+                         msg='Scaling group maxEntities did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.gc_cooldown,
                          self.scaling_group.groupConfiguration.cooldown,
-                         msg='Scaling group cooldown did not match')
+                         msg='Scaling group cooldown did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.gc_metadata,
                          self.autoscale_behaviors.to_data(
                              self.scaling_group.groupConfiguration.metadata),
-                         msg='Scaling group metadata did not match')
+                         msg='Scaling group metadata did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
 
     def test_created_scaling_group_launchconfig_scalingpolicy_fields(self):
         """
@@ -103,30 +112,37 @@ class CreateScalingGroupTest(AutoscaleFixture):
         """
         self.assertEqual(self.autoscale_config.lc_name,
                          self.scaling_group.launchConfiguration.server.name,
-                         msg='Server name provided in the launch config did not match')
+                         msg='Server name provided in the launch config did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.autoscale_config.lc_image_ref,
                          self.scaling_group.launchConfiguration.server.imageRef,
-                         msg='Image id did not match')
+                         msg='Image id did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(self.autoscale_config.lc_flavor_ref,
                          self.scaling_group.launchConfiguration.server.flavorRef,
-                         msg='Flavor id did not match')
+                         msg='Flavor id did not match'
+                         ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.network_uuid_list(self.lc_networks),
             self.autoscale_behaviors.network_uuid_list(
                 self.scaling_group.launchConfiguration.server.networks),
-            msg='Networks within the launch config did not match')
+            msg='Networks within the launch config did not match'
+            ' for group {0}'.format(self.scaling_group.id))
         self.assertEquals(
             self.autoscale_behaviors.personality_list(self.lc_personality),
             self.autoscale_behaviors.personality_list(
                 self.scaling_group.launchConfiguration.server.personality),
-            msg='Personality within the launch config did not match')
+            msg='Personality within the launch config did not match'
+            ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(
             self.autoscale_behaviors.lbaas_list(self.lc_load_balancers),
             self.autoscale_behaviors.lbaas_list(
                 self.scaling_group.launchConfiguration.loadBalancers),
-            msg='Load balancers did not match')
+            msg='Load balancers did not match'
+            ' for group {0}'.format(self.scaling_group.id))
         self.assertEqual(
             self.autoscale_behaviors.policy_details_list(self.sp_list),
             self.autoscale_behaviors.policy_details_list(
                 self.scaling_group.scalingPolicies),
-            msg='Scaling policies of the scaling group did not match')
+            msg='Scaling policies of the scaling group did not match'
+            ' for group {0}'.format(self.scaling_group.id))

@@ -9,6 +9,7 @@ from jsonschema import ValidationError
 
 from twisted.internet import defer
 from twisted.python import reflect
+from otter.util.config import config_value
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
 from otter.log import log
@@ -24,7 +25,7 @@ def fails_with(mapping):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, bound_log, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
 
             def _fail(failure, request):
                 failure = unwrap_first_error(failure)
@@ -37,7 +38,7 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
-                    bound_log.bind(
+                    self.log.bind(
                         uri=request.uri,
                         **errorObj
                     ).msg(failure.value.message)
@@ -48,14 +49,14 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
-                    bound_log.bind(
+                    self.log.bind(
                         uri=request.uri,
                         code=code
                     ).err(failure, 'Unhandled Error handling request')
                 request.setResponseCode(code)
                 return json.dumps(errorObj)
 
-            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addErrback(_fail, request)
             return d
         return _
@@ -82,19 +83,19 @@ def succeeds_with(success_code):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, bound_log, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
             def _succeed(result, request):
                 # Default twisted response code is 200.  Assuming that if this
                 # is 200, then it is the default and can be overriden
                 if request.code == 200:
                     request.setResponseCode(success_code)
-                bound_log.bind(
+                self.log.bind(
                     uri=request.uri,
                     code=request.code
                 ).msg('Request succeeded')
                 return result
 
-            d = defer.maybeDeferred(f, request, bound_log, *args, **kwargs)
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addCallback(_succeed, request)
             return d
         return _
@@ -106,9 +107,20 @@ def bind_log(f):
     Binds keyword arguments to log
     """
     @wraps(f)
-    def _(request, log, *args, **kwargs):
+    def _(self, request, log, *args, **kwargs):
         bound_log = log.bind(**kwargs)
-        return f(request, bound_log, *args, **kwargs)
+        return f(self, request, bound_log, *args, **kwargs)
+    return _
+
+
+def log_arguments(f):
+    """
+    Binds all arguments that are not 'self' or 'request' to self.log
+    """
+    @wraps(f)
+    def _(self, request, *args, **kwargs):
+        self.log = self.log.bind(**kwargs)
+        return f(self, request, *args, **kwargs)
     return _
 
 
@@ -118,7 +130,7 @@ def with_transaction_id():
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
             transaction_id = generate_transaction_id()
             request.setHeader('X-Response-Id', transaction_id)
             bound_log = log.bind(
@@ -131,7 +143,7 @@ def with_transaction_id():
                 referer=request.getHeader("referer"),
                 useragent=request.getHeader("user-agent")
             ).msg("Received request")
-            return bind_log(f)(request, bound_log, *args, **kwargs)
+            return bind_log(f)(self, request, bound_log, *args, **kwargs)
         return _
     return decorator
 
@@ -150,7 +162,7 @@ def validate_body(schema):
     """
     def decorator(f):
         @wraps(f)
-        def _(request, *args, **kwargs):
+        def _(self, request, *args, **kwargs):
             try:
                 request.content.seek(0)
                 data = json.loads(request.content.read())
@@ -160,7 +172,40 @@ def validate_body(schema):
             except ValidationError, e:
                 return defer.fail(e)
             kwargs['data'] = data
-            return f(request, *args, **kwargs)
+            return f(self, request, *args, **kwargs)
 
         return _
     return decorator
+
+
+class InvalidQueryArgument(Exception):
+    """
+    Something is wrong with a query arg
+    """
+
+
+def paginatable(f):
+    """
+    Is a paginatable endpoint, which means that it accepts the limit and marker
+    query args.  This decorator validates them and puts them into a pagination
+    dictionary.  It also sets a default limit based on the config value for
+    the pagination limit, if no query argument for limit is passed.
+    """
+    @wraps(f)
+    def _(self, request, *args, **kwargs):
+        paginate = {}
+        if 'limit' in request.args:
+            try:
+                paginate['limit'] = int(request.args['limit'][0])
+            except:
+                return defer.fail(InvalidQueryArgument(
+                    'Invalid query argument for "limit"'))
+        else:
+            paginate['limit'] = config_value('limit.pagination')
+
+        if 'marker' in request.args:
+            paginate['marker'] = request.args['marker'][0]
+
+        kwargs['paginate'] = paginate
+        return f(self, request, *args, **kwargs)
+    return _

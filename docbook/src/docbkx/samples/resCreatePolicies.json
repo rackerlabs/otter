@@ -1,8 +1,84 @@
-[
-  {
-    "cooldown": 600,
-    "type": "webhook",
-    "name": "scaling_policy_test982504",
-    "change": 1
-  }
-]
+HTTP/1.1 201 Created
+Content-Type: application/json
+Date: Wed, 11 Sep 2013 00:15:13 GMT
+Location: https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.2)
+x-response-id: 8414c879-6fd4-4401-87ad-b7984e5a28d0
+
+{
+    "policies": [
+        {
+            "args": {
+                "at": "2013-12-05T03:12:00Z"
+            },
+            "changePercent": -5.5,
+            "cooldown": 1800,
+            "id": "9f7c5801-6b25-4f5a-af07-4bb752e23d53",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/9f7c5801-6b25-4f5a-af07-4bb752e23d53/",
+                    "rel": "self"
+                }
+            ],
+            "name": "scale down by 5.5 percent on the 5th",
+            "type": "schedule"
+        },
+        {
+            "cooldown": 1800,
+            "desiredCapacity": 5,
+            "id": "b0555a35-b2cb-4f0e-8743-d59e1621b980",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/b0555a35-b2cb-4f0e-8743-d59e1621b980/",
+                    "rel": "self"
+                }
+            ],
+            "name": "set group to 5 servers",
+            "type": "webhook"
+        },
+        {
+            "args": {
+                "cron": "23 * * * *"
+            },
+            "changePercent": -5.5,
+            "cooldown": 1800,
+            "id": "30707675-8e7c-4ea5-9358-c21648afcf29",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/30707675-8e7c-4ea5-9358-c21648afcf29/",
+                    "rel": "self"
+                }
+            ],
+            "name": "scale down by 5.5 percent at 11pm",
+            "type": "schedule"
+        },
+        {
+            "change": 1,
+            "cooldown": 1800,
+            "id": "1f3bdd08-7aae-4009-a3b7-49aa47fc0876",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/1f3bdd08-7aae-4009-a3b7-49aa47fc0876/",
+                    "rel": "self"
+                }
+            ],
+            "name": "scale up by one server",
+            "type": "webhook"
+        },
+        {
+            "changePercent": -5.5,
+            "cooldown": 1800,
+            "id": "5afac18c-41e5-49d6-aba8-dec17c0d8ed7",
+            "links": [
+                {
+                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5afac18c-41e5-49d6-aba8-dec17c0d8ed7/",
+                    "rel": "self"
+                }
+            ],
+            "name": "scale down by 5.5 percent",
+            "type": "webhook"
+        }
+    ]
+}

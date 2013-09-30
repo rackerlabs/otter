@@ -10,16 +10,12 @@
                 "mykey": "myvalue"
             },
             "personality": [
-                {
-                    "path": "/root/.ssh/authorized_keys",
-                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                }
             ],
             "networks": [
                 {
                     "uuid": "11111111-1111-1111-1111-111111111111"
                 }
-            ],
+            ]
         },
         "loadBalancers": [
             {

@@ -53,7 +53,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             "policies_links": []
         })
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_policy_dictionary_gets_translated(self, url_root):
         """
         When there are policies returned as a dict, a properly formed JSON blob
@@ -102,7 +102,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_policy_create(self, mock_url):
         """
         Tries to create a set of policies.
@@ -151,7 +151,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = controller_patcher.start()
         self.addCleanup(controller_patcher.stop)
 
-    @mock.patch('otter.rest.application.get_url_root', return_value="")
+    @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_get_policy(self, url_root):
         """
         Get details of a specific policy.  The response should conform with

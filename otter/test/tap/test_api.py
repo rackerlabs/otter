@@ -10,12 +10,14 @@ from twisted.internet import reactor
 from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
+from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import Options, makeService
 from otter.test.utils import patch
 
 
 test_config = {
     'port': 'tcp:9999',
+    'admin': 'tcp:9789',
     'cassandra': {
         'seed_hosts': ['tcp:127.0.0.1:9160'],
         'keyspace': 'otter_test'
@@ -54,6 +56,22 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
+    def test_admin_options(self):
+        """
+        The port long option should end up in the 'port' key.
+        """
+        config = Options()
+        config.parseOptions(['--admin=tcp:9789'])
+        self.assertEqual(config['admin'], 'tcp:9789')
+
+    def test_short_admin_options(self):
+        """
+        The a short option should end up in the 'admin' key.
+        """
+        config = Options()
+        config.parseOptions(['-a', 'tcp:9789'])
+        self.assertEqual(config['admin'], 'tcp:9789')
+
     def test_store_options(self):
         """
         The mock long flag option should end up in the 'mock' key
@@ -65,7 +83,7 @@ class APIOptionsTests(TestCase):
 
     def test_short_store_options(self):
         """
-        The m shor toption should end up in the 'mock' key
+        The m short option should end up in the 'mock' key
         """
         config = Options()
         self.assertFalse(config['mock'])
@@ -89,7 +107,10 @@ class APIMakeServiceTests(TestCase):
         self.LoggingCQLClient = patch(self, 'otter.tap.api.LoggingCQLClient')
         self.log = patch(self, 'otter.tap.api.log')
 
-        self.set_store = patch(self, 'otter.tap.api.set_store')
+        Otter_patcher = mock.patch('otter.tap.api.Otter')
+        self.Otter = Otter_patcher.start()
+        self.addCleanup(Otter_patcher.stop)
+
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
 
         SchedulerService_patcher = mock.patch('otter.tap.api.SchedulerService')
@@ -102,7 +123,15 @@ class APIMakeServiceTests(TestCase):
         Site instance.
         """
         makeService(test_config)
-        self.service.assert_called_with('tcp:9999', self.Site.return_value)
+        self.service.assert_any_call('tcp:9999', self.Site.return_value)
+
+    def test_admin_site_on_port(self):
+        """
+        makeService will create a strports admin service on tcp:9789 with a
+        Site instance.
+        """
+        makeService(test_config)
+        self.service.assert_any_call('tcp:9789', self.Site.return_value)
 
     def test_unicode_service_site_on_port(self):
         """
@@ -111,7 +140,7 @@ class APIMakeServiceTests(TestCase):
         """
         unicode_config = json.loads(json.dumps(test_config, encoding="utf-8"))
         makeService(unicode_config)
-        self.service.assert_called_with('tcp:9999', self.Site.return_value)
+        self.service.assert_any_call('tcp:9999', self.Site.return_value)
         self.assertTrue(isinstance(self.service.call_args[0][0], str))
 
     def test_is_MultiService(self):
@@ -174,7 +203,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.set_store.assert_called_once_with(self.CassScalingGroupCollection.return_value)
+        self.Otter.assert_called_once_with(self.CassScalingGroupCollection.return_value)
 
     def test_mock_store(self):
         """
@@ -188,7 +217,7 @@ class APIMakeServiceTests(TestCase):
 
         for mocked in (self.RoundRobinCassandraCluster,
                        self.CassScalingGroupCollection,
-                       self.set_store, self.clientFromString):
+                       self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
@@ -208,7 +237,7 @@ class APIMakeServiceTests(TestCase):
                        self.LoggingCQLClient,
                        self.CassScalingGroupCollection,
                        self.SchedulerService,
-                       self.set_store, self.clientFromString):
+                       self.clientFromString):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
@@ -223,5 +252,18 @@ class APIMakeServiceTests(TestCase):
 
         expected_parent = makeService(mock_config)
         scheduler_service.assert_called_once_with(100, 10,
-                                                  self.LoggingCQLClient.return_value)
+                                                  self.LoggingCQLClient.return_value,
+                                                  self.CassScalingGroupCollection.return_value)
         scheduler_service.return_value.setServiceParent.assert_called_with(expected_parent)
+
+    @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
+    def test_supervisor_service_set_by_default(self, supervisor):
+        """
+        A SupervisorService service is added to the Multiservice, and set as
+        default supervisor
+        """
+        self.addCleanup(lambda: set_supervisor(None))
+        parent = makeService(test_config)
+        supervisor_service = parent.getServiceNamed('supervisor')
+
+        self.assertEqual(get_supervisor(), supervisor_service)

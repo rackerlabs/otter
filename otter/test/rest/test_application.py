@@ -7,9 +7,13 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
-from otter.rest.decorators import with_transaction_id
-from otter.rest.application import get_autoscale_links, app, transaction_id
+from otter.rest.otterapp import OtterApp
+from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
+from otter.test.utils import patch
+from otter.util.config import set_config_data
+from otter.util.http import (get_autoscale_links, transaction_id,
+                             get_new_paginate_query_args)
 
 
 class LinkGenerationTestCase(TestCase):
@@ -22,7 +26,7 @@ class LinkGenerationTestCase(TestCase):
         Set a blank root URL
         """
         self.base_url_patcher = mock.patch(
-            "otter.rest.application.get_url_root", return_value="")
+            "otter.util.http.get_url_root", return_value="")
         self.base_url_patcher.start()
 
     def tearDown(self):
@@ -249,6 +253,65 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
 
+    def test_query_params(self):
+        """
+        When query parameters are provided, a correct HTTP query string is
+        appended to the URL without adding an extra slash
+        """
+        query = get_autoscale_links(
+            '11111', group_id='1',
+            query_params=[('marco', 'polo'),
+                          ('ping', 'pong'),
+                          ('razzle', 'dazzle')],
+            format=None)
+        self.assertEqual(
+            query,
+            '/v1.0/11111/groups/1/?marco=polo&ping=pong&razzle=dazzle')
+
+
+class PaginationQueryArgGenerationTestCase(TestCase):
+    """
+    Tests for generating new pagination args in
+    :func:`get_new_paginate_query_args`
+    """
+    def test_no_new_args_if_limited_data(self):
+        """
+        If the data is shorter then the limit, then there is probably no data
+        after, hence no need for a next page, and so no query args are returned.
+        """
+        result = get_new_paginate_query_args(
+            {'limit': 50, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+        self.assertIsNone(result)
+
+    def test_new_marker_if_too_much_data(self):
+        """
+        If the data length is equal to the limit, then there is
+        probably another page of data, so a new marker is returned
+        """
+        result = get_new_paginate_query_args(
+            {'limit': 5, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+        self.assertEqual(result.get('marker'), '4')
+
+    def test_respects_previous_limit(self):
+        """
+        New paginate query args has the same limit as the previous, but new
+        marker
+        """
+        result = get_new_paginate_query_args(
+            {'limit': 5, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+        self.assertEqual(result.get('limit'), 5)
+
+    def test_default_limit_if_no_previous_limit(self):
+        """
+        New paginate query args uses default limits if no old limits provided
+        """
+        self.addCleanup(set_config_data, {})
+        set_config_data({'limit': {'pagination': 3}})
+
+        result = get_new_paginate_query_args(
+            {}, [{'id': str(i)} for i in range(3)])
+        self.assertEqual(result.get('limit'), 3)
+
 
 class RouteTests(RequestTestMixin, TestCase):
     """
@@ -262,13 +325,17 @@ class RouteTests(RequestTestMixin, TestCase):
         """
         requests = [0]
 
-        @app.route('/foo/')
-        @with_transaction_id()
-        def foo(request, log):
-            requests[0] += 1
-            return 'ok'
+        class FakeApp(object):
+            app = OtterApp()
 
-        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
+            @app.route('/v1.0/foo/')
+            @with_transaction_id()
+            def foo(self, request, log):
+                requests[0] += 1
+                return 'ok'
+
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo',
+                                root=FakeApp().app.resource())
         self.assertEqual(requests[0], 1)
 
 
@@ -286,11 +353,57 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
 
         transaction_ids = []
 
-        @app.route('/foo')
-        @with_transaction_id()
-        def foo(request, log):
-            transaction_ids.append(transaction_id(request))
-            return 'ok'
+        class FakeApp(object):
+            app = OtterApp()
 
-        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo')
+            @app.route('/v1.0/foo')
+            @with_transaction_id()
+            def foo(self, request, log):
+                transaction_ids.append(transaction_id(request))
+                return 'ok'
+
+        self.assert_status_code(200, method='GET', endpoint='/v1.0/foo',
+                                root=FakeApp().app.resource())
         self.assertEqual(transaction_ids[0], 'transaction-id')
+
+
+class DelegatedLogArgumentsTestCase(RequestTestMixin, TestCase):
+    """
+    Tests `log_arguments` decorator in conjunction with delegated routes.
+    """
+
+    def setUp(self):
+        """
+        Mock out the log in the `with_transaction_id` decorator.
+        """
+        self.mock_log = patch(self, 'otter.rest.decorators.log')
+
+    def test_all_arguments_logged(self):
+        """
+        `log_arguments` should log all args, and kwargs on a route that
+        has been delgated.
+        """
+        class FakeSubApp(object):
+            app = OtterApp()
+
+            def __init__(self, log):
+                self.log = log
+
+            @app.route('/<string:extra_arg1>/')
+            @log_arguments
+            def doWork(self, request, extra_arg1):
+                return 'empty response'
+
+        class FakeApp(object):
+            app = OtterApp()
+
+            @app.route('/', branch=True)
+            @with_transaction_id()
+            def delegate_to_dowork(self, request, log):
+                return FakeSubApp(log).app.resource()
+
+        self.assert_status_code(200, method='GET', endpoint='/some_data/',
+                                root=FakeApp().app.resource())
+
+        kwargs = {'extra_arg1': 'some_data'}
+        self.mock_log.bind().bind().bind.assert_called_once_with(**kwargs)

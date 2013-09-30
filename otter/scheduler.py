@@ -14,7 +14,6 @@ from twisted.application.internet import TimerService
 from silverberg.lock import BasicLock, BusyLockError, with_lock
 
 from otter.util.hashkey import generate_transaction_id
-from otter.rest.application import get_store
 from otter.controller import maybe_execute_scaling_policy, CannotExecutePolicyError
 from otter.log import log as otter_log
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
@@ -33,7 +32,7 @@ class SchedulerService(TimerService):
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, slv_client, clock=None):
+    def __init__(self, batchsize, interval, slv_client, store, clock=None):
         """
         Initializes the scheduler service with batch size and interval
 
@@ -44,10 +43,12 @@ class SchedulerService(TimerService):
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
         from otter.models.cass import LOCK_TABLE_NAME
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
-        TimerService.__init__(self, interval, self.check_for_events, batchsize)
-        self.clock = clock
+        self.lock_table = LOCK_TABLE_NAME
+        self.slv_client = slv_client
         self.log = otter_log.bind(system='otter.scheduler')
+        TimerService.__init__(self, interval, self.check_for_events, batchsize)
+        self.store = store
+        self.clock = clock
 
     def check_for_events(self, batchsize):
         """
@@ -62,9 +63,12 @@ class SchedulerService(TimerService):
             return None
 
         def _do_check():
-            d = with_lock(self.lock, self.fetch_and_process, batchsize)
+            lock_log = self.log.bind(category='locking')
+            lock = BasicLock(self.slv_client, self.lock_table, 'schedule', max_retry=0,
+                             log=lock_log)
+            d = with_lock(lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            d.addErrback(ignore_and_log, BusyLockError, self.log,
+            d.addErrback(ignore_and_log, BusyLockError, lock_log,
                          "Couldn't get lock to process events")
             d.addErrback(self.log.err)
             return d
@@ -83,16 +87,12 @@ class SchedulerService(TimerService):
             if not len(events):
                 return events, set()
 
-            log.msg('Processing events', num_events=len(events))
+            log.msg('Processing {num_events} events', num_events=len(events))
 
             deleted_policy_ids = set()
 
-            def eb(failure, policy_id):
-                failure.trap(NoSuchPolicyError, NoSuchScalingGroupError)
-                deleted_policy_ids.add(policy_id)
-
             deferreds = [
-                self.execute_event(log, event).addErrback(eb, event['policyId']).addErrback(log.err)
+                self.execute_event(log, event, deleted_policy_ids)
                 for event in events
             ]
             d = defer.gatherResults(deferreds, consumeErrors=True)
@@ -114,35 +114,46 @@ class SchedulerService(TimerService):
                 else:
                     events_to_delete.append(event['policyId'])
 
-            log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
-            log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
-            d = get_store().update_delete_events(events_to_delete, events_to_update)
+            log.msg('Deleting {policy_ids_deleting} events',
+                    policy_ids_deleting=len(events_to_delete))
+            log.msg('Updating {policy_ids_updating} events',
+                    policy_ids_updating=len(events_to_update))
+            d = self.store.update_delete_events(events_to_delete, events_to_update)
 
             return d.addCallback(lambda _: events)
 
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
-        log.msg('Checking for events')
-        deferred = get_store().fetch_batch_of_events(utcnow, batchsize)
+        deferred = self.store.fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
         deferred.addCallback(update_delete_events)
         deferred.addErrback(log.err)
         return deferred
 
-    def execute_event(self, log, event):
+    def execute_event(self, log, event, deleted_policy_ids):
         """
         Execute a single event
 
         :param log: A bound log for logging
+        :param event: event dict to execute
+        :param deleted_policy_ids: Set of policy ids that are deleted. Policy id will be added
+                                   to this if its scaling group or policy has been deleted
         :return: a deferred with the results of execution
         """
         tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
         log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
         log.msg('Executing policy')
-        group = get_store().get_scaling_group(log, tenant_id, group_id)
+        group = self.store.get_scaling_group(log, tenant_id, group_id)
         d = group.modify_state(partial(maybe_execute_scaling_policy,
                                        log, generate_transaction_id(),
                                        policy_id=policy_id))
         d.addErrback(ignore_and_log, CannotExecutePolicyError, log, 'Cannot execute policy')
+
+        def collect_deleted_policy(failure):
+            failure.trap(NoSuchScalingGroupError, NoSuchPolicyError)
+            deleted_policy_ids.add(policy_id)
+
+        d.addErrback(collect_deleted_policy)
+        d.addErrback(log.err, 'Scheduler failed to execute policy')
         return d

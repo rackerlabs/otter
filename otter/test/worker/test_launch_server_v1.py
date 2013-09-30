@@ -5,7 +5,7 @@ import mock
 import json
 
 from twisted.trial.unittest import TestCase
-from twisted.internet.defer import CancelledError, Deferred, fail, succeed
+from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
 
 from otter.worker.launch_server_v1 import (
@@ -26,10 +26,13 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch
+from otter.test.utils import DummyException, mock_log, patch, CheckFailure
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
-from otter.util.deferredutils import unwrap_first_error
+from otter.util.deferredutils import unwrap_first_error, TimedOutError
+
+from otter.test.utils import iMock
+from otter.undo import IUndoStack
 
 fake_config = {
     'regionOverrides': {},
@@ -119,6 +122,8 @@ class LoadBalancersTests(TestCase):
         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
         patch(self, 'otter.util.http.treq', new=self.treq)
 
+        self.undo = iMock(IUndoStack)
+
     def test_add_to_load_balancer(self):
         """
         add_to_load_balancer will make a properly formed post request to
@@ -129,13 +134,14 @@ class LoadBalancersTests(TestCase):
         response.code = 200
         self.treq.post.return_value = succeed(response)
 
-        content = mock.Mock()
+        content = {'nodes': [{'id': 1}]}
         self.treq.json_content.return_value = succeed(content)
 
         d = add_to_load_balancer('http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
-                                 '192.168.1.1')
+                                 '192.168.1.1',
+                                 self.undo)
 
         result = self.successResultOf(d)
         self.assertEqual(result, content)
@@ -170,7 +176,8 @@ class LoadBalancersTests(TestCase):
         d = add_to_load_balancer('http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
-                                 '192.168.1.1')
+                                 '192.168.1.1',
+                                 self.undo)
 
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(RequestError))
@@ -178,6 +185,52 @@ class LoadBalancersTests(TestCase):
 
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
+
+    def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
+        """
+        add_to_load_balancer pushes an inverse remove_from_load_balancer
+        operation onto the undo stack.
+        """
+        response = mock.Mock()
+        response.code = 200
+
+        self.treq.post.return_value = succeed(response)
+        self.treq.json_content.return_value = succeed({'nodes': [{'id': 1}]})
+
+        d = add_to_load_balancer('http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo)
+
+        self.successResultOf(d)
+
+        self.undo.push.assert_called_once_with(
+            remove_from_load_balancer,
+            'http://url/', 'my-auth-token',
+            12345,
+            1)
+
+    def test_add_to_load_balancer_doesnt_push_onto_undo_stack_on_failure(self):
+        """
+        add_to_load_balancer doesn't push an operation onto the undo stack
+        if it fails.
+        """
+        response = mock.Mock()
+        response.code = 500
+
+        self.treq.post.return_value = succeed(response)
+        self.treq.content.return_value = succeed("{'nodes': [{'id': 1}]}")
+
+        d = add_to_load_balancer('http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo)
+
+        self.failureResultOf(d, RequestError)
+
+        self.assertEqual(self.undo.push.call_count, 0)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
@@ -189,10 +242,8 @@ class LoadBalancersTests(TestCase):
         d2 = Deferred()
         add_to_load_balancer_deferreds = [d1, d2]
 
-        def _add_to_load_balancer(endpoint, auth_token, lb_config, ip_address):
-            # Include the ID and port in the response so that we can verify
-            # that add_to_load_balancers associates the response with the correct
-            # load balancer.
+        def _add_to_load_balancer(
+                endpoint, auth_token, lb_config, ip_address, undo):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
@@ -202,7 +253,12 @@ class LoadBalancersTests(TestCase):
                                     'port': 80},
                                    {'loadBalancerId': 54321,
                                     'port': 81}],
-                                  '192.168.1.1')
+                                  '192.168.1.1',
+                                  self.undo)
+
+        # Include the ID and port in the response so that we can verify
+        # that add_to_load_balancers associates the response with the correct
+        # load balancer.
 
         d2.callback((54321, 81))
         d1.callback((12345, 80))
@@ -211,6 +267,66 @@ class LoadBalancersTests(TestCase):
 
         self.assertEqual(sorted(results), [(12345, (12345, 80)),
                                            (54321, (54321, 81))])
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
+    def test_add_to_load_balancers_is_serial(self, add_to_load_balancer):
+        """
+        add_to_load_balancers calls add_to_load_balancer in series.
+        """
+        d1 = Deferred()
+        d2 = Deferred()
+
+        add_to_load_balancer_deferreds = [d1, d2]
+
+        def _add_to_load_balancer(*args):
+            return add_to_load_balancer_deferreds.pop(0)
+
+        add_to_load_balancer.side_effect = _add_to_load_balancer
+
+        d = add_to_load_balancers('http://url/', 'my-auth-token',
+                                  [{'loadBalancerId': 12345,
+                                    'port': 80},
+                                   {'loadBalancerId': 54321,
+                                    'port': 81}],
+                                  '192.168.1.1',
+                                  self.undo)
+
+        self.assertNoResult(d)
+
+        add_to_load_balancer.assert_called_once_with(
+            'http://url/',
+            'my-auth-token',
+            {'loadBalancerId': 12345, 'port': 80},
+            '192.168.1.1',
+            self.undo
+        )
+
+        d1.callback(None)
+
+        add_to_load_balancer.assert_called_with(
+            'http://url/',
+            'my-auth-token',
+            {'loadBalancerId': 54321, 'port': 81},
+            '192.168.1.1',
+            self.undo
+        )
+
+        d2.callback(None)
+
+        self.successResultOf(d)
+
+    def test_add_to_load_balancers_no_lb_configs(self):
+        """
+        add_to_load_balancers returns a Deferred that fires with an empty list
+        when no load balancers are configured.
+        """
+
+        d = add_to_load_balancers('http://url/', 'my-auth-token',
+                                  [],
+                                  '192.168.1.1',
+                                  self.undo)
+
+        self.assertEqual(self.successResultOf(d), [])
 
     def test_remove_from_load_balancer(self):
         """
@@ -273,6 +389,8 @@ class ServerTests(TestCase):
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
         self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid)
+
+        self.undo = iMock(IUndoStack)
 
     def test_server_details(self):
         """
@@ -498,9 +616,7 @@ class ServerTests(TestCase):
         self.assertNoResult(d)
 
         clock.advance(1)
-        self.failureResultOf(d, CancelledError)
-        # instance id was previously bound by launch_server
-        self.log.msg.assert_called_with(mock.ANY, timeout=6, time_building=6)
+        self.failureResultOf(d, TimedOutError)
 
         # the loop has stopped
         clock.advance(5)
@@ -557,7 +673,8 @@ class ServerTests(TestCase):
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
-                          launch_config)
+                          launch_config,
+                          self.undo)
 
         result = self.successResultOf(d)
         self.assertEqual(
@@ -577,7 +694,7 @@ class ServerTests(TestCase):
 
         add_to_load_balancers.assert_called_once_with(
             'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
-            '10.0.0.1')
+            '10.0.0.1', self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
     @mock.patch('otter.worker.launch_server_v1.create_server')
@@ -595,7 +712,8 @@ class ServerTests(TestCase):
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
-                          {'server': {}})
+                          {'server': {}},
+                          self.undo)
 
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
@@ -632,7 +750,8 @@ class ServerTests(TestCase):
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
-                          launch_config)
+                          launch_config,
+                          self.undo)
 
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
@@ -671,7 +790,8 @@ class ServerTests(TestCase):
                           self.scaling_group,
                           fake_service_catalog,
                           'my-auth-token',
-                          launch_config)
+                          launch_config,
+                          self.undo)
 
         failure = self.failureResultOf(d)
         failure.trap(RequestError)
@@ -680,6 +800,77 @@ class ServerTests(TestCase):
         self.assertTrue(real_failure.check(APIError))
         self.assertEqual(real_failure.value.code, 500)
         self.assertEqual(real_failure.value.body, "Oh noes")
+
+    @mock.patch('otter.worker.launch_server_v1.verified_delete')
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    def test_launch_server_pushes_verified_delete_onto_undo(
+            self, wait_for_active, create_server, add_to_load_balancers,
+            verified_delete):
+        """
+        launch_server will push verified_delete onto the undo stack
+        after the server is successfully created.
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        server_details = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        create_server.return_value = Deferred()
+
+        wait_for_active.return_value = succeed(server_details)
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        # Check that the push hasn't happened because create_server hasn't
+        # succeeded yet.
+        self.assertEqual(self.undo.push.call_count, 0)
+
+        create_server.return_value.callback(server_details)
+
+        self.successResultOf(d)
+
+        self.undo.push.assert_called_once_with(
+            verified_delete,
+            mock.ANY,
+            'http://dfw.openstack/',
+            'my-auth-token',
+            '1')
+
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    def test_launch_server_doesnt_push_undo_op_on_create_server_failure(
+            self, create_server):
+        """
+        launch_server won't push anything onto the undo stack if create_server
+        fails.
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': []}
+
+        create_server.return_value = fail(APIError(500, ''))
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        self.failureResultOf(d, APIError)
+
+        self.assertEqual(self.undo.push.call_count, 0)
 
 
 class ConfigPreparationTests(TestCase):
@@ -704,7 +895,7 @@ class ConfigPreparationTests(TestCase):
         suffix.
         """
         test_config = {'server': {'name': 'web.example.com'}}
-        expected_name = 'as000000-web.example.com'
+        expected_name = 'web.example.com-as000000'
 
         launch_config = prepare_launch_config(self.scaling_group_uuid,
                                               test_config)
@@ -924,13 +1115,14 @@ class DeleteServerTests(TestCase):
         """
         clock = Clock()
         self.treq.delete.return_value = succeed(
-            mock.Mock(spec=['code'], code=500))
+            mock.Mock(spec=['code', 'headers'], code=500, headers=None))
         self.treq.content.return_value = succeed(error_body)
         self.treq.head.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
         failure = self.failureResultOf(d, RequestError)
+        self.assertTrue(failure.value.reason.check(APIError))
         self.assertEqual(failure.value.reason.value.code, 500)
 
     def test_verified_delete_does_not_propagate_verification_failure(self):
@@ -1003,9 +1195,8 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.log.err.assert_called_once_with(
-            None, instance_id="serverId", why=mock.ANY, timeout=11,
-            time_delete=11)
+        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
+                                             instance_id='serverId')
 
         # the loop has stopped
         clock.advance(5)
