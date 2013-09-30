@@ -709,7 +709,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, {'policy1': {}, 'policy2': {}})
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
 
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
@@ -725,7 +725,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.returns = [[]]
         d = self.group._naive_list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, {})
+        self.assertEqual(r, [])
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -787,7 +787,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.returns = [cass_response]
         d = self.group.list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, {'group1': {}, 'group3': {}})
+        self.assertEqual(r, [{'id': 'group1'}, {'id': 'group3'}])
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -809,7 +809,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
-        self.assertEqual(result, {self.mock_key.return_value: {'b': 'lah'}})
+        self.assertEqual(result, [{'b': 'lah', 'id': self.mock_key.return_value}])
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -839,7 +839,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
-        self.assertEqual(result, {self.mock_key.return_value: pol})
+        pol['id'] = self.mock_key.return_value
+        self.assertEqual(result, [pol])
 
     def test_add_first_checks_view_config(self):
         """
@@ -1430,12 +1431,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             {'group_config': serialize_json_data(self.config, 1.0),
              'launch_config': serialize_json_data(self.launch_config, 1.0)})
         self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed({}))
+            return_value=defer.succeed([]))
 
         self.assertEqual(self.validate_view_manifest_return_value(),
                          {'groupConfiguration': self.config,
                           'launchConfiguration': self.launch_config,
-                          'scalingPolicies': {},
+                          'scalingPolicies': [],
                           'id': "12345678g"})
         self.group._naive_list_policies.assert_called_once_with()
 
@@ -1817,7 +1818,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': {},
+            'scalingPolicies': [],
             'id': self.mock_key.return_value
         })
 
@@ -1863,10 +1864,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    [policy])
+
+        expected_policy = policy.copy()
+        expected_policy['id'] = self.mock_key.return_value
+
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': {self.mock_key.return_value: policy},
+            'scalingPolicies': [expected_policy],
             'id': self.mock_key.return_value
         })
 
@@ -1920,10 +1925,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    policies)
+
+        policies[0]['id'] = '2'
+        policies[1]['id'] = '3'
+
         self.assertEqual(result, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3'), policies)),
+            'scalingPolicies': policies,
             'id': '1'
         })
 
