@@ -57,6 +57,13 @@ class ScalingGroupListTest(AutoscaleFixture):
                          self.first_scaling_group.launchConfiguration,
                          msg="Group's launch configurations did not match for group "
                          '{0}'.format(self.first_scaling_group.id))
+        self.assertEquals(len(group_info.state.active), group_info.state.activeCapacity)
+        self.assertEquals(group_info.state.activeCapacity, 0)
+        self.assertEquals(group_info.state.desiredCapacity,
+                          group_info.state.activeCapacity + group_info.state.pendingCapacity)
+        self.assertFalse(group_info.state.paused,
+                         msg='The scaling group status is paused upon creation'
+                         ' for group {0}'.format(self.group.id))
 
     def test_default_maxentities_set_on_a_group(self):
         """
@@ -85,15 +92,18 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.validate_headers(list_groups_response.headers)
         group_id_list = [(group.id, group.name) for group in list_groups]
         self.assertIn(
-            (self.first_scaling_group.id, self.first_scaling_group.groupConfiguration.name),
+            (self.first_scaling_group.id,
+             self.first_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.first_scaling_group.id, group_id_list))
         self.assertIn(
-            (self.second_scaling_group.id, self.second_scaling_group.groupConfiguration.name),
+            (self.second_scaling_group.id,
+             self.second_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.second_scaling_group.id, group_id_list))
         self.assertIn(
-            (self.third_scaling_group.id, self.third_scaling_group.groupConfiguration.name),
+            (self.third_scaling_group.id,
+             self.third_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.third_scaling_group.id, group_id_list))
 
