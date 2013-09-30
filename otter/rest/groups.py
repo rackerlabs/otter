@@ -14,7 +14,7 @@ from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id)
 from otter.rest.errors import exception_codes
-from otter.rest.policies import OtterPolicies, policy_dict_to_list
+from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -332,8 +332,7 @@ class OtterGroups(object):
             request.setHeader(
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
-            result["scalingPolicies"] = policy_dict_to_list(
-                result["scalingPolicies"], self.tenant_id, uuid)
+            linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
             return {"group": result}
 
         deferred.addCallback(_format_output)
@@ -467,15 +466,7 @@ class OtterGroup(object):
         """
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
-
-            policies = []
-            for policy_id, policy in data["scalingPolicies"].iteritems():
-                policy["id"] = policy_id
-                policy["links"] = get_autoscale_links(self.tenant_id, uuid, policy_id)
-                policies.append(policy)
-
-            data["scalingPolicies"] = policies
-
+            linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
             return {"group": data}
 
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
