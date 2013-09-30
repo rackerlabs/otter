@@ -127,7 +127,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=ScalingGroup)
 
-    def list_scaling_groups(self, url=None, requestslib_kwargs=None):
+    def list_scaling_groups(self, url=None, marker=None, limit=None,
+                            requestslib_kwargs=None):
         """
         :summary: Lists IDs and links for all scaling groups
         :return: Response Object containing response code 200 and body with
@@ -137,9 +138,9 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         {tenant_id}/groups/
         """
-
+        params = {'marker': marker, 'limit': limit}
         url = url or '%s/groups/' % (self.url)
-        return self.request('GET', url,
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=Group)
 
