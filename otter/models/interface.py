@@ -344,7 +344,7 @@ class IScalingGroup(Interface):
         """
         Gets all the policies associated with particular scaling group.
 
-        :return: a dict of the policies, as specified by
+        :return: a list of the policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
             ``dict``
