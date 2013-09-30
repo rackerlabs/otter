@@ -457,10 +457,7 @@ def remove_from_load_balancers(log, region, service_catalog, auth_token, lb_deta
 def verified_delete(log,
                     server_endpoint,
                     auth_token,
-                    server_id,
-                    interval=5,
-                    timeout=3660,
-                    clock=None):
+                    server_id):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
     deleted by trying again until getting the server results in a 404.
@@ -492,35 +489,4 @@ def verified_delete(log,
     d.addCallback(check_success, [204])
     d.addErrback(wrap_request_error, path, 'server_delete')
 
-    if clock is None:  # pragma: no cover
-        from twisted.internet import reactor
-        clock = reactor
-
-    def verify(_):
-        def check_status():
-            check_d = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
-            check_d.addCallback(check_success, [404])
-            return check_d
-
-        start_time = clock.seconds()
-
-        timeout_description = (
-            "Waiting for Nova to actually delete server {0}".format(server_id))
-
-        verify_d = retry_and_timeout(check_status, timeout,
-                                     next_interval=repeating_interval(interval),
-                                     clock=clock,
-                                     deferred_description=timeout_description)
-
-        def on_success(_):
-            time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
-
-        verify_d.addCallback(on_success)
-        verify_d.addErrback(del_log.err)
-
-    d.addCallback(verify)
     return d
