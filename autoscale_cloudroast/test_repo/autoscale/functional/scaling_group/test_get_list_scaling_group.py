@@ -1,6 +1,8 @@
 """
 Test to create and verify get and list group.
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
@@ -29,6 +31,7 @@ class ScalingGroupListTest(AutoscaleFixture):
         cls.resources.add(cls.third_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 
+    @unittest.skip("AUTO-635")
     def test_get_scaling_group(self):
         """
         Verify the get group for response code 200, headers and data.
