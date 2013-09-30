@@ -59,23 +59,29 @@ def update_load_balancers(log, supervisor, group, state):
 
     deferreds = []
 
-    def remove_deleted(_, server_id):
+    def remove_server(_, server_id):
         if server_id in state.deleted:
             state.remove_deleted(server_id)
+        elif server_id in state.error:
+            del state.error[server_id]['lb_info']
+        elif server_id in state.deleting:
+            del state.deleting[server_id]['lb_info']
+
 
     # TODO: Deleted servers are required only if active servers transition to 'deleted' state
     # before going to 'deleting' state. If we can guarantee that 'active' always transition to
     # 'deleting' then 'deleted' is not required
-    # Remove deleting or deleted servers from load balancers
-    for server_id, info in itertools.chain(state.deleting.items(), state.deleted.items()):
+    # Remove servers from load balancers that are no longer active
+    for server_id, info in itertools.chain(
+        state.error.items(), state.deleting.items(), state.deleted.items()):
         if info and info.get('lb_info'):
             d = supervisor.remove_from_load_balancers(log, group, server_id, info['lb_info'])
-            d.addCallback(remove_deleted, server_id)
+            d.addCallback(remove_server, server_id)
             deferreds.append(d)
 
     # Add active servers to load balancers that are not already there
-    for server_id, info in state.active:
-        if not info or not 'lb_info' in info:
+    for server_id, info in state.active.items():
+        if not (info and info.get('lb_info')):
             d = supervisor.add_to_load_balancers(log, group, server_id)
             d.addCallback(lambda lb_info, server_id: state.add_lb_info(server_id, lb_info))
             deferreds.append(d)
