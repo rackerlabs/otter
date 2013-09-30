@@ -45,6 +45,8 @@ class ScalingGroup(AutoMarshallingModel):
             setattr(scaling_group, 'id', getattr(scaling_group, 'id'))
         if hasattr(scaling_group, 'groupConfiguration'):
             scaling_group.groupConfiguration = Group._dict_to_obj(scaling_group.groupConfiguration)
+        if hasattr(scaling_group, 'state'):
+            scaling_group.state = Group._dict_to_obj(scaling_group.state)
         if hasattr(scaling_group, 'launchConfiguration'):
             scaling_group.launchConfiguration = scaling_group.launchConfiguration['args']
             scaling_group.launchConfiguration = Config._dict_to_obj(scaling_group.launchConfiguration)
