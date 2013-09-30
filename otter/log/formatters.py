@@ -124,13 +124,13 @@ def PEP3101FormattingWrapper(observer):
 IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
 
 
-def GELFObserverWrapper(observer, hostname, seconds=None):
+def ObserverWrapper(observer, hostname, seconds=None):
     """
-    Create a log observer that will format messages as GELF and delegate to
+    Create a log observer that will format messages and delegate to
     `observer`.
 
-    :param str hostname: The hostname to be used in the gelf format.
-    :param ILogObserver observer: The log observer to call with our GELF
+    :param str hostname: The hostname to be used.
+    :param ILogObserver observer: The log observer to call with our
         formatted data.
     :param seconds: A 0-argument callable that returns a UNIX timestamp.
 
@@ -140,7 +140,7 @@ def GELFObserverWrapper(observer, hostname, seconds=None):
     if seconds is None:  # pragma: no cover
         seconds = time.time
 
-    def GELFObserver(eventDict):
+    def Observer(eventDict):
         short_message = None
         full_message = None
 
@@ -181,8 +181,8 @@ def GELFObserverWrapper(observer, hostname, seconds=None):
 
         for key, value in eventDict.iteritems():
             if key not in IGNORE_FIELDS:
-                log_params["_%s" % (key, )] = value
+                log_params["%s" % (key, )] = value
 
         observer(log_params)
 
-    return GELFObserver
+    return Observer
