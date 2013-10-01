@@ -417,7 +417,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         policy_list = self.successResultOf(self.group.list_policies())
         uuid = policy_list[0]['id']
         result = self.validate_list_webhooks_return_value(uuid)
-        self.assertEqual(result, {})
+        self.assertEqual(result, [])
 
     def test_list_webhooks_succeeds(self):
         """
@@ -432,7 +432,10 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         }
         self.group.webhooks = {uuid: webhooks}
         result = self.validate_list_webhooks_return_value(uuid)
-        self.assertEqual(result, webhooks)
+        self.assertEqual(result, [
+            dict(id='10', **self.sample_webhook_data),
+            dict(id='11', **self.sample_webhook_data)
+        ])
 
     def test_create_webhooks_nonexistant_policy_fails(self):
         """
@@ -467,17 +470,20 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         # create two webhooks, both empty
         creation = self.validate_create_webhooks_return_value(
             '2', [{'name': 'one'}, {'name': 'two'}])
-        self.assertEqual(len(creation), 2)
-        for name in ('one', 'two'):
-            self.assertIn({
+        for item in creation:
+            self.assertIn('id', item)
+            del item['id']
+
+        self.assertEqual(creation, [
+            {
                 'name': name,
                 'metadata': {},
                 'capability': {
                     'hash': 'hash',
                     'version': 'ver'
                 },
-            }, creation.values())
-
+            } for name in ('one', 'two')
+        ])
         # listing should return 3
         listing = self.successResultOf(self.group.list_webhooks('2'))
         self.assertGreater(len(listing), len(creation))
