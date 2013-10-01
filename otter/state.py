@@ -4,6 +4,7 @@ Contains code to handle group changes from nova.
 
 from otter.controller import execute_group_transition
 from otter.util.hashkey import generate_transaction_id
+from otter.log import log as otter_log
 
 
 def remove_server(state, server_id):
@@ -117,7 +118,7 @@ class GroupEvent(object):
         :param change: One of the above ADDED, DELETING...
         """
         self.tenant_id = tenant_id
-        self.group = group
+        self.group_id = group_id
         self.server_id = server_id
         self.change = change
 
@@ -138,16 +139,16 @@ class GroupEventReceiver(object):
     def __init__(self, store):
         self.store = store
 
-    def group_event_received(event):
+    def group_event_received(self, event):
         """
         Called when `GroupEvent` is received from AtomHopper
         """
-        log = log.bind(event_run_id=generate_transaction_id())
+        log = otter_log.bind(event_run_id=generate_transaction_id())
         group = self.store.get_scaling_group(log, event.tenant_id, event.group_id)
-        d = group.modify_state(self.process_group_event, event)
+        d = group.modify_state(self.process_group_event, event, log)
         d.addErrback(log.err)
 
-    def process_group_event(self, group, state, event):
+    def process_group_event(self, group, state, event, log):
         """
         Process group event
         """
