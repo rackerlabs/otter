@@ -20,19 +20,18 @@ Storage model for state information:
  * last touched information for group
  * last touched information for policy
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_UP
-from functools import partial
 import iso8601
 import json
+import itertools
 
 from twisted.internet import defer
 
-from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
-from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+from otter.util.http import ignore_request_api_error
 
 
 class CannotExecutePolicyError(Exception):
@@ -91,22 +90,13 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
 
     # XXX:  this is a hack to create an internal zero-change policy so
     # calculate delta will work
-    delta = calculate_delta(bound_log, state, config, {'change': 0})
+    desired = calculate_desired(bound_log, state, config, {'change': 0})
 
-    if delta == 0:
+    if desired == len(state.active) + len(state.pending):
         return defer.succeed(state)
-    elif delta > 0:
-        deferred = scaling_group.view_launch_config()
-        deferred.addCallback(partial(execute_launch_config, bound_log,
-                                     transaction_id, state,
-                                     scaling_group=scaling_group, delta=delta))
-        deferred.addCallback(lambda _: state)
-        return deferred
-    else:
-        # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
-        deferred.addCallback(lambda _: state)
-        return deferred
+
+    state.desired = desired
+    return execute_group_transition(bound_log, scaling_group, state)
 
 
 def maybe_execute_scaling_policy(
@@ -246,7 +236,7 @@ def calculate_desired(log, state, config, policy):
             max_entities=max_entities, min_entities=config['minEntities'],
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))
-    return constrained_desired_capacity
+    return desired
 
 
 def execute_group_transition(log, group, current):
@@ -282,7 +272,7 @@ def execute_group_transition(log, group, current):
     # add/remove to load balancers
     dl2 = update_load_balancers(log, supervisor, group, current)
 
-    d = DeferredList(dl1 + dl2, consumeErrors=True).addCallback(handle_service_errors)
+    d = defer.DeferredList(dl1 + dl2, consumeErrors=True).addCallback(handle_delete_errors)
 
     def scale(_):
         current_total = len(current.active) + len(current.pending)
@@ -310,13 +300,12 @@ def update_load_balancers(log, supervisor, group, state):
         elif server_id in state.deleting:
             del state.deleting[server_id]['lb_info']
 
-
     # TODO: Deleted servers are required only if active servers transition to 'deleted' state
     # before going to 'deleting' state. If we can guarantee that 'active' always transition to
     # 'deleting' then 'deleted' is not required
     # Remove servers from load balancers that are no longer active
-    for server_id, info in itertools.chain(
-        state.error.items(), state.deleting.items(), state.deleted.items()):
+    for server_id, info in itertools.chain(state.error.items(), state.deleting.items(),
+                                           state.deleted.items()):
         if info and info.get('lb_info'):
             d = supervisor.remove_from_load_balancers(log, group, server_id, info['lb_info'])
             d.addCallback(remove_server, server_id)
@@ -337,11 +326,11 @@ def execute_scale_up(log, supervisor, group, state, delta):
 
     def launch_servers(launch_config):
         deferreds = [
-            supervisor.launch_server(log, group, launch_config)
-                .addCallback(lambda s: state.add_pending(s['id'], s))
+            supervisor.launch_server(
+                log, group, launch_config).addCallback(lambda s: state.add_pending(s['id'], s))
             for _i in range(delta)
         ]
-        return DeferredList(deferreds, consumeErrors=True)
+        return defer.DeferredList(deferreds, consumeErrors=True)
 
     return d.addCallback(launch_servers)
 
@@ -357,10 +346,11 @@ def execute_scale_down(log, supervisor, group, state, delta):
         # find oldest active servers
         sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
         servers_to_delete = sorted_servers[:delta]
-        d = [supervisor.delete_server(log, group, server['id'], server['lb_info'])
-                .addCallback(server_deleted, server['id'])
-             for server in servers_to_delete]
-        return DeferredList(deferreds, consumeErrors=True)
+        ds = [supervisor.delete_server(log, group, server['id'],
+                                       server['lb_info']).addCallback(server_deleted,
+                                                                      server['id'])
+              for server in servers_to_delete]
+        return defer.DeferredList(ds, consumeErrors=True)
     else:
         # Cannot delete pending servers now.
         return defer.succeed(None)
@@ -387,7 +377,7 @@ def delete_unwanted_servers(log, supervisor, group, state):
             log, group, server_id, info.get('lb_info')).addCallback(remove_error, server_id)
         # TODO: Put group in error state if delete fails
         d.addErrback(log.err, 'Could not delete server in error', server_id=server_id)
-        deferreds.append(d) # TODO: schedule to execute state transition after some time
+        deferreds.append(d)  # TODO: schedule to execute state transition after some time
     for server_id, info in state.pending.items():
         if datetime.utcnow() - from_timestamp(info['created']) > timedelta(hours=1):
             log.msg('server building for too long', server_id=server_id)
@@ -408,4 +398,3 @@ def delete_unwanted_servers(log, supervisor, group, state):
     #return defer.DeferredList(deferreds, consumeErrors=True)
     return deferreds
     #return d.addCallback(collect_errors)
-
