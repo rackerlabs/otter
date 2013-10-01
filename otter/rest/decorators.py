@@ -201,7 +201,7 @@ def paginatable(f):
                 return defer.fail(InvalidQueryArgument(
                     'Invalid query argument for "limit"'))
         else:
-            paginate['limit'] = config_value('limit.pagination')
+            paginate['limit'] = config_value('limits.pagination')
 
         if 'marker' in request.args:
             paginate['marker'] = request.args['marker'][0]

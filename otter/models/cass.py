@@ -209,7 +209,7 @@ def get_consistency_level(operation, resource):
         return ConsistencyLevel.ONE
 
 
-def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
+def _build_policies(policies, policies_table, event_table, queries, data):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -228,10 +228,10 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
         addition to the query to execute the query
     :type data: ``dict``
 
-    :param outpolicies: a dictionary to which to insert the created policies
-        along with their generated IDs
-    :type outpolicies: ``dict``
+    :returns: a ``list`` of the created policies along with their generated IDs
     """
+    outpolicies = []
+
     if policies is not None:
         for i, policy in enumerate(policies):
             polname = "policy{}".format(i)
@@ -246,7 +246,10 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
                 if policy["type"] == 'schedule':
                     _build_schedule_policy(policy, event_table, queries, data, polname)
 
-            outpolicies[polId] = policy
+            outpolicies.append(policy.copy())
+            outpolicies[-1]['id'] = polId
+
+    return outpolicies
 
 
 def _build_schedule_policy(policy, event_table, queries, data, polname):
@@ -585,16 +588,16 @@ class CassScalingGroup(object):
         all the policies associated with particular scaling group
         irregardless of whether the scaling group still exists.
         """
-        def construct_dictionary(rows):
-            return dict(
-                [(row['policyId'], _jsonloads_data(row['data'])) for row in rows])
+        def insert_id(rows):
+            return [dict(id=row['policyId'], **_jsonloads_data(row['data']))
+                    for row in rows]
 
         query = _cql_list_policy.format(cf=self.policies_table)
         d = self.connection.execute(query,
                                     {"tenantId": self.tenant_id,
                                      "groupId": self.uuid},
                                     get_consistency_level('list', 'policy'))
-        d.addCallback(construct_dictionary)
+        d.addCallback(insert_id)
         return d
 
     def list_policies(self):
@@ -643,10 +646,9 @@ class CassScalingGroup(object):
             queries = []
             cqldata = {"tenantId": self.tenant_id,
                        "groupId": self.uuid}
-            outpolicies = {}
 
-            _build_policies(data, self.policies_table, self.event_table, queries, cqldata,
-                            outpolicies)
+            outpolicies = _build_policies(data, self.policies_table,
+                                          self.event_table, queries, cqldata)
 
             b = Batch(queries, cqldata,
                       consistency=get_consistency_level('create', 'policy'))
@@ -843,7 +845,7 @@ class CassScalingGroup(object):
 
             if len(policies) > 0:
                 events_query, events_params = _delete_many_query_and_params(
-                    self.event_table, '"policyId"', policies.keys())
+                    self.event_table, '"policyId"', [p['id'] for p in policies])
                 queries.append(events_query)
                 params.update(events_params)
 
@@ -959,9 +961,8 @@ class CassScalingGroupCollection:
                 "created_at": datetime.utcnow()
                 }
 
-        outpolicies = {}
-        _build_policies(policies, self.policies_table, self.event_table, queries, data,
-                        outpolicies)
+        outpolicies = _build_policies(policies, self.policies_table,
+                                      self.event_table, queries, data)
 
         b = Batch(queries, data,
                   consistency=get_consistency_level('create', 'group'))
