@@ -96,7 +96,7 @@ class GroupState(object):
         :returns: ``dict`` of what server info stored
         :raises: :class:`AssertionError` if the job doesn't exist
         """
-        assert server_id in self.pending, "Server doesn't exist: {0}".format(job_id)
+        assert server_id in self.pending, "Server doesn't exist: {0}".format(server_id)
         return self._remove_from(self.pending, server_id)
 
     def add_pending(self, server_id):
@@ -108,7 +108,7 @@ class GroupState(object):
         :returns: None
         :raises: :class:`AssertionError` if the job already exists
         """
-        assert job_id not in self.pending, "Job exists: {0}".format(job_id)
+        assert server_id not in self.pending, "Job exists: {0}".format(server_id)
         self.pending[server_id] = {'created': self.now()}
 
     def add_active(self, server_id, server_info):
