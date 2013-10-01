@@ -189,7 +189,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(log, region, service_catalog, auth_token, server_id, undo):
+def add_to_load_balancers(log, region, service_catalog, auth_token, server_id, launch_config, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -240,7 +240,7 @@ def add_to_load_balancers(log, region, service_catalog, auth_token, server_id, u
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_load_balancer(lb_endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
             d.addCallback(add_next, ip_address)

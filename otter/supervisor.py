@@ -179,12 +179,14 @@ class SupervisorService(object, Service):
         d.addCallback(when_authenticated)
         return d
 
-    def add_to_load_balancers(self, log, scaling_group, server_id):
+    def add_to_load_balancers(self, log, scaling_group, server_id, launch_config):
         """
         Add the specified IP to mulitple load balancer based on the configs in
         lb_configs.
         """
         log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
+
+        undo = InMemoryUndoStack(self.coiterate)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -193,7 +195,7 @@ class SupervisorService(object, Service):
                 config_value('region'),
                 service_catalog,
                 auth_token,
-                server_id)
+                server_id, launch_config, undo)
 
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")

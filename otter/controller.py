@@ -132,15 +132,19 @@ def maybe_execute_scaling_policy(
     deferred = scaling_group.get_policy(policy_id)
 
     def _do_get_config(policy):
-        deferred = scaling_group.view_config()
-        return deferred.addCallback(lambda config: (config, policy))
+        deferred = defer.gatherResults([
+            scaling_group.view_config(),
+            scaling_group.view_launch_config()
+        ])
+        return deferred.addCallback(lambda results: results + [policy])
 
     deferred.addCallbacks(_do_get_config)
 
-    def _do_maybe_execute((config, policy)):
+    def _do_maybe_execute(config_launch_policy):
         """
         state_config_policy should be returned by ``check_cooldowns``
         """
+        config, launch, policy = config_launch_policy
         def mark_executed(_):
             state.mark_executed(policy_id)
             return state  # propagate the fully updated state back
@@ -154,7 +158,7 @@ def maybe_execute_scaling_policy(
                                                scaling_group.uuid, policy_id,
                                                "No change in servers")
             state.desired = desired
-            d = execute_group_transition(bound_log, scaling_group, state)
+            d = execute_group_transition(bound_log, scaling_group, state, launch)
             return d.addCallback(mark_executed)
         else:
             raise CannotExecutePolicyError(scaling_group.tenant_id,

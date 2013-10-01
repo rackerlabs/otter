@@ -155,5 +155,10 @@ class GroupEventReceiver(object):
         # call any of below server change events
         changed_state = self._group_transitions[event.change](
             log.bind(server_id=event.server_id), group, state, event.server_id)
+
         # and execute state transition
-        return changed_state and execute_group_transition(log, group, changed_state) or state
+        if changed_state:
+            d = group.view_launch_config()
+            return d.addCallback(partial(execute_group_transition(log, group, changed_state)))
+        else:
+            return state
