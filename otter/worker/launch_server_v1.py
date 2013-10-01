@@ -189,7 +189,7 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
+def add_to_load_balancers(log, region, service_catalog, auth_token, server_id, launch_config, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
@@ -203,23 +203,50 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
     :return: Deferred that fires with a list of 2-tuples of loadBalancerId, and
         Add Node response.
     """
-    lb_iter = iter(lb_configs)
+    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
+    cloudLoadBalancers = config_value('cloudLoadBalancers')
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
 
+    log.msg("Looking for load balancer endpoint",
+            service_name=cloudLoadBalancers,
+            region=lb_region)
+
+    lb_endpoint = public_endpoint_url(service_catalog,
+                                      cloudLoadBalancers,
+                                      lb_region)
+
+    log.msg("Looking for cloud servers endpoint",
+            service_name=cloudServersOpenStack,
+            region=region)
+
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
+
+    lb_configs = launch_config.get('loadBalancers', [])
+
+    d = server_details(server_endpoint, auth_token, server_id)
+
+    def add_to_lbs(server):
+        ip_address = private_ip_addresses(server)[0]
+        return maybeDeferred(add_next, None, ip_address)
+
+    return d.addCallback(add_to_lbs)
+
+    lb_iter = iter(lb_configs)
     results = []
 
-    def add_next(_):
+    def add_next(_, ip_address):
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_load_balancer(lb_endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
-            d.addCallback(add_next)
+            d.addCallback(add_next, ip_address)
             return d
         except StopIteration:
             return results
-
-    return maybeDeferred(add_next, None)
 
 
 def endpoints(service_catalog, service_name, region):
@@ -326,17 +353,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
-
-    log.msg("Looking for load balancer endpoint",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
-    lb_endpoint = public_endpoint_url(service_catalog,
-                                      cloudLoadBalancers,
-                                      lb_region)
 
     log.msg("Looking for cloud servers endpoint",
             service_name=cloudServersOpenStack,
@@ -346,38 +363,11 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
                                           cloudServersOpenStack,
                                           region)
 
-    lb_config = launch_config.get('loadBalancers', [])
-
     server_config = launch_config['server']
 
     log = log.bind(server_name=server_config['name'])
 
-    d = create_server(server_endpoint, auth_token, server_config)
-
-    def wait_for_server(server):
-        server_id = server['server']['id']
-
-        undo.push(
-            verified_delete, log, server_endpoint, auth_token, server_id)
-
-        ilog = log.bind(instance_id=server_id)
-        return wait_for_active(
-            ilog,
-            server_endpoint,
-            auth_token,
-            server_id)
-
-    d.addCallback(wait_for_server)
-
-    def add_lb(server):
-        ip_address = private_ip_addresses(server)[0]
-        lbd = add_to_load_balancers(
-            lb_endpoint, auth_token, lb_config, ip_address, undo)
-        lbd.addCallback(lambda lb_response: (server, lb_response))
-        return lbd
-
-    d.addCallback(add_lb)
-    return d
+    return create_server(server_endpoint, auth_token, server_config)
 
 
 def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
@@ -400,7 +390,7 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     return d
 
 
-def delete_server(log, region, service_catalog, auth_token, instance_details):
+def delete_server(log, region, service_catalog, auth_token, server_id, lb_info):
     """
     Delete the server specified by instance_details.
 
@@ -422,9 +412,27 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
 
     :return: TODO
     """
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
+    log.msg("Looking for cloud servers endpoint: %{service_name}s",
+            service_name=cloudServersOpenStack,
+            region=region)
+
+    server_endpoint = public_endpoint_url(service_catalog,
+                                          cloudServersOpenStack,
+                                          region)
+
+    if lb_info:
+        d = remove_from_load_balancers(log, region, service_catalog, auth_token, lb_info)
+        d.addCallback(lambda _: verified_delete(log, server_endpoint, auth_token, server_id))
+        return d
+    else:
+        return verified_delete(log, server_endpoint, auth_token, server_id)
+
+
+def remove_from_load_balancers(log, region, service_catalog, auth_token, lb_details):
+
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
 
     log.msg("Looking for load balancer endpoint: %(service_name)s",
             service_name=cloudLoadBalancers,
@@ -434,38 +442,21 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
                                       cloudLoadBalancers,
                                       lb_region)
 
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
-            service_name=cloudServersOpenStack,
-            region=region)
-
-    server_endpoint = public_endpoint_url(service_catalog,
-                                          cloudServersOpenStack,
-                                          region)
-
-    (server_id, loadbalancer_details) = instance_details
-
     node_info = itertools.chain(
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
-          for (loadbalancer_id, node_details) in loadbalancer_details])
+          for (loadbalancer_id, node_details) in lb_details])
 
     d = gatherResults(
         [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
-    def when_removed_from_loadbalancers(_ignore):
-        return verified_delete(log, server_endpoint, auth_token, server_id)
-
-    d.addCallback(when_removed_from_loadbalancers)
     return d
 
 
 def verified_delete(log,
                     server_endpoint,
                     auth_token,
-                    server_id,
-                    interval=5,
-                    timeout=3660,
-                    clock=None):
+                    server_id):
     """
     Attempt to delete a server from the server endpoint, and ensure that it is
     deleted by trying again until getting the server results in a 404.
@@ -497,35 +488,4 @@ def verified_delete(log,
     d.addCallback(check_success, [204])
     d.addErrback(wrap_request_error, path, 'server_delete')
 
-    if clock is None:  # pragma: no cover
-        from twisted.internet import reactor
-        clock = reactor
-
-    def verify(_):
-        def check_status():
-            check_d = treq.head(
-                append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
-            check_d.addCallback(check_success, [404])
-            return check_d
-
-        start_time = clock.seconds()
-
-        timeout_description = (
-            "Waiting for Nova to actually delete server {0}".format(server_id))
-
-        verify_d = retry_and_timeout(check_status, timeout,
-                                     next_interval=repeating_interval(interval),
-                                     clock=clock,
-                                     deferred_description=timeout_description)
-
-        def on_success(_):
-            time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
-
-        verify_d.addCallback(on_success)
-        verify_d.addErrback(del_log.err)
-
-    d.addCallback(verify)
     return d

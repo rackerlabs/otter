@@ -101,6 +101,18 @@ class APIError(Exception):
         self.headers = headers
 
 
+def ignore_request_api_error(failure, code, log, msg, **kwargs):
+    """
+    Ignore RequestError that has APIError of specific code
+    """
+    # Succeed if deleting server does not exist
+    failure.trap(RequestError)
+    failure.reason.trap(APIError)
+    if failure.reason.value.code == code:
+        log.msg(msg, **kwargs)
+        return None
+
+
 def check_success(response, success_codes):
     """
     Convert an HTTP response to an appropriate APIError if

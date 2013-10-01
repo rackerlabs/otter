@@ -18,7 +18,8 @@ class GroupState(object):
     :ivar str group_name: the name of the scaling group whose state this
         object represents
     :ivar dict active: the mapping of active server ids and their info
-    :ivar dict pending: the list of pending job ids and their info
+    :ivar dict pending: the list of instance ids building
+    :ivar desired: number of active servers desired
     :ivar bool paused: whether the scaling group is paused in scaling activities
     :ivar dict policy_touched: dictionary mapping policy ids to the last time
         they were executed, if ever.
@@ -29,13 +30,23 @@ class GroupState(object):
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
-                 policy_touched, paused, now=timestamp.now):
+    def __init__(self, tenant_id, group_id, group_name, active, pending, desired,
+                 group_touched, policy_touched, paused, now=timestamp.now,
+                 deleting={}, deleted={}, error={}):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.group_name = group_name
         self.active = active
         self.pending = pending
+        self.deleting = deleting
+
+        # TODO: Deleted servers are required only if active servers transition to 'deleted' state
+        # before going to 'deleting' state. If we can guarantee that 'active' always transition to
+        # 'deleting' then 'deleted' is not required
+        self.deleted = deleted
+
+        self.desired = desired
+        self.error = error
         self.paused = paused
         self.policy_touched = policy_touched
         self.group_touched = group_touched
@@ -71,29 +82,34 @@ class GroupState(object):
             self.paused
         )
 
-    def remove_job(self, job_id):
+    def _remove_from(self, bucket, server_id):
+        info = bucket[server_id]
+        del bucket[server_id]
+        return info
+
+    def remove_pending(self, server_id):
         """
-        Removes a pending job from the pending list.  If the job is not in
+        Removes a pending server from the pending list. If the server is not in
         pending, raises an AssertionError.
 
-        :param str job_id:  the id of the job to complete
-        :returns: None
+        :param str server_id:  the id of the server
+        :returns: ``dict`` of what server info stored
         :raises: :class:`AssertionError` if the job doesn't exist
         """
-        assert job_id in self.pending, "Job doesn't exist: {0}".format(job_id)
-        del self.pending[job_id]
+        assert server_id in self.pending, "Server doesn't exist: {0}".format(server_id)
+        return self._remove_from(self.pending, server_id)
 
-    def add_job(self, job_id):
+    def add_pending(self, server_id):
         """
-        Adds a pending job to the pending collection.  If the job is already in
+        Adds a pending server_id to the pending collection.  If the server_id is already in
         pending, raises an AssertError.
 
         :param str job_id:  the id of the job to complete
         :returns: None
         :raises: :class:`AssertionError` if the job already exists
         """
-        assert job_id not in self.pending, "Job exists: {0}".format(job_id)
-        self.pending[job_id] = {'created': self.now()}
+        assert server_id not in self.pending, "Job exists: {0}".format(server_id)
+        self.pending[server_id] = {'created': self.now()}
 
     def add_active(self, server_id, server_info):
         """
@@ -118,7 +134,32 @@ class GroupState(object):
         :raises: :class:`AssertionError` if the server id does not exist
         """
         assert server_id in self.active, "Server does not exists: {}".format(server_id)
-        del self.active[server_id]
+        return self._remove_from(self.active, server_id)
+
+    def add_lb_info(self, server_id, lb_info):
+        """
+        Add load balancer info to active server
+        """
+        self.active[server_id]['lb_info'] = lb_info
+
+    def add_error(self, server_id, info={}):
+        self.error[server_id] = info
+
+    def remove_error(self, server_id):
+        return self._remove_from(self.error, server_id)
+
+    def add_deleting(self, server_id, info={}):
+        info.setdefault('deleted', self.now())
+        self.deleting[server_id] = info
+
+    def remove_deleting(self, server_id):
+        return self._remove_from(self.deleting, server_id)
+
+    def add_deleted(self, server_id, info={}):
+        self.deleted[server_id] = info
+
+    def remove_deleted(self, server_id):
+        return self._remove_from(self.deleted, server_id)
 
     def mark_executed(self, policy_id):
         """

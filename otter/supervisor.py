@@ -20,12 +20,11 @@ class ISupervisor(Interface):
     deletion jobs.
     """
 
-    def execute_config(log, transaction_id, scaling_group, launch_config):
+    def launch_server(self, log, scaling_group, launch_config):
         """
         Executes a single launch config.
 
         :param log: Bound logger.
-        :param str transaction_id: Transaction ID.
         :param callable auth_function: A 1-argument callable that takes a tenant_id,
             and returns a Deferred that fires with a 2-tuple of auth_token and
             service_catalog.
@@ -136,11 +135,11 @@ class SupervisorService(object, Service):
 
         return succeed((job_id, completion_d))
 
-    def execute_delete_server(self, log, transaction_id, scaling_group, server):
+    def delete_server(self, log, scaling_group, server_id, lb_info):
         """
         see :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -150,7 +149,7 @@ class SupervisorService(object, Service):
                 config_value('region'),
                 service_catalog,
                 auth_token,
-                (server['id'], server['lb_info']))
+                server_id, lb_info)
 
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")
@@ -158,6 +157,49 @@ class SupervisorService(object, Service):
         d.addCallback(lambda _: log.msg('Server deleted successfully'))
         d.addErrback(log.err, 'Server deletion failed')
 
+        return d
+
+    def remove_from_load_balancers(self, log, scaling_group, server_id, lb_info):
+        """
+        Remove given server from load balancers
+        """
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
+
+        # authenticate for tenant
+        def when_authenticated((auth_token, service_catalog)):
+            return launch_server_v1.remove_from_load_balancers(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                server_id, lb_info)
+
+        d = self.auth_function(scaling_group.tenant_id)
+        log.msg("Authenticating for tenant")
+        d.addCallback(when_authenticated)
+        return d
+
+    def add_to_load_balancers(self, log, scaling_group, server_id, launch_config):
+        """
+        Add the specified IP to mulitple load balancer based on the configs in
+        lb_configs.
+        """
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
+
+        undo = InMemoryUndoStack(self.coiterate)
+
+        # authenticate for tenant
+        def when_authenticated((auth_token, service_catalog)):
+            return launch_server_v1.add_to_load_balancers(
+                log,
+                config_value('region'),
+                service_catalog,
+                auth_token,
+                server_id, launch_config, undo)
+
+        d = self.auth_function(scaling_group.tenant_id)
+        log.msg("Authenticating for tenant")
+        d.addCallback(when_authenticated)
         return d
 
     def validate_launch_config(self, log, tenant_id, launch_config):
