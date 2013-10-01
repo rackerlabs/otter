@@ -357,9 +357,9 @@ def execute_scale_down(log, supervisor, group, state, delta):
         # find oldest active servers
         sorted_servers = sorted(state.active.values(), key=lambda s: from_timestamp(s['created']))
         servers_to_delete = sorted_servers[:delta]
-            d = [supervisor.delete_server(log, group, server['id'], server['lb_info'])
-                    .addCallback(server_deleted, server['id'])
-                 for server in servers_to_delete]
+        d = [supervisor.delete_server(log, group, server['id'], server['lb_info'])
+                .addCallback(server_deleted, server['id'])
+             for server in servers_to_delete]
         return DeferredList(deferreds, consumeErrors=True)
     else:
         # Cannot delete pending servers now.

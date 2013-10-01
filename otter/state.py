@@ -6,61 +6,6 @@ from otter.controller import execute_group_transition
 from otter.util.hashkey import generate_transaction_id
 
 
-class GroupEvent(object):
-    """
-    A change in the group
-    """
-
-    ADDED, DELETING, DELETED, ERROR, ACTIVE = range(1, 6)
-
-    def __init__(self, tenant_id, group_id, server_id, change):
-        """
-        :param group_id: Group ID
-        :param server_id: Server ID of server that changed
-        :param change: One of the above ADDED, DELETING...
-        """
-        self.tenant_id = tenant_id
-        self.group = group
-        self.server_id = server_id
-        self.change = change
-
-
-_group_transitions = {
-    GroupEvent.ADDED: server_created,
-    GroupEvent.DELETING: server_deleting,
-    GroupEvent.DELETED: server_deleted,
-    GroupEvent.ERROR: server_error,
-    GroupEvent.ACTIVE: server_active
-}
-
-
-class GroupEventReceiver(object):
-    """
-    Receive `GroupEvent` events from Atom hopper
-    """
-    def __init__(self, store):
-        self.store = store
-
-    def group_event_received(event):
-        """
-        Called when `GroupEvent` is received from AtomHopper
-        """
-        log = log.bind(event_run_id=generate_transaction_id())
-        group = self.store.get_scaling_group(log, event.tenant_id, event.group_id)
-        d = group.modify_state(self.process_group_event, event)
-        d.addErrback(log.err)
-
-    def process_group_event(self, group, state, event):
-        """
-        Process group event
-        """
-        # call any of below server change events
-        changed_state = _group_transitions[event.change](
-            log.bind(server_id=event.server_id), group, state, event.server_id))
-        # and execute state transition
-        return changed_state and execute_group_transition(log, group, changed_state) or state
-
-
 def remove_server(state, server_id):
     """
     Remove server from state
@@ -158,3 +103,56 @@ def remove_scheduled_check(group, server_id):
     pass
 
 
+class GroupEvent(object):
+    """
+    A change in the group
+    """
+
+    ADDED, DELETING, DELETED, ERROR, ACTIVE = range(1, 6)
+
+    def __init__(self, tenant_id, group_id, server_id, change):
+        """
+        :param group_id: Group ID
+        :param server_id: Server ID of server that changed
+        :param change: One of the above ADDED, DELETING...
+        """
+        self.tenant_id = tenant_id
+        self.group = group
+        self.server_id = server_id
+        self.change = change
+
+
+class GroupEventReceiver(object):
+    """
+    Receive `GroupEvent` events from Atom hopper
+    """
+
+    _group_transitions = {
+        GroupEvent.ADDED: server_created,
+        GroupEvent.DELETING: server_deleting,
+        GroupEvent.DELETED: server_deleted,
+        GroupEvent.ERROR: server_error,
+        GroupEvent.ACTIVE: server_active
+    }
+
+    def __init__(self, store):
+        self.store = store
+
+    def group_event_received(event):
+        """
+        Called when `GroupEvent` is received from AtomHopper
+        """
+        log = log.bind(event_run_id=generate_transaction_id())
+        group = self.store.get_scaling_group(log, event.tenant_id, event.group_id)
+        d = group.modify_state(self.process_group_event, event)
+        d.addErrback(log.err)
+
+    def process_group_event(self, group, state, event):
+        """
+        Process group event
+        """
+        # call any of below server change events
+        changed_state = self._group_transitions[event.change](
+            log.bind(server_id=event.server_id), group, state, event.server_id)
+        # and execute state transition
+        return changed_state and execute_group_transition(log, group, changed_state) or state
