@@ -1824,14 +1824,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch)
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': {}
-        })
+
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], {})
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         # Verify data argument seperately since data in actual call will have datetime.utcnow
         # which cannot be mocked or predicted.
+
         data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(data.pop('created_at'), datetime))
         self.assertEqual(expectedData, data)
@@ -1872,11 +1873,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    [policy])
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': {self.mock_key.return_value: policy}
-        })
+
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], {self.mock_key.return_value: policy})
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
@@ -1928,15 +1929,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    policies)
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3'), policies))
-        })
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
         self.assertEqual(called_data, expectedData)
+
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], dict(zip(('2', '3'), policies)))
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         mock.ANY,

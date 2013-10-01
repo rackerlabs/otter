@@ -320,7 +320,7 @@ class OtterGroups(object):
         deferred.addCallback(_do_obey_config_change)
 
         def _add_to_bobby(result, client):
-            d = client.create_group(self.tenant_id, result["state"].group_id)
+            d = client.create_group(self.tenant_id, result['state'].group_id)
             return d.addCallback(lambda _: result)
 
         bobby = get_bobby()
