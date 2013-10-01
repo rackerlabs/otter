@@ -275,7 +275,7 @@ for change in ['change', 'changePercent', 'desiredCapacity']:
         _policy_type = deepcopy(_policy_base_type)
         _policy_type['properties'][change] = {'required': True}
         _policy_type['properties']['type'] = {'pattern': _type}
-        if _type == 'schedule':
+        if _type == 'schedule' or _type == 'cloud_monitoring':
             _policy_type['properties']['args'] = {'required': True}
         _policy_types.append(_policy_type)
 
@@ -355,6 +355,12 @@ policy = {
                     "type": "object",
                     "properties": {"cron": {"required": True}},
                     "additionalProperties": False
+                },
+                {
+                    "type": "object",
+                    "properties": {"alarm_criteria": {"required": True},
+                                   "check": {"required":True}},
+                    "additionalProperties": False
                 }
             ],
             "properties": {
@@ -380,10 +386,10 @@ policy = {
     },
     "dependencies": {
         "args": {
-            # args can be there only when type is 'schedule'
+            # args can be there only when type is 'schedule' or 'cloud_monitoring'
             "type": "object",
             "properties": {
-                "type": {"pattern": "schedule"}
+                "type": {"enum": ["schedule", "cloud_monitoring"]}
             }
         }
     }

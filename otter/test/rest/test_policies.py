@@ -199,7 +199,25 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
             "name": "Schedule policy for MaaS",
             "cooldown": 3,
             "change": 10,
-            "type": "cloud_monitoring"
+            "type": "cloud_monitoring",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
         }
         self.mock_group.create_policies.return_value = defer.succeed({
             '5': bobby_policy.copy()
@@ -213,7 +231,8 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
         self.mock_group.create_policies.assert_called_once_with(
             [bobby_policy])
 
-        create_policy.assert_called_once_with("11111", "1", "5", {}, "")
+        create_policy.assert_called_once_with("11111", "1", "5", bobby_policy["args"]["check"],
+                                              bobby_policy["args"]["alarm_criteria"]["criteria"])
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_policies_response)

@@ -207,7 +207,10 @@ class OtterPolicies(object):
             d = defer.succeed(policy_dict)
             for policy_uuid, policy_item in policy_dict.iteritems():
                 if policy_item['type'] == 'cloud_monitoring':
-                    client.create_policy(self.tenant_id, self.scaling_group_id, policy_uuid, {}, "")
+                    print policy_item['args']
+                    client.create_policy(self.tenant_id, self.scaling_group_id, policy_uuid,
+                                         policy_item['args']['check'],
+                                         policy_item['args']['alarm_criteria']['criteria'])
             return d.addCallback(lambda _: policy_dict)
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
