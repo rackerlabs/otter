@@ -314,10 +314,9 @@ class IScalingGroup(Interface):
             :data:`otter.json_schema.group_schemas.policy`
         :type data: ``list`` of ``dict``
 
-        :return: dictionary of UUIDs to their matching newly created scaling
-            policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: ``dict`` of ``dict``
+        :return: list of newly created scaling policies and their ids, as
+            specified by :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``list`` of ``dict``
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
@@ -344,10 +343,10 @@ class IScalingGroup(Interface):
         """
         Gets all the policies associated with particular scaling group.
 
-        :return: a dict of the policies, as specified by
+        :return: a list of the policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            ``list``
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
