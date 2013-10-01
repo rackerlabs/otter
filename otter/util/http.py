@@ -3,7 +3,7 @@ HTTP utils, such as formulation of URLs
 """
 
 from itertools import chain
-from urllib import quote
+from urllib import quote, urlencode
 
 import treq
 
@@ -88,14 +88,17 @@ class APIError(Exception):
 
     :param int code: HTTP Response code for this error.
     :param str body: HTTP Response body for this error or None.
+    :param Headers headers: HTTP Response headers for this error, or None
     """
-    def __init__(self, code, body):
+    def __init__(self, code, body, headers=None):
         Exception.__init__(
             self,
-            'API Error code={0!r}, body={1!r}'.format(code, body))
+            'API Error code={0!r}, body={1!r}, headers={2!r}'.format(
+                code, body, headers))
 
         self.code = code
         self.body = body
+        self.headers = headers
 
 
 def check_success(response, success_codes):
@@ -113,7 +116,7 @@ def check_success(response, success_codes):
     :return: response or a deferred that errbacks with an APIError.
     """
     def _raise_api_error(body):
-        raise APIError(response.code, body)
+        raise APIError(response.code, body, response.headers)
 
     if response.code not in success_codes:
         return treq.content(response).addCallback(_raise_api_error)
@@ -148,7 +151,7 @@ def get_url_root():
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                         webhook_id=None, capability_hash=None,
                         capability_version="1", format="json",
-                        api_version="1.0"):
+                        api_version="1.0", query_params=None):
     """
     Generates links into the autoscale system, based on the ids given.  If
     the format is "json", then a JSON blob will be given in the form of::
@@ -214,6 +217,9 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
 
     url = append_segments(*segments)
 
+    if query_params is not None:
+        url = "{0}?{1}".format(url, urlencode(query_params))
+
     if format == "json":
         links = [
             {"href": url, "rel": "self"}
@@ -232,6 +238,34 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         return links
     else:
         return url
+
+
+def get_new_paginate_query_args(old_paginate_query_args, new_data):
+    """
+    Given a list of dictionaries of resources (all of which should have an
+    'id' key and also be in sorted ascending order), produces a dictionary
+    (or None) that can be passed to the ``query_params`` keyword argument of
+    :func:`get_autoscale_links`.
+
+    :param dict old_query_qargs: the old pagination query args - the new args
+        should respect the same limits, just possibly with a different marker
+
+    :param list new_data: A list of dictionaries containing the data fetched
+        with the previous paginate query args.  These should be openstack-type
+        resource dictionaries, each containing a key 'id' that can be used
+        as a marker, and should already be in sorted order
+
+    :returns: a dictionary of new kwargs if there might be more data to view
+        (if the length of the list is the previous limit, for instance), or
+        None if there is no next page.
+    """
+    old_limit = old_paginate_query_args.get(
+        'limit', config_value('limit.pagination'))
+
+    if len(new_data) >= old_limit:
+        return {'limit': old_limit, 'marker': new_data[-1]['id']}
+    else:
+        return None
 
 
 def transaction_id(request):

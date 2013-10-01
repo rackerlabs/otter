@@ -14,6 +14,7 @@ from twisted.internet import defer
 from twisted.web import server, http
 from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
+from twisted.web.http import parse_qs
 
 from otter.models.interface import IAdmin, IScalingGroup, IScalingGroupCollection
 from otter.rest.application import Otter
@@ -55,8 +56,16 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     :param body: the body to include in the request
     :type body: ``str``
     """
-    # build mock request
-    mock_request = requestMock(endpoint, method, headers=headers, body=body)
+    # handle query args, since requestMock does not (see
+    # twisted.web.http.py:Request.requestReceived)
+    with_query = endpoint.split(b'?', 1)
+    if len(with_query) == 1:
+        mock_request = requestMock(endpoint, method, headers=headers, body=body)
+        mock_request.args = {}
+    else:
+        mock_request = requestMock(with_query[0], method, headers=headers,
+                                   body=body)
+        mock_request.args = parse_qs(with_query[1])
 
     # these are used when writing the response
     mock_request.code = 200

@@ -126,6 +126,12 @@ class GeneralLaunchConfigTestCase(TestCase):
     """
     Verification that the general JSON schema for launch configs is correct.
     """
+    def setUp(self):
+        """
+        Store launch configuration
+        """
+        self.launch = group_examples.launch_server_config()[0]
+
     def test_schema_valid(self):
         """
         The schema itself is a valid Draft 3 schema
@@ -138,7 +144,8 @@ class GeneralLaunchConfigTestCase(TestCase):
         """
         self.assertRaisesRegexp(
             ValidationError, "'type' is a required property",
-            validate, {"args": {"server": {}}}, group_schemas.launch_config)
+            validate, {"args": {"server": self.launch['args']['server']}},
+            group_schemas.launch_config)
 
     def test_invalid_launch_config_type_does_not_validate(self):
         """
@@ -263,6 +270,34 @@ class ServerLaunchConfigTestCase(TestCase):
             validate, invalid, group_schemas.launch_server)
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, group_schemas.launch_config)
+
+
+class LaunchConfigServerPayloadValidationTests(TestCase):
+    """
+    Tests to verify json schema of 'server' attribute used to create servers
+    Valid tests are already done in ServerLaunchConfigTestCase.test_valid_examples_validate
+    """
+    def setUp(self):
+        """
+        Keep valid payload
+        """
+        self.server = group_examples.launch_server_config()[0]['args']['server']
+
+    def test_invalid_image(self):
+        """
+        invalidates if imageRef is not a string
+        """
+        self.server['imageRef'] = 3
+        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_flavor(self):
+        """
+        invalidates if flavorRef is not a string
+        """
+        self.server['flavorRef'] = 3
+        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
 
 
 class ScalingPolicyTestCase(TestCase):
@@ -668,15 +703,41 @@ class CreateScalingGroupTestCase(TestCase):
             'scalingPolicies': []
         }, rest_schemas.create_group_request)
 
-    def test_creation_with_scaling_policies_valid(self):
+    def test_creation_with_one_scaling_policy_valid(self):
         """
-        Creation with an array of scaling policies validates
+        Creation with an array of one scaling policy validates
         """
         validate({
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
             'scalingPolicies': [self.policy]
         }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_valid(self):
+        """
+        Creation with an array of many scaling policies
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': group_examples.policy()
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_invalid(self):
+        """
+        Creation with an array of many scaling policies validates each scaling policy.
+        It raises error if any of the policies is invalid
+        """
+        policy2 = deepcopy(self.policy)
+        policy2['type'] = 'junk'
+        invalid = {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': [self.policy, policy2]
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'scalingPolicies',
+            validate, invalid, rest_schemas.create_group_request)
 
     def test_creation_with_duplicate_scaling_policies_valid(self):
         """

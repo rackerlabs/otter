@@ -278,13 +278,6 @@ format="SVG" scale="60"/>
                 your servers' startup processes with <link
                     xlink:href="http://www.opscode.com/chef/"
                     >Chef</link> or a similar tool. </para>
-            <para>
-                <note>
-                    <para>Autoscale can create servers, but you must
-                        manually remove those servers when you no
-                        longer want them to be active.</para>
-                </note>
-            </para>
         </section>
         <section xml:id="Sample_Use_Case">
             <title>Sample Use Case<?sbr?><?sbr?><?sbr?></title>

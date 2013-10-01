@@ -30,6 +30,9 @@ from otter.test.utils import patch
 from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
+from otter.supervisor import set_supervisor
+from otter.worker.validate_config import InvalidLaunchConfiguration
+
 
 class FormatterHelpers(TestCase):
     """
@@ -60,7 +63,7 @@ class FormatterHelpers(TestCase):
             'j2': {'created': 't'},
             'j3': {'created': 't'}}
         translated = format_state_dict(
-            GroupState('11111', 'one', active, pending, None, {}, True))
+            GroupState('11111', 'one', 'test', active, pending, None, {}, True))
 
         # sort so it can be compared
         translated['active'].sort(key=lambda x: x['id'])
@@ -71,6 +74,7 @@ class FormatterHelpers(TestCase):
                 {'id': '2', 'links': ['links2']},
                 {'id': '3', 'links': ['links3']}
             ],
+            'name': 'test',
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
@@ -97,6 +101,17 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
         patch(self, 'otter.util.http.get_url_root', return_value="")
 
+        # Patch supervisor
+        self.supervisor = mock.Mock(spec=['validate_launch_config'])
+        self.supervisor.validate_launch_config.return_value = defer.succeed(None)
+        set_supervisor(self.supervisor)
+
+    def tearDown(self):
+        """
+        Reset the supervisor
+        """
+        set_supervisor(None)
+
     def test_list_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -120,6 +135,20 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                                 body=json.dumps(request_body))
         self.flushLoggedErrors()
 
+    def test_create_invalid_launch_config(self):
+        """
+        Invalid launch configuration raises 400
+        """
+        self.supervisor.validate_launch_config.return_value = defer.fail(
+            InvalidLaunchConfiguration('meh'))
+        request_body = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0]
+        }
+        self.assert_status_code(400, method='POST',
+                                body=json.dumps(request_body))
+        self.flushLoggedErrors()
+
     def test_no_groups_returns_empty_list(self):
         """
         If there are no groups for that account, a JSON blob consisting of an
@@ -140,8 +169,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         list of states that are all formatted
         """
         states = [
-            GroupState('11111', '2', {}, {}, None, {}, False),
-            GroupState('11111', '2', {}, {}, None, {}, False)
+            GroupState('11111', '2', '', {}, {}, None, {}, False),
+            GroupState('11111', '2', '', {}, {}, None, {}, False)
         ]
 
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(states)
@@ -161,7 +190,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         so long as format returns the right value
         """
         self.mock_store.list_scaling_group_states.return_value = defer.succeed(
-            [GroupState('11111', '1', {}, {1: {}}, None, {}, False)]
+            [GroupState('11111', '1', '', {}, {1: {}}, None, {}, False)]
         )
 
         body = self.assert_status_code(200)
@@ -170,6 +199,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp, {
             "groups": [{
                 'active': [],
+                'name': '',
                 'activeCapacity': 0,
                 'pendingCapacity': 1,
                 'desiredCapacity': 1,
@@ -420,11 +450,17 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = patch(self, 'otter.rest.groups.controller')
         patch(self, 'otter.util.http.get_url_root', return_value="")
 
+        # Patch supervisor
+        supervisor = mock.Mock(spec=['validate_launch_config'])
+        supervisor.validate_launch_config.return_value = defer.succeed(None)
+        set_supervisor(supervisor)
+
     def tearDown(self):
         """
         Revert mock Bobby client
         """
         set_bobby(None)
+        set_supervisor(None)
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_group', return_value=defer.succeed(''))

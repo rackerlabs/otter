@@ -10,7 +10,9 @@ from otter.models.interface import (
     GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError)
 
-from otter.rest.decorators import InvalidJsonError
+from otter.worker.validate_config import InvalidLaunchConfiguration
+
+from otter.rest.decorators import InvalidJsonError, InvalidQueryArgument
 
 
 class InvalidMinEntities(Exception):
@@ -18,15 +20,16 @@ class InvalidMinEntities(Exception):
     Something is wrong with the minEntities values.
     """
 
-
 exception_codes = {
     InvalidMinEntities: 400,
     ValidationError: 400,
+    InvalidLaunchConfiguration: 400,
     InvalidJsonError: 400,
     NoSuchScalingGroupError: 404,
     NoSuchPolicyError: 404,
     NoSuchWebhookError: 404,
     GroupNotEmptyError: 403,
     CannotExecutePolicyError: 403,
-    NotImplementedError: 501
+    InvalidQueryArgument: 400,
+    NotImplementedError: 501,
 }
