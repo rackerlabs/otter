@@ -1,4 +1,5 @@
 """
+IGNORE THIS!
 Handle group change events by reacting right away. A different implementation than one in state.py
 """
 
