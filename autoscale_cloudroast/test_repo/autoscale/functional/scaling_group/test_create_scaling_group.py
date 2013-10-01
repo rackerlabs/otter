@@ -1,6 +1,8 @@
 """
 Test to create and verify the created group.
 """
+import unittest
+
 from test_repo.autoscale.fixtures import AutoscaleFixture
 import base64
 from cloudcafe.common.tools.datagen import rand_name
@@ -147,6 +149,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             msg='Scaling policies of the scaling group did not match'
             ' for group {0}'.format(self.scaling_group.id))
 
+    @unittest.skip('AUTO-635')
     def test_created_scaling_group_state_fields(self):
         """
         Verify the state on the group is as expected.
