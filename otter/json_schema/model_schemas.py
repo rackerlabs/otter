@@ -31,7 +31,7 @@ for _policy_type in policy['type']:
 
 policy_list = {
     "type": "array",
-    "items": [policy],
+    "items": policy,
     "uniqueItems": True,
     "required": True
 }
