@@ -197,7 +197,7 @@ def paginatable(f):
     @wraps(f)
     def _(self, request, *args, **kwargs):
         paginate = {}
-        hard_limit = config_value('limit.pagination')
+        hard_limit = config_value('limits.pagination')
         if 'limit' in request.args:
             try:
                 paginate['limit'] = int(request.args['limit'][0])
