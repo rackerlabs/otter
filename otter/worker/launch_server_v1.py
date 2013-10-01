@@ -377,6 +377,19 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         return lbd
 
     d.addCallback(add_lb)
+
+    def _add_to_bobby(result, client):
+        server, lb_response = result
+
+        d = client.create_server(scaling_group.tenant_id, scaling_group.uuid, server["server"]["id"])
+        return d.addCallback(lambda _: result)
+
+    from otter.rest.bobby import get_bobby
+
+    bobby = get_bobby()
+    if bobby is not None:
+        d.addCallback(_add_to_bobby, bobby)
+
     return d
 
 
