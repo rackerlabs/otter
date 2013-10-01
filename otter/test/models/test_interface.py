@@ -291,7 +291,7 @@ class IScalingGroupProviderMixin(object):
     def validate_list_webhooks_return_value(self, *args, **kwargs):
         """
         Calls ``list_webhooks(policy_id)`` and validates that it returns a
-        dictionary uuids mapped to webhook JSON blobs.
+        list of webhook blobs.
 
         :return: the return value of ``list_webhooks(policy_id)``
         """
@@ -302,8 +302,8 @@ class IScalingGroupProviderMixin(object):
 
     def validate_create_webhooks_return_value(self, *args, **kwargs):
         """
-        Calls ``create_webhooks(policy_id, data)`` and validates that it returns
-        a dictionary uuids mapped to webhook JSON blobs.
+        Calls ``create_webhooks(policy_id, data)`` and validates that it
+        returns a list of webhook blobs.
 
         :return: the return value of ``create_webhooks(policy_id, data)``
         """
