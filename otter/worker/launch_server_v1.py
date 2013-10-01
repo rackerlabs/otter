@@ -223,7 +223,7 @@ def add_to_load_balancers(log, region, service_catalog, auth_token, server_id, l
                                           cloudServersOpenStack,
                                           region)
 
-    lb_config = launch_config.get('loadBalancers', [])
+    lb_configs = launch_config.get('loadBalancers', [])
 
     d = server_details(server_endpoint, auth_token, server_id)
 
@@ -353,7 +353,6 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     """
     launch_config = prepare_launch_config(scaling_group.uuid, launch_config)
 
-    cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
     log.msg("Looking for cloud servers endpoint",
@@ -413,7 +412,8 @@ def delete_server(log, region, service_catalog, auth_token, server_id, lb_info):
 
     :return: TODO
     """
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
+    cloudServersOpenStack = config_value('cloudServersOpenStack')
+    log.msg("Looking for cloud servers endpoint: %{service_name}s",
             service_name=cloudServersOpenStack,
             region=region)
 
@@ -433,7 +433,6 @@ def remove_from_load_balancers(log, region, service_catalog, auth_token, lb_deta
 
     lb_region = config_value('regionOverrides.cloudLoadBalancers') or region
     cloudLoadBalancers = config_value('cloudLoadBalancers')
-    cloudServersOpenStack = config_value('cloudServersOpenStack')
 
     log.msg("Looking for load balancer endpoint: %(service_name)s",
             service_name=cloudLoadBalancers,
