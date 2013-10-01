@@ -282,8 +282,7 @@ def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_i
     return d.addCallback(_insert_event)
 
 
-def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
-                    output):
+def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -304,10 +303,9 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         will be added to this dictionary
     :type cql_paramters: ``dict``
 
-    :param output: a dictionary to which to insert the created policies
-        along with their generated IDs
-    :type output: ``dict``
+    :returns: ``list`` of the created webhooks along with their IDs
     """
+    output = []
     for i, webhook in enumerate(bare_webhooks):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
@@ -325,11 +323,13 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         cql_parameters['{0}Capability'.format(name)] = serialize_json_data(
             {version: cap_hash}, 1)
 
-        output[webhook_id] = webhook.copy()
-        output[webhook_id]['capability'] = {'hash': cap_hash, 'version': version}
+        output.append(dict(id=webhook_id,
+                           capability={'hash': cap_hash, 'version': version},
+                           **webhook))
+    return output
 
 
-def _assemble_webhook_from_row(row):
+def _assemble_webhook_from_row(row, include_id=False):
     """
     Builds a webhook as per :data:`otter.json_schema.model_schemas.webhook`
     from the user-mutable user data (name and metadata) and the
@@ -347,6 +347,9 @@ def _assemble_webhook_from_row(row):
 
     version, cap_hash = capability_data.iteritems().next()
     webhook_base['capability'] = {'version': version, 'hash': cap_hash}
+
+    if include_id:
+        webhook_base['id'] = row['webhookId']
 
     return webhook_base
 
@@ -715,8 +718,8 @@ class CassScalingGroup(object):
         irregardless of whether the scaling policy still exists.
         """
         def _assemble_webhook_results(results):
-            return {row['webhookId']: _assemble_webhook_from_row(row)
-                    for row in results}
+            return [_assemble_webhook_from_row(row, include_id=True)
+                    for row in results]
 
         query = _cql_list_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query, {"tenantId": self.tenant_id,
@@ -751,10 +754,9 @@ class CassScalingGroup(object):
             cql_params = {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
                           "policyId": policy_id}
-            output = {}
 
-            _build_webhooks(data, self.webhooks_table, queries, cql_params,
-                            output)
+            output = _build_webhooks(data, self.webhooks_table, queries,
+                                     cql_params)
 
             b = Batch(queries, cql_params,
                       consistency=get_consistency_level('create', 'webhook'))
