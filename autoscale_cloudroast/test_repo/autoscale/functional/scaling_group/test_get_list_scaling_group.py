@@ -60,13 +60,7 @@ class ScalingGroupListTest(AutoscaleFixture):
                          self.first_scaling_group.launchConfiguration,
                          msg="Group's launch configurations did not match for group "
                          '{0}'.format(self.first_scaling_group.id))
-        self.assertEquals(len(group_info.state.active), group_info.state.activeCapacity)
-        self.assertEquals(group_info.state.activeCapacity, 0)
-        self.assertEquals(group_info.state.desiredCapacity,
-                          group_info.state.activeCapacity + group_info.state.pendingCapacity)
-        self.assertFalse(group_info.state.paused,
-                         msg='The scaling group status is paused upon creation'
-                         ' for group {0}'.format(self.group.id))
+        self.assert_group_state(group_info.state)
 
     def test_default_maxentities_set_on_a_group(self):
         """
