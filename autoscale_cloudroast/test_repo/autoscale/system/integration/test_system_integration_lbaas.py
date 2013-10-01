@@ -193,21 +193,19 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
 
-    @unittest.skip('AUTO-378')
+    @tags(speed='slow')
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load balancer id
         and verify the scaling group deletes the servers after trying to add loadbalancer.
         Also, when 25 nodes already exist on a lb
         """
-        load_balancer_list = [00000, self.lb_other_region]
+        load_balancer_list = [self.lb_other_region]
         for each_load_balancer in load_balancer_list:
             group = self._create_group_given_lbaas_id(each_load_balancer)
             self._wait_for_servers_to_be_deleted_when_lb_invalid(
                 group.id, group.groupConfiguration.minEntities)
-            self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(group_id=group.id)),
-                              0, msg='Servers created on the group before trying to add the '
-                              'invalid load balancer were not deleted on group {0}'.format(group.id))
+            self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
 
     def _create_group_given_lbaas_id(self, *lbaas_ids):
         """
