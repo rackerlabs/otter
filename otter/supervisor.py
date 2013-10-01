@@ -139,7 +139,7 @@ class SupervisorService(object, Service):
         """
         see :meth:`ISupervisor.execute_delete_server`
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -163,7 +163,7 @@ class SupervisorService(object, Service):
         """
         Remove given server from load balancers
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
@@ -184,7 +184,7 @@ class SupervisorService(object, Service):
         Add the specified IP to mulitple load balancer based on the configs in
         lb_configs.
         """
-        log = log.bind(server_id=server['id'], tenant_id=scaling_group.tenant_id)
+        log = log.bind(server_id=server_id, tenant_id=scaling_group.tenant_id)
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
