@@ -54,7 +54,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                              lc_personality=None, lc_metadata=None,
                              lc_disk_config=None, lc_networks=None,
                              lc_load_balancers=None, sp_list=None,
-                             requestslib_kwargs=None):
+                             network_type=None, requestslib_kwargs=None):
         """
         :summary: Create scaling group
         :param gc_name: The name of the scaling group
@@ -104,6 +104,10 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
             lc_metadata['build_config'] = 'core'
         else:
             lc_metadata = dict(build_config='core')
+        # Setting netowrk type for servers to be private by default.
+        lc_networks = [{'uuid': '11111111-1111-1111-1111-111111111111'}]
+        if network_type is 'public':
+            lc_networks.append({'uuid': '00000000-0000-0000-0000-000000000000'})
         scaling_group = ScalingGroup_Request(gc_name=gc_name,
                                              gc_cooldown=gc_cooldown,
                                              gc_min_entities=gc_min_entities,
