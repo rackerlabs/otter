@@ -736,7 +736,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         List policies calls naive list policies, and doesn't call view config
         if there are existing policies
         """
-        expected_result = {'policy1': {}, 'policy2': {}}
+        expected_result = [{'id': 'policy1'}, {'id': 'policy2'}]
         mock_naive.return_value = defer.succeed(expected_result)
 
         d = self.group.list_policies()
@@ -749,7 +749,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
-                return_value=defer.succeed({}))
+                return_value=defer.succeed([]))
     def test_list_policy_empty_list_existing_group(self, mock_naive,
                                                    mock_view_config):
         """
@@ -759,7 +759,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         d = self.group.list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, {})
+        self.assertEqual(r, [])
 
         mock_naive.assert_called_once_with()
         mock_view_config.assert_called_with()
@@ -767,7 +767,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies',
-                return_value=defer.succeed({}))
+                return_value=defer.succeed([]))
     def test_list_policy_invalid_group(self, mock_naive, mock_view_config):
         """
         If the group does not exist, `list_policies` raises a
@@ -794,7 +794,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     def test_add_scaling_policy(self, view_config):
         """
         Test that you can add a scaling policy, and what is returned is a
-        dictionary of the ids to the scaling policies
+        list of the scaling policies with their ids
         """
         self.returns = [None]
         d = self.group.create_policies([{"b": "lah"}])
@@ -815,8 +815,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                 return_value=defer.succeed({}))
     def test_add_scaling_policy_at(self, view_config):
         """
-        Test that you can add a scaling policy with 'at' schedule and what is returned is
-        dictionary of the ids to the scaling policies
+        Test that you can add a scaling policy with 'at' schedule and what is
+        returned is a list of the scaling policies with their ids
         """
         self.returns = [None]
         expected_at = '2012-10-20T03:23:45'
