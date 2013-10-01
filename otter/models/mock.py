@@ -135,6 +135,7 @@ class MockScalingGroup:
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
             'scalingPolicies': self.policies,
+            'id': self.uuid,
             'state': self.state
         })
 

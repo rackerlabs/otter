@@ -37,8 +37,6 @@ def format_state_dict(state):
         'desiredCapacity': len(state.active) + len(state.pending),
         'name': state.group_name,
         'paused': state.paused,
-        'id': state.group_id,
-        'links': get_autoscale_links(state.tenant_id, state.group_id),
         'active': [
             {
                 'id': key,
@@ -310,7 +308,7 @@ class OtterGroups(object):
                                                       data.get('scalingPolicies', None)))
 
         def _do_obey_config_change(result):
-            group_id = result['state'].group_id
+            group_id = result['id']
             config = result['groupConfiguration']
             group = self.store.get_scaling_group(self.log, self.tenant_id, group_id)
             d = group.modify_state(partial(controller.obey_config_change, self.log,
@@ -320,7 +318,7 @@ class OtterGroups(object):
         deferred.addCallback(_do_obey_config_change)
 
         def _add_to_bobby(result, client):
-            d = client.create_group(self.tenant_id, result['state'].group_id)
+            d = client.create_group(self.tenant_id, result['id'])
             return d.addCallback(lambda _: result)
 
         bobby = get_bobby()
@@ -328,10 +326,11 @@ class OtterGroups(object):
             deferred.addCallback(_add_to_bobby, bobby)
 
         def _format_output(result):
-            uuid = result['state'].group_id
+            uuid = result['id']
             result["state"] = format_state_dict(result["state"])
             request.setHeader(
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
+            result["links"] = get_autoscale_links(self.tenant_id, uuid)
             result["scalingPolicies"] = policy_dict_to_list(
                 result["scalingPolicies"], self.tenant_id, uuid)
             return {"group": result}
@@ -466,7 +465,7 @@ class OtterGroup(object):
         }
         """
         def openstack_formatting(data, uuid):
-
+            data["links"] = get_autoscale_links(self.tenant_id, uuid)
             policies = []
             for policy_id, policy in data["scalingPolicies"].iteritems():
                 policy["id"] = policy_id

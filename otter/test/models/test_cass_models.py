@@ -1426,19 +1426,20 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When viewing the manifest, if the group exists a dictionary with the
         config, launch config, and scaling policies is returned.
         """
-        verified_view.return_value = defer.succeed(
-            {'tenantId': self.tenant_id, "groupId": self.group_id,
-             'group_config': serialize_json_data(self.config, 1.0),
-             'launch_config': serialize_json_data(self.launch_config, 1.0),
-             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}
-        )
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23
+        })
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed({}))
 
         self.assertEqual(self.validate_view_manifest_return_value(), {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch_config,
+            'id': "12345678g",
             'scalingPolicies': {},
             'state': GroupState(
                 self.tenant_id,
@@ -1828,11 +1829,11 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result['groupConfiguration'], self.config)
         self.assertEqual(result['scalingPolicies'], {})
         self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
         self.assertTrue(isinstance(result['state'], GroupState))
 
         # Verify data argument seperately since data in actual call will have datetime.utcnow
         # which cannot be mocked or predicted.
-
         data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(data.pop('created_at'), datetime))
         self.assertEqual(expectedData, data)
@@ -1877,6 +1878,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(result['groupConfiguration'], self.config)
         self.assertEqual(result['scalingPolicies'], {self.mock_key.return_value: policy})
         self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
         self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
@@ -1930,14 +1932,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                    self.config, self.launch,
                                                    policies)
 
-        called_data = self.connection.execute.call_args[0][1]
-        self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
-        self.assertEqual(called_data, expectedData)
-
         self.assertEqual(result['groupConfiguration'], self.config)
         self.assertEqual(result['scalingPolicies'], dict(zip(('2', '3'), policies)))
         self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], '1')
         self.assertTrue(isinstance(result['state'], GroupState))
+
+        called_data = self.connection.execute.call_args[0][1]
+        self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
+        self.assertEqual(called_data, expectedData)
 
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         mock.ANY,

@@ -450,6 +450,7 @@ class CassScalingGroup(object):
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
+                'id': self.uuid,
                 'state': _unmarshal_state(group)
             })
             return d
@@ -982,6 +983,7 @@ class CassScalingGroupCollection:
             'groupConfiguration': config,
             'launchConfiguration': launch,
             'scalingPolicies': outpolicies,
+            'id': scaling_group_id,
             'state': _unmarshal_state(scaling_group_state)
         })
         return d

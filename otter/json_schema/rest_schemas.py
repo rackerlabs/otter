@@ -143,7 +143,7 @@ group_state = _openstackify_schema("group", {
         }
     },
     'additionalProperties': False
-}, include_id=True)
+})
 
 _list_of_states = {
     'type': 'array',
@@ -211,7 +211,7 @@ create_and_manifest_response = _openstackify_schema("group", {
         "state": deepcopy(group_state)['properties']['group']
     },
     "additionalProperties": False
-})
+}, include_id=True)
 
 
 # ----- schemas for viewing configs

@@ -113,7 +113,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         for key in request_body:
             self.assertEqual(response["group"][key], request_body[key])
         for key in ("id", "links"):
-            self.assertTrue(key in response["group"]['state'])
+            self.assertTrue(key in response["group"])
 
         headers = wrapper.response.headers.getRawHeaders('Location')
         self.assertTrue(headers is not None)

@@ -27,6 +27,10 @@ manifest = {
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
         "state": {},
+        "id": {
+            "type": "string",
+            "required": True
+        },
         "scalingPolicies": {
             "type": "object",
             "patternProperties": {

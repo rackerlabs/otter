@@ -113,6 +113,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result['groupConfiguration'], self.output_config)
         self.assertEqual(result['launchConfiguration'], self.launch_config)
         self.assertEqual(result['scalingPolicies'].values(), self.policies)
+        self.assertEqual(result['id'], '1')
         self.assertEqual(
             result['state'], GroupState(self.tenant_id, '1', '', {}, {}, None, {}, False)
         )
@@ -702,6 +703,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
             'scalingPolicies': dict(zip(('2', '3'), policies)),
+            'id': '1',
             'state': GroupState(self.tenant_id, "1", "", {}, {}, "0001-01-01T00:00:00Z", {}, False)
         })
 
@@ -751,7 +753,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assertEqual(self.mock_uuid.call_count, 1)
 
-        uuid = manifest['state'].group_id
+        uuid = manifest['id']
         self.assertEqual(uuid, '1')
 
         mock_sgrp.assert_called_once_with(
@@ -775,7 +777,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
         group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
-                                                  manifest['state'].group_id)
+                                                  manifest['id'])
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
@@ -804,7 +806,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                 self.mock_log, self.tenant_id, self.config, launch, {}))
 
         group = self.collection.get_scaling_group(self.mock_log, self.tenant_id,
-                                                  manifest['state'].group_id)
+                                                  manifest['id'])
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
@@ -872,7 +874,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         manifest = self.successResultOf(
             self.collection.create_scaling_group(
                 self.mock_log, self.tenant_id, self.config, {}))  # empty launch for testing
-        uuid = manifest['state'].group_id
+        uuid = manifest['id']
 
         succeeded_deferreds = self._call_all_methods_on_group(uuid)
         for deferred in succeeded_deferreds:
