@@ -27,16 +27,18 @@ from otter.controller import CannotExecutePolicyError
 from otter import controller
 
 
-def _format_webhook(webhook_id, webhook_model, tenant_id, group_id, policy_id):
+def _format_webhook(webhook_model, tenant_id, group_id, policy_id,
+                    webhook_id=None):
     """
     Take a webhook format that looks like
     :class:`otter.json_schema.model_schemas.view_webhook` and format it to
     instead look like :class:`otter.json_schema.rest_schemas.view_webhook`
     """
-    webhook_model['id'] = webhook_id
+    if webhook_id is not None:
+        webhook_model['id'] = webhook_id
     webhook_model['links'] = get_autoscale_links(
         tenant_id, group_id=group_id, policy_id=policy_id,
-        webhook_id=webhook_id,
+        webhook_id=webhook_model['id'],
         capability_hash=webhook_model['capability']['hash'],
         capability_version=webhook_model['capability']['version'])
     del webhook_model['capability']
@@ -107,12 +109,10 @@ class OtterWebhooks(object):
                 "webhooks_links": []
             }
         """
-        def format_webhooks(webhook_dict):
-            webhook_list = []
-            for webhook_id, webhook_model in webhook_dict.iteritems():
-                webhook_list.append(
-                    _format_webhook(webhook_id, webhook_model, self.tenant_id,
-                                    self.group_id, self.policy_id))
+        def format_webhooks(webhook_list):
+            webhook_list = [_format_webhook(webhook_model, self.tenant_id,
+                                              self.group_id, self.policy_id)
+                            for webhook_model in webhook_list]
 
             return {
                 'webhooks': webhook_list,
@@ -192,17 +192,15 @@ class OtterWebhooks(object):
                 ]
             }
         """
-        def format_webhooks_and_send_redirect(webhook_dict):
+        def format_webhooks_and_send_redirect(webhook_list):
             request.setHeader(
                 "Location",
                 get_autoscale_links(self.tenant_id, self.group_id, self.policy_id, "", format=None)
             )
 
-            webhook_list = []
-            for webhook_id, webhook_model in webhook_dict.iteritems():
-                webhook_list.append(
-                    _format_webhook(webhook_id, webhook_model, self.tenant_id,
-                                    self.group_id, self.policy_id))
+            webhook_list = [_format_webhook(webhook_model, self.tenant_id,
+                                            self.group_id, self.policy_id)
+                            for webhook_model in webhook_list]
 
             return {'webhooks': webhook_list}
 
@@ -267,9 +265,9 @@ class OtterWebhook(object):
             }
         """
         def format_one_webhook(webhook_model):
-            result = _format_webhook(self.webhook_id, webhook_model,
-                                     self.tenant_id, self.group_id,
-                                     self.policy_id)
+            result = _format_webhook(webhook_model, self.tenant_id,
+                                     self.group_id, self.policy_id,
+                                    webhook_id=self.webhook_id)
             return {'webhook': result}
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
