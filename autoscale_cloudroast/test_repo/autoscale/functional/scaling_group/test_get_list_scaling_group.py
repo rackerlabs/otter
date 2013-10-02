@@ -78,7 +78,7 @@ class ScalingGroupListTest(AutoscaleFixture):
         Verify the list group for response code 200, headers and data.
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
-        list_groups = list_groups_response.entity
+        list_groups = (list_groups_response.entity).groups
         self.assertEqual(200, list_groups_response.status_code,
                          msg='The list scaling group call failed with: '
                          '{0}'.format(list_groups_response.content))
@@ -102,7 +102,7 @@ class ScalingGroupListTest(AutoscaleFixture):
         Verify the list group returns entities in sorted order by group ID
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
-        list_groups = list_groups_response.entity
+        list_groups = (list_groups_response.entity).groups
         self.assertEqual(200, list_groups_response.status_code,
                          msg='The list scaling group call failed with: '
                          '{0}'.format(list_groups_response.content))

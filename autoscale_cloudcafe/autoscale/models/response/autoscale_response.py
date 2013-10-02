@@ -89,11 +89,6 @@ class Group(AutoMarshallingModel):
         json_dict = json.loads(serialized_str)
         if 'groupConfiguration' in json_dict.keys():
             ret = cls._dict_to_obj(json_dict['groupConfiguration'])
-        if 'groups' in json_dict.keys():
-            ret = []
-            for group in json_dict['groups']:
-                s = cls._dict_to_obj(group)
-                ret.append(s)
         if 'group' in json_dict.keys():
             ret = cls._dict_to_obj(json_dict['group'])
         return ret
@@ -117,6 +112,74 @@ class Group(AutoMarshallingModel):
                 newkey = re.split('}', each)[1]
                 setattr(group, newkey, group_dict[each])
         return group
+
+
+class Groups(AutoMarshallingModel):
+    """
+    works for list scaling groups
+    """
+
+    def __init__(self, **kwargs):
+        super(Groups, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of a Group based on the json serialized_str
+        passed in.
+        """
+        json_dict = json.loads(serialized_str)
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, groups_dict):
+        """
+        Helper method to turn dictionary into Group instance.
+        """
+        groups = Groups(**groups_dict)
+        if hasattr(groups, 'groups_links'):
+            groups.groups_links = Links._dict_to_obj(groups.groups_links)
+            #print groups.groups_links
+        if hasattr(groups, 'groups'):
+            groups.groups = ListGroups._json_to_obj(groups.groups)
+        return groups
+
+
+class ListGroups(AutoMarshallingModel):
+    """
+    Marshalling for group state's active state
+    """
+
+    def __init__(self, **kwargs):
+        super(ListGroups, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        ret = []
+        for k in serialized_str:
+            s = cls._dict_to_obj(k)
+            ret.append(s)
+        return ret
+
+    @classmethod
+    def _dict_to_obj(cls, list_group_dict):
+        """
+        Helper method to turn dictionary into Group instance
+        """
+        list_group = ListGroups(**list_group_dict)
+        if hasattr(list_group, 'links'):
+            list_group.links = Links._dict_to_obj(list_group.links)
+        if hasattr(list_group, 'active'):
+            list_group.active = Active._json_to_obj(list_group.active)
+        for each in list_group_dict:
+            if each.startswith('{'):
+                newkey = re.split('}', each)[1]
+                setattr(list_group, newkey, list_group_dict[each])
+        return list_group
 
 
 class Config(AutoMarshallingModel):
