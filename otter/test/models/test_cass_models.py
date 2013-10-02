@@ -1089,8 +1089,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     def test_add_webhooks_valid_policy_check_return_value(self, mock_get_policy):
         """
         When adding one or more webhooks is successful, what is returned is a
-        dictionary of the webhook ids to the webhooks, which include capability
-        info and metadata.
+        list of the webhooks with ids, which include capability info and
+        metadata.
         """
         mock_ids = ['100001', '100002']
 
@@ -1122,8 +1122,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     def test_add_webhooks_valid_policy_check_query(self, mock_get_policy):
         """
         When adding one or more webhooks is successful, what is returned is a
-        dictionary of the webhook ids to the webhooks, which include capability
-        info and metadata.
+        list of the webhooks with ids, which include capability info and
+        metadata.
         """
         mock_ids = ['100001', '100002']
 
