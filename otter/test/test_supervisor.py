@@ -255,12 +255,11 @@ class DeleteServerTests(SupervisorTests):
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
 
-        d = self.supervisor.execute_delete_server(self.log, 'transaction-id',
-                                              self.group, self.fake_server)
+        d = self.supervisor.execute_delete_server(
+            self.log, 'transaction-id', self.group, self.fake_server)
 
         f = self.failureResultOf(d, ValueError)
         self.assertEqual(f.value, expected)
-
 
 
 class ValidateLaunchConfigTests(SupervisorTests):
