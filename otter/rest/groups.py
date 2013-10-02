@@ -12,12 +12,13 @@ from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+                                   with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
-from otter.rest.policies import OtterPolicies, policy_dict_to_list
+from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util.http import (get_autoscale_links, transaction_id,
+                             get_new_paginate_query_args)
 from otter.rest.bobby import get_bobby
 
 
@@ -62,7 +63,8 @@ class OtterGroups(object):
     @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_all_scaling_groups(self, request):
+    @paginatable
+    def list_all_scaling_groups(self, request, paginate):
         """
         Lists all the autoscaling groups and their states per for a given tenant ID.
 
@@ -99,18 +101,30 @@ class OtterGroups(object):
                 "paused": false
               }
             ],
-            "groups_links": []
+            "groups_links": [
+              {
+                "href" : "http://dfw.<...>/v1.0/010101/groups/?limit=1&marker={groupId2}"
+                "rel" : "next"
+              }
+            ]
           }
-
-        TODO:
         """
         def format_list(group_states):
+            groups = [format_state_dict(state) for state in group_states]
+            new_query_args = get_new_paginate_query_args(paginate, groups)
+            next_links = []
+            if new_query_args is not None:
+                next_links = get_autoscale_links(
+                    self.tenant_id, query_params=new_query_args)
+                next_links[0]['rel'] = 'next'
+
             return {
-                "groups": [format_state_dict(state) for state in group_states],
-                "groups_links": []
+                "groups": groups,
+                "groups_links": next_links
             }
 
-        deferred = self.store.list_scaling_group_states(self.log, self.tenant_id)
+        deferred = self.store.list_scaling_group_states(
+            self.log, self.tenant_id, **paginate)
         deferred.addCallback(format_list)
         deferred.addCallback(json.dumps)
         return deferred
@@ -332,8 +346,7 @@ class OtterGroups(object):
             request.setHeader(
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
-            result["scalingPolicies"] = policy_dict_to_list(
-                result["scalingPolicies"], self.tenant_id, uuid)
+            linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
             return {"group": result}
 
         deferred.addCallback(_format_output)
@@ -467,15 +480,7 @@ class OtterGroup(object):
         """
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
-
-            policies = []
-            for policy_id, policy in data["scalingPolicies"].iteritems():
-                policy["id"] = policy_id
-                policy["links"] = get_autoscale_links(self.tenant_id, uuid, policy_id)
-                policies.append(policy)
-
-            data["scalingPolicies"] = policies
-
+            linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
             return {"group": data}
 
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
