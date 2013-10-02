@@ -111,7 +111,7 @@ class OtterWebhooks(object):
         """
         def format_webhooks(webhook_list):
             webhook_list = [_format_webhook(webhook_model, self.tenant_id,
-                                              self.group_id, self.policy_id)
+                                            self.group_id, self.policy_id)
                             for webhook_model in webhook_list]
 
             return {
@@ -267,7 +267,7 @@ class OtterWebhook(object):
         def format_one_webhook(webhook_model):
             result = _format_webhook(webhook_model, self.tenant_id,
                                      self.group_id, self.policy_id,
-                                    webhook_id=self.webhook_id)
+                                     webhook_id=self.webhook_id)
             return {'webhook': result}
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
