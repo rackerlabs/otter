@@ -19,55 +19,38 @@ for property_name in group_config['properties']:
     group_config['properties'][property_name]['required'] = True
 
 
+_id = {
+    "type": "string",
+    "required": True
+}
+
+policy = deepcopy(group_schemas.policy)
+policy['properties']['id'] = _id
+for _policy_type in policy['type']:
+    _policy_type['properties']['id'] = {}
+
+policy_list = {
+    "type": "array",
+    "items": policy,
+    "uniqueItems": True,
+    "required": True
+}
+
+
 # create group and view manifest returns a dictionary with keys being the ids
 manifest = {
     "type": "object",
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
+        "id": _id,
+        "state": {},
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
-        "state": {},
-        "id": {
-            "type": "string",
-            "required": True
-        },
-        "scalingPolicies": {
-            "type": "object",
-            "patternProperties": {
-                "^\S+$": {
-                    "type": "object",
-                    "required": True,
-                    "items": [group_schemas.policy]
-                }
-            },
-            "required": True,
-            "additionalProperties": False
-        }
+        "scalingPolicies": policy_list
     },
     "additionalProperties": False
 }
 
-# example:
-# {
-#     "f236a93f-a46d-455c-9403-f26838011522": {
-#         "name": "scale up by 10",
-#         "change": 10,
-#         "cooldown": 5
-#     },
-#     "e27040e5-527e-4710-b8a9-98e5e9aff2f0": {
-#         "name": "scale down by 5.5 percent",
-#         "changePercent": -5.5,
-#         "cooldown": 6
-#     }
-#}
-policy_list = {
-    "type": "object",
-    "patternProperties": {
-        "^\S+$": group_schemas.policy
-    },
-    "required": False,
-    "additionalProperties": False
-}
 
 webhook = deepcopy(group_schemas.webhook)
 webhook['properties']['metadata']['required'] = True

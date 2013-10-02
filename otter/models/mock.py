@@ -131,13 +131,15 @@ class MockScalingGroup:
         if self.config is None:
             return defer.fail(self.error)
 
-        return defer.succeed({
+        d = self.list_policies()
+        d.addCallback(lambda policies: {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': self.policies,
             'id': self.uuid,
-            'state': self.state
+            'state': self.state,
+            'scalingPolicies': policies,
         })
+        return d
 
     def view_config(self):
         """
@@ -210,7 +212,8 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
 
-        return defer.succeed(self.policies)
+        pairs = sorted(self.policies.iteritems(), key=lambda x: x[0])
+        return defer.succeed([dict(id=k, **v) for k, v in pairs])
 
     def get_policy(self, policy_id):
         """
@@ -233,14 +236,15 @@ class MockScalingGroup:
         if self.error is not None:
             return defer.fail(self.error)
 
-        return_data = {}
+        return_data = []
 
         for policy in data:
             policy_id = str(uuid4())
             self.policies[policy_id] = policy
-            return_data[policy_id] = policy
+            return_data.append(policy.copy())
+            return_data[-1]['id'] = policy_id
 
-        return defer.succeed(return_data)
+        return defer.succeed(sorted(return_data, key=lambda x: x['id']))
 
     def update_policy(self, policy_id, data):
         """

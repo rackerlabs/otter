@@ -34,6 +34,9 @@ from otter.util.deferredutils import unwrap_first_error, TimedOutError
 from otter.test.utils import iMock
 from otter.undo import IUndoStack
 
+from otter.rest.bobby import set_bobby
+from otter.bobby import BobbyClient
+
 fake_config = {
     'regionOverrides': {},
     'cloudServersOpenStack': 'cloudServersOpenStack',
@@ -366,6 +369,90 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(real_failure.value.code, 500)
 
 
+class BobbyServerTests(TestCase):
+    """
+    Test server manipulation functions with Bobby present -- will become part of the
+    regular tests later on.
+    """
+    def setUp(self):
+        """
+        Set up test dependencies.
+        """
+        self.log = mock_log()
+        set_config_data(fake_config)
+        self.addCleanup(set_config_data, {})
+
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        patch(self, 'otter.util.http.treq', new=self.treq)
+
+        self.generate_server_name = patch(
+            self,
+            'otter.worker.launch_server_v1.generate_server_name')
+        self.generate_server_name.return_value = 'as000000'
+
+        self.scaling_group_uuid = '1111111-11111-11111-11111111'
+
+        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid, tenant_id='1234')
+
+        self.undo = iMock(IUndoStack)
+
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
+
+    def tearDown(self):
+        """
+        Reset bobby dependencies.
+        """
+        set_bobby(None)
+
+    @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
+    @mock.patch('otter.worker.launch_server_v1.create_server')
+    @mock.patch('otter.worker.launch_server_v1.wait_for_active')
+    @mock.patch('otter.bobby.BobbyClient.create_server', return_value=succeed(''))
+    def test_launch_server_bobby(self, bobby_create_server, wait_for_active, create_server,
+                                 add_to_load_balancers):
+        """
+        launch_server creates a server, waits until the server is active then
+        adds the server's first private IPv4 address to any load balancers.
+        """
+        launch_config = {'server': {'imageRef': '1', 'flavorRef': '1'},
+                         'loadBalancers': [
+                             {'loadBalancerId': 12345, 'port': 80},
+                             {'loadBalancerId': 54321, 'port': 81}
+                         ]}
+
+        server_detail = {
+            'server': {
+                'id': '1',
+                'addresses': {'private': [
+                    {'version': 4, 'addr': '10.0.0.1'}]}}}
+
+        create_server.return_value = succeed(server_detail)
+
+        wait_for_active.return_value = succeed(server_detail)
+
+        add_to_load_balancers.return_value = succeed([
+            (12345, ('10.0.0.1', 80)),
+            (54321, ('10.0.0.1', 81))
+        ])
+
+        d = launch_server(self.log,
+                          'DFW',
+                          self.scaling_group,
+                          fake_service_catalog,
+                          'my-auth-token',
+                          launch_config,
+                          self.undo)
+
+        result = self.successResultOf(d)
+        self.assertEqual(
+            result,
+            (server_detail, [
+                (12345, ('10.0.0.1', 80)),
+                (54321, ('10.0.0.1', 81))]))
+
+        bobby_create_server.assert_called_once_with('1234', self.scaling_group_uuid, '1')
+
+
 class ServerTests(TestCase):
     """
     Test server manipulation functions.
@@ -388,7 +475,7 @@ class ServerTests(TestCase):
 
         self.scaling_group_uuid = '1111111-11111-11111-11111111'
 
-        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid)
+        self.scaling_group = mock.Mock(uuid=self.scaling_group_uuid, tenant_id='1234')
 
         self.undo = iMock(IUndoStack)
 
@@ -824,6 +911,12 @@ class ServerTests(TestCase):
         create_server.return_value = Deferred()
 
         wait_for_active.return_value = succeed(server_details)
+
+        mock_server_response = {'server': {'id': '1',
+                                           'addresses': {'private': [{'version': 4,
+                                                                      'addr': '10.0.0.1'}]}}}
+        mock_lb_response = [(12345, ('10.0.0.1', 80)), (54321, ('10.0.0.1', 81))]
+        add_to_load_balancers.return_value = succeed((mock_server_response, mock_lb_response))
 
         d = launch_server(self.log,
                           'DFW',

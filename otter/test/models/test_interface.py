@@ -266,8 +266,8 @@ class IScalingGroupProviderMixin(object):
 
     def validate_list_policies_return_value(self, *args, **kwargs):
         """
-        Calls ``list_policies``, and validates that it returns a policy
-        dictionary containing the policies mapped to their IDs
+        Calls ``list_policies``, and validates that it returns a list
+        containing the policies with their IDs
 
         :return: the return value of ``list_policies()``
         """
@@ -279,7 +279,7 @@ class IScalingGroupProviderMixin(object):
     def validate_create_policies_return_value(self, *args, **kwargs):
         """
         Calls ``list_policies``, and validates that it returns a policy
-        dictionary containing the policies mapped to their IDs
+        list containing the policies mapped to their IDs
 
         :return: the return value of ``list_policies()``
         """

@@ -64,7 +64,8 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         """
         store = MockScalingGroupCollection()
         self.root = Otter(store).app.resource()
-        set_config_data({'url_root': 'http://127.0.0.1'})
+        set_config_data({'url_root': 'http://127.0.0.1',
+                         'limits': {'pagination': 5}})
         self.addCleanup(set_config_data, {})
 
         self.config = config()[1]
@@ -432,7 +433,7 @@ class MockStoreRestWebhooksTestCase(TestCase):
                 "change": 10,
                 "cooldown": 3,
                 "type": "webhook"
-            }])).keys()[0]
+            }]))[0]['id']
 
         self.webhooks_url = (
             '/v1.0/{tenant}/groups/{group}/policies/{policy}/webhooks/'.format(

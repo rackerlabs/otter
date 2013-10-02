@@ -260,10 +260,10 @@ def get_new_paginate_query_args(old_paginate_query_args, new_data):
         None if there is no next page.
     """
     old_limit = old_paginate_query_args.get(
-        'limit', config_value('limit.pagination'))
+        'limit', config_value('limits.pagination'))
 
     if len(new_data) >= old_limit:
-        return {'limit': old_limit, 'marker': new_data[-1]['id']}
+        return {'limit': old_limit, 'marker': new_data[-1].group_id}
     else:
         return None
 
