@@ -134,8 +134,9 @@ format="SVG" scale="60"/>
         <section xml:id="Resources"
             xmlns:xlink="http://www.w3.org/1999/xlink">
             <title>Additional Resources</title>
-            <para> You can see and experiment with all &PRODNAME; API
-                calls at <link xlink:href="http://docs.autoscale.apiary.io/"
+            <para> You can view and experiment with all &PRODNAME; API
+                calls at <link
+                    xlink:href="http://docs.autoscale.apiary.io/"
                     >http://docs.autoscale.apiary.io/</link>. </para>
             <para>To run the examples in this guide, the following
                 prerequisites are required:</para>
@@ -580,9 +581,88 @@ format="SVG" scale="60"/>
                 <para> For detailed information about the Rackspace
                     Cloud Identity Service, visit <link
                         xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html"
-                        >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html</link>.
-                </para>
+                        >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html</link>.</para>
             </tip>
+            <para>To authenticate access to Rackspace Cloud
+                services, you issue an authentication request to
+                the Rackspace Cloud Identity Service, which is an
+                implementation of the OpenStack Keystone Identity
+                Service v2.0. </para>
+            <important>
+                <para>Multiple Rackspace Cloud Identity Service endpoints exist. You may use any endpoint, regardless of where your account was created. </para>
+            </important>
+            <para>The following table shows a list of valid
+                endpoints:</para>
+            <table rules="all">
+                <caption>Regionalized Service Endpoints</caption>
+            <thead>
+                <tr align="center">
+                    <td colspan="2">Region</td>
+                    <td colspan="5">Endpoint</td>
+                </tr>
+            </thead>
+            <tbody>
+                <tr align="left">
+                    <td colspan="2">US</td>
+                    <td colspan="5"
+                        ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                    </td>
+                </tr>
+                <tr align="left">
+                    <td colspan="2">UK</td>
+                    <td colspan="5"
+                        ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                    </td>
+                </tr>
+                <tr align="left">
+                    <td colspan="2">London (LON)</td>
+                    <td colspan="5">
+                        <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                    </td>
+                </tr>
+                <tr align="left">
+                    <td colspan="2">Sydney (SYD)</td>
+                    <td colspan="5">
+                        <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                    </td>
+                </tr>
+            </tbody>
+            </table>
+    
+            <section xml:id="Authenticate_using_cURL">
+           <title>Authenticate using cURL</title>
+                <para>To authenticate against the Rackspace Autoscale API, you issue a POST request to the appropriate Rackspace Cloud Identity Service endpoint.
+                    
+                    
+                    In the request body, supply one of the following sets of credentials:</para>
+                <para>
+                    <itemizedlist>
+                        <listitem>
+                            <para>user name and password</para>
+                        </listitem>
+                        <listitem>
+                            <para>user name and API key</para>
+                        </listitem>
+                    </itemizedlist>
+                </para>
+                <para>You need to use your username and password to log into the Rackspace Cloud Control Panel.</para>
+                <para>To obtain your API key, log into <link
+                        xlink:href="http://mycloud.rackspace.com."
+                        >http://mycloud.rackspace.com</link>, click
+                    your username, and select <emphasis role="bold"
+                        >API Keys</emphasis> to get your key.</para>
+                <para>
+                    <example>
+                        <title>Authenticate with Username and API Key:
+                            JSON Request</title>
+                        <programlisting> 
+                            $ curl -s https://identity.api.rackspacecloud.com/v2.0/tokens -X 'POST' \
+                                   -d '{"auth":{"RAX-KSKEY:apiKeyCredentials":{"username":"theUserName","apiKey":"0000000000000000000"}}}' \
+                                   -H "Content-Type: application/json" | python -m json.tool </programlisting>
+                    </example>
+                    </para>
+                   
+            </section>
         </section>
         <section xml:id="Save_Image">
             <title>Save an Image</title>
