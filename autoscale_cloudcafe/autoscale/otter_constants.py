@@ -18,3 +18,4 @@ class OtterConstants(object):
     LIMIT_UNIT_ALL = 'MINUTE'
     LIMIT_VALUE_WEBHOOK = 10
     LIMIT_UNIT_WEBHOOK = 'SECOND'
+    PAGINATION_LIMIT = 100
