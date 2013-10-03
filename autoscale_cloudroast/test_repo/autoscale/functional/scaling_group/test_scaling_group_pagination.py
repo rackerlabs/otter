@@ -1,5 +1,6 @@
 """
 Test to verify pagination for a list of groups.
+@TODO: Tests for marker not included
 """
 import unittest
 
@@ -14,12 +15,24 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def setUp(self):
         """
-        Create 10 scaling groups.
+        Create 3 scaling groups.
         """
         super(GroupPaginationTest, self).setUp()
-        self._create_multiple_groups(4)
+        self._create_multiple_groups(3)
         self.total_groups = len(
             (self.autoscale_client.list_scaling_groups().entity).groups)
+
+    def test_list_groups_when_list_groups_is_greater_than_the_limit(self):
+        """
+        List the scaling groups without limit when over 100 groups exist on the group
+        and verify the groups are listed in batches of the set limit with a next link.
+        """
+        self._create_multiple_groups(self.pagination_limit)
+        list_groups = self._list_group_with_given_limit(None)
+        self.assertEquals(len(list_groups.groups), self.pagination_limit)
+        rem_list_group = self.autoscale_client.list_scaling_groups(
+            list_groups.groups_links.next).entity
+        self._assert_list_groups_with_limits(1, rem_list_group)
 
     def test_list_groups_with_limit_less_than_number_of_groups(self):
         """
@@ -57,18 +70,6 @@ class GroupPaginationTest(AutoscaleFixture):
         list_groups = self._list_group_with_given_limit(param)
         self._assert_list_groups_with_limits(self.total_groups, list_groups)
 
-    def test_list_groups_when_list_groups_is_greater_than_the_limit(self):
-        """
-        List the scaling groups without limit when over 100 groups exist on the group
-        and verify the groups are listed in batches of the set limit with a next link.
-        """
-        self._create_multiple_groups(self.pagination_limit)
-        list_groups = self._list_group_with_given_limit(None)
-        self.assertEquals(len(list_groups.groups), self.pagination_limit)
-        rem_list_group = self.autoscale_client.list_scaling_groups(
-            list_groups.groups_links.next).entity
-        self._assert_list_groups_with_limits(1, rem_list_group)
-
     @unittest.skip('PR-398')
     def test_list_groups_with_invalid_limits(self):
         """
@@ -77,6 +78,26 @@ class GroupPaginationTest(AutoscaleFixture):
         params = [0, -1, 'ab', 10000]
         for each in params:
             self._list_group_with_given_limit(params, 400)
+
+    def test_list_groups_with_marker(self):
+        """
+        List the scaling groups with the marker set to be a group ID
+        on the tenant and verify. (incomplete)
+        """
+        group = (self.autoscale_behaviors.create_scaling_group_min()).entity
+        groups_response = self.autoscale_client.list_scaling_groups(marker=group.id)
+        self.assertEquals(groups_response.status_code, 200, msg='list group failed'
+                          ' with {0}'.format(groups_response.status_code))
+
+    def test_list_groups_with_invalid_marker(self):
+        """
+        List the scaling groups with invalid markers and verify. (incomplete)
+        """
+        params = [1, 'invalid']
+        for each_param in params:
+            groups_response = self.autoscale_client.list_scaling_groups(marker=each_param)
+            self.assertEquals(groups_response.status_code, 200, msg='list group failed'
+                              ' with {0}'.format(groups_response.status_code))
 
     def _list_group_with_given_limit(self, param, response=200):
         """
