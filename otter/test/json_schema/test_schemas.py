@@ -299,6 +299,54 @@ class LaunchConfigServerPayloadValidationTests(TestCase):
         self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
                                 validate, self.server, group_schemas.server)
 
+    def test_invalid_personality_object(self):
+        """
+        Invalidates if personality contains object instead of array
+        """
+        self.server['personality'] = {'b': 'lah'}
+        self.assertRaisesRegexp(ValidationError, "{'b': 'lah'} is not of type 'array'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_no_path(self):
+        """
+        Invalidates if personality item does not contain path
+        """
+        del self.server['personality'][0]['path']
+        self.assertRaisesRegexp(ValidationError, "'path' is a required property",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_path_not_string(self):
+        """
+        Invalidates if personality path is not string
+        """
+        self.server['personality'][0]['path'] = 4
+        self.assertRaisesRegexp(ValidationError, "4 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_path_exceeds_255(self):
+        """
+        Invalidates if personality path is > 255 chars
+        """
+        self.server['personality'][0]['path'] = 'abc' * 100
+        self.assertRaisesRegexp(ValidationError, "'{}' is too long".format('abc' * 100),
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_contents_not_string(self):
+        """
+        Invalidates if personality item does not contain contents
+        """
+        self.server['personality'][0]['contents'] = 4
+        self.assertRaisesRegexp(ValidationError, "4 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_no_contents(self):
+        """
+        Invalidates if personality item does not contain contents
+        """
+        del self.server['personality'][0]['contents']
+        self.assertRaisesRegexp(ValidationError, "'contents' is a required property",
+                                validate, self.server, group_schemas.server)
+
 
 class ScalingPolicyTestCase(TestCase):
     """
