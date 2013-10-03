@@ -15,6 +15,14 @@ x-response-id: 66b7d0eb-6f57-4130-8d6e-60231e42ab20
             "minEntities": 0,
             "name": "smallest possible group config"
         },
+        "state": {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "paused": false,
+            "pendingCapacity": 0,
+            "name": "testscalinggroup198547"
+        },
         "id": "847ef1f1-cf4a-4db3-b9ad-9a7424d5e17f",
         "launchConfiguration": {
             "args": {

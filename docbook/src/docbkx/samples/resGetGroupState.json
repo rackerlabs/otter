@@ -19,6 +19,7 @@ x-response-id: 8dc6bfc0-91e7-4fee-8d1a-ee42c1efe15c
             }
         ],
         "paused": false,
-        "pendingCapacity": 0
+        "pendingCapacity": 0,
+        "name": "testscalinggroup198547"
     }
 }
