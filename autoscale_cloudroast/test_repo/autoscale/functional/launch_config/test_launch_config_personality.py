@@ -48,7 +48,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         """
         long_path = ''.join(random.choice(string.ascii_lowercase)
                             for _ in range(260))
-        personality = [{'path': '/{0}/test.txt'.format(long_path),
+        personality = [{'path': '/root/{0}.txt'.format(long_path),
                         'contents': base64.b64encode('tests')}]
         self._create_group_given(personality)
 
@@ -79,7 +79,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         """
         group_response = self.autoscale_behaviors.create_scaling_group_given(
             lc_personality=personality)
-        self.assertEquals(group_response.status.code, response, msg='Create group '
+        self.assertEquals(group_response.status_code, response, msg='Create group '
                           'with invalid lc_personality returned {0} as against '
                           '{1}'.format(group_response.status_code, response))
         if response is 200:
