@@ -271,7 +271,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed({
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
-            'scalingPolicies': {},
+            'scalingPolicies': [],
             'id': '1'
         })
         self.assert_status_code(400, None, 'POST', '{')
@@ -285,7 +285,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed({
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
-            'scalingPolicies': {},
+            'scalingPolicies': [],
             'id': '1'
         })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
@@ -309,7 +309,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         rval = {
             'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': {},
+            'scalingPolicies': [],
             'id': '1'
         }
 
@@ -338,11 +338,12 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
         expected_config.setdefault('metadata', {})
 
+        return_policies = [dict(id=str(i), **p) for i, p in enumerate(policies)]
+
         rval = {
             'groupConfiguration': expected_config,
             'launchConfiguration': launch,
-            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
-                                        [p.copy() for p in policies])),
+            'scalingPolicies': return_policies,
             'id': '1'
         }
 
@@ -472,7 +473,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.mock_store.create_scaling_group.return_value = defer.succeed({
             'groupConfiguration': config,
             'launchConfiguration': launch,
-            'scalingPolicies': {},
+            'scalingPolicies': [],
             'id': '1'
         })
 
@@ -597,7 +598,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         manifest = {
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': {"5": policy_examples()[0]},
+            'scalingPolicies': [dict(id="5", **policy_examples()[0])],
             'id': 'one'
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)

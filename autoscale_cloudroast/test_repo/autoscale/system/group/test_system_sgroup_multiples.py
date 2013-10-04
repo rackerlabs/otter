@@ -4,7 +4,6 @@ System tests for account with multiple scaling groups
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import time
-import unittest
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -47,8 +46,8 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             execute_policies = self.autoscale_client.execute_policy(
                 self.first_scaling_group.id, each['id'])
             self.assertEquals(execute_policies.status_code, 202,
-                              msg='Policy execution failed for group {0} with {1}'.format(
-                              self.first_scaling_group.id, execute_policies.status_code))
+                              msg='Policy execution failed for group {0} with '
+                              '{1}'.format(self.first_scaling_group.id, execute_policies.status_code))
         sp1 = self.gc_min_entities + change
         sp2 = self.autoscale_behaviors.calculate_servers(sp1, percentage)
         sp3 = self.autoscale_behaviors.calculate_servers(sp2, percentage)
@@ -86,13 +85,13 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             execute_webhook = self.autoscale_client.execute_webhook(
                 each_webhook['links'].capability)
             self.assertEquals(execute_webhook.status_code, 202,
-                              msg='Policy webhook execution failed for group {0} with {1}'.format(
-                              self.first_scaling_group.id, execute_webhook.status_code))
+                              msg='Policy webhook execution failed for group {0} with '
+                              '{1}'.format(self.first_scaling_group.id, execute_webhook.status_code))
         time.sleep(10)
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 
-    @unittest.skip('Awaiting absolute limits')
+    @tags(type='one-time')
     def test_system_max_scaling_groups_on_one_account(self):
         """
         The maximum scaling groups an account cannot be more than 1000.
@@ -108,7 +107,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.assertEquals(create_group_beyond_max.status_code, 429,
                           msg='created more than 1000 groups on the tenant')
 
-    @unittest.skip('Awaiting absolute limits')
+    @tags(type='one-time')
     def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
         Verify the maximum scaling policies are allowed on a scaling group.
@@ -121,11 +120,10 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.first_scaling_group.id).entity), self.max_policies)
         policy_beyond_max = self.autoscale_behaviors.create_policy_min(
             self.first_scaling_group.id)
-        print policy_beyond_max
         self.assertEquals(policy_beyond_max['status_code'], 429,
                           msg='Created more than max policies on the group')
 
-    @unittest.skip('Awaiting absolute limits')
+    @tags(type='one-time')
     def test_system_max_scheduler_policies_on_a_scaling_group(self):
         """
         Verify the maximum scaling policies are allowed on a scaling group.
@@ -145,7 +143,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.assertEquals(policy_beyond_max['status_code'], 429,
                           msg='Created more than max policies on the group')
 
-    @unittest.skip('Awaiting absolute limits')
+    @tags(type='one-time')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
         Verify the maximum scaling policies are allowed on a scaling policy.

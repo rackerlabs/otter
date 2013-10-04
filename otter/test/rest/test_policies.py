@@ -44,7 +44,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         If there are no policies for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
         """
-        self.mock_group.list_policies.return_value = defer.succeed({})
+        self.mock_group.list_policies.return_value = defer.succeed([])
         response_body = self.assert_status_code(200)
         self.mock_group.list_policies.assert_called_once()
 
@@ -56,27 +56,27 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         })
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policy_dictionary_gets_translated(self, url_root):
+    def test_policy_dictionary_gets_linkified(self, url_root):
         """
-        When there are policies returned as a dict, a properly formed JSON blob
-        containing ids and links are returned with a 200 (OK) status
+        When policies are returned, a properly formed JSON blob containing ids
+        and links are returned with a 200 (OK) status
         """
-        self.mock_group.list_policies.return_value = defer.succeed({
-            '5': policy_examples()[0]
-        })
+        self.mock_group.list_policies.return_value = defer.succeed(
+            [dict(id='5', **policy_examples()[0])])
         response_body = self.assert_status_code(200)
         self.mock_group.list_policies.assert_called_once()
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
-        expected = policy_examples()[0]
-        expected['id'] = '5'
-        expected['links'] = [
-            {
+        expected = dict(
+            id='5',
+            links=[{
                 'rel': 'self',
                 'href': '/v1.0/11111/groups/1/policies/5/'
-            }
-        ]
+            }],
+            **policy_examples()[0]
+        )
+
         self.assertEqual(resp, {
             "policies": [expected],
             "policies_links": []
@@ -109,9 +109,8 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         """
         Tries to create a set of policies.
         """
-        self.mock_group.create_policies.return_value = defer.succeed({
-            '5': policy_examples()[0]
-        })
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **policy_examples()[0])])
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(policy_examples()[:1]),
             # location header points to the policy list

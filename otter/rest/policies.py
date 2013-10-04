@@ -19,19 +19,12 @@ from otter.util.http import get_autoscale_links, transaction_id
 from otter import controller
 
 
-def policy_dict_to_list(policy_dict, tenantId, groupId):
+def linkify_policy_list(policy_list, tenantId, groupId):
     """
-    Takes dictionary of policies mapping policy ids to the policy blobs, and
-    transforms them into a list of dictionaries that contain the keys 'id' and
-    'links'.
+    Takes list of policies and adds 'links'.
     """
-    policy_list = []
-    for policy_uuid, policy_item in policy_dict.iteritems():
-        policy_item['id'] = policy_uuid
-        policy_item['links'] = get_autoscale_links(
-            tenantId, groupId, policy_uuid)
-        policy_list.append(policy_item)
-    return policy_list
+    for policy in policy_list:
+        policy['links'] = get_autoscale_links(tenantId, groupId, policy['id'])
 
 
 class OtterPolicies(object):
@@ -118,9 +111,10 @@ class OtterPolicies(object):
                 ]
             }
         """
-        def format_policies(policy_dict):
+        def format_policies(policy_list):
+            linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {
-                'policies': policy_dict_to_list(policy_dict, self.tenant_id, self.scaling_group_id),
+                'policies': policy_list,
                 "policies_links": []
             }
 
@@ -188,19 +182,12 @@ class OtterPolicies(object):
             }
         """
 
-        def format_policies_and_send_redirect(policy_dict):
+        def format_policies_and_send_redirect(policy_list):
             request.setHeader(
                 "Location",
                 get_autoscale_links(self.tenant_id, self.scaling_group_id, "", format=None)
             )
-
-            policy_list = []
-            for policy_uuid, policy_item in policy_dict.iteritems():
-                policy_item['id'] = policy_uuid
-                policy_item['links'] = get_autoscale_links(
-                    self.tenant_id, self.scaling_group_id, policy_uuid)
-                policy_list.append(policy_item)
-
+            linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {'policies': policy_list}
 
         def _add_to_bobby(policy_dict, client):
