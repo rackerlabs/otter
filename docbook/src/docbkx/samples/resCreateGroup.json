@@ -47,12 +47,12 @@
       }
     },
     "state": {
-            "active": [],
-            "activeCapacity": 0,
-            "desiredCapacity": 0,
-            "paused": false,
-            "pendingCapacity": 0,
-            "name": "testscalinggroup198547"
+      "active": [],
+      "activeCapacity": 0,
+      "desiredCapacity": 0,
+      "paused": false,
+      "pendingCapacity": 0,
+      "name": "testscalinggroup198547"
     },
     "scalingPolicies": [
       {

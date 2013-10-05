@@ -200,12 +200,16 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_groups_response)
         self.assertEqual(resp, {
             "groups": [{
-                'active': [],
-                'name': '',
-                'activeCapacity': 0,
-                'pendingCapacity': 1,
-                'desiredCapacity': 1,
-                'paused': False,
+                'id': '1',
+                'links': [{'href': 'hey', 'rel': 'self'}],
+                'state': {
+                    'active': [],
+                    'name': '',
+                    'activeCapacity': 0,
+                    'pendingCapacity': 1,
+                    'desiredCapacity': 1,
+                    'paused': False
+                }
             }],
             "groups_links": []
         })

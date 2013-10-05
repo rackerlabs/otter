@@ -8,18 +8,11 @@ x-response-id: 8dc6bfc0-91e7-4fee-8d1a-ee42c1efe15c
 
 {
     "group": {
-        "active": [],
-        "activeCapacity": 0,
-        "desiredCapacity": 0,
-        "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
-        "links": [
-            {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
-                "rel": "self"
-            }
-        ],
         "paused": false,
         "pendingCapacity": 0,
-        "name": "testscalinggroup198547"
+        "name": "testscalinggroup198547",
+        "active": [],
+        "activeCapacity": 0,
+        "desiredCapacity": 0
     }
 }

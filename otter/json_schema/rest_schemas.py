@@ -150,10 +150,12 @@ _list_of_states = {
     'description': "Lists of states with ids and links",
     'required': True,
     'uniqueItems': True,
-    'items': deepcopy(group_state)['properties']['group']
+    'properties': {
+        'state': deepcopy(group_state)['properties']['group']
+    }
 }
 list_groups_response = _openstackify_schema("groups", _list_of_states,
-                                            paginated=True)
+                                            paginated=True, include_id=True)
 
 
 # ----- schemas for viewing policies
