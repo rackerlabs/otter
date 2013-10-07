@@ -141,7 +141,6 @@ class Groups(AutoMarshallingModel):
         groups = Groups(**groups_dict)
         if hasattr(groups, 'groups_links'):
             groups.groups_links = Links._dict_to_obj(groups.groups_links)
-            #print groups.groups_links
         if hasattr(groups, 'groups'):
             groups.groups = ListGroups._json_to_obj(groups.groups)
         return groups
