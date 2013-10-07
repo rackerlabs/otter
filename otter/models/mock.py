@@ -204,7 +204,7 @@ class MockScalingGroup:
         self.launch = data
         return defer.succeed(None)
 
-    def list_policies(self):
+    def list_policies(self, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_policies`
         """
@@ -212,7 +212,9 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         pairs = sorted(self.policies.iteritems(), key=lambda x: x[0])
-        return defer.succeed([dict(id=k, **v) for k, v in pairs])
+        policies = [dict(id=k, **v) for k, v in pairs
+                    if (marker is None or k > marker)]
+        return defer.succeed(policies[:limit])
 
     def get_policy(self, policy_id):
         """
