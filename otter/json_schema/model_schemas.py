@@ -78,7 +78,7 @@ webhook['required'] = True
 
 webhook_list = {
     "type": "array",
-    "items": [webhook],
+    "items": webhook,
     "uniqueItems": True,
     "required": True
 }
