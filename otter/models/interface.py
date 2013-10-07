@@ -339,9 +339,14 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
-    def list_policies():
+    def list_policies(limit=100, marker=None):
         """
         Gets all the policies associated with particular scaling group.
+
+        :param int limit: the maximum number of policies to return
+            (for pagination purposes)
+        :param str marker: the policy ID of the last seen policy (for
+            pagination purposes - page offsets)
 
         :return: a list of the policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
