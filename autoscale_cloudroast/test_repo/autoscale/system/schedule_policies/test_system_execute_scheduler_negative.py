@@ -6,6 +6,7 @@ cron style scheduler policies
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from time import sleep
 from cafe.drivers.unittest.decorators import tags
+from cloudcafe.common.tools.datagen import rand_name
 
 
 class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
@@ -129,6 +130,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
         Create more number of policies than specified in scheduler batch size and verify all
         of them are executed in the batch size specified.
         """
+        lc_name = rand_name('scheduler_batch_size_check')
         at_style_policies_list = []
         size = 1
         at_style_time = self.autoscale_behaviors.get_time_in_utc(10)
@@ -141,7 +143,7 @@ class ExecuteNegativeSchedulerPolicy(AutoscaleFixture):
                 'change': 1}
             at_style_policies_list.append(policy)
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-            lc_name='scheduler_batch_size_check', gc_cooldown=0,
+            lc_name=lc_name, gc_cooldown=0,
             sp_list=at_style_policies_list)
         group = create_group_response.entity
         self.resources.add(group, self.empty_scaling_group)
