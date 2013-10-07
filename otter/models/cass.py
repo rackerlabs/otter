@@ -963,16 +963,16 @@ class CassScalingGroupCollection:
             "created_at": datetime.utcnow()
         }
 
-        scaling_group_state = {
-            "tenantId": tenant_id,
-            "groupId": scaling_group_id,
-            "group_config": json.dumps(config),
-            "active": data['active'],
-            "pending": data['pending'],
-            "policyTouched": data['policyTouched'],
-            "paused": '\x00',
-            "groupTouched": data['created_at']
-        }
+        scaling_group_state = GroupState(
+            tenant_id,
+            scaling_group_id,
+            config['name'],
+            data['active'],
+            data['pending'],
+            data['created_at'],
+            data['policyTouched'],
+            data['paused']
+        )
 
         outpolicies = _build_policies(policies, self.policies_table,
                                       self.event_table, queries, data)
@@ -985,7 +985,7 @@ class CassScalingGroupCollection:
             'launchConfiguration': launch,
             'scalingPolicies': outpolicies,
             'id': scaling_group_id,
-            'state': _unmarshal_state(scaling_group_state)
+            'state': scaling_group_state
         })
         return d
 
