@@ -75,18 +75,18 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_webhooks_response)
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_returned_webhooks_dict_gets_translated(self, mock_url):
+    def test_returned_webhooks_list_gets_translated(self, mock_url):
         """
-        Test that the webhooks dict gets translated into a list of webhooks
-        with ids and links.
+        Test that the webhooks list gets translated with links and capability
+        removed.
         """
         # return two webhook objects
-        self.mock_group.list_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {},
-                  'capability': {'hash': 'xxx', 'version': '1'}},
-            "4": {'name': 'four', 'metadata': {},
-                  'capability': {'hash': 'yyy', 'version': '1'}}
-        })
+        self.mock_group.list_webhooks.return_value = defer.succeed([
+            {'id': '3', 'name': 'three', 'metadata': {},
+             'capability': {'hash': 'xxx', 'version': '1'}},
+            {'id': '4', 'name': 'four', 'metadata': {},
+             'capability': {'hash': 'yyy', 'version': '1'}}
+        ])
         body = self.assert_status_code(200)
         self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
 
@@ -174,12 +174,12 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         Tries to create a set of webhooks.
         """
         creation = [{'name': 'three'}, {'name': 'four'}]
-        self.mock_group.create_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {},
-                  'capability': {'hash': 'xxx', 'version': '1'}},
-            "4": {'name': 'four', 'metadata': {},
-                  'capability': {'hash': 'yyy', 'version': '1'}}
-        })
+        self.mock_group.create_webhooks.return_value = defer.succeed([
+            {'id': '3', 'name': 'three', 'metadata': {},
+             'capability': {'hash': 'xxx', 'version': '1'}},
+            {'id': '4', 'name': 'four', 'metadata': {},
+             'capability': {'hash': 'yyy', 'version': '1'}}
+        ])
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(creation),
             # location header points to the webhooks list
