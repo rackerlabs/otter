@@ -29,17 +29,17 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         file_contents = 'This is a test file.'
         personality = [{'path': '/root/.csivh',
                         'contents': file_contents}]
-        self._create_group_given(personality)
+        self._assert_create_group(personality)
 
     def test_launch_config_personality_with_invalid_personality(self):
         """
         Create a scaling group with invalid personality and verify the creation
         fails with an error 400
         """
-        personality = ['abc', 0, {'path': '/abc'}, {'contents': 'test'},
-                      [{'path': self.path}], [{'content': 'test'}]]
-        for each in personality:
-            self._create_group_given(each)
+        personalities = ['abc', 0, {'path': '/abc'}, {'contents': 'test'},
+                        [{'path': self.path}], [{'content': 'test'}]]
+        for personality in personalities:
+            self._assert_create_group(personality)
 
     def test_launch_config_personality_with_max_path_size(self):
         """
@@ -47,10 +47,10 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         fails with an error 400
         """
         long_path = ''.join(random.choice(string.ascii_lowercase)
-                            for _ in range(260))
+                            for _ in range(self.personality_maxlength + 1))
         personality = [{'path': '/root/{0}.txt'.format(long_path),
                         'contents': base64.b64encode('tests')}]
-        self._create_group_given(personality)
+        self._assert_create_group(personality)
 
     def test_launch_config_personality_with_max_file_content_size(self):
         """
@@ -58,10 +58,10 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         fails with an error 400
         """
         file_content = ''.join(random.choice(string.ascii_lowercase)
-                               for _ in range(1002))
+                               for _ in range(self.personality_file_size + 1))
         personality = [{'path': self.path,
                         'contents': base64.b64encode(file_content)}]
-        self._create_group_given(personality)
+        self._assert_create_group(personality)
 
     def test_launch_config_personality_with_max_personalities(self):
         """
@@ -70,10 +70,10 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         """
         personality_content = {'path': self.path,
                                'contents': base64.b64encode('tests')}
-        personality = [personality_content for _ in range(6)]
-        self._create_group_given(personality)
+        personality = [personality_content for _ in range(self.max_personalities + 1)]
+        self._assert_create_group(personality)
 
-    def _create_group_given(self, personality, response=400):
+    def _assert_create_group(self, personality, response=400):
         """
         Creates a group with the given server personality.
         """
