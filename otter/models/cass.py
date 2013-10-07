@@ -970,7 +970,7 @@ class CassScalingGroupCollection:
             "active": data['active'],
             "pending": data['pending'],
             "policyTouched": data['policyTouched'],
-            "paused": '0',
+            "paused": '\x00',
             "groupTouched": data['created_at']
         }
 
