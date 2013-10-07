@@ -377,7 +377,7 @@ class AutoscaleFixture(BaseTestFixture):
             while time.time() < end_time:
                 delete_response = self.lbaas_client.delete_node(load_balancer, each_node_id)
                 if 'PENDING_UPDATE' in delete_response.text:
-                    time.sleep(1)
+                    time.sleep(2)
                 else:
                     break
             else:
