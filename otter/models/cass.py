@@ -582,7 +582,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def _naive_list_policies(self):
+    def _naive_list_policies(self, limit=None, marker=None):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_policies`, but gets
         all the policies associated with particular scaling group
@@ -592,25 +592,23 @@ class CassScalingGroup(object):
             return [dict(id=row['policyId'], **_jsonloads_data(row['data']))
                     for row in rows]
 
-        query = _cql_list_policy.format(cf=self.policies_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid},
+        # TODO: this is just in place so that pagination in the manifest can
+        # be handled elsewhere
+        if limit is not None:
+            cql, params = _paginated_list(self.tenant_id, self.uuid,
+                                          limit=limit, marker=marker)
+        else:
+            cql = _cql_list_policy
+            params = {"tenantId": self.tenant_id, "groupId": self.uuid}
+
+        d = self.connection.execute(cql.format(cf=self.policies_table), params,
                                     get_consistency_level('list', 'policy'))
         d.addCallback(insert_id)
         return d
 
-    def list_policies(self):
+    def list_policies(self, limit=100, marker=None):
         """
-        Gets all the policies associated with particular scaling group.
-
-        :return: a dict of the policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.list_policies`
         """
         # If there are no policies - make sure it's not because the group
         # doesn't exist
@@ -619,7 +617,7 @@ class CassScalingGroup(object):
                 return self.view_config().addCallback(lambda _: policies_dict)
             return policies_dict
 
-        d = self._naive_list_policies()
+        d = self._naive_list_policies(limit=limit, marker=marker)
         return d.addCallback(_check_if_empty)
 
     def get_policy(self, policy_id):

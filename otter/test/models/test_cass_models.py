@@ -728,6 +728,48 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(r, [])
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
+    def test_naive_list_policies_respects_limit(self):
+        """
+        If there are more than the requested number of policies,
+        ``_naive_list_policies`` only requests the requested number.
+        """
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy2', 'data': '{"_ver": 2}'}]
+        self.returns = [cass_response]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "limit": 2}
+        expectedCql = ('SELECT "policyId", data FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'LIMIT :limit;')
+        d = self.group._naive_list_policies(limit=2)
+        r = self.successResultOf(d)
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_naive_list_policies_offsets_by_marker(self):
+        """
+        If a marker is provided, it is passed into the CQL as a where clause
+        """
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy2', 'data': '{"_ver": 2}'}]
+        self.returns = [cass_response]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "limit": 2,
+                        "marker": 'blah'}
+        expectedCql = ('SELECT "policyId", data FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'AND "policyId" > :marker LIMIT :limit;')
+        d = self.group._naive_list_policies(limit=2, marker="blah")
+        r = self.successResultOf(d)
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
@@ -743,7 +785,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, expected_result)
 
-        mock_naive.assert_called_once_with()
+        mock_naive.assert_called_once_with(limit=100, marker=None)
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -761,8 +803,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, [])
 
-        mock_naive.assert_called_once_with()
+        mock_naive.assert_called_once_with(limit=100, marker=None)
         mock_view_config.assert_called_with()
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    def test_list_policies_passes_limit_and_marker(self, mock_naive, _):
+        """
+        List policies calls naive list policies, and doesn't call view config
+        if there are existing policies
+        """
+        expected_result = [{'id': 'policy1'}, {'id': 'policy2'}]
+        mock_naive.return_value = defer.succeed(expected_result)
+
+        d = self.group.list_policies(limit=5, marker='blah')
+        r = self.successResultOf(d)
+        self.assertEqual(r, expected_result)
+
+        mock_naive.assert_called_once_with(limit=5, marker='blah')
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
@@ -782,12 +841,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When listing the policies, any version information is removed from the
         final output
         """
-        cass_response = [{'policyId': 'group1', 'data': '{"_ver": 5}'},
-                         {'policyId': 'group3', 'data': '{"_ver": 2}'}]
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy3', 'data': '{"_ver": 2}'}]
         self.returns = [cass_response]
         d = self.group.list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, [{'id': 'group1'}, {'id': 'group3'}])
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy3'}])
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
