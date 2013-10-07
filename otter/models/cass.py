@@ -958,22 +958,21 @@ class CassScalingGroupCollection:
             "launch_config": serialize_json_data(launch, 1),
             "active": '{}',
             "pending": '{}',
+            "created_at": datetime.utcnow(),
             "policyTouched": '{}',
-            "paused": False,
-            "created_at": datetime.utcnow()
+            "paused": False
         }
 
         scaling_group_state = GroupState(
             tenant_id,
             scaling_group_id,
             config['name'],
-            data['active'],
-            data['pending'],
+            {},
+            {},
             data['created_at'],
-            data['policyTouched'],
+            {},
             data['paused']
         )
-
         outpolicies = _build_policies(policies, self.policies_table,
                                       self.event_table, queries, data)
 
