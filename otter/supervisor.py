@@ -144,7 +144,6 @@ class SupervisorService(object, Service):
 
         # authenticate for tenant
         def when_authenticated((auth_token, service_catalog)):
-            log.msg('Deleting server')
             return launch_server_v1.delete_server(
                 log,
                 config_value('region'),
@@ -155,8 +154,6 @@ class SupervisorService(object, Service):
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
-        d.addCallback(lambda _: log.msg('Server deleted successfully'))
-        d.addErrback(log.err, 'Server deletion failed')
 
         return d
 
