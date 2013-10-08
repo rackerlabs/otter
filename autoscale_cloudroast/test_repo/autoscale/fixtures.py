@@ -110,6 +110,9 @@ class AutoscaleFixture(BaseTestFixture):
         cls.limit_unit_all = OtterConstants.LIMIT_UNIT_ALL
         cls.limit_value_webhook = OtterConstants.LIMIT_VALUE_WEBHOOK
         cls.limit_unit_webhook = OtterConstants.LIMIT_UNIT_WEBHOOK
+        cls.personality_maxlength = OtterConstants.PERSONALITY_MAXLENGTH
+        cls.max_personalities = OtterConstants.PERSONALITIES_PER_SERVER
+        cls.personality_max_file_size = OtterConstants.PERSONAITY_FILE_SIZE
         cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
         cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
