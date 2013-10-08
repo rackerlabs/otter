@@ -44,6 +44,7 @@ manifest = {
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
         "id": _id,
+        "state": {},
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": policy_list

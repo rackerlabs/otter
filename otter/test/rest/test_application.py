@@ -280,7 +280,7 @@ class PaginationQueryArgGenerationTestCase(TestCase):
         after, hence no need for a next page, and so no query args are returned.
         """
         result = get_new_paginate_query_args(
-            {'limit': 50, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+            {'limit': 50, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
         self.assertIsNone(result)
 
     def test_new_marker_if_too_much_data(self):
@@ -289,7 +289,7 @@ class PaginationQueryArgGenerationTestCase(TestCase):
         probably another page of data, so a new marker is returned
         """
         result = get_new_paginate_query_args(
-            {'limit': 5, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+            {'limit': 5, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
         self.assertEqual(result.get('marker'), '4')
 
     def test_respects_previous_limit(self):
@@ -298,7 +298,7 @@ class PaginationQueryArgGenerationTestCase(TestCase):
         marker
         """
         result = get_new_paginate_query_args(
-            {'limit': 5, 'marker': 'meh'}, [{'id': str(i)} for i in range(5)])
+            {'limit': 5, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
         self.assertEqual(result.get('limit'), 5)
 
     def test_default_limit_if_no_previous_limit(self):
@@ -309,7 +309,7 @@ class PaginationQueryArgGenerationTestCase(TestCase):
         set_config_data({'limits': {'pagination': 3}})
 
         result = get_new_paginate_query_args(
-            {}, [{'id': str(i)} for i in range(3)])
+            {}, [mock.Mock(group_id=str(i)) for i in range(5)])
         self.assertEqual(result.get('limit'), 3)
 
 

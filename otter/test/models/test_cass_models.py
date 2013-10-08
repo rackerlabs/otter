@@ -1488,20 +1488,32 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When viewing the manifest, if the group exists a dictionary with the
         config, launch config, and scaling policies is returned.
         """
-        verified_view.return_value = defer.succeed(
-            {'group_config': serialize_json_data(self.config, 1.0),
-             'launch_config': serialize_json_data(self.launch_config, 1.0)})
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23
+        })
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed([]))
 
-        self.assertEqual(self.validate_view_manifest_return_value(),
-                         {'groupConfiguration': self.config,
-                          'launchConfiguration': self.launch_config,
-                          'scalingPolicies': [],
-                          'id': "12345678g"})
+        self.assertEqual(self.validate_view_manifest_return_value(), {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': [],
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '123',
+                {'PT': 'R'}, False)
+        })
+
         self.group._naive_list_policies.assert_called_once_with()
 
-        view_cql = ('SELECT group_config, launch_config, active, '
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
@@ -1539,7 +1551,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return_value=defer.succeed({}))
         r = self.group.view_manifest()
         self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = ('SELECT group_config, launch_config, active, '
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
@@ -1877,12 +1889,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch)
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': [],
-            'id': self.mock_key.return_value
-        })
+
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], [])
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         # Verify data argument seperately since data in actual call will have datetime.utcnow
         # which cannot be mocked or predicted.
@@ -1926,16 +1938,13 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    [policy])
-
         expected_policy = policy.copy()
         expected_policy['id'] = self.mock_key.return_value
-
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': [expected_policy],
-            'id': self.mock_key.return_value
-        })
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], [expected_policy])
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
@@ -1987,16 +1996,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    policies)
-
         policies[0]['id'] = '2'
         policies[1]['id'] = '3'
 
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': policies,
-            'id': '1'
-        })
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], policies)
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], '1')
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))

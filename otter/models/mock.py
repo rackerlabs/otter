@@ -134,8 +134,9 @@ class MockScalingGroup:
         d.addCallback(lambda policies: {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
+            'id': self.uuid,
+            'state': self.state,
             'scalingPolicies': policies,
-            'id': self.uuid
         })
         return d
 
@@ -410,7 +411,6 @@ class MockScalingGroupCollection:
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid, self,
             {'config': config, 'launch': launch, 'policies': policies})
-
         return self.data[tenant][uuid].view_manifest()
 
     def list_scaling_group_states(self, log, tenant, limit=100, marker=None):
