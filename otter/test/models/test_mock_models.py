@@ -104,6 +104,15 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         self.collection.data[self.tenant_id]['1'] = self.group
 
+        self.counter = 0
+
+        def generate_uuid():
+            self.counter += 1
+            return self.counter
+
+        self.mock_uuid = patch(self, 'otter.models.mock.uuid4',
+                               side_effect=generate_uuid)
+
     def test_view_manifest_has_all_info(self):
         """
         View manifest should return a dictionary that conforms to the JSON
@@ -323,6 +332,33 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
 
         for a_policy in self.policies:
             self.assertIn(a_policy, policies)
+
+    def test_list_policies_limits_number_of_policies(self):
+        """
+        Listing all policies limits the number of policies by the limit
+        specified
+        """
+        self.policies = group_examples.policy()[:3]
+        self.group = MockScalingGroup(
+            self.mock_log, self.tenant_id, self.group_id, self.collection,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': self.policies})
+
+        policies = self.validate_list_policies_return_value(limit=2)
+        self.assertEqual([p['id'] for p in policies], ['1', '2'])
+
+    def test_list_policies_offsets_by_marker(self):
+        """
+        Listing all policies will offset the list by the last seen parameter
+        """
+        self.policies = group_examples.policy()[:3]
+        self.group = MockScalingGroup(
+            self.mock_log, self.tenant_id, self.group_id, self.collection,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': self.policies})
+
+        policies = self.validate_list_policies_return_value(limit=2, marker='1')
+        self.assertEqual([p['id'] for p in policies], ['2', '3'])
 
     def test_get_policy_succeeds(self):
         """
