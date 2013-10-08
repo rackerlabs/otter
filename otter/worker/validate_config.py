@@ -4,13 +4,16 @@ Contains code to validate launch config
 
 from twisted.internet import defer
 import treq
-import base64
+import base64, re
 import itertools
 
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
                              RequestError, APIError, wrap_request_error)
+
+
+b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
 
 
 class InvalidLaunchConfiguration(Exception):
@@ -209,6 +212,8 @@ def validate_personality(log, auth_token, server_endpoint, personality):
     encoded_contents = []
     try:
         for file in personality:
+            if not b64_chars_re.match(file['contents']):
+                raise TypeError
             encoded_contents.append(base64.standard_b64decode(str(file['contents'])))
     except TypeError:
         d.cancel()

@@ -289,6 +289,17 @@ class ValidatePersonalityTests(TestCase):
             f.value.message,
             'Invalid base64 encoding for contents of path "/etc/banner.txt"')
 
+    def test_invalid_base64_chars(self):
+        """
+        Fails when content is having non-base64 characters but is valid encoding
+        """
+        self.personality[0]['contents'] = '()()'
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        f = self.failureResultOf(d, InvalidBase64Encoding)
+        self.assertEqual(
+            f.value.message,
+            'Invalid base64 encoding for contents of path "/etc/banner.txt"')
+
     def test_exceeds_max_personality(self):
         """
         Fails when number of files in personality exceeds max limit
