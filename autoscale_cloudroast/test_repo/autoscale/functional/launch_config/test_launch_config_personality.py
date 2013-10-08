@@ -2,10 +2,12 @@
 Test for launch config's personality validation.
 """
 import base64
+import unittest
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
+@unittest.skip('Not implemented')
 class LaunchConfigPersonalityTest(AutoscaleFixture):
 
     """
