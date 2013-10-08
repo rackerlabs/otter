@@ -118,19 +118,320 @@
                 This operation creates an autoscaling group.
             </para>
             <para>
-                This operation creates an autoscaling group. To create a scaling group,  
-                specify the scaling group
-                configuration, launch configuration, and optional scaling policies in the request body in JSON format. 
-                If the group is created successfuly, the response body describes the created group in JSON format. The response includes an ID and
-                links for the group.
+                This operation creates an autoscaling group or a collection of servers and load balancers that are managed by a scaling policy. 
+                To describe the group you wish to create, specify the scaling group configuration, launch configuration, and optional scaling 
+                policies in the request body in JSON format. For a successful request, the response body describes 
+                the created group in JSON format. The response includes an ID and links for the group.
             </para>
         </wadl:doc>
         <request>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
+                <wadl:doc xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+                    <p>The request is divided into three top-level sections:
+                        <ul>
+                            <li><code>launchConfiguration</code></li>
+                            <li><code>groupConfiguration</code></li>
+                            <li><code>scalingPolicies</code></li>
+                        </ul>
+                        More narrative description could go here.
+                    </p>
                     <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
-                </doc>
-                
+                </wadl:doc>
+                <param name="group" style="plain" path="$['group']" required="true">
+                    <doc>Wrapper for the request.</doc>
+                </param>
+                <param name="launchConfiguration"
+                    style="plain"
+                    path="$['group']['launchConfiguration']"
+                    required="true">
+                    <doc>One of three top-level sections. This section defines the configuration for the items controlled by this group.
+                    </doc>
+                </param>
+                <param name="args"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']"
+                    required="true">
+                    <doc>
+                        The arguments passed in to the launch configuration.
+                    </doc>
+                </param>
+                <param name="loadBalancers"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']">
+                    <doc>
+                        An array of load balancers.
+                    </doc>
+                </param>
+                <param name="port"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']['port']">
+                    <doc>
+                        The port for a load balancer.
+                    </doc>
+                </param>
+                <param name="loadBalancerId"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']['loadBalancerId']">
+                    <doc>
+                        The load balancer id. 
+                    </doc>
+                </param>
+                <param name="server"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="imageRef"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['imageRef']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="flavorRef"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['flavorRef']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="diskConfig"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['diskConfig']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="personality"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="path"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']['path']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="contents"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']['contents']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="networks"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="uuid"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']['uuid']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="networks"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="uuid"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']['uuid']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="metadata"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="build_config"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['build_config']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="meta_key_1"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['meta_key_1']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="meta_key_2"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['meta_key_2']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="type"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['type']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="groupConfiguration"
+                    style="plain"
+                    path="$['group']['groupConfiguration']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="maxEntities"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['maxEntities']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="cooldown"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['cooldown']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="minEntities"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['minEntities']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="metadata"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="gc_meta_key_2"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']['gc_meta_key_2']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="gc_meta_key_1"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']['gc_meta_key_1']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="scalingPolicies"
+                    style="plain"
+                    path="$['group']['scalingPolicies']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="links"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="href"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']['href']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="rel"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']['rel']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="cooldown"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['cooldown']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="type"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['type']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="id" style="plain" path="$['group']['scalingPolicies']['id']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="change"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['change']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="links" style="plain" path="$['group']['links']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="href" style="plain" path="$['group']['links']['href']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="rel" style="plain" path="$['group']['links']['rel']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="id" style="plain" path="$['group']['id']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
             </representation>
         </request>
         <response status="201">

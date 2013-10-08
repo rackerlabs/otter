@@ -190,18 +190,24 @@ def paginatable(f):
     query args.  This decorator validates them and puts them into a pagination
     dictionary.  It also sets a default limit based on the config value for
     the pagination limit, if no query argument for limit is passed.
+
+    If a pagination limit is passed that exceeds the hard limit or is less than
+    1, it is coerced into the correct range.
     """
     @wraps(f)
     def _(self, request, *args, **kwargs):
         paginate = {}
+        hard_limit = config_value('limits.pagination')
         if 'limit' in request.args:
             try:
                 paginate['limit'] = int(request.args['limit'][0])
             except:
                 return defer.fail(InvalidQueryArgument(
                     'Invalid query argument for "limit"'))
+
+            paginate['limit'] = max(min(paginate['limit'], hard_limit), 1)
         else:
-            paginate['limit'] = config_value('limits.pagination')
+            paginate['limit'] = hard_limit
 
         if 'marker' in request.args:
             paginate['marker'] = request.args['marker'][0]
