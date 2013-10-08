@@ -2,8 +2,6 @@
 Test for launch config's personality validation.
 """
 import base64
-import random
-import string
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
@@ -46,8 +44,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         Create a scaling group with path over 255 characters and verify the creation
         fails with an error 400
         """
-        long_path = ''.join(random.choice(string.ascii_lowercase)
-                            for _ in range(self.personality_maxlength + 1))
+        long_path = 'z' * (self.personality_maxlength + 1)
         personality = [{'path': '/root/{0}.txt'.format(long_path),
                         'contents': base64.b64encode('tests')}]
         self._assert_create_group(personality)
@@ -57,8 +54,7 @@ class LaunchConfigPersonalityTest(AutoscaleFixture):
         Create a scaling group with file contents over 1000 characters and verify the creation
         fails with an error 400
         """
-        file_content = ''.join(random.choice(string.ascii_lowercase)
-                               for _ in range(self.personality_file_size + 1))
+        file_content = 'z' * (self.personality_max_file_size + 1)
         personality = [{'path': self.path,
                         'contents': base64.b64encode(file_content)}]
         self._assert_create_group(personality)
