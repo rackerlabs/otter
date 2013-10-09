@@ -49,7 +49,7 @@ class GroupPaginationTest(AutoscaleFixture):
             list_group.groups_links.next).entity
         self._assert_list_groups_with_limits(1, rem_list_group)
 
-    @unittest.skip('fails')
+    @unittest.skip('AUTO-700')
     def test_list_groups_with_limit_equal_to_number_of_groups(self):
         """
         List the scaling groups with the limit set to be equal to the number of groups
@@ -82,7 +82,7 @@ class GroupPaginationTest(AutoscaleFixture):
     def test_list_groups_with_marker(self):
         """
         List the scaling groups with the marker set to be a group ID
-        on the tenant and verify. (incomplete)
+        on the tenant and verify.
         """
         group = (self.autoscale_behaviors.create_scaling_group_min()).entity
         groups_response = self.autoscale_client.list_scaling_groups(marker=group.id)
@@ -91,7 +91,8 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def test_list_groups_with_invalid_marker(self):
         """
-        List the scaling groups with invalid markers and verify. (incomplete)
+        List the scaling groups with invalid markers and verify.
+        (Currently Otter is not checking the validity of the marker)
         """
         params = [1, 'invalid']
         for each_param in params:
@@ -101,7 +102,7 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def _list_group_with_given_limit(self, param, response=200):
         """
-        Lists groups with given limit and verifies they are successfull
+        Lists groups with given limit and verifies they are successful
         """
         groups_response = self.autoscale_client.list_scaling_groups(limit=param)
         self.assertEquals(groups_response.status_code, response, msg='list group failed'
