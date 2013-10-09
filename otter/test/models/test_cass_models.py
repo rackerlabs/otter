@@ -728,6 +728,48 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(r, [])
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
+    def test_naive_list_policies_respects_limit(self):
+        """
+        If there are more than the requested number of policies,
+        ``_naive_list_policies`` only requests the requested number.
+        """
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy2', 'data': '{"_ver": 2}'}]
+        self.returns = [cass_response]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "limit": 2}
+        expectedCql = ('SELECT "policyId", data FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'LIMIT :limit;')
+        d = self.group._naive_list_policies(limit=2)
+        r = self.successResultOf(d)
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_naive_list_policies_offsets_by_marker(self):
+        """
+        If a marker is provided, it is passed into the CQL as a where clause
+        """
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy2', 'data': '{"_ver": 2}'}]
+        self.returns = [cass_response]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "limit": 2,
+                        "marker": 'blah'}
+        expectedCql = ('SELECT "policyId", data FROM scaling_policies '
+                       'WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
+                       'AND "policyId" > :marker LIMIT :limit;')
+        d = self.group._naive_list_policies(limit=2, marker="blah")
+        r = self.successResultOf(d)
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy2'}])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
@@ -743,7 +785,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, expected_result)
 
-        mock_naive.assert_called_once_with()
+        mock_naive.assert_called_once_with(limit=100, marker=None)
         self.assertEqual(len(mock_view_config.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
@@ -761,8 +803,25 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.successResultOf(d)
         self.assertEqual(r, [])
 
-        mock_naive.assert_called_once_with()
+        mock_naive.assert_called_once_with(limit=100, marker=None)
         mock_view_config.assert_called_with()
+
+    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
+    def test_list_policies_passes_limit_and_marker(self, mock_naive, _):
+        """
+        List policies calls naive list policies, and doesn't call view config
+        if there are existing policies
+        """
+        expected_result = [{'id': 'policy1'}, {'id': 'policy2'}]
+        mock_naive.return_value = defer.succeed(expected_result)
+
+        d = self.group.list_policies(limit=5, marker='blah')
+        r = self.successResultOf(d)
+        self.assertEqual(r, expected_result)
+
+        mock_naive.assert_called_once_with(limit=5, marker='blah')
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.fail(NoSuchScalingGroupError('t', 'g')))
@@ -782,12 +841,12 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When listing the policies, any version information is removed from the
         final output
         """
-        cass_response = [{'policyId': 'group1', 'data': '{"_ver": 5}'},
-                         {'policyId': 'group3', 'data': '{"_ver": 2}'}]
+        cass_response = [{'policyId': 'policy1', 'data': '{"_ver": 5}'},
+                         {'policyId': 'policy3', 'data': '{"_ver": 2}'}]
         self.returns = [cass_response]
         d = self.group.list_policies()
         r = self.successResultOf(d)
-        self.assertEqual(r, [{'id': 'group1'}, {'id': 'group3'}])
+        self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy3'}])
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_config',
                 return_value=defer.succeed({}))
@@ -1089,8 +1148,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     def test_add_webhooks_valid_policy_check_return_value(self, mock_get_policy):
         """
         When adding one or more webhooks is successful, what is returned is a
-        dictionary of the webhook ids to the webhooks, which include capability
-        info and metadata.
+        list of the webhooks with ids, which include capability info and
+        metadata.
         """
         mock_ids = ['100001', '100002']
 
@@ -1104,24 +1163,26 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             [{'name': 'a name'}, {'name': 'new name', 'metadata': {"k": "v"}}])
 
         capability = {"hash": 'hash', "version": 'ver'}
-        expected_results = {
-            '100001': {'name': 'a name',
-                       'metadata': {},
-                       'capability': capability},
-            '100002': {'name': 'new name',
-                       'metadata': {"k": "v"},
-                       'capability': capability}
-        }
+        expected_results = [
+            {'id': '100001',
+             'name': 'a name',
+             'metadata': {},
+             'capability': capability},
+            {'id': '100002',
+             'name': 'new name',
+             'metadata': {"k": "v"},
+             'capability': capability}
+        ]
 
-        self.assertEqual(result, dict(expected_results))
+        self.assertEqual(result, expected_results)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
     def test_add_webhooks_valid_policy_check_query(self, mock_get_policy):
         """
         When adding one or more webhooks is successful, what is returned is a
-        dictionary of the webhook ids to the webhooks, which include capability
-        info and metadata.
+        list of the webhooks with ids, which include capability info and
+        metadata.
         """
         mock_ids = ['100001', '100002']
 
@@ -1186,7 +1247,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
         """
-        Naive list webhooks produces a valid dictionary as per
+        Naive list webhooks produces a valid list as per
         :data:`otter.json_schema.model_schemas.webhook_list`, whether or not
         the policy is invalid
         """
@@ -1212,8 +1273,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             "hash": "hash"
         }
 
-        self.assertEqual(r, {'webhook1': expected_data,
-                             'webhook2': expected_data})
+        self.assertEqual(r, [dict(id='webhook1', **expected_data),
+                             dict(id='webhook2', **expected_data)])
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
@@ -1223,13 +1284,13 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_empty_list(self, mock_get_policy):
         """
-        If there are no webhooks, list webhooks produces an empty dictionary
+        If there are no webhooks, list webhooks produces an empty list
         even if the policy were invalid
         """
         self.returns = [[]]
         r = self.successResultOf(
             self.group._naive_list_webhooks('23456789'))
-        self.assertEqual(r, {})
+        self.assertEqual(r, [])
         self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
@@ -1245,10 +1306,10 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             'version': 'ver',
             'hash': 'hash'
         }
-        expected_result = {
-            'webhook1': expected_webhook_data,
-            'webhook2': expected_webhook_data
-        }
+        expected_result = [
+            dict(id='webhook1', **expected_webhook_data),
+            dict(id='webhook2', **expected_webhook_data)
+        ]
         mock_naive.return_value = defer.succeed(expected_result)
         r = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(r, expected_result)
@@ -1259,14 +1320,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
-                return_value=defer.succeed({}))
+                return_value=defer.succeed([]))
     def test_list_webhooks_empty_list(self, mock_naive, mock_get_policy):
         """
         Listing a valid policy calls ``naive_list_webhooks``, and then calls
         ``get_policy`` to see if the policy actually exists
         """
         result = self.validate_list_webhooks_return_value('23456789')
-        self.assertEqual(result, {})
+        self.assertEqual(result, [])
 
         mock_naive.assert_called_with('23456789')
         mock_get_policy.assert_called_once_with('23456789')
@@ -1274,7 +1335,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'p', 'g')))
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks',
-                return_value=defer.succeed({}))
+                return_value=defer.succeed([]))
     def test_list_webhooks_invalid_policy(self, mock_naive, mock_get_policy):
         """
         If the group does not exist, `list_policies` raises a
@@ -1427,20 +1488,32 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         When viewing the manifest, if the group exists a dictionary with the
         config, launch config, and scaling policies is returned.
         """
-        verified_view.return_value = defer.succeed(
-            {'group_config': serialize_json_data(self.config, 1.0),
-             'launch_config': serialize_json_data(self.launch_config, 1.0)})
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23
+        })
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed([]))
 
-        self.assertEqual(self.validate_view_manifest_return_value(),
-                         {'groupConfiguration': self.config,
-                          'launchConfiguration': self.launch_config,
-                          'scalingPolicies': [],
-                          'id': "12345678g"})
+        self.assertEqual(self.validate_view_manifest_return_value(), {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch_config,
+            'scalingPolicies': [],
+            'id': "12345678g",
+            'state': GroupState(
+                self.tenant_id,
+                self.group_id,
+                'a', {'A': 'R'},
+                {'P': 'R'}, '123',
+                {'PT': 'R'}, False)
+        })
+
         self.group._naive_list_policies.assert_called_once_with()
 
-        view_cql = ('SELECT group_config, launch_config, active, '
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
@@ -1478,7 +1551,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return_value=defer.succeed({}))
         r = self.group.view_manifest()
         self.failureResultOf(r, NoSuchScalingGroupError)
-        view_cql = ('SELECT group_config, launch_config, active, '
+        view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
@@ -1816,12 +1889,12 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch)
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': [],
-            'id': self.mock_key.return_value
-        })
+
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], [])
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         # Verify data argument seperately since data in actual call will have datetime.utcnow
         # which cannot be mocked or predicted.
@@ -1865,16 +1938,13 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    [policy])
-
         expected_policy = policy.copy()
         expected_policy['id'] = self.mock_key.return_value
-
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': [expected_policy],
-            'id': self.mock_key.return_value
-        })
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], [expected_policy])
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], self.mock_key.return_value)
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
@@ -1926,16 +1996,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.validate_create_return_value(self.mock_log, '123',
                                                    self.config, self.launch,
                                                    policies)
-
         policies[0]['id'] = '2'
         policies[1]['id'] = '3'
 
-        self.assertEqual(result, {
-            'groupConfiguration': self.config,
-            'launchConfiguration': self.launch,
-            'scalingPolicies': policies,
-            'id': '1'
-        })
+        self.assertEqual(result['groupConfiguration'], self.config)
+        self.assertEqual(result['scalingPolicies'], policies)
+        self.assertEqual(result['launchConfiguration'], self.launch)
+        self.assertEqual(result['id'], '1')
+        self.assertTrue(isinstance(result['state'], GroupState))
 
         called_data = self.connection.execute.call_args[0][1]
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))

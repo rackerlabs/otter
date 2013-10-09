@@ -59,7 +59,7 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                      ':pending, :policyTouched, :paused, :created_at)')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
-_cql_view_manifest = ('SELECT group_config, launch_config, active, '
+_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -282,8 +282,7 @@ def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_i
     return d.addCallback(_insert_event)
 
 
-def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
-                    output):
+def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -304,10 +303,9 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         will be added to this dictionary
     :type cql_paramters: ``dict``
 
-    :param output: a dictionary to which to insert the created policies
-        along with their generated IDs
-    :type output: ``dict``
+    :returns: ``list`` of the created webhooks along with their IDs
     """
+    output = []
     for i, webhook in enumerate(bare_webhooks):
         name = "webhook{0}".format(i)
         webhook_id = generate_key_str('webhook')
@@ -325,11 +323,13 @@ def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
         cql_parameters['{0}Capability'.format(name)] = serialize_json_data(
             {version: cap_hash}, 1)
 
-        output[webhook_id] = webhook.copy()
-        output[webhook_id]['capability'] = {'hash': cap_hash, 'version': version}
+        output.append(dict(id=webhook_id,
+                           capability={'hash': cap_hash, 'version': version},
+                           **webhook))
+    return output
 
 
-def _assemble_webhook_from_row(row):
+def _assemble_webhook_from_row(row, include_id=False):
     """
     Builds a webhook as per :data:`otter.json_schema.model_schemas.webhook`
     from the user-mutable user data (name and metadata) and the
@@ -347,6 +347,9 @@ def _assemble_webhook_from_row(row):
 
     version, cap_hash = capability_data.iteritems().next()
     webhook_base['capability'] = {'version': version, 'hash': cap_hash}
+
+    if include_id:
+        webhook_base['id'] = row['webhookId']
 
     return webhook_base
 
@@ -453,7 +456,8 @@ class CassScalingGroup(object):
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
-                'id': self.uuid
+                'id': self.uuid,
+                'state': _unmarshal_state(group)
             })
             return d
 
@@ -464,8 +468,8 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-
-        return d.addCallback(_get_policies)
+        d.addCallback(_get_policies)
+        return d
 
     def view_config(self):
         """
@@ -582,7 +586,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_update_launch)
         return d
 
-    def _naive_list_policies(self):
+    def _naive_list_policies(self, limit=None, marker=None):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_policies`, but gets
         all the policies associated with particular scaling group
@@ -592,25 +596,23 @@ class CassScalingGroup(object):
             return [dict(id=row['policyId'], **_jsonloads_data(row['data']))
                     for row in rows]
 
-        query = _cql_list_policy.format(cf=self.policies_table)
-        d = self.connection.execute(query,
-                                    {"tenantId": self.tenant_id,
-                                     "groupId": self.uuid},
+        # TODO: this is just in place so that pagination in the manifest can
+        # be handled elsewhere
+        if limit is not None:
+            cql, params = _paginated_list(self.tenant_id, self.uuid,
+                                          limit=limit, marker=marker)
+        else:
+            cql = _cql_list_policy
+            params = {"tenantId": self.tenant_id, "groupId": self.uuid}
+
+        d = self.connection.execute(cql.format(cf=self.policies_table), params,
                                     get_consistency_level('list', 'policy'))
         d.addCallback(insert_id)
         return d
 
-    def list_policies(self):
+    def list_policies(self, limit=100, marker=None):
         """
-        Gets all the policies associated with particular scaling group.
-
-        :return: a dict of the policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
-
-        :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
-            with this uuid) does not exist
+        see :meth:`otter.models.interface.IScalingGroup.list_policies`
         """
         # If there are no policies - make sure it's not because the group
         # doesn't exist
@@ -619,7 +621,7 @@ class CassScalingGroup(object):
                 return self.view_config().addCallback(lambda _: policies_dict)
             return policies_dict
 
-        d = self._naive_list_policies()
+        d = self._naive_list_policies(limit=limit, marker=marker)
         return d.addCallback(_check_if_empty)
 
     def get_policy(self, policy_id):
@@ -715,8 +717,8 @@ class CassScalingGroup(object):
         irregardless of whether the scaling policy still exists.
         """
         def _assemble_webhook_results(results):
-            return {row['webhookId']: _assemble_webhook_from_row(row)
-                    for row in results}
+            return [_assemble_webhook_from_row(row, include_id=True)
+                    for row in results]
 
         query = _cql_list_webhook.format(cf=self.webhooks_table)
         d = self.connection.execute(query, {"tenantId": self.tenant_id,
@@ -751,10 +753,9 @@ class CassScalingGroup(object):
             cql_params = {"tenantId": self.tenant_id,
                           "groupId": self.uuid,
                           "policyId": policy_id}
-            output = {}
 
-            _build_webhooks(data, self.webhooks_table, queries, cql_params,
-                            output)
+            output = _build_webhooks(data, self.webhooks_table, queries,
+                                     cql_params)
 
             b = Batch(queries, cql_params,
                       consistency=get_consistency_level('create', 'webhook'))
@@ -950,17 +951,28 @@ class CassScalingGroupCollection:
 
         queries = [_cql_create_group.format(cf=self.group_table)]
 
-        data = {"tenantId": tenant_id,
-                "groupId": scaling_group_id,
-                "group_config": serialize_json_data(config, 1),
-                "launch_config": serialize_json_data(launch, 1),
-                "active": '{}',
-                "pending": '{}',
-                "policyTouched": '{}',
-                "paused": False,
-                "created_at": datetime.utcnow()
-                }
+        data = {
+            "tenantId": tenant_id,
+            "groupId": scaling_group_id,
+            "group_config": serialize_json_data(config, 1),
+            "launch_config": serialize_json_data(launch, 1),
+            "active": '{}',
+            "pending": '{}',
+            "created_at": datetime.utcnow(),
+            "policyTouched": '{}',
+            "paused": False
+        }
 
+        scaling_group_state = GroupState(
+            tenant_id,
+            scaling_group_id,
+            config['name'],
+            {},
+            {},
+            data['created_at'],
+            {},
+            data['paused']
+        )
         outpolicies = _build_policies(policies, self.policies_table,
                                       self.event_table, queries, data)
 
@@ -971,7 +983,8 @@ class CassScalingGroupCollection:
             'groupConfiguration': config,
             'launchConfiguration': launch,
             'scalingPolicies': outpolicies,
-            'id': scaling_group_id
+            'id': scaling_group_id,
+            'state': scaling_group_state
         })
         return d
 

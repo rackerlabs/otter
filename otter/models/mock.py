@@ -2,7 +2,6 @@
 Mock (in memory) implementation of the store for the front-end scaling groups
 engine
 """
-from copy import deepcopy
 from collections import defaultdict
 from uuid import uuid4
 
@@ -135,8 +134,9 @@ class MockScalingGroup:
         d.addCallback(lambda policies: {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
+            'id': self.uuid,
+            'state': self.state,
             'scalingPolicies': policies,
-            'id': self.uuid
         })
         return d
 
@@ -204,7 +204,7 @@ class MockScalingGroup:
         self.launch = data
         return defer.succeed(None)
 
-    def list_policies(self):
+    def list_policies(self, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_policies`
         """
@@ -212,7 +212,9 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         pairs = sorted(self.policies.iteritems(), key=lambda x: x[0])
-        return defer.succeed([dict(id=k, **v) for k, v in pairs])
+        policies = [dict(id=k, **v) for k, v in pairs
+                    if (marker is None or k > marker)]
+        return defer.succeed(policies[:limit])
 
     def get_policy(self, policy_id):
         """
@@ -285,8 +287,9 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         if policy_id in self.policies:
-            # return a copy so this store doesn't get mutated
-            return defer.succeed(deepcopy(self.webhooks.get(policy_id, {})))
+            pairs = sorted(self.webhooks.get(policy_id, {}).iteritems(),
+                           key=lambda x: x[0])
+            return defer.succeed([dict(id=k, **v) for k, v in pairs])
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
@@ -299,7 +302,7 @@ class MockScalingGroup:
             return defer.fail(self.error)
 
         if policy_id in self.policies:
-            created = {}
+            created = []
             for webhook_input in data:
                 webhook_real = {'metadata': {}}
                 webhook_real.update(webhook_input)
@@ -311,7 +314,7 @@ class MockScalingGroup:
                 uuid = str(uuid4())
                 self.webhooks[policy_id][uuid] = webhook_real
                 # return a copy so this store doesn't get mutated
-                created[uuid] = webhook_real.copy()
+                created.append(dict(id=uuid, **webhook_real))
 
             return defer.succeed(created)
         else:
@@ -408,7 +411,6 @@ class MockScalingGroupCollection:
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid, self,
             {'config': config, 'launch': launch, 'policies': policies})
-
         return self.data[tenant][uuid].view_manifest()
 
     def list_scaling_group_states(self, log, tenant, limit=100, marker=None):

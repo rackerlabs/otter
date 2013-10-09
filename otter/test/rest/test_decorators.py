@@ -508,14 +508,31 @@ class PaginatableTestCase(TestCase):
         d = self.app.paginate_me(self.mockRequest)
         self.assertEqual(self.successResultOf(d), {'limit': 5})
 
-    def test_invalid_limit_value(self):
+    def test_non_integer_limit_value(self):
         """
         Decorator raises InvalidQueryArgument if the limit argument cannot be
         coerced into an integer.
         """
-        self.mockRequest.args['limit'] = ['X']
+        self.mockRequest.args['limit'] = ['x']
         d = self.app.paginate_me(self.mockRequest)
         self.failureResultOf(d, InvalidQueryArgument)
+
+    def test_zero_limit_value(self):
+        """
+        Decorator coerces limit to 1 if the limit argument is < 1
+        """
+        self.mockRequest.args['limit'] = ['0']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 1})
+
+    def test_too_high_limit_value(self):
+        """
+        Decorator coerces limit to the hard pagination limit if the limit
+        argument is too high
+        """
+        self.mockRequest.args['limit'] = ['100']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
 
     def test_invalid_query_keys(self):
         """

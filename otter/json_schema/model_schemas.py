@@ -24,6 +24,7 @@ _id = {
     "required": True
 }
 
+
 policy = deepcopy(group_schemas.policy)
 policy['properties']['id'] = _id
 for _policy_type in policy['type']:
@@ -43,6 +44,7 @@ manifest = {
     "description": "Schema returned by the interface for viewing a manifest",
     "properties": {
         "id": _id,
+        "state": {},
         "groupConfiguration": group_schemas.config,
         "launchConfiguration": group_schemas.launch_config,
         "scalingPolicies": policy_list
@@ -52,6 +54,7 @@ manifest = {
 
 
 webhook = deepcopy(group_schemas.webhook)
+webhook['properties']['id'] = _id
 webhook['properties']['metadata']['required'] = True
 webhook['properties']['capability'] = {
     "type": "object",
@@ -74,10 +77,9 @@ webhook['properties']['capability'] = {
 }
 webhook['required'] = True
 
-
 webhook_list = {
-    "type": "object",
-    "description": "Schema returned by the interface for viewing all webhooks",
-    "patternProperties": {"^\S+$": webhook},
-    "additionalProperties": False
+    "type": "array",
+    "items": webhook,
+    "uniqueItems": True,
+    "required": True
 }
