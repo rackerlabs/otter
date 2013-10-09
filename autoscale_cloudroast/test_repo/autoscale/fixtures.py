@@ -110,6 +110,9 @@ class AutoscaleFixture(BaseTestFixture):
         cls.limit_unit_all = OtterConstants.LIMIT_UNIT_ALL
         cls.limit_value_webhook = OtterConstants.LIMIT_VALUE_WEBHOOK
         cls.limit_unit_webhook = OtterConstants.LIMIT_UNIT_WEBHOOK
+        cls.personality_maxlength = OtterConstants.PERSONALITY_MAXLENGTH
+        cls.max_personalities = OtterConstants.PERSONALITIES_PER_SERVER
+        cls.personality_max_file_size = OtterConstants.PERSONAITY_FILE_SIZE
         cls.non_autoscale_username = cls.autoscale_config.non_autoscale_username
         cls.non_autoscale_password = cls.autoscale_config.non_autoscale_password
         cls.non_autoscale_tenant = cls.autoscale_config.non_autoscale_tenant
@@ -366,6 +369,23 @@ class AutoscaleFixture(BaseTestFixture):
         else:
             self.fail('Servers on the tenant with name {0} were not deleted even'
                       ' after waiting 15 mins'.format(server_name))
+
+    def delete_nodes_in_loadbalancer(self, node_id_list, load_balancer):
+        """
+        Given the node id list and load balancer id, check for lb status
+        'PENDING UPDATE' and delete node when lb is ACTIVE
+        """
+        for each_node_id in node_id_list:
+            end_time = time.time() + 120
+            while time.time() < end_time:
+                delete_response = self.lbaas_client.delete_node(load_balancer, each_node_id)
+                if 'PENDING_UPDATE' in delete_response.text:
+                    time.sleep(2)
+                else:
+                    break
+            else:
+                print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE'
+                ' state'.format(load_balancer)
 
     @classmethod
     def tearDownClass(cls):

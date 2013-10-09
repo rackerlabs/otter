@@ -236,22 +236,6 @@ class DeleteServerTests(SupervisorTests):
             self.service_catalog,
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
-        args, _ = self.log.bind.return_value.msg.call_args
-        self.assertEqual(args[0], 'Server deleted successfully')
-
-    def test_execute_delete_error_is_logged(self):
-        """
-        ``launch_server_v1.delete_server`` error is logged
-        """
-        expected = KeyError('some')
-        self.delete_server.return_value = fail(expected)
-
-        self.supervisor.execute_delete_server(self.log, 'transaction-id',
-                                              self.group, self.fake_server)
-
-        args, kwargs = self.log.bind.return_value.err.call_args
-        self.assertEqual(args[0].value, expected)
-        self.assertEqual(args[1], 'Server deletion failed')
 
     def test_execute_delete_auths(self):
         """
@@ -271,12 +255,11 @@ class DeleteServerTests(SupervisorTests):
         expected = ValueError('auth failure')
         self.auth_function.return_value = fail(expected)
 
-        self.supervisor.execute_delete_server(self.log, 'transaction-id',
-                                              self.group, self.fake_server)
+        d = self.supervisor.execute_delete_server(
+            self.log, 'transaction-id', self.group, self.fake_server)
 
-        args, kwargs = self.log.bind.return_value.err.call_args
-        self.assertEqual(args[0].value, expected)
-        self.assertEqual(args[1], 'Server deletion failed')
+        f = self.failureResultOf(d, ValueError)
+        self.assertEqual(f.value, expected)
 
 
 class ValidateLaunchConfigTests(SupervisorTests):
