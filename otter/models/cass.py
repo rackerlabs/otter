@@ -59,7 +59,7 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                      ':pending, :policyTouched, :paused, :created_at)')
 _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
-_cql_view_manifest = ('SELECT group_config, launch_config, active, '
+_cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
@@ -456,7 +456,8 @@ class CassScalingGroup(object):
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
-                'id': self.uuid
+                'id': self.uuid,
+                'state': _unmarshal_state(group)
             })
             return d
 
@@ -467,8 +468,8 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-
-        return d.addCallback(_get_policies)
+        d.addCallback(_get_policies)
+        return d
 
     def view_config(self):
         """
@@ -950,17 +951,28 @@ class CassScalingGroupCollection:
 
         queries = [_cql_create_group.format(cf=self.group_table)]
 
-        data = {"tenantId": tenant_id,
-                "groupId": scaling_group_id,
-                "group_config": serialize_json_data(config, 1),
-                "launch_config": serialize_json_data(launch, 1),
-                "active": '{}',
-                "pending": '{}',
-                "policyTouched": '{}',
-                "paused": False,
-                "created_at": datetime.utcnow()
-                }
+        data = {
+            "tenantId": tenant_id,
+            "groupId": scaling_group_id,
+            "group_config": serialize_json_data(config, 1),
+            "launch_config": serialize_json_data(launch, 1),
+            "active": '{}',
+            "pending": '{}',
+            "created_at": datetime.utcnow(),
+            "policyTouched": '{}',
+            "paused": False
+        }
 
+        scaling_group_state = GroupState(
+            tenant_id,
+            scaling_group_id,
+            config['name'],
+            {},
+            {},
+            data['created_at'],
+            {},
+            data['paused']
+        )
         outpolicies = _build_policies(policies, self.policies_table,
                                       self.event_table, queries, data)
 
@@ -971,7 +983,8 @@ class CassScalingGroupCollection:
             'groupConfiguration': config,
             'launchConfiguration': launch,
             'scalingPolicies': outpolicies,
-            'id': scaling_group_id
+            'id': scaling_group_id,
+            'state': scaling_group_state
         })
         return d
 

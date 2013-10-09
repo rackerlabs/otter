@@ -46,6 +46,14 @@
         "gc_meta_key_1": "gc_meta_value_1"
       }
     },
+    "state": {
+      "active": [],
+      "activeCapacity": 0,
+      "desiredCapacity": 0,
+      "paused": false,
+      "pendingCapacity": 0,
+      "name": "testscalinggroup198547"
+    },
     "scalingPolicies": [
       {
         "name": "scale up by 1",

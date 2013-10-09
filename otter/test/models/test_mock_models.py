@@ -122,6 +122,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertEqual(result['groupConfiguration'], self.output_config)
         self.assertEqual(result['launchConfiguration'], self.launch_config)
         self.assertEqual(result['id'], '1')
+        self.assertEqual(
+            result['state'], GroupState(self.tenant_id, '1', '', {}, {}, None, {}, False)
+        )
 
         policies = result['scalingPolicies']
         for policy in policies:
@@ -756,6 +759,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertEqual(manifest, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
+            'state': GroupState(self.tenant_id, "1", "", {}, {}, "0001-01-01T00:00:00Z", {}, False),
             'scalingPolicies': expected_policies,
             'id': '1'
         })
