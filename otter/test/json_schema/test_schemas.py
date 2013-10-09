@@ -333,7 +333,7 @@ class LaunchConfigServerPayloadValidationTests(TestCase):
 
     def test_invalid_personality_contents_not_string(self):
         """
-        Invalidates if personality item does not contain contents
+        Invalidates if personality item contents is not a string
         """
         self.server['personality'][0]['contents'] = 4
         self.assertRaisesRegexp(ValidationError, "4 is not of type 'string'",
