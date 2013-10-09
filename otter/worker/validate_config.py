@@ -150,13 +150,14 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         raise InvalidLaunchConfiguration(msg)
 
     def raise_validation_error(failure, prop_name, prop_value):
-        msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name,
-                                                              shorten(str(prop_value), 128))
-        log.msg(msg, reason=failure)
+        msg = 'Invalid {prop_name} "{prop_value}" in launchConfiguration'
+        prop_value = shorten(str(prop_value), 128)
+        log.msg(msg, prop_name=prop_name, prop_value=prop_value, reason=failure)
         if failure.check(InvalidLaunchConfiguration):
             return failure
         else:
-            raise InvalidLaunchConfiguration(msg)
+            raise InvalidLaunchConfiguration(msg.format(prop_name=prop_name,
+                                                        prop_value=prop_value))
 
     service_endpoint = get_service_endpoint(service_catalog, region)
     deferreds = []

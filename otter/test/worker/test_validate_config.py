@@ -128,7 +128,8 @@ class ValidateLaunchServerConfigTests(TestCase):
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         self.failureResultOf(d, InvalidLaunchConfiguration)
         self.log.msg.assert_called_once_with(
-            'Invalid imageRef "imagegood" in launchConfiguration',
+            'Invalid {prop_name} "{prop_value}" in launchConfiguration',
+            prop_name='imageRef', prop_value='imagegood',
             reason=CheckFailure(InvalidLaunchConfiguration))
 
     def test_optional_property(self):
