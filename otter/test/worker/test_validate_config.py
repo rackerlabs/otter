@@ -10,7 +10,7 @@ from twisted.trial.unittest import TestCase
 from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
 from otter.util.config import set_config_data
 from otter.util.http import RequestError
-from otter.worker.validate_config import reduce
+from otter.worker.validate_config import shorten
 
 from otter.worker.validate_config import (
     validate_launch_server_config, validate_image, validate_flavor, get_service_endpoint,
@@ -143,29 +143,29 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.assertFalse(self.validate_flavor.called)
 
 
-class ReduceTests(TestCase):
+class ShortenTests(TestCase):
     """
-    Tests for `worker.reduce`
+    Tests for `worker.shorten`
     """
 
-    def test_reduces(self):
+    def test_shortens(self):
         """
-        Reduces the string to required length
+        shortens the string to required length
         """
-        self.assertEqual(reduce('manish is bad boy', 12), 'manish is...')
+        self.assertEqual(shorten('manish is bad boy', 12), 'manish is...')
 
-    def test_no_reduce(self):
+    def test_no_shorten(self):
         """
-        Does not reduce when required length is greated
+        Does not shorten when required length is greated
         """
-        self.assertEqual(reduce('manish is bad boy', 32), 'manish is bad boy')
+        self.assertEqual(shorten('manish is bad boy', 32), 'manish is bad boy')
 
-    def test_reduce_equal(self):
+    def test_shorten_equal(self):
         """
-        Does not reduce when required length is equal
+        Does not shorten when required length is equal
         """
         s = 'manish is bad boy'
-        self.assertEqual(reduce(s, len(s)), s)
+        self.assertEqual(shorten(s, len(s)), s)
 
 
 class ValidateImageTests(TestCase):

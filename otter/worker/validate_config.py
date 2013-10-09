@@ -108,14 +108,14 @@ def get_service_endpoint(service_catalog, region):
     return server_endpoint
 
 
-def reduce(s, length):
+def shorten(s, length):
     """
-    Reduce `s` to `length` by appending it with "...". If `s` is small,
+    Shorten `s` to `length` by appending it with "...". If `s` is small,
     return the same string
 
-    >>> reduce("very long string", 9)
+    >>> shorten("very long string", 9)
     "very l..."
-    >>> reduce("small", 10)
+    >>> shorten("small", 10)
     "small"
     """
 
@@ -151,7 +151,7 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
 
     def raise_validation_error(failure, prop_name, prop_value):
         msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name,
-                                                              reduce(str(prop_value), 128))
+                                                              shorten(str(prop_value), 128))
         log.msg(msg, reason=failure)
         if failure.check(InvalidLaunchConfiguration):
             return failure
