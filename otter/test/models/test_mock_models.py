@@ -476,6 +476,40 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             dict(id='11', **self.sample_webhook_data)
         ])
 
+    def test_list_webhooks_limits_number_of_webhooks(self):
+        """
+        Listing all webhooks limits the number of webhooks by the limit
+        specified
+        """
+        policy_id = self.group.policies.keys()[0]
+        self.group.webhooks = {
+            policy_id: {
+                '10': self.sample_webhook_data,
+                '11': self.sample_webhook_data
+            }
+        }
+        result = self.validate_list_webhooks_return_value(policy_id, limit=1)
+        self.assertEqual(result, [
+            dict(id='10', **self.sample_webhook_data)
+        ])
+
+    def test_list_webooks_offsets_by_marker(self):
+        """
+        Listing all webhooks will offset the list by the last seen parameter
+        """
+        policy_id = self.group.policies.keys()[0]
+        self.group.webhooks = {
+            policy_id: {
+                '10': self.sample_webhook_data,
+                '11': self.sample_webhook_data
+            }
+        }
+        result = self.validate_list_webhooks_return_value(
+            policy_id, limit=2, marker='10')
+        self.assertEqual(result, [
+            dict(id='11', **self.sample_webhook_data)
+        ])
+
     def test_create_webhooks_nonexistant_policy_fails(self):
         """
         Creating webhooks on a policy that doesn't exist fails with a
