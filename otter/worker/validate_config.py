@@ -4,7 +4,8 @@ Contains code to validate launch config
 
 from twisted.internet import defer
 import treq
-import base64, re
+import base64
+import re
 import itertools
 
 from otter.worker.launch_server_v1 import public_endpoint_url
@@ -107,6 +108,23 @@ def get_service_endpoint(service_catalog, region):
     return server_endpoint
 
 
+def reduce(s, length):
+    """
+    Reduce `s` to `length` by appending it with "...". If `s` is small,
+    return the same string
+
+    >>> reduce("very long string", 9)
+    "very l..."
+    >>> reduce("small", 10)
+    "small"
+    """
+
+    if len(s) > length:
+        return s[:length - 3] + '...'
+    else:
+        return s
+
+
 def validate_launch_server_config(log, region, service_catalog, auth_token, launch_config):
     """
     Validate launch_server type configuration
@@ -132,7 +150,8 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         raise InvalidLaunchConfiguration(msg)
 
     def raise_validation_error(failure, prop_name, prop_value):
-        msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name, prop_value)
+        msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name,
+                                                              reduce(str(prop_value), 128))
         log.msg(msg, reason=failure)
         if failure.check(InvalidLaunchConfiguration):
             return failure

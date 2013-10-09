@@ -10,6 +10,7 @@ from twisted.trial.unittest import TestCase
 from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
 from otter.util.config import set_config_data
 from otter.util.http import RequestError
+from otter.worker.validate_config import reduce
 
 from otter.worker.validate_config import (
     validate_launch_server_config, validate_image, validate_flavor, get_service_endpoint,
@@ -140,6 +141,31 @@ class ValidateLaunchServerConfigTests(TestCase):
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         self.successResultOf(d)
         self.assertFalse(self.validate_flavor.called)
+
+
+class ReduceTests(TestCase):
+    """
+    Tests for `worker.reduce`
+    """
+
+    def test_reduces(self):
+        """
+        Reduces the string to required length
+        """
+        self.assertEqual(reduce('manish is bad boy', 12), 'manish is...')
+
+    def test_no_reduce(self):
+        """
+        Does not reduce when required length is greated
+        """
+        self.assertEqual(reduce('manish is bad boy', 32), 'manish is bad boy')
+
+    def test_reduce_equal(self):
+        """
+        Does not reduce when required length is equal
+        """
+        s = 'manish is bad boy'
+        self.assertEqual(reduce(s, len(s)), s)
 
 
 class ValidateImageTests(TestCase):
