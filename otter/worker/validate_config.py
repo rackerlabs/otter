@@ -229,14 +229,14 @@ def validate_personality(log, auth_token, server_endpoint, personality):
 
     # Be optimistic and check base64 encoding anyways
     encoded_contents = []
-    try:
-        for file in personality:
-            if not b64_chars_re.match(file['contents']):
+    for _file in personality:
+        try:
+            if not b64_chars_re.match(_file['contents']):
                 raise TypeError
-            encoded_contents.append(base64.standard_b64decode(str(file['contents'])))
-    except TypeError:
-        d.cancel()
-        return defer.fail(InvalidBase64Encoding(file['path']))
+            encoded_contents.append(base64.standard_b64decode(str(_file['contents'])))
+        except TypeError:
+            d.cancel()
+            return defer.fail(InvalidBase64Encoding(_file['path']))
 
     def check_sizes(limits):
 
