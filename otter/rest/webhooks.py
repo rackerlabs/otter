@@ -334,8 +334,6 @@ class OtterExecute(object):
         This returns a 202 in all cases except internal server error,
         and does not wait for execution to finish.
         """
-        logl = [self.log]
-
         d = self.store.webhook_info_by_hash(self.log, self.capability_hash)
 
         def log_informational_webhook_failure(failure):
@@ -343,19 +341,18 @@ class OtterExecute(object):
                          CannotExecutePolicyError,
                          NoSuchPolicyError,
                          NoSuchScalingGroupError)
-            logl[0].msg("Non-fatal error during webhook execution: {exc!r}",
-                        exc=failure.value)
+            self.log.msg("Non-fatal error during webhook execution: {exc!r}",
+                         exc=failure.value)
 
         def execute_policy((tenant_id, group_id, policy_id)):
-            bound_log = self.log.bind(tenant_id=tenant_id,
-                                      scaling_group_id=group_id,
-                                      policy_id=policy_id)
-            logl[0] = bound_log
-            group = self.store.get_scaling_group(bound_log, tenant_id, group_id)
+            self.log = self.log.bind(tenant_id=tenant_id,
+                                     scaling_group_id=group_id,
+                                     policy_id=policy_id)
+            group = self.store.get_scaling_group(self.log, tenant_id, group_id)
             return group.modify_state(partial(controller.maybe_execute_scaling_policy,
-                                              bound_log, transaction_id(request),
+                                              self.log, transaction_id(request),
                                               policy_id=policy_id))
 
         d.addCallback(execute_policy)
         d.addErrback(log_informational_webhook_failure)
-        d.addErrback(lambda f: logl[0].err(f, "Unhandled exception executing webhook."))
+        d.addErrback(lambda f: self.log.err(f, "Unhandled exception executing webhook."))
