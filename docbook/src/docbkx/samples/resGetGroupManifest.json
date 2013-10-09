@@ -20,7 +20,8 @@ x-response-id: f19a5888-61ff-4bbf-bc8e-6ac6c18f7839
             "activeCapacity": 0,
             "desiredCapacity": 0,
             "paused": false,
-            "pendingCapacity": 0
+            "pendingCapacity": 0,
+            "name": "smallest possible launch config group"
         },
         "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
         "launchConfiguration": {
