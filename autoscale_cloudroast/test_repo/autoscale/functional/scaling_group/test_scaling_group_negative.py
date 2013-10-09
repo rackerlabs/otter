@@ -18,7 +18,7 @@ class ScalingGroupNegative(AutoscaleFixture):
     #     (also helps validate that teardowns within the testsuite )
     #     """
     #     list_groups_resp = self.autoscale_client.list_scaling_groups()
-    #     list_groups = list_groups_resp.entity
+    #     list_groups = (list_groups_resp.entity).groups
     #     self.assertEquals(list_groups_resp.status_code, 200,
     #                       msg='The list group call when no groups exists failed with {0}'
     #                       .format(list_groups_resp.status_code)
