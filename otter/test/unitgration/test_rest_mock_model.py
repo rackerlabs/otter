@@ -232,7 +232,7 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         manifest = self.successResultOf(
             store.create_scaling_group(self.mock_log, self.tenant_id, config()[0],
                                        launch_server_config()[0]))
-        self.group_id = manifest['id']
+        self.group_id = manifest['state'].group_id
         self.group_name = 'name'
 
         self.policies_url = '/v1.0/{tenant}/groups/{group}/policies/'.format(
@@ -424,7 +424,7 @@ class MockStoreRestWebhooksTestCase(TestCase):
             store.create_scaling_group(self.mock_log, self.tenant_id,
                                        config()[0],
                                        launch_server_config()[0]))
-        self.group_id = manifest['id']
+        self.group_id = manifest['state'].group_id
         group = store.get_scaling_group(self.mock_log,
                                         self.tenant_id, self.group_id)
         self.policy_id = self.successResultOf(

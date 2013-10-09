@@ -80,11 +80,7 @@ class FormatterHelpers(TestCase):
             'activeCapacity': 3,
             'pendingCapacity': 3,
             'desiredCapacity': 6,
-            'paused': True,
-            'id': "one",
-            "links": [
-                {"href": "/v1.0/11111/groups/one/", "rel": "self"},
-            ]
+            'paused': True
         })
 
 
@@ -204,14 +200,16 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.list_groups_response)
         self.assertEqual(resp, {
             "groups": [{
-                'active': [],
-                'name': '',
-                'activeCapacity': 0,
-                'pendingCapacity': 1,
-                'desiredCapacity': 1,
-                'paused': False,
                 'id': '1',
-                'links': [{'href': 'hey', 'rel': 'self'}]
+                'links': [{'href': 'hey', 'rel': 'self'}],
+                'state': {
+                    'active': [],
+                    'name': '',
+                    'activeCapacity': 0,
+                    'pendingCapacity': 1,
+                    'desiredCapacity': 1,
+                    'paused': False
+                }
             }],
             "groups_links": []
         })
@@ -272,7 +270,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
-            'id': '1'
+            'id': '1',
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
         })
         self.assert_status_code(400, None, 'POST', '{')
         self.flushLoggedErrors(InvalidJsonError)
@@ -286,7 +285,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
             'groupConfiguration': 'config',
             'launchConfiguration': 'launch',
             'scalingPolicies': [],
-            'id': '1'
+            'id': '1',
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False)
         })
         response_body = self.assert_status_code(400, None, 'POST', '{}')
         self.flushLoggedErrors(ValidationError)
@@ -309,8 +309,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         rval = {
             'groupConfiguration': expected_config,
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': [],
-            'id': '1'
+            'id': '1',
+            'state': GroupState('11111', '2', '', {}, {}, None, {}, False),
+            'scalingPolicies': []
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -333,6 +334,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         config = request_body['groupConfiguration']
         launch = request_body['launchConfiguration']
         policies = request_body.get('scalingPolicies', [])
+        state = GroupState('11111', '1', '', {}, {}, None, {}, False)
 
         expected_config = config.copy()
         expected_config.setdefault('maxEntities', MAX_ENTITIES)
@@ -343,6 +345,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         rval = {
             'groupConfiguration': expected_config,
             'launchConfiguration': launch,
+            'state': state,
             'scalingPolicies': return_policies,
             'id': '1'
         }
@@ -357,7 +360,6 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.create_and_manifest_response)
-
         # compare the policies separately, because they have links and may be
         # in a different order
         resp_policies = resp['group'].pop('scalingPolicies')
@@ -367,6 +369,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 'groupConfiguration': expected_config,
                 'launchConfiguration': launch,
                 'id': '1',
+                'state': format_state_dict(state),
                 'links': [{"href": "/v1.0/11111/groups/1/", "rel": "self"}]
             }
         })
@@ -544,7 +547,8 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
             'launchConfiguration': launch,
             'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
                                         [p.copy() for p in policies])),
-            'id': '1'
+            'id': '1',
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False)
         }
 
         self.mock_store.create_scaling_group.return_value = defer.succeed(rval)
@@ -598,8 +602,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         manifest = {
             'groupConfiguration': config_examples()[0],
             'launchConfiguration': launch_examples()[0],
-            'scalingPolicies': [dict(id="5", **policy_examples()[0])],
-            'id': 'one'
+            'id': 'one',
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'scalingPolicies': [dict(id="5", **policy_examples()[0])]
         }
         self.mock_group.view_manifest.return_value = defer.succeed(manifest)
 
@@ -623,7 +628,8 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
                 "id": "one",
                 "links": [
                     {"href": "/v1.0/11111/groups/one/", "rel": "self"}
-                ]
+                ],
+                'state': manifest['state']
             }
         }
         self.assertEqual(resp, expected)

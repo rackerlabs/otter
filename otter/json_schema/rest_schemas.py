@@ -143,17 +143,19 @@ group_state = _openstackify_schema("group", {
         }
     },
     'additionalProperties': False
-}, include_id=True)
+})
 
 _list_of_states = {
     'type': 'array',
     'description': "Lists of states with ids and links",
     'required': True,
     'uniqueItems': True,
-    'items': deepcopy(group_state)['properties']['group']
+    'properties': {
+        'state': deepcopy(group_state)['properties']['group']
+    }
 }
 list_groups_response = _openstackify_schema("groups", _list_of_states,
-                                            paginated=True)
+                                            paginated=True, include_id=True)
 
 
 # ----- schemas for viewing policies
@@ -207,7 +209,8 @@ create_and_manifest_response = _openstackify_schema("group", {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": _view_policies_list
+        "scalingPolicies": _view_policies_list,
+        "state": deepcopy(group_state)['properties']['group']
     },
     "additionalProperties": False
 }, include_id=True)

@@ -323,7 +323,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
         def _set_group_id(manifest):
-            self.group_id = manifest['id']
+            self.group_id = manifest['state'].group_id
             self.policies_url = (
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))

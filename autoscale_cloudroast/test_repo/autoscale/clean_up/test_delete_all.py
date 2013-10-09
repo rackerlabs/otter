@@ -3,7 +3,6 @@ Deletes.
 """
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import time
 
 
 class DeleteAll(AutoscaleFixture):
@@ -55,19 +54,7 @@ class DeleteAll(AutoscaleFixture):
                 print 'Nothing to delete. Only one node on load balancer'
             else:
                 node_id_list.pop()
-                for each_node_id in node_id_list:
-                    end_time = time.time() + 120
-                    while time.time() < end_time:
-                        delete_response = self.lbaas_client.delete_node(
-                            each_load_balancer, each_node_id)
-                        if 'PENDING_UPDATE' in delete_response.text:
-                            time.sleep(1)
-                        else:
-                            break
-                    else:
-                        print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE '
-                        'state'.format(each_load_balancer)
-                list_nodes = (
-                    self.lbaas_client.list_nodes(each_load_balancer)).entity
+                self.delete_nodes_in_loadbalancer(node_id_list, each_load_balancer)
+                list_nodes = (self.lbaas_client.list_nodes(each_load_balancer)).entity
                 print 'Deleted {0} nodes'.format(len(node_id_list))\
                     if len(list_nodes) > 1 else 'Deleted {0} nodes one remains'.format(len(node_id_list))
