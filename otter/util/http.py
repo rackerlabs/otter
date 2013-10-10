@@ -257,34 +257,6 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         return url
 
 
-def get_new_paginate_query_args(old_paginate_query_args, new_data):
-    """
-    Given a list of dictionaries of resources (all of which should have an
-    'id' key and also be in sorted ascending order), produces a dictionary
-    (or None) that can be passed to the ``query_params`` keyword argument of
-    :func:`get_autoscale_links`.
-
-    :param dict old_query_qargs: the old pagination query args - the new args
-        should respect the same limits, just possibly with a different marker
-
-    :param list new_data: A list of dictionaries containing the data fetched
-        with the previous paginate query args.  These should be openstack-type
-        resource dictionaries, each containing a key 'id' that can be used
-        as a marker, and should already be in sorted order
-
-    :returns: a dictionary of new kwargs if there might be more data to view
-        (if the length of the list is the previous limit, for instance), or
-        None if there is no next page.
-    """
-    old_limit = old_paginate_query_args.get(
-        'limit', config_value('limits.pagination'))
-
-    if len(new_data) >= old_limit:
-        return {'limit': old_limit, 'marker': new_data[-1].group_id}
-    else:
-        return None
-
-
 def transaction_id(request):
     """
     Extract the transaction id from the given request.
