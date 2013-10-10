@@ -153,7 +153,7 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
     links = []
     if not marker:
         links.append({'href': url, 'rel': rel})
-    if marker or len(collection) > limit:
+    if len(collection) >= limit:
         query_params = {'limit': limit, 'marker': collection[-1]['id']}
         next_url = "{0}?{1}".format(collection, urlencode(query_params))
         links.append({'href': next_url, 'rel': 'next'})
