@@ -17,8 +17,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
-from otter.util.http import (get_autoscale_links, transaction_id,
-                             get_new_paginate_query_args)
+from otter.util.http import get_autoscale_links, transaction_id
 from otter.rest.bobby import get_bobby
 
 
@@ -114,21 +113,14 @@ class OtterGroups(object):
         """
 
         def format_list(group_states):
-            new_query_args = get_new_paginate_query_args(paginate, group_states)
             groups = [{
                 'id': state.group_id,
                 'links': get_autoscale_links(state.tenant_id, state.group_id),
                 'state': format_state_dict(state)
             } for state in group_states]
-            next_links = []
-            if new_query_args is not None:
-                next_links = get_autoscale_links(
-                    self.tenant_id, query_params=new_query_args)
-                next_links[0]['rel'] = 'next'
-
             return {
                 "groups": groups,
-                "groups_links": next_links
+                "groups_links": get_groups_links(groups, state.tenant_id, **paginate)
             }
 
         deferred = self.store.list_scaling_group_states(
