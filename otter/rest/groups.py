@@ -17,7 +17,7 @@ from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util.http import get_autoscale_links, transaction_id, get_groups_links
 from otter.rest.bobby import get_bobby
 
 
@@ -120,7 +120,7 @@ class OtterGroups(object):
             } for state in group_states]
             return {
                 "groups": groups,
-                "groups_links": get_groups_links(groups, state.tenant_id, **paginate)
+                "groups_links": get_groups_links(groups, self.tenant_id, **paginate)
             }
 
         deferred = self.store.list_scaling_group_states(

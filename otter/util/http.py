@@ -155,7 +155,7 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
         links.append({'href': url, 'rel': rel})
     if len(collection) >= limit:
         query_params = {'limit': limit, 'marker': collection[-1]['id']}
-        next_url = "{0}?{1}".format(collection, urlencode(query_params))
+        next_url = "{0}?{1}".format(url, urlencode(query_params))
         links.append({'href': next_url, 'rel': 'next'})
     return links
 
@@ -164,8 +164,7 @@ def get_groups_links(groups, tenant_id, rel='self', limit=None, marker=None):
     """
     Get the links to groups along with 'next' link
     """
-    url = append_segments(
-        get_autoscale_links(tenant_id, format=None), 'groups')
+    url = get_autoscale_links(tenant_id, format=None)
     return get_collection_links(groups, url, rel, limit, marker)
 
 
