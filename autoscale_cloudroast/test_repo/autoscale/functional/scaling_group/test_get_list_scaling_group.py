@@ -1,8 +1,6 @@
 """
 Test to create and verify get and list group.
 """
-import unittest
-
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
@@ -31,7 +29,6 @@ class ScalingGroupListTest(AutoscaleFixture):
         cls.resources.add(cls.third_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 
-    @unittest.skip("AUTO-635")
     def test_get_scaling_group(self):
         """
         Verify the get group for response code 200, headers and data.
@@ -87,7 +84,7 @@ class ScalingGroupListTest(AutoscaleFixture):
                          msg='The list scaling group call failed with: '
                          '{0}'.format(list_groups_response.content))
         self.validate_headers(list_groups_response.headers)
-        group_id_list = [(group.id, group.name) for group in list_groups]
+        group_id_list = [(group.id, group.state['name']) for group in list_groups]
         self.assertIn(
             (self.first_scaling_group.id,
              self.first_scaling_group.groupConfiguration.name),
