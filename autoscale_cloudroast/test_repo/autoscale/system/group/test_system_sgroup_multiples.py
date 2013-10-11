@@ -96,12 +96,12 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         """
         The maximum scaling groups an account cannot be more than 1000.
         """
-        current_group_count = len(self.autoscale_client.list_scaling_groups().entity)
+        current_group_count = len((self.autoscale_client.list_scaling_groups().entity).groups)
         max_groups = self.max_groups - current_group_count
         for group in (range(max_groups)):
             create_group_reponse = self.autoscale_behaviors.create_scaling_group_min()
             self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
-        self.assertEquals(len(self.autoscale_client.list_scaling_groups().entity),
+        self.assertEquals(len((self.autoscale_client.list_scaling_groups().entity).groups),
                           self.max_groups)
         create_group_beyond_max = self.autoscale_behaviors.create_scaling_group_min()
         self.assertEquals(create_group_beyond_max.status_code, 429,
