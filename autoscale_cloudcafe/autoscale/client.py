@@ -195,23 +195,27 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def delete_scaling_group(self, group_id, requestslib_kwargs=None):
+    def delete_scaling_group(self, group_id, force=None, requestslib_kwargs=None):
         """
         :summary: Deletes the scaling group when empty. Rejects when group
                   has entities.
         :param group_id: The id of an existing scaling group.
         :type group_id: String
+        :param force: If force is set to true, a group is deleted even if the servers exist.
+        :type force: Boolean
         :return: Response Object containing response code 204
                  on success and empty body
         :rtype: Response Object
 
             DELETE
             '/{tenantId}/groups/{groupId}'
+            '/{tenantId}/groups/{groupId}?force=true'
         """
 
         self.group_id = group_id
+        params = {'force': force}
         url = '%s/groups/%s/' % (self.url, self.group_id)
-        return self.request('DELETE', url,
+        return self.request('DELETE', url, params=params,
                             requestslib_kwargs=requestslib_kwargs)
 
     def list_status_entities_sgroups(self, group_id, requestslib_kwargs=None):
