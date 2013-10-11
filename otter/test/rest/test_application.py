@@ -271,7 +271,7 @@ class CollectionLinksTests(TestCase):
         links = get_collection_links(self.coll, 'url', 'self', limit=20)
         self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
 
-    def test_big_collection(self):
+    def test_limit_collection(self):
         """
         Collection len == limit gives next link also
         """
@@ -280,13 +280,23 @@ class CollectionLinksTests(TestCase):
         self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
                                  {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
 
-    @mock.patch('otter.util.http.config_value', return_value=20)
+    def test_big_collection(self):
+        """
+        Collection len > limit gives next link with marker based on limit
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=2)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=567&limit=2', 'rel': 'next'}])
+
+    @mock.patch('otter.util.http.config_value', return_value=3)
     def test_no_limit(self, config_value):
         """
         Defaults to config limit if not given
         """
         links = get_collection_links(self.coll, 'url', 'self')
-        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
         config_value.assert_called_once_with('limits.pagination')
 
     def test_rel_None(self):
