@@ -11,9 +11,8 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
 from otter.test.utils import patch
-from otter.util.config import set_config_data
-from otter.util.http import (get_autoscale_links, transaction_id,
-                             get_new_paginate_query_args)
+from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
+                             get_groups_links)
 
 
 class LinkGenerationTestCase(TestCase):
@@ -253,20 +252,65 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
 
-    def test_query_params(self):
+
+class CollectionLinksTests(TestCase):
+    """
+    Tests for `get_collection_links`
+    """
+
+    def setUp(self):
         """
-        When query parameters are provided, a correct HTTP query string is
-        appended to the URL without adding an extra slash
+        Setup sample collection
         """
-        query = get_autoscale_links(
-            '11111', group_id='1',
-            query_params=[('marco', 'polo'),
-                          ('ping', 'pong'),
-                          ('razzle', 'dazzle')],
-            format=None)
-        self.assertEqual(
-            query,
-            '/v1.0/11111/groups/1/?marco=polo&ping=pong&razzle=dazzle')
+        self.coll = [{'id': '23'}, {'id': '567'}, {'id': '3444'}]
+
+    def test_small_collection(self):
+        """
+        Collection len < limit gives self link only. No next link
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
+
+    def test_big_collection(self):
+        """
+        Collection len == limit gives next link also
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=3)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
+
+    @mock.patch('otter.util.http.config_value', return_value=20)
+    def test_no_limit(self, config_value):
+        """
+        Defaults to config limit if not given
+        """
+        links = get_collection_links(self.coll, 'url', 'self')
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
+        config_value.assert_called_once_with('limits.pagination')
+
+
+class GetSpecificCollectionsLinks(TestCase):
+    """
+    Test for `get_groups_links`
+    """
+
+    def setUp(self):
+        """
+        Mock get_autoscale_links and get_collection_links
+        """
+        self.gal = patch(self, 'otter.util.http.get_autoscale_links', return_value='url')
+        self.gcl = patch(self, 'otter.util.http.get_collection_links', return_value='col links')
+
+    def test_get_groups_links(self):
+        """
+        `get_groups_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_groups_links('groups', 'tid', rel='rel', limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', format=None)
+        self.gcl.assert_called_once_with('groups', 'url', 'rel', 2, '3')
 
 
 class RouteTests(RequestTestMixin, TestCase):

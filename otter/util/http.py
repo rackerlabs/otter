@@ -149,6 +149,32 @@ def get_url_root():
 
 
 def get_collection_links(collection, url, rel, limit=None, marker=None):
+    """
+    Return links `dict` for given collection like below. The 'next' link is
+    added only if number of items in `collection` has reached `limit`
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          },
+          {
+            "href": <url of next link>,
+            "rel": "next"
+          }
+        ]
+
+    :param collection: the collection whose links are required.
+    :type collection: list of dict that has 'id' in it
+
+    :param url: URL of the collection
+
+    :param rel: What to put under 'rel'
+
+    :param limit: pagination limit
+
+    :param marker: pagination marker
+    """
     limit = limit or config_value('limits.pagination')
     links = []
     if not marker:
