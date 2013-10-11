@@ -1297,8 +1297,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
     def test_naive_list_webhooks_respects_limit(self):
         """
-        If there are more than the requested number of webhooks,
-        ``_naive_list_webhooks`` only requests the requested number.
+        The limit provided is passed to the CQL query
         """
         self.returns = [[]]
         expectedData = {"groupId": '12345678g',
