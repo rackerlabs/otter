@@ -166,7 +166,7 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
         params['groupId'] = group_id
 
         if policy_id is not None:
-            params['policyId'] = group_id
+            params['policyId'] = policy_id
             cql_parts = [_cql_list_webhook.rstrip(';'),
                          marker_cql.format('"webhookId"')]
         else:
@@ -710,7 +710,7 @@ class CassScalingGroup(object):
         d.addCallback(_do_delete)
         return d
 
-    def _naive_list_webhooks(self, policy_id):
+    def _naive_list_webhooks(self, policy_id, limit, marker):
         """
         Like :meth:`otter.models.cass.CassScalingGroup.list_webhooks`, but gets
         all the webhooks associated with particular scaling policy
@@ -720,15 +720,15 @@ class CassScalingGroup(object):
             return [_assemble_webhook_from_row(row, include_id=True)
                     for row in results]
 
-        query = _cql_list_webhook.format(cf=self.webhooks_table)
-        d = self.connection.execute(query, {"tenantId": self.tenant_id,
-                                            "groupId": self.uuid,
-                                            "policyId": policy_id},
+        cql, params = _paginated_list(self.tenant_id, self.uuid, policy_id,
+                                      limit=limit, marker=marker)
+
+        d = self.connection.execute(cql.format(cf=self.webhooks_table), params,
                                     get_consistency_level('list', 'webhook'))
         d.addCallback(_assemble_webhook_results)
         return d
 
-    def list_webhooks(self, policy_id):
+    def list_webhooks(self, policy_id, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
         """
@@ -738,7 +738,7 @@ class CassScalingGroup(object):
                 return policy_there.addCallback(lambda _: webhooks_dict)
             return webhooks_dict
 
-        d = self._naive_list_webhooks(policy_id)
+        d = self._naive_list_webhooks(policy_id, limit=limit, marker=marker)
         d.addCallback(_check_if_empty)
         return d
 

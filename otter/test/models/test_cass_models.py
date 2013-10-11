@@ -811,8 +811,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
     @mock.patch('otter.models.cass.CassScalingGroup._naive_list_policies')
     def test_list_policies_passes_limit_and_marker(self, mock_naive, _):
         """
-        List policies calls naive list policies, and doesn't call view config
-        if there are existing policies
+        List policies calls ``naive_list_policies`` with the appropriate limit
+        and marker values
         """
         expected_result = [{'id': 'policy1'}, {'id': 'policy2'}]
         mock_naive.return_value = defer.succeed(expected_result)
@@ -1261,12 +1261,14 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
-                        "policyId": '23456789'}
+                        "policyId": '23456789',
+                        "limit": 100}
         expectedCql = ('SELECT "webhookId", data, capability FROM '
                        'policy_webhooks WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId AND "policyId" = :policyId;')
+                       '"groupId" = :groupId AND "policyId" = :policyId '
+                       'LIMIT :limit;')
         r = self.successResultOf(
-            self.group._naive_list_webhooks('23456789'))
+            self.group._naive_list_webhooks('23456789', 100, None))
 
         expected_data['capability'] = {
             "version": "ver",
@@ -1289,9 +1291,59 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         """
         self.returns = [[]]
         r = self.successResultOf(
-            self.group._naive_list_webhooks('23456789'))
+            self.group._naive_list_webhooks('23456789', 2, None))
         self.assertEqual(r, [])
         self.assertEqual(len(mock_get_policy.mock_calls), 0)
+
+    def test_naive_list_webhooks_respects_limit(self):
+        """
+        The limit provided is passed to the CQL query
+        """
+        self.returns = [[]]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "policyId": '234567',
+                        "limit": 2}
+        expectedCql = ('SELECT "webhookId", data, capability FROM '
+                       'policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId AND "policyId" = :policyId '
+                       'LIMIT :limit;')
+        d = self.group._naive_list_webhooks('234567', 2, None)
+        r = self.successResultOf(d)
+        self.assertEqual(r, [])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
+    def test_naive_list_webhooks_offsets_by_marker(self):
+        """
+        If a marker is provided, it is passed into the CQL as a where clause
+        """
+        expected_data = {'name': 'name', 'metadata': {}}
+        data = json.dumps(expected_data)
+        capability = '{"ver": "hash"}'
+        self.returns = [[
+            {'webhookId': 'webhook1', 'data': data, 'capability': capability}
+        ]]
+        expectedData = {"groupId": '12345678g',
+                        "tenantId": '11111',
+                        "policyId": '234567',
+                        "limit": 2,
+                        "marker": 'blah'}
+        expectedCql = ('SELECT "webhookId", data, capability FROM '
+                       'policy_webhooks WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId AND "policyId" = :policyId '
+                       'AND "webhookId" > :marker LIMIT :limit;')
+        d = self.group._naive_list_webhooks('234567', 2, "blah")
+        expected_data['capability'] = {
+            "version": "ver",
+            "hash": "hash"
+        }
+        r = self.successResultOf(d)
+        self.assertEqual(r, [dict(id='webhook1', **expected_data)])
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
@@ -1314,7 +1366,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         r = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(r, expected_result)
 
-        mock_naive.assert_called_once_with('23456789')
+        mock_naive.assert_called_once_with('23456789', limit=100, marker=None)
         self.assertEqual(len(mock_get_policy.mock_calls), 0)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
@@ -1329,7 +1381,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         result = self.validate_list_webhooks_return_value('23456789')
         self.assertEqual(result, [])
 
-        mock_naive.assert_called_with('23456789')
+        mock_naive.assert_called_with('23456789', limit=100, marker=None)
         mock_get_policy.assert_called_once_with('23456789')
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
@@ -1338,14 +1390,31 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                 return_value=defer.succeed([]))
     def test_list_webhooks_invalid_policy(self, mock_naive, mock_get_policy):
         """
-        If the group does not exist, `list_policies` raises a
+        If the group does not exist, `list_webhooks` raises a
         :class:`NoSuchScalingPolicy`
         """
         self.failureResultOf(self.group.list_webhooks('23456789'),
                              NoSuchPolicyError)
-        mock_naive.assert_called_with('23456789')
+        mock_naive.assert_called_with('23456789', limit=100, marker=None)
         mock_get_policy.assert_called_once_with('23456789')
         self.flushLoggedErrors(NoSuchPolicyError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    @mock.patch('otter.models.cass.CassScalingGroup._naive_list_webhooks')
+    def test_list_webhooks_passes_limit_and_marker(self, mock_naive, _):
+        """
+        List webhooks calls ``naive_list_webhooks`` with the appropriate limit
+        and marker values
+        """
+        expected_result = [{'id': 'webhook1'}, {'id': 'webhook2'}]
+        mock_naive.return_value = defer.succeed(expected_result)
+
+        d = self.group.list_webhooks('1234', limit=5, marker='blah')
+        r = self.successResultOf(d)
+        self.assertEqual(r, expected_result)
+
+        mock_naive.assert_called_once_with('1234', limit=5, marker='blah')
 
     def test_view_webhook(self):
         """
