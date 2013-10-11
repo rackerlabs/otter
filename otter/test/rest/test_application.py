@@ -289,6 +289,13 @@ class CollectionLinksTests(TestCase):
         self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
         config_value.assert_called_once_with('limits.pagination')
 
+    def test_rel_None(self):
+        """
+        Does not include self link if rel is None
+        """
+        links = get_collection_links(self.coll, 'url', None, limit=30)
+        self.assertEqual(links, [])
+
 
 class GetSpecificCollectionsLinks(TestCase):
     """

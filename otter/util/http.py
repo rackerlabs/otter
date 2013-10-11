@@ -177,7 +177,7 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
     """
     limit = limit or config_value('limits.pagination')
     links = []
-    if not marker:
+    if not marker and rel is not None:
         links.append({'href': url, 'rel': rel})
     if len(collection) >= limit:
         query_params = {'limit': limit, 'marker': collection[-1]['id']}
