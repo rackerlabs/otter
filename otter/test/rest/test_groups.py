@@ -363,6 +363,8 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         # compare the policies separately, because they have links and may be
         # in a different order
         resp_policies = resp['group'].pop('scalingPolicies')
+        resp_policies_links = resp['group'].pop('scalingPolicies_links')
+        # TODO: Validate resp_policies_links
 
         self.assertEqual(resp, {
             'group': {
@@ -545,8 +547,7 @@ class AllGroupsBobbyEndpointTestCase(RestAPITestMixin, TestCase):
         rval = {
             'groupConfiguration': expected_config,
             'launchConfiguration': launch,
-            'scalingPolicies': dict(zip([str(i) for i in range(len(policies))],
-                                        [p.copy() for p in policies])),
+            'scalingPolicies': policies,
             'id': '1',
             'state': GroupState('11111', '1', '', {}, {}, None, {}, False)
         }
@@ -628,6 +629,9 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
                 "id": "one",
                 "links": [
                     {"href": "/v1.0/11111/groups/one/", "rel": "self"}
+                ],
+                'scalingPolicies_links': [
+                    {"href": "/v1.0/11111/groups/one/policies/", "rel": "policies"}
                 ],
                 'state': manifest['state']
             }
