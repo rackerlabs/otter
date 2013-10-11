@@ -11,6 +11,7 @@ from otter.json_schema import validate
 from otter.json_schema import group_schemas, group_examples, rest_schemas
 from otter.util.config import set_config_data
 
+
 class ScalingGroupConfigTestCase(TestCase):
     """
     Simple verification that the JSON schema for scaling groups is correct.
@@ -725,7 +726,6 @@ class CreateScalingPoliciesTestCase(TestCase):
         reload(rest_schemas)
         self.assertRaises(ValidationError, validate, [self.one_policy] * 6,
                           rest_schemas.create_policies_request)
-
 
 
 class CreateScalingGroupTestCase(TestCase):
