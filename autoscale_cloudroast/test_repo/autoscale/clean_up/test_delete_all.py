@@ -17,12 +17,11 @@ class DeleteAll(AutoscaleFixture):
         Delete all groups on the account
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
-        list_groups = list_groups_response.entity
+        list_groups = (list_groups_response.entity).groups
         for each_group in list_groups:
             self.empty_scaling_group(each_group)
             self.autoscale_client.delete_scaling_group(each_group.id)
-        list_groups_again = (
-            self.autoscale_client.list_scaling_groups()).entity
+        list_groups_again = ((self.autoscale_client.list_scaling_groups()).entity).groups
         print 'Deleting {0} groups, {1} still exist'.format(len(list_groups), len(list_groups_again))\
             if len(list_groups_again) is not 0 else "Deleted {0} groups".format(len(list_groups))
 
