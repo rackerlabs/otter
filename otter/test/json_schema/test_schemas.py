@@ -9,7 +9,7 @@ from jsonschema import Draft3Validator, ValidationError
 
 from otter.json_schema import validate
 from otter.json_schema import group_schemas, group_examples, rest_schemas
-
+from otter.util.config import set_config_data
 
 class ScalingGroupConfigTestCase(TestCase):
     """
@@ -691,11 +691,12 @@ class CreateScalingPoliciesTestCase(TestCase):
         """
         Draft3Validator.check_schema(rest_schemas.create_policies_request)
 
-    def test_empty_array_valid(self):
+    def test_empty_array_invalid(self):
         """
-        Seems pointless to disallow empty arrays, so empty arrays validate.
+        Empty arrays fail to validate
         """
-        validate([], rest_schemas.create_policies_request)
+        self.assertRaises(ValidationError, validate, [],
+                          rest_schemas.create_policies_request)
 
     def test_duplicate_policies_valid(self):
         """
@@ -710,6 +711,21 @@ class CreateScalingPoliciesTestCase(TestCase):
         """
         self.assertRaises(ValidationError, validate, self.one_policy,
                           rest_schemas.create_policies_request)
+
+    def test_too_many_policies_fail(self):
+        """
+        If the number of policies is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.assertRaises(ValidationError, validate, [self.one_policy] * 6,
+                          rest_schemas.create_policies_request)
+
 
 
 class CreateScalingGroupTestCase(TestCase):
@@ -837,7 +853,7 @@ class CreateScalingGroupTestCase(TestCase):
                 }, rest_schemas.create_group_request)
 
 
-class CreateWebhookTestCase(TestCase):
+class SingleWebhookTestCase(TestCase):
     """
     Verify the webhook schema.
     """
@@ -859,6 +875,55 @@ class CreateWebhookTestCase(TestCase):
         Metadata is optional.
         """
         validate({'name': 'foo'}, group_schemas.webhook)
+
+
+class CreateWebhooksTestCase(TestCase):
+    """
+    Verification that the JSON schema for creating scaling policies is correct
+    """
+    one_webhook = {'name': 'foo'}
+
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(rest_schemas.create_webhooks_request)
+
+    def test_empty_array_invalid(self):
+        """
+        Empty arrays fail to validate
+        """
+        self.assertRaises(ValidationError, validate, [],
+                          rest_schemas.create_webhooks_request)
+
+    def test_duplicate_webhooks_valid(self):
+        """
+        Duplicate webhooks are valid
+        """
+        validate([self.one_webhook] * 5,
+                 rest_schemas.create_webhooks_request)
+
+    def test_non_array_webhook_fails(self):
+        """
+        A single webhook, not in an array, fails to validate.
+        """
+        self.assertRaises(ValidationError, validate, self.one_webhook,
+                          rest_schemas.create_policies_request)
+
+    def test_too_many_webhooks_fail(self):
+        """
+        If the number of webhooks is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.addCleanup(set_config_data, {})
+        self.assertRaises(ValidationError, validate, [self.one_webhook] * 6,
+                          rest_schemas.create_policies_request)
 
 
 class UpdateWebhookTestCase(TestCase):

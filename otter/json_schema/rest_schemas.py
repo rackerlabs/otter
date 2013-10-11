@@ -10,6 +10,7 @@ from itertools import cycle
 
 from otter.json_schema.group_schemas import (
     policy, config, launch_config, webhook)
+from otter.util.config import config_value
 
 
 #------------- subschemas and other utilities -----------------
@@ -167,7 +168,7 @@ for type_blob in view_policy["type"]:
 
 _view_policies_list = {
     "type": "array",
-    "items": [view_policy],
+    "items": view_policy,
     "uniqueItems": True,
     "required": True
 }
@@ -178,7 +179,9 @@ list_policies_response = _openstackify_schema("policies", _view_policies_list,
 
 create_policies_request = {
     "type": "array",
-    "items": policy
+    "items": policy,
+    "minItems": 1,
+    "maxItems": config_value('limits.pagination') or 1000
 }
 
 create_policies_response = _openstackify_schema("policies", _view_policies_list)
@@ -194,7 +197,10 @@ create_group_request = {
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": create_policies_request
+        "scalingPolicies": {
+            "type": "array",
+            "items": policy
+        }
     },
     "additionalProperties": False
 }
@@ -240,7 +246,8 @@ create_webhooks_request = {
     "type": "array",
     "description": "Schema of the JSON used to create webhooks",
     "items": webhook,
-    "minItems": 1
+    "minItems": 1,
+    "maxItems": config_value('limits.pagination') or 1000
 }
 
 create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)
