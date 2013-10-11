@@ -31,15 +31,19 @@ class GroupPaginationTest(AutoscaleFixture):
 
     def test_list_groups_when_list_groups_is_greater_than_the_limit(self):
         """
-        List the scaling groups without limit when over 100 groups exist on the group
-        and verify the groups are listed in batches of the set limit with a next link.
+        List the scaling groups without limit and limit over 100 when over 100
+        groups exist on the group and verify the groups are listed in batches
+        of the set limit with a next link.
         """
         self._create_multiple_groups(self.pagination_limit)
-        list_groups = self._list_group_with_given_limit(None)
-        self._assert_list_groups_with_limits_and_next_link(1, list_groups)
-        rem_list_group = self.autoscale_client.list_scaling_groups(
-            list_groups.groups_links.next).entity
-        self._assert_list_groups_with_limits_and_next_link(1, rem_list_group, False)
+        params = [None, 100000]
+        for each_param in params:
+            list_groups = self._list_group_with_given_limit(each_param)
+            self._assert_list_groups_with_limits_and_next_link(self.pagination_limit,
+                                                               list_groups)
+            rem_list_group = self.autoscale_client.list_scaling_groups(
+                list_groups.groups_links.next).entity
+            self._assert_list_groups_with_limits_and_next_link(1, rem_list_group, False)
 
     def test_list_groups_with_limit_less_than_number_of_groups(self):
         """

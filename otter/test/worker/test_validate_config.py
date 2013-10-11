@@ -3,15 +3,20 @@ Tests for `worker.validate_config.py`
 """
 
 import mock
+import base64
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
 from otter.test.utils import mock_log, patch, mock_treq, CheckFailure
 from otter.util.config import set_config_data
+from otter.util.http import RequestError
+from otter.worker.validate_config import shorten
 
 from otter.worker.validate_config import (
     validate_launch_server_config, validate_image, validate_flavor, get_service_endpoint,
-    InvalidLaunchConfiguration, UnknownImage, InactiveImage, UnknownFlavor)
+    InvalidLaunchConfiguration, UnknownImage, InactiveImage, UnknownFlavor,
+    validate_personality, InvalidPersonality, InvalidBase64Encoding, InvalidMaxPersonality,
+    InvalidFileContentSize)
 
 
 class ValidateLaunchServerConfigTests(TestCase):
@@ -27,11 +32,12 @@ class ValidateLaunchServerConfigTests(TestCase):
         self.launch_config = {
             'server': {
                 'imageRef': 'imagegood',
-                'flavorRef': 'flavoreor'
+                'flavorRef': 'flavoreor',
+                'personality': 'some_personality'
             }
         }
-        self.func_suffixes = ['image', 'flavor']
-        self.properties = ['imageRef', 'flavorRef']
+        self.func_suffixes = ['image', 'flavor', 'personality']
+        self.properties = ['imageRef', 'flavorRef', 'personality']
         for func_suffix in self.func_suffixes:
             setattr(self, 'validate_{}'.format(func_suffix), patch(
                 self, 'otter.worker.validate_config.validate_{}'.format(func_suffix),
@@ -93,6 +99,15 @@ class ValidateLaunchServerConfigTests(TestCase):
             f.value.message,
             'Following problems with launch configuration:\nimage problem\nflavor problem')
 
+    def test_invalid_personality(self):
+        """
+        Invalid personality causes InvalidLaunchConfiguration
+        """
+        self.validate_personality.return_value = defer.fail(InvalidPersonality(':('))
+        d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
+        f = self.failureResultOf(d, InvalidLaunchConfiguration)
+        self.assertEqual(f.value.message, 'Following problems with launch configuration:\n:(')
+
     def test_other_error_raised(self):
         """
         `InvalidLaunchConfiguration` is raised even if any of the internal validate_* functions
@@ -113,7 +128,8 @@ class ValidateLaunchServerConfigTests(TestCase):
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         self.failureResultOf(d, InvalidLaunchConfiguration)
         self.log.msg.assert_called_once_with(
-            'Invalid imageRef "imagegood" in launchConfiguration',
+            'Invalid {prop_name} "{prop_value}" in launchConfiguration',
+            prop_name='imageRef', prop_value='imagegood',
             reason=CheckFailure(InvalidLaunchConfiguration))
 
     def test_optional_property(self):
@@ -126,6 +142,31 @@ class ValidateLaunchServerConfigTests(TestCase):
         d = validate_launch_server_config(self.log, 'dfw', 'catalog', 'token', self.launch_config)
         self.successResultOf(d)
         self.assertFalse(self.validate_flavor.called)
+
+
+class ShortenTests(TestCase):
+    """
+    Tests for `worker.shorten`
+    """
+
+    def test_shortens(self):
+        """
+        shortens the string to required length
+        """
+        self.assertEqual(shorten('manish is bad boy', 12), 'manish is...')
+
+    def test_no_shorten(self):
+        """
+        Does not shorten when required length is greated
+        """
+        self.assertEqual(shorten('manish is bad boy', 32), 'manish is bad boy')
+
+    def test_shorten_equal(self):
+        """
+        Does not shorten when required length is equal
+        """
+        s = 'manish is bad boy'
+        self.assertEqual(shorten(s, len(s)), s)
 
 
 class ValidateImageTests(TestCase):
@@ -220,6 +261,94 @@ class ValidateFlavorTests(TestCase):
         self.treq.get.return_value = defer.succeed(mock.Mock(code=500))
         d = validate_flavor(self.log, 'token', 'endpoint', 'flavor_some')
         self.failureResultOf(d)
+
+
+class ValidatePersonalityTests(TestCase):
+    """
+    Tests for `validate_personality`
+    """
+
+    def setUp(self):
+        """
+        Mock treq
+        """
+        self.log = mock_log()
+        limits = {'limits': {'absolute': {'maxPersonality': 1, 'maxPersonalitySize': 35}}}
+        self.treq = patch(self, 'otter.worker.validate_config.treq',
+                          new=mock_treq(code=200, method='get', json_content=limits))
+        patch(self, 'otter.util.http.treq', new=self.treq)
+        self.personality = [
+            {'path': '/etc/banner.txt',
+             'contents': base64.b64encode('This is a test of base64 encoding')}
+        ]
+        self.headers = {'content-type': ['application/json'],
+                        'accept': ['application/json']}
+
+    def test_valid(self):
+        """
+        Succeeds if given personality is valid
+        """
+        self.headers['x-auth-token'] = ['token']
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        self.successResultOf(d)
+        self.treq.get.assert_called_once_with('endpoint/limits', headers=self.headers)
+
+    def test_limit_failure_succeeds(self):
+        """
+        If getting /limits fails, then it logs and just validates base64
+        encoding and succeed
+        """
+        self.treq.get.return_value = defer.succeed(mock.Mock(code=500))
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        self.successResultOf(d)
+        self.log.msg.assert_called_once_with(
+            'Skipping personality size checks due to limits error',
+            reason=CheckFailure(RequestError))
+
+    def test_invalid_base64_encoding(self):
+        """
+        Fails when content is not base64 encoded
+        """
+        self.personality[0]['contents'] = 'bad encoding'
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        f = self.failureResultOf(d, InvalidBase64Encoding)
+        self.assertEqual(
+            f.value.message,
+            'Invalid base64 encoding for contents of path "/etc/banner.txt"')
+
+    def test_invalid_base64_chars(self):
+        """
+        Fails when content is having non-base64 characters but is valid encoding
+        """
+        self.personality[0]['contents'] = '()()'
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        f = self.failureResultOf(d, InvalidBase64Encoding)
+        self.assertEqual(
+            f.value.message,
+            'Invalid base64 encoding for contents of path "/etc/banner.txt"')
+
+    def test_exceeds_max_personality(self):
+        """
+        Fails when number of files in personality exceeds max limit
+        """
+        self.personality.append(
+            {'path': '/somepath', 'contents': self.personality[0]['contents']})
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        f = self.failureResultOf(d, InvalidMaxPersonality)
+        self.assertEqual(
+            f.value.message,
+            'Number of files "2" in personality exceeds maximum limit "1"')
+
+    def test_exceeds_max_personality_size(self):
+        """
+        Fails when size of decoded content in personality exceeds max limit
+        """
+        self.personality[0]['contents'] = base64.b64encode('abc' * 30)
+        d = validate_personality(self.log, 'token', 'endpoint', self.personality)
+        f = self.failureResultOf(d, InvalidFileContentSize)
+        self.assertEqual(
+            f.value.message,
+            'File "/etc/banner.txt" content\'s size exceeds maximum size "35"')
 
 
 class GetServiceEndpointTests(TestCase):

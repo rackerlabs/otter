@@ -73,6 +73,22 @@ server = {
         "flavorRef": {
             "type": "string",
             "required": True
+        },
+        "personality": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "minLength": 1,
+                        "required": True
+                    },
+                    "contents": {"type": "string", "required": True}
+                }
+            },
+            "required": False
         }
     },
     "required": True

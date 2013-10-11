@@ -11,9 +11,8 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
 from otter.test.utils import patch
-from otter.util.config import set_config_data
-from otter.util.http import (get_autoscale_links, transaction_id,
-                             get_new_paginate_query_args)
+from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
+                             get_groups_links)
 
 
 class LinkGenerationTestCase(TestCase):
@@ -253,64 +252,82 @@ class LinkGenerationTestCase(TestCase):
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
 
-    def test_query_params(self):
-        """
-        When query parameters are provided, a correct HTTP query string is
-        appended to the URL without adding an extra slash
-        """
-        query = get_autoscale_links(
-            '11111', group_id='1',
-            query_params=[('marco', 'polo'),
-                          ('ping', 'pong'),
-                          ('razzle', 'dazzle')],
-            format=None)
-        self.assertEqual(
-            query,
-            '/v1.0/11111/groups/1/?marco=polo&ping=pong&razzle=dazzle')
 
-
-class PaginationQueryArgGenerationTestCase(TestCase):
+class CollectionLinksTests(TestCase):
     """
-    Tests for generating new pagination args in
-    :func:`get_new_paginate_query_args`
+    Tests for `get_collection_links`
     """
-    def test_no_new_args_if_limited_data(self):
-        """
-        If the data is shorter then the limit, then there is probably no data
-        after, hence no need for a next page, and so no query args are returned.
-        """
-        result = get_new_paginate_query_args(
-            {'limit': 50, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
-        self.assertIsNone(result)
 
-    def test_new_marker_if_too_much_data(self):
+    def setUp(self):
         """
-        If the data length is equal to the limit, then there is
-        probably another page of data, so a new marker is returned
+        Setup sample collection
         """
-        result = get_new_paginate_query_args(
-            {'limit': 5, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
-        self.assertEqual(result.get('marker'), '4')
+        self.coll = [{'id': '23'}, {'id': '567'}, {'id': '3444'}]
 
-    def test_respects_previous_limit(self):
+    def test_small_collection(self):
         """
-        New paginate query args has the same limit as the previous, but new
-        marker
+        Collection len < limit gives self link only. No next link
         """
-        result = get_new_paginate_query_args(
-            {'limit': 5, 'marker': 'meh'}, [mock.Mock(group_id=str(i)) for i in range(5)])
-        self.assertEqual(result.get('limit'), 5)
+        links = get_collection_links(self.coll, 'url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
 
-    def test_default_limit_if_no_previous_limit(self):
+    def test_limit_collection(self):
         """
-        New paginate query args uses default limits if no old limits provided
+        Collection len == limit gives next link also
         """
-        self.addCleanup(set_config_data, {})
-        set_config_data({'limits': {'pagination': 3}})
+        links = get_collection_links(self.coll, 'url', 'self', limit=3)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
 
-        result = get_new_paginate_query_args(
-            {}, [mock.Mock(group_id=str(i)) for i in range(5)])
-        self.assertEqual(result.get('limit'), 3)
+    def test_big_collection(self):
+        """
+        Collection len > limit gives next link with marker based on limit
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=2)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=567&limit=2', 'rel': 'next'}])
+
+    @mock.patch('otter.util.http.config_value', return_value=3)
+    def test_no_limit(self, config_value):
+        """
+        Defaults to config limit if not given
+        """
+        links = get_collection_links(self.coll, 'url', 'self')
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
+        config_value.assert_called_once_with('limits.pagination')
+
+    def test_rel_None(self):
+        """
+        Does not include self link if rel is None
+        """
+        links = get_collection_links(self.coll, 'url', None, limit=30)
+        self.assertEqual(links, [])
+
+
+class GetSpecificCollectionsLinks(TestCase):
+    """
+    Test for `get_groups_links`
+    """
+
+    def setUp(self):
+        """
+        Mock get_autoscale_links and get_collection_links
+        """
+        self.gal = patch(self, 'otter.util.http.get_autoscale_links', return_value='url')
+        self.gcl = patch(self, 'otter.util.http.get_collection_links', return_value='col links')
+
+    def test_get_groups_links(self):
+        """
+        `get_groups_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_groups_links('groups', 'tid', rel='rel', limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', format=None)
+        self.gcl.assert_called_once_with('groups', 'url', 'rel', 2, '3')
 
 
 class RouteTests(RequestTestMixin, TestCase):

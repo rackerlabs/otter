@@ -4,11 +4,17 @@ Contains code to validate launch config
 
 from twisted.internet import defer
 import treq
+import base64
+import re
+import itertools
 
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             RequestError, APIError)
+                             RequestError, APIError, wrap_request_error)
+
+
+b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
 
 
 class InvalidLaunchConfiguration(Exception):
@@ -48,6 +54,49 @@ class UnknownFlavor(InvalidLaunchConfiguration):
         self.flavor_ref = flavor_ref
 
 
+class InvalidPersonality(InvalidLaunchConfiguration):
+    """
+    Personality is invalid either because content is not base64 encoded or some other
+    reason
+    """
+    def __init__(self, msg):
+        super(InvalidPersonality, self).__init__(
+            msg or 'Invalid personality in launch configuration')
+
+
+class InvalidBase64Encoding(InvalidPersonality):
+    """
+    Personality has invalid base64 encoding in contents
+    """
+    def __init__(self, path):
+        super(InvalidBase64Encoding, self).__init__(
+            'Invalid base64 encoding for contents of path "{}"'.format(path))
+        self.path = path
+
+
+class InvalidMaxPersonality(InvalidPersonality):
+    """
+    Personality has more than maximum number of files allowed
+    """
+    def __init__(self, max_personality, length):
+        super(InvalidMaxPersonality, self).__init__(
+            'Number of files "{}" in personality exceeds maximum limit "{}"'.format(
+                length, max_personality))
+        self.max_personality = max_personality
+        self.personality_length = length
+
+
+class InvalidFileContentSize(InvalidPersonality):
+    """
+    Personality has file content whose size exceeds maximum limit allowed
+    """
+    def __init__(self, path, max_size):
+        super(InvalidFileContentSize, self).__init__(
+            'File "{}" content\'s size exceeds maximum size "{}"'.format(path, max_size))
+        self.path = path
+        self.max_size = max_size
+
+
 def get_service_endpoint(service_catalog, region):
     """
     Get the service endpoint used to connect cloud services
@@ -57,6 +106,23 @@ def get_service_endpoint(service_catalog, region):
                                           cloudServersOpenStack,
                                           region)
     return server_endpoint
+
+
+def shorten(s, length):
+    """
+    Shorten `s` to `length` by appending it with "...". If `s` is small,
+    return the same string
+
+    >>> shorten("very long string", 9)
+    "very l..."
+    >>> shorten("small", 10)
+    "small"
+    """
+
+    if len(s) > length:
+        return s[:length - 3] + '...'
+    else:
+        return s
 
 
 def validate_launch_server_config(log, region, service_catalog, auth_token, launch_config):
@@ -71,7 +137,8 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
 
     validate_functions = [
         (validate_image, 'imageRef'),
-        (validate_flavor, 'flavorRef')
+        (validate_flavor, 'flavorRef'),
+        (validate_personality, 'personality')
     ]
 
     def collect_errors(results):
@@ -83,12 +150,14 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
         raise InvalidLaunchConfiguration(msg)
 
     def raise_validation_error(failure, prop_name, prop_value):
-        msg = 'Invalid {} "{}" in launchConfiguration'.format(prop_name, prop_value)
-        log.msg(msg, reason=failure)
+        msg = 'Invalid {prop_name} "{prop_value}" in launchConfiguration'
+        prop_value = shorten(str(prop_value), 128)
+        log.msg(msg, prop_name=prop_name, prop_value=prop_value, reason=failure)
         if failure.check(InvalidLaunchConfiguration):
             return failure
         else:
-            raise InvalidLaunchConfiguration(msg)
+            raise InvalidLaunchConfiguration(msg.format(prop_name=prop_name,
+                                                        prop_value=prop_value))
 
     service_endpoint = get_service_endpoint(service_catalog, region)
     deferreds = []
@@ -142,4 +211,48 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     # Extracting the content to avoid a strange bug in twisted/treq where next
     # subsequent call to nova hangs indefintely
     d.addCallback(treq.content)
+    return d
+
+
+def validate_personality(log, auth_token, server_endpoint, personality):
+    """
+    Validate personality by checking base64 encoded content and possibly limits
+    """
+    # Get limits
+    url = append_segments(server_endpoint, 'limits')
+    d = treq.get(url, headers=headers(auth_token))
+    d.addCallback(check_success, [200, 203])
+    d.addErrback(wrap_request_error, url, 'get_limits')
+
+    # Do not invalidate if we don't get limits
+    d.addErrback(
+        lambda f: log.msg('Skipping personality size checks due to limits error', reason=f))
+
+    # Be optimistic and check base64 encoding anyways
+    encoded_contents = []
+    for _file in personality:
+        try:
+            if not b64_chars_re.match(_file['contents']):
+                raise TypeError
+            encoded_contents.append(base64.standard_b64decode(str(_file['contents'])))
+        except TypeError:
+            d.cancel()
+            return defer.fail(InvalidBase64Encoding(_file['path']))
+
+    def check_sizes(limits):
+
+        # check max personality
+        max_personality = limits['limits']['absolute']['maxPersonality']
+        if len(personality) > max_personality:
+            raise InvalidMaxPersonality(max_personality, len(personality))
+
+        # check max content size
+        max_file_size = limits['limits']['absolute']['maxPersonalitySize']
+        for file, encoded_content in itertools.izip(personality, encoded_contents):
+            if len(encoded_content) > max_file_size:
+                raise InvalidFileContentSize(file['path'], max_file_size)
+
+    d.addCallback(treq.json_content)
+    d.addCallback(check_sizes)
+
     return d

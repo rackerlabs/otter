@@ -71,7 +71,13 @@ def launch_server_config():
                 "server": {
                     "flavorRef": "2",
                     "name": "worker",
-                    "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0"
+                    "imageRef": "a09e7493-7429-41e1-8d3f-384d7ece09c0",
+                    "personality": [
+                        {
+                            "path": "/etc/banner.txt",
+                            "contents": "VGhpcyBpcyBhIHRlc3Qgb2YgYmFzZTY0IGVuY29kaW5n"
+                        }
+                    ]
                 }
             }
         }
