@@ -5,6 +5,7 @@ Test to verify pagination for a list of groups.
 import unittest
 
 from test_repo.autoscale.fixtures import AutoscaleFixture
+from cafe.drivers.unittest.decorators import tags
 
 
 class GroupPaginationTest(AutoscaleFixture):
@@ -29,6 +30,7 @@ class GroupPaginationTest(AutoscaleFixture):
         super(GroupPaginationTest, self).tearDown()
         self.resources.release()
 
+    @tags(type='one-time')
     def test_list_groups_when_list_groups_is_greater_than_the_limit(self):
         """
         List the scaling groups without limit when over 100 groups exist on the group
@@ -36,7 +38,7 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         self._create_multiple_groups(self.pagination_limit)
         list_groups = self._list_group_with_given_limit(None)
-        self._assert_list_groups_with_limits_and_next_link(1, list_groups)
+        self._assert_list_groups_with_limits_and_next_link(100, list_groups)
         rem_list_group = self.autoscale_client.list_scaling_groups(
             list_groups.groups_links.next).entity
         self._assert_list_groups_with_limits_and_next_link(1, rem_list_group, False)
