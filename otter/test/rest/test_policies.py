@@ -37,7 +37,8 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
-    def test_no_policies_returns_empty_list(self):
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_no_policies_returns_empty_list(self, url_root):
         """
         If there are no policies for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status

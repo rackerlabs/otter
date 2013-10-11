@@ -194,6 +194,14 @@ def get_groups_links(groups, tenant_id, rel='self', limit=None, marker=None):
     return get_collection_links(groups, url, rel, limit, marker)
 
 
+def get_policies_links(policies, tenant_id, group_id, rel='self', limit=None, marker=None):
+    """
+    Get the links to groups along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, group_id, "", format=None)
+    return get_collection_links(policies, url, rel, limit, marker)
+
+
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                         webhook_id=None, capability_hash=None,
                         capability_version="1", format="json",

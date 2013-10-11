@@ -167,7 +167,7 @@ for type_blob in view_policy["type"]:
 
 _view_policies_list = {
     "type": "array",
-    "items": [view_policy],
+    "items": view_policy,
     "uniqueItems": True,
     "required": True
 }
