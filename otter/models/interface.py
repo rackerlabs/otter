@@ -390,9 +390,14 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
-    def list_webhooks(policy_id):
+    def list_webhooks(policy_id, limit=100, marker=None):
         """
         Gets all the capability URLs created for one particular scaling policy
+
+        :param int limit: the maximum number of policies to return
+            (for pagination purposes)
+        :param str marker: the policy ID of the last seen policy (for
+            pagination purposes - page offsets)
 
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
