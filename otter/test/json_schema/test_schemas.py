@@ -813,6 +813,27 @@ class CreateScalingGroupTestCase(TestCase):
             'scalingPolicies': [self.policy] * 5
         }, rest_schemas.create_group_request)
 
+    def test_creation_with_too_many_policies_fail(self):
+        """
+        If the number of policies is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.assertRaises(
+            ValidationError,
+            validate,
+            {
+                'groupConfiguration': self.config,
+                'launchConfiguration': self.launch,
+                'scalingPolicies': [self.policy] * 6
+            },
+            rest_schemas.create_group_request)
+
     def test_wrong_launch_config_fails(self):
         """
         Not including a launchConfiguration or including an invalid ones will

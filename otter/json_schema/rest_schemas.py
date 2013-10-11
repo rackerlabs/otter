@@ -191,16 +191,16 @@ get_policy_response = _openstackify_schema("policy", policy, include_id=True)
 
 
 # ----- schemas for group creation
+_policies_in_group = create_policies_request.copy()
+del _policies_in_group['minItems']
+
 create_group_request = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": {
-            "type": "array",
-            "items": policy
-        }
+        "scalingPolicies": _policies_in_group
     },
     "additionalProperties": False
 }
