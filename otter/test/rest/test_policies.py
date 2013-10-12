@@ -81,6 +81,45 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             "policies_links": []
         })
 
+    @mock.patch('otter.rest.policies.get_policies_links')
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_pagination(self, url_root, get_policies_links):
+        """
+        `list_policies` and `get_policies_links` is called with pagination arguments
+        passed. The returned value from `get_policies_links` is put in 'policies_links'
+        """
+        get_policies_links.return_value = [{'href': 'someurl', 'rel': 'next'}]
+        self.mock_group.list_policies.return_value = defer.succeed([])
+        response_body = self.assert_status_code(
+            200, endpoint='{}?limit=3&marker=m'.format(self.endpoint))
+        self.mock_group.list_policies.assert_called_once_with(limit=3, marker='m')
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        get_policies_links.assert_called_once_with(
+            [], '11111', '1', None, limit=3, marker='m')
+        self.assertEqual(resp['policies_links'], get_policies_links.return_value)
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_policies_links_next(self, url_root):
+        """
+        When more than limit policies are returned, a properly formed JSON blob with
+        policies_links containing next link is returned with a 200 (OK) status
+        """
+        self.mock_group.list_policies.return_value = defer.succeed(
+            [dict(id='{}'.format(i), **policy_examples()[0])
+             for i in range(1, 102)])
+        response_body = self.assert_status_code(200)
+        self.mock_group.list_policies.assert_called_once()
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        expected_links = [
+            {'href': '/v1.0/11111/groups/1/policies/?marker=100&limit=100',
+             'rel': 'next'}
+        ]
+        self.assertEqual(resp['policies_links'], expected_links)
+
     def test_policy_create_bad_input_400(self):
         """
         Checks that the serialization checks and rejects unserializable
