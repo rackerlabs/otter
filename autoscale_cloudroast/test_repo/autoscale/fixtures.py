@@ -216,6 +216,17 @@ class AutoscaleFixture(BaseTestFixture):
                 get_policy.args.cron, created_policy['schedule_value'],
                 msg='Cron style schedule policy value not as expected')
 
+    def assert_group_state(self, group_state):
+        """
+        Given the group state, verify active, pending and
+        desired capacity are as expected
+        """
+        self.assertEquals(len(group_state.active), group_state.activeCapacity)
+        self.assertGreaterEqual(group_state.pendingCapacity, 0)
+        self.assertEquals(group_state.desiredCapacity,
+                          group_state.activeCapacity + group_state.pendingCapacity)
+        self.assertFalse(group_state.paused)
+
     def create_default_at_style_policy_wait_for_execution(
         self, group_id, delay=3,
             change=None, scale_down=None):

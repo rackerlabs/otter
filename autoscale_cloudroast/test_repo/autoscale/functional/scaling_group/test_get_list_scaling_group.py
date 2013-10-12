@@ -57,6 +57,7 @@ class ScalingGroupListTest(AutoscaleFixture):
                          self.first_scaling_group.launchConfiguration,
                          msg="Group's launch configurations did not match for group "
                          '{0}'.format(self.first_scaling_group.id))
+        self.assert_group_state(group_info.state)
 
     def test_default_maxentities_set_on_a_group(self):
         """
@@ -83,17 +84,20 @@ class ScalingGroupListTest(AutoscaleFixture):
                          msg='The list scaling group call failed with: '
                          '{0}'.format(list_groups_response.content))
         self.validate_headers(list_groups_response.headers)
-        group_id_list = [(group.id, group.name) for group in list_groups]
+        group_id_list = [(group.id, group.state['name']) for group in list_groups]
         self.assertIn(
-            (self.first_scaling_group.id, self.first_scaling_group.groupConfiguration.name),
+            (self.first_scaling_group.id,
+             self.first_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.first_scaling_group.id, group_id_list))
         self.assertIn(
-            (self.second_scaling_group.id, self.second_scaling_group.groupConfiguration.name),
+            (self.second_scaling_group.id,
+             self.second_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.second_scaling_group.id, group_id_list))
         self.assertIn(
-            (self.third_scaling_group.id, self.third_scaling_group.groupConfiguration.name),
+            (self.third_scaling_group.id,
+             self.third_scaling_group.groupConfiguration.name),
             group_id_list, msg='Group with id {0} was not found in the list '
             '{1}'.format(self.third_scaling_group.id, group_id_list))
 
