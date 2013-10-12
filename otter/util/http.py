@@ -175,7 +175,7 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
 
     :param marker: pagination marker
     """
-    limit = limit or config_value('limits.pagination')
+    limit = limit or config_value('limits.pagination') or 100
     links = []
     if not marker and rel is not None:
         links.append({'href': url, 'rel': rel})
