@@ -148,10 +148,56 @@ def get_url_root():
     return config_value('url_root')
 
 
+def get_collection_links(collection, url, rel, limit=None, marker=None):
+    """
+    Return links `dict` for given collection like below. The 'next' link is
+    added only if number of items in `collection` has reached `limit`
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          },
+          {
+            "href": <url of next link>,
+            "rel": "next"
+          }
+        ]
+
+    :param collection: the collection whose links are required.
+    :type collection: list of dict that has 'id' in it
+
+    :param url: URL of the collection
+
+    :param rel: What to put under 'rel'
+
+    :param limit: pagination limit
+
+    :param marker: pagination marker
+    """
+    limit = limit or config_value('limits.pagination')
+    links = []
+    if not marker and rel is not None:
+        links.append({'href': url, 'rel': rel})
+    if len(collection) >= limit:
+        query_params = {'limit': limit, 'marker': collection[limit - 1]['id']}
+        next_url = "{0}?{1}".format(url, urlencode(query_params))
+        links.append({'href': next_url, 'rel': 'next'})
+    return links
+
+
+def get_groups_links(groups, tenant_id, rel='self', limit=None, marker=None):
+    """
+    Get the links to groups along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, format=None)
+    return get_collection_links(groups, url, rel, limit, marker)
+
+
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                         webhook_id=None, capability_hash=None,
                         capability_version="1", format="json",
-                        api_version="1.0", query_params=None):
+                        api_version="1.0"):
     """
     Generates links into the autoscale system, based on the ids given.  If
     the format is "json", then a JSON blob will be given in the form of::
@@ -217,9 +263,6 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
 
     url = append_segments(*segments)
 
-    if query_params is not None:
-        url = "{0}?{1}".format(url, urlencode(query_params))
-
     if format == "json":
         links = [
             {"href": url, "rel": "self"}
@@ -238,34 +281,6 @@ def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
         return links
     else:
         return url
-
-
-def get_new_paginate_query_args(old_paginate_query_args, new_data):
-    """
-    Given a list of dictionaries of resources (all of which should have an
-    'id' key and also be in sorted ascending order), produces a dictionary
-    (or None) that can be passed to the ``query_params`` keyword argument of
-    :func:`get_autoscale_links`.
-
-    :param dict old_query_qargs: the old pagination query args - the new args
-        should respect the same limits, just possibly with a different marker
-
-    :param list new_data: A list of dictionaries containing the data fetched
-        with the previous paginate query args.  These should be openstack-type
-        resource dictionaries, each containing a key 'id' that can be used
-        as a marker, and should already be in sorted order
-
-    :returns: a dictionary of new kwargs if there might be more data to view
-        (if the length of the list is the previous limit, for instance), or
-        None if there is no next page.
-    """
-    old_limit = old_paginate_query_args.get(
-        'limit', config_value('limits.pagination'))
-
-    if len(new_data) >= old_limit:
-        return {'limit': old_limit, 'marker': new_data[-1].group_id}
-    else:
-        return None
 
 
 def transaction_id(request):

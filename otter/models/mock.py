@@ -279,7 +279,7 @@ class MockScalingGroup:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))
 
-    def list_webhooks(self, policy_id):
+    def list_webhooks(self, policy_id, limit=100, marker=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.list_webhooks`
         """
@@ -289,7 +289,9 @@ class MockScalingGroup:
         if policy_id in self.policies:
             pairs = sorted(self.webhooks.get(policy_id, {}).iteritems(),
                            key=lambda x: x[0])
-            return defer.succeed([dict(id=k, **v) for k, v in pairs])
+            webhooks = [dict(id=k, **v) for k, v in pairs
+                        if (marker is None or k > marker)]
+            return defer.succeed(webhooks[:limit])
         else:
             return defer.fail(NoSuchPolicyError(self.tenant_id,
                                                 self.uuid, policy_id))

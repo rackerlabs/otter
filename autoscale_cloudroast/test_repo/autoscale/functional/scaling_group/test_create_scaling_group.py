@@ -146,3 +146,9 @@ class CreateScalingGroupTest(AutoscaleFixture):
                 self.scaling_group.scalingPolicies),
             msg='Scaling policies of the scaling group did not match'
             ' for group {0}'.format(self.scaling_group.id))
+
+    def test_created_scaling_group_state_fields(self):
+        """
+        Verify the state on the group is as expected.
+        """
+        self.assert_group_state(self.scaling_group.state)
