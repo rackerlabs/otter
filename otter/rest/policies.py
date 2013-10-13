@@ -190,15 +190,14 @@ class OtterPolicies(object):
             linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {'policies': policy_list}
 
-        def _add_to_bobby(policy_dict, client):
-            d = defer.succeed(policy_dict)
-            for policy_uuid, policy_item in policy_dict.iteritems():
+        def _add_to_bobby(policy_list, client):
+            d = defer.succeed(policy_list)
+            for policy_item in policy_list:
                 if policy_item['type'] == 'cloud_monitoring':
-                    print policy_item['args']
-                    client.create_policy(self.tenant_id, self.scaling_group_id, policy_uuid,
+                    client.create_policy(self.tenant_id, self.scaling_group_id, policy_item['id'],
                                          policy_item['args']['check'],
                                          policy_item['args']['alarm_criteria']['criteria'])
-            return d.addCallback(lambda _: policy_dict)
+            return d.addCallback(lambda _: policy_list)
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         deferred = rec.create_policies(data)

@@ -161,9 +161,8 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
         Tries to create a set of policies.
         """
 
-        self.mock_group.create_policies.return_value = defer.succeed({
-            '5': policy_examples()[0]
-        })
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **policy_examples()[0])])
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(policy_examples()[:1]),
             # location header points to the policy list
@@ -218,9 +217,8 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
                                                 "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
             }
         }
-        self.mock_group.create_policies.return_value = defer.succeed({
-            '5': bobby_policy.copy()
-        })
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
 
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps([bobby_policy]),
