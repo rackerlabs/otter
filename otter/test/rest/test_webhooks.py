@@ -429,7 +429,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
 
-    @mock.patch('otter.rest.decorators.log')
+    @mock.patch('otter.rest.webhooks.log')
     def test_execute_webhook(self, log):
         """
         Execute a webhook by hash returns a 202
@@ -444,8 +444,9 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             log.bind(), self.tenant_id, self.group_id)
 
-        self.assertEqual(log.bind.call_args_list[0],
-                         mock.call(tenant_id=self.tenant_id, scaling_group_id=self.group_id,
+        self.assertEqual(log.bind.call_args_list[1],
+                         mock.call(tenant_id=self.tenant_id,
+                                   scaling_group_id=self.group_id,
                                    policy_id=self.policy_id))
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
@@ -496,7 +497,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         excs = self.flushLoggedErrors(ValueError)
         self.assertEqual(excs[0].value, exc)
 
-    @mock.patch('otter.rest.decorators.log')
+    @mock.patch('otter.rest.webhooks.log')
     def test_execute_webhook_logs_info_message_when_policy_cannot_be_executed(self, log):
         """
         Executing a webhook logs an information message about non-fatal, policy

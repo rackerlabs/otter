@@ -309,13 +309,16 @@ class OtterExecute(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, capability_version, capability_hash):
+    def __init__(self, store, capability_version, capability_hash):
+        self.log = log.bind(system='otter.rest.execute',
+                            capability_version=capability_version,
+                            capability_hash=capability_hash)
         self.store = store
-        self.log = log
         self.capability_version = capability_version
         self.capability_hash = capability_hash
 
     @app.route('/', methods=['POST'])
+    @with_own_transaction_id()
     @fails_with({})  # This will allow us to surface internal server error only.
     @succeeds_with(202)
     def execute_webhook(self, request):
