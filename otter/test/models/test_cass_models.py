@@ -1551,8 +1551,9 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.assertEqual(len(self.connection.execute.mock_calls), 1)  # only view
         self.flushLoggedErrors(NoSuchWebhookError)
 
+    @mock.patch('otter.models.cass.config_value', return_value=10)
     @mock.patch('otter.models.cass.verified_view')
-    def test_view_manifest_success(self, verified_view):
+    def test_view_manifest_success(self, verified_view, _):
         """
         When viewing the manifest, if the group exists a dictionary with the
         config, launch config, and scaling policies is returned.
@@ -1580,7 +1581,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
                 {'PT': 'R'}, False)
         })
 
-        self.group._naive_list_policies.assert_called_once_with()
+        self.group._naive_list_policies.assert_called_once_with(limit=10)
 
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                     'pending, "groupTouched", "policyTouched", paused, created_at '
