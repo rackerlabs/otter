@@ -942,7 +942,6 @@ class CreateWebhooksTestCase(TestCase):
         set_config_data({"limits": {"pagination": 5}})
         self.addCleanup(cleanup)
         reload(rest_schemas)
-        self.addCleanup(set_config_data, {})
         self.assertRaises(ValidationError, validate, [self.one_webhook] * 6,
                           rest_schemas.create_policies_request)
 
