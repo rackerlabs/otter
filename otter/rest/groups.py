@@ -501,7 +501,11 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
-        if request.args.get('force', False):
+        try:
+            force = request.args.get('force')[0]
+        except (IndexError, TypeError):
+            force = False
+        if force == 'true':
             d = group.update_config({'minEntities': 0, 'maxEntities': 0})
             return d.addCallback(lambda _: group.delete_group())
         else:
