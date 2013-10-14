@@ -659,6 +659,20 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             {'maxEntities': 0, 'minEntities': 0})
         self.mock_group.delete_group.assert_called_once_with()
 
+    def test_group_delete_force_garbage_arg(self):
+        """
+        Deleting a group with force sets min/max to zero and deletes it.
+        """
+        self.mock_group.delete_group.return_value = defer.succeed(None)
+        self.mock_group.update_config.return_value = defer.succeed(None)
+
+        self.assert_status_code(
+            204, endpoint="{0}?force=blah".format(self.endpoint),
+            method="DELETE")
+
+        self.assertEqual(0, self.mock_group.update_config.call_count)
+        self.mock_group.delete_group.assert_called_once_with()
+
     def test_group_delete_404(self):
         """
         Deleting a non-existant group fails with a 404.
