@@ -20,6 +20,7 @@ from otter.models.interface import IAdmin, IScalingGroup, IScalingGroupCollectio
 from otter.rest.application import Otter
 from otter.rest.admin import OtterAdmin
 from otter.test.utils import iMock, patch
+from otter.util.config import set_config_data
 
 
 def _render(resource, request):
@@ -279,6 +280,16 @@ class RestAPITestMixin(RequestTestMixin):
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
         self.root = Otter(self.mock_store).app.resource()
+        self.get_url_root = patch(self, 'otter.util.http.get_url_root', return_value="")
+
+        # set pagination limits as it'll be used by all rest interfaces
+        set_config_data({'limits': {'pagination': 100}})
+
+    def tearDown(self):
+        """
+        Reset config data
+        """
+        set_config_data({})
 
     def test_invalid_methods_are_405(self):
         """
