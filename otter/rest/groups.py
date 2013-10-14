@@ -456,8 +456,17 @@ class OtterGroup(object):
         Delete a scaling group if there are no entities belonging to the scaling
         group.  If successful, no response body will be returned.
         """
-        return self.store.get_scaling_group(self.log, self.tenant_id,
-                                            self.group_id).delete_group()
+        group = self.store.get_scaling_group(self.log, self.tenant_id,
+                                             self.group_id)
+        try:
+            force = request.args.get('force')[0]
+        except (IndexError, TypeError):
+            force = False
+        if force == 'true':
+            d = group.update_config({'minEntities': 0, 'maxEntities': 0})
+            return d.addCallback(lambda _: group.delete_group())
+        else:
+            return group.delete_group()
 
     @app.route('/state/', methods=['GET'])
     @fails_with(exception_codes)
