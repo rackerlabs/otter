@@ -37,8 +37,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(500)
         self.flushLoggedErrors()
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_no_policies_returns_empty_list(self, url_root):
+    def test_no_policies_returns_empty_list(self):
         """
         If there are no policies for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
@@ -54,8 +53,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             "policies_links": []
         })
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policy_dictionary_gets_linkified(self, url_root):
+    def test_policy_dictionary_gets_linkified(self):
         """
         When policies are returned, a properly formed JSON blob containing ids
         and links are returned with a 200 (OK) status
@@ -82,8 +80,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         })
 
     @mock.patch('otter.rest.policies.get_policies_links')
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_pagination(self, url_root, get_policies_links):
+    def test_pagination(self, get_policies_links):
         """
         `list_policies` and `get_policies_links` is called with pagination arguments
         passed. The returned value from `get_policies_links` is put in 'policies_links'
@@ -100,8 +97,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             [], '11111', '1', None, limit=3, marker='m')
         self.assertEqual(resp['policies_links'], get_policies_links.return_value)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policies_links_next(self, url_root):
+    def test_policies_links_next(self):
         """
         When more than limit policies are returned, a properly formed JSON blob with
         policies_links containing next link is returned with a 200 (OK) status
@@ -142,8 +138,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policy_create(self, mock_url):
+    def test_policy_create(self):
         """
         Tries to create a set of policies.
         """
@@ -190,8 +185,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = controller_patcher.start()
         self.addCleanup(controller_patcher.stop)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_get_policy(self, url_root):
+    def test_get_policy(self):
         """
         Get details of a specific policy.  The response should conform with
         the json schema.
