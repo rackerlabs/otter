@@ -288,7 +288,7 @@ class RestAPITestMixin(RequestTestMixin):
         """
         Reset config data
         """
-        set_config_data(None)
+        set_config_data({})
 
     def test_invalid_methods_are_405(self):
         """
