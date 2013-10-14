@@ -223,6 +223,7 @@ create_and_manifest_response = _openstackify_schema("group", {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
         "scalingPolicies": _view_policies_list,
+        "scalingPolicies_links": _links,
         "state": deepcopy(group_state)['properties']['group']
     },
     "additionalProperties": False
