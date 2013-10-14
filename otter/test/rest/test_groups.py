@@ -364,7 +364,6 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         # in a different order
         resp_policies = resp['group'].pop('scalingPolicies')
         resp_policies_links = resp['group'].pop('scalingPolicies_links')
-        # TODO: Validate resp_policies_links
 
         self.assertEqual(resp, {
             'group': {
@@ -383,6 +382,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                 "rel": "self"
             }])
         self.assertEqual(resp_policies, policies)
+
+        self.assertEqual(resp_policies_links,
+                         [{'href': '/v1.0/11111/groups/1/policies/', 'rel': 'policies'}])
 
     def test_group_create_maxEntities_eq_minEntities_valid(self):
         """
@@ -594,8 +596,25 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_view_manifest(self, url_root):
+    @mock.patch('otter.rest.groups.get_policies_links', return_value='pol links')
+    def test_get_policies_links_called(self, mock_get_policies_links):
+        """
+        'scalingPolicies_links' is added in response by calling `get_policies_links`
+        """
+        policies = [dict(id="5", **policy_examples()[0])]
+        manifest = {
+            'id': 'one',
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'scalingPolicies': policies
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
+        response_body = self.assert_status_code(200, method="GET")
+        resp = json.loads(response_body)
+        self.assertEqual(resp['group']['scalingPolicies_links'], 'pol links')
+        mock_get_policies_links.assert_called_once_with(
+            policies, '11111', 'one', rel='policies')
+
+    def test_view_manifest(self):
         """
         Viewing the manifest of an existant group returns whatever the
         implementation's `view_manifest()` method returns, in string format
