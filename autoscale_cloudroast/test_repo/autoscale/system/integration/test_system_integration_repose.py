@@ -2,7 +2,6 @@
 System Integration tests autoscaling with repose
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import unittest
 from cafe.drivers.unittest.decorators import tags
 
 
@@ -48,7 +47,7 @@ class AutoscaleReposeTests(AutoscaleFixture):
                     self.assertEquals(limits.verb, 'ALL',
                                       msg='The verb for tenant is {0}'.format(limits.verb))
 
-    @unittest.skip('AUTO-530')
+    @tags(type='repose')
     def test_system_repose_rate_limits_with_trailing_slash(self):
         """
         Verify the relative and absolute rate limits set by autoscale in repose, using the limits
