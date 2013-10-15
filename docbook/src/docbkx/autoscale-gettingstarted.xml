@@ -1118,12 +1118,9 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </programlisting>
-<<<<<<< HEAD
                 <para>If the <command>DELETE</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned. </para>
-=======
->>>>>>> master
             </example>
         </section>
         <section xml:id="Execute_Policy">
