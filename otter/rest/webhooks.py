@@ -12,10 +12,10 @@ import json
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id)
+                                   with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util.http import get_autoscale_links, transaction_id, get_webhooks_links
 
 from otter.models.interface import (
     UnrecognizedCapabilityError,
@@ -61,7 +61,8 @@ class OtterWebhooks(object):
     @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_webhooks(self, request):
+    @paginatable
+    def list_webhooks(self, request, paginate):
         """
         Get a list of all webhooks (capability URL) associated with a particular
         scaling policy. This data is returned in the body of the response in JSON
@@ -116,11 +117,13 @@ class OtterWebhooks(object):
 
             return {
                 'webhooks': webhook_list,
-                "webhooks_links": []
+                "webhooks_links": get_webhooks_links(
+                    webhook_list, self.tenant_id, self.group_id,
+                    self.policy_id, None, **paginate)
             }
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.list_webhooks(self.policy_id)
+        deferred = rec.list_webhooks(self.policy_id, **paginate)
         deferred.addCallback(format_webhooks)
         deferred.addCallback(json.dumps)
         return deferred
