@@ -205,7 +205,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             group.id,
             self.gc_min_entities_alt)
         server_ip_list = self._get_ipv4_address_list_on_servers(server_list)
-        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, True)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'true')
         self.assertEquals(delete_group_response.status_code, 204,
                           msg='Could not force delete group {0} when active servers existed '
                           'on it '.format(group.id))
