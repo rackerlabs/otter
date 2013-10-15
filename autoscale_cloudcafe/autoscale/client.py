@@ -3,7 +3,7 @@ Client objects for all the autoscale api calls
 """
 from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
-                                                          ScalingGroup)
+                                                          ScalingGroup, Groups)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -127,7 +127,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             requestslib_kwargs=requestslib_kwargs,
                             response_entity_type=ScalingGroup)
 
-    def list_scaling_groups(self, url=None, requestslib_kwargs=None):
+    def list_scaling_groups(self, url=None, marker=None, limit=None,
+                            requestslib_kwargs=None):
         """
         :summary: Lists IDs and links for all scaling groups
         :return: Response Object containing response code 200 and body with
@@ -137,11 +138,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         {tenant_id}/groups/
         """
-
+        params = {'marker': marker, 'limit': limit}
         url = url or '%s/groups/' % (self.url)
-        return self.request('GET', url,
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Group)
+                            response_entity_type=Groups)
 
     def view_manifest_config_for_scaling_group(self, group_id,
                                                requestslib_kwargs=None):

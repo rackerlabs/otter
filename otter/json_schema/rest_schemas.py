@@ -10,6 +10,10 @@ from itertools import cycle
 
 from otter.json_schema.group_schemas import (
     policy, config, launch_config, webhook)
+from otter.util.config import config_value
+
+
+_max_batch_creates = config_value('limits.pagination') or 100
 
 
 #------------- subschemas and other utilities -----------------
@@ -167,7 +171,7 @@ for type_blob in view_policy["type"]:
 
 _view_policies_list = {
     "type": "array",
-    "items": [view_policy],
+    "items": view_policy,
     "uniqueItems": True,
     "required": True
 }
@@ -178,7 +182,10 @@ list_policies_response = _openstackify_schema("policies", _view_policies_list,
 
 create_policies_request = {
     "type": "array",
-    "items": policy
+    "description": "Schema of the JSON used to create policies",
+    "items": policy,
+    "minItems": 1,
+    "maxItems": _max_batch_creates
 }
 
 create_policies_response = _openstackify_schema("policies", _view_policies_list)
@@ -188,13 +195,19 @@ get_policy_response = _openstackify_schema("policy", policy, include_id=True)
 
 
 # ----- schemas for group creation
+_policies_in_group = {
+    "type": "array",
+    "items": policy,
+    "maxItems": _max_batch_creates
+}
+
 create_group_request = {
     "type": "object",
     "description": "Schema of the JSON used to create a scaling group.",
     "properties": {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
-        "scalingPolicies": create_policies_request
+        "scalingPolicies": _policies_in_group
     },
     "additionalProperties": False
 }
@@ -210,6 +223,7 @@ create_and_manifest_response = _openstackify_schema("group", {
         "groupConfiguration": config,
         "launchConfiguration": launch_config,
         "scalingPolicies": _view_policies_list,
+        "scalingPolicies_links": _links,
         "state": deepcopy(group_state)['properties']['group']
     },
     "additionalProperties": False
@@ -240,7 +254,8 @@ create_webhooks_request = {
     "type": "array",
     "description": "Schema of the JSON used to create webhooks",
     "items": webhook,
-    "minItems": 1
+    "minItems": 1,
+    "maxItems": _max_batch_creates
 }
 
 create_webhooks_response = _openstackify_schema("webhooks", _list_of_webhooks)

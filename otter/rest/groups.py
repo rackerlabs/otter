@@ -17,8 +17,8 @@ from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
-from otter.util.http import (get_autoscale_links, transaction_id,
-                             get_new_paginate_query_args)
+from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
+                             get_policies_links)
 from otter.rest.bobby import get_bobby
 
 
@@ -114,21 +114,14 @@ class OtterGroups(object):
         """
 
         def format_list(group_states):
-            new_query_args = get_new_paginate_query_args(paginate, group_states)
             groups = [{
                 'id': state.group_id,
                 'links': get_autoscale_links(state.tenant_id, state.group_id),
                 'state': format_state_dict(state)
             } for state in group_states]
-            next_links = []
-            if new_query_args is not None:
-                next_links = get_autoscale_links(
-                    self.tenant_id, query_params=new_query_args)
-                next_links[0]['rel'] = 'next'
-
             return {
                 "groups": groups,
-                "groups_links": next_links
+                "groups_links": get_groups_links(groups, self.tenant_id, None, **paginate)
             }
 
         deferred = self.store.list_scaling_group_states(
@@ -346,6 +339,8 @@ class OtterGroups(object):
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
             linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
+            result['scalingPolicies_links'] = get_policies_links(
+                result['scalingPolicies'], self.tenant_id, uuid, rel='policies')
             return {"group": result}
 
         deferred.addCallback(_format_output)
@@ -441,6 +436,8 @@ class OtterGroup(object):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
             data["state"] = format_state_dict(data["state"])
             linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
+            data['scalingPolicies_links'] = get_policies_links(
+                data['scalingPolicies'], self.tenant_id, uuid, rel='policies')
             return {"group": data}
 
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
@@ -459,8 +456,17 @@ class OtterGroup(object):
         Delete a scaling group if there are no entities belonging to the scaling
         group.  If successful, no response body will be returned.
         """
-        return self.store.get_scaling_group(self.log, self.tenant_id,
-                                            self.group_id).delete_group()
+        group = self.store.get_scaling_group(self.log, self.tenant_id,
+                                             self.group_id)
+        try:
+            force = request.args.get('force')[0]
+        except (IndexError, TypeError):
+            force = False
+        if force == 'true':
+            d = group.update_config({'minEntities': 0, 'maxEntities': 0})
+            return d.addCallback(lambda _: group.delete_group())
+        else:
+            return group.delete_group()
 
     @app.route('/state/', methods=['GET'])
     @fails_with(exception_codes)
