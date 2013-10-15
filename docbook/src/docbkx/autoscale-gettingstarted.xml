@@ -41,21 +41,19 @@ format="SVG" scale="60"/>
 <!ENTITY MUST '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
 <!ENTITY MUST_NOT '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
 ]>
-
-<book version="5.0" 
-      xmlns="http://docbook.org/ns/docbook"
-      xmlns:xlink="http://www.w3.org/1999/xlink"
-      xmlns:xi="http://www.w3.org/2001/XInclude"
-      xmlns:svg="http://www.w3.org/2000/svg"
-      xmlns:m="http://www.w3.org/1998/Math/MathML"
-      xmlns:html="http://www.w3.org/1999/xhtml"
-      xml:id="autoscale-getting-started"
-      xmlns:raxm="http://docs.rackspace.com/api/metadata"
-      xlink:href="http:// docs.autoscale.apiary.io/ ">
-<!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
-<title>&PRODNAME; Getting Started Guide</title>
-<titleabbrev>&PRODABBV; Intro</titleabbrev>    
-<?rax title.font.size="35px" subtitle.font.size="20px"
+<book version="5.0" xmlns="http://docbook.org/ns/docbook"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    xmlns:xi="http://www.w3.org/2001/XInclude"
+    xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns:m="http://www.w3.org/1998/Math/MathML"
+    xmlns:html="http://www.w3.org/1999/xhtml"
+    xml:id="autoscale-getting-started"
+    xmlns:raxm="http://docs.rackspace.com/api/metadata"
+    xlink:href="http:// docs.autoscale.apiary.io/ ">
+    <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
+    <title>&PRODNAME; Getting Started Guide</title>
+    <titleabbrev>&PRODABBV; Intro</titleabbrev>
+    <?rax title.font.size="35px" subtitle.font.size="20px"
       status.bar.text="Early Access" 
       canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
@@ -83,7 +81,7 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision> 
+            </revision>
             <revision>
                 <date>2013-08-02</date>
                 <revdescription>
@@ -145,7 +143,9 @@ format="SVG" scale="60"/>
                     <listitem>
                         <para>Rackspace Cloud account. To sign up for
                             a Rackspace Cloud account, go to the
-                            Rackspace Public Cloud <link xlink:href="https://cart.rackspace.com/cloud/signup/">signup page</link>. </para>
+                            Rackspace Public Cloud <link
+                                xlink:href="https://cart.rackspace.com/cloud/signup/"
+                                >signup page</link>. </para>
                     </listitem>
                     <listitem>
                         <para>Rackspace username and password
@@ -157,34 +157,31 @@ format="SVG" scale="60"/>
                 complete the following tasks:</para>
             <itemizedlist>
                 <listitem>
-                    <para>
-                        Configure alarms by using Cloud Monitoring.
-                        For more information, see the <link xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html">Rackspace Cloud Monitoring Getting
-                        Started Guide</link>.
-                    </para> 
+                    <para> Configure alarms by using Cloud Monitoring.
+                        For more information, see the <link
+                            xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-getting-started/content/index.html"
+                            >Rackspace Cloud Monitoring Getting
+                            Started Guide</link>. </para>
                 </listitem>
                 <listitem>
-                    <para>
-                        Create servers by using Cloud Servers. For
-                        more information, see the <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
-                        >Next
-                        Generation Cloud Servers™ Developer
-                        Guide</link>.
-                    </para>
+                    <para> Create servers by using Cloud Servers. For
+                        more information, see the <link
+                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
+                            >Next Generation Cloud Servers™ Developer
+                            Guide</link>. </para>
                 </listitem>
                 <listitem>
-                    <para>
-                        Create load balancers by using Cloud Load
+                    <para> Create load balancers by using Cloud Load
                         Balancers. For more information see the <link
-                        xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html">Rackspace Cloud Load Balancers Developers
-                        Guide</link>.
-                    </para>
+                            xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html"
+                            >Rackspace Cloud Load Balancers Developers
+                            Guide</link>. </para>
                 </listitem>
             </itemizedlist>
-            <para>You
-                can view detailed information about the Rackspace
-                Autoscale API at <link xlink:href="http:// docs.autoscale.apiary.io/ ">http://
-                    docs.autoscale.apiary.io/ </link></para>
+            <para>You can view detailed information about the
+                Rackspace Autoscale API at <link
+                    xlink:href="http:// docs.autoscale.apiary.io/ "
+                    >http:// docs.autoscale.apiary.io/ </link></para>
         </section>
     </chapter>
     <chapter xml:id="Core_Concepts">
@@ -468,7 +465,8 @@ format="SVG" scale="60"/>
                     APIs or an other Cloud technologies. Visit the
                     Developer Forum at <link
                         xlink:href="https://community.rackspace.com/developers/default"
-                        >https://community.rackspace.com/developers/default</link>. </para>
+                        >https://community.rackspace.com/developers/default</link>.
+                </para>
             </tip>
         </section>
         <section xml:id="Scaling_Policies">
@@ -550,24 +548,24 @@ format="SVG" scale="60"/>
             <para>As with all Rackspace APIs, before you can use the
                 Autoscale API you must authenticate with your
                 Rackspace credentials. </para>
-      <itemizedlist>
-          <listitem>
-              <para> When you authenticate, you submit your credentials
-                  to the Rackspace Cloud Identity Service.</para>
-          </listitem>
-                    <listitem>
-                        <para> If your credentials are valid, the
-                            Identity Service responds with your
-                            Service Catalog, which includes your
-                            token, token ID, user ID, and token tenant
-                            ID. </para>
-                    </listitem>
-                    <listitem>
-                        <para>To make requests of &PROD;, you must use
+            <itemizedlist>
+                <listitem>
+                    <para> When you authenticate, you submit your
+                        credentials to the Rackspace Cloud Identity
+                        Service.</para>
+                </listitem>
+                <listitem>
+                    <para> If your credentials are valid, the Identity
+                        Service responds with your Service Catalog,
+                        which includes your token, token ID, user ID,
+                        and token tenant ID. </para>
+                </listitem>
+                <listitem>
+                    <para>To make requests of &PROD;, you must use
                         your token tenant ID, also known as the
                         tenantID. </para>
-                    </listitem>
-                </itemizedlist>
+                </listitem>
+            </itemizedlist>
             <para> If you subscribe to many Rackspace services, your
                 Service Catalog response might be lengthy. For an
                 example of an annotated Service Catalog response,
@@ -583,58 +581,60 @@ format="SVG" scale="60"/>
                         xlink:href="http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html"
                         >http://docs.rackspace.com/auth/api/v2.0/auth-client-devguide/content/QuickStart-000.html</link>.</para>
             </tip>
-            <para>To authenticate access to Rackspace Cloud
-                services, you issue an authentication request to
-                the Rackspace Cloud Identity Service, which is an
-                implementation of the OpenStack Keystone Identity
-                Service v2.0. </para>
+            <para>To authenticate access to Rackspace Cloud services,
+                you issue an authentication request to the Rackspace
+                Cloud Identity Service, which is an implementation of
+                the OpenStack Keystone Identity Service v2.0. </para>
             <important>
-                <para>Multiple Rackspace Cloud Identity Service endpoints exist. You may use any endpoint, regardless of where your account was created. </para>
+                <para>Multiple Rackspace Cloud Identity Service
+                    endpoints exist. You may use any endpoint,
+                    regardless of where your account was created.
+                </para>
             </important>
             <para>The following table shows a list of valid
                 endpoints:</para>
             <table rules="all">
                 <caption>Regionalized Service Endpoints</caption>
-            <thead>
-                <tr align="center">
-                    <td colspan="2">Region</td>
-                    <td colspan="5">Endpoint</td>
-                </tr>
-            </thead>
-            <tbody>
-                <tr align="left">
-                    <td colspan="2">US</td>
-                    <td colspan="5"
-                        ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                    </td>
-                </tr>
-                <tr align="left">
-                    <td colspan="2">UK</td>
-                    <td colspan="5"
-                        ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                    </td>
-                </tr>
-                <tr align="left">
-                    <td colspan="2">London (LON)</td>
-                    <td colspan="5">
-                        <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                    </td>
-                </tr>
-                <tr align="left">
-                    <td colspan="2">Sydney (SYD)</td>
-                    <td colspan="5">
-                        <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                    </td>
-                </tr>
-            </tbody>
+                <thead>
+                    <tr align="center">
+                        <td colspan="2">Region</td>
+                        <td colspan="5">Endpoint</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr align="left">
+                        <td colspan="2">US</td>
+                        <td colspan="5"
+                                ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
+                    <tr align="left">
+                        <td colspan="2">UK</td>
+                        <td colspan="5"
+                                ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
+                    <tr align="left">
+                        <td colspan="2">London (LON)</td>
+                        <td colspan="5">
+                            <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
+                    <tr align="left">
+                        <td colspan="2">Sydney (SYD)</td>
+                        <td colspan="5">
+                            <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
+                </tbody>
             </table>
-    
             <section xml:id="Authenticate_using_cURL">
-           <title>Authenticate using cURL</title>
-                <para>To authenticate against the Rackspace Autoscale API, you issue a POST request to the appropriate Rackspace Cloud Identity Service endpoint.
-                    
-                    
-                    In the request body, supply one of the following sets of credentials:</para>
+                <title>Authenticate using cURL</title>
+                <para>To authenticate against the Rackspace Autoscale
+                    API, you issue a POST request to the appropriate
+                    Rackspace Cloud Identity Service endpoint. In the
+                    request body, supply one of the following sets of
+                    credentials:</para>
                 <para>
                     <itemizedlist>
                         <listitem>
@@ -645,7 +645,8 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </para>
-                <para>You need to use your username and password to log into the Rackspace Cloud Control Panel.</para>
+                <para>You need to use your username and password to
+                    log into the Rackspace Cloud Control Panel.</para>
                 <para>To obtain your API key, log into <link
                         xlink:href="http://mycloud.rackspace.com."
                         >http://mycloud.rackspace.com</link>, click
@@ -660,8 +661,7 @@ format="SVG" scale="60"/>
                                    -d '{"auth":{"RAX-KSKEY:apiKeyCredentials":{"username":"theUserName","apiKey":"0000000000000000000"}}}' \
                                    -H "Content-Type: application/json" | python -m json.tool </programlisting>
                     </example>
-                    </para>
-                   
+                </para>
             </section>
         </section>
         <section xml:id="Save_Image">
@@ -684,13 +684,14 @@ format="SVG" scale="60"/>
                     </listitem>
                 </itemizedlist>
             </para>
-            <para> With the Cloud Servers API, you can use a 
-                <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html">List Images</link>
-                request to retrieve a list of options available for configuring your server. 
-                <example>
+            <para> With the Cloud Servers API, you can use a <link
+                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
+                    >List Images</link> request to retrieve a list of
+                options available for configuring your server. <example>
                     <title>Requesting a List of Cloud Server
                         Images</title>
-                    <para>The following example shows how to request a list cloud server images.</para>
+                    <para>The following example shows how to request a
+                        list cloud server images.</para>
                     <programlisting language="bash">
                         $ curl -X GET \
                         -H "Content-Type: application/json" \
@@ -761,12 +762,13 @@ format="SVG" scale="60"/>
             </example>
         </section>
         <section xml:id="Manage_Launch_Configuration">
-            <title>Manage the Launch Configuration for your
-                Scaling Group</title>
+            <title>Manage the Launch Configuration for your Scaling
+                Group</title>
             <para>You can use the Autoscale API to view and update the
                 launch configuration for your scaling group.</para>
             <example>
-                <title>Get the Current Configuration for your Scaling Group</title>
+                <title>Get the Current Configuration for your Scaling
+                    Group</title>
                 <para>The following example shows how to obtain the
                     configuration for a scaling group, which includes
                     the minimum number of entities, the maximum number
@@ -792,7 +794,8 @@ format="SVG" scale="60"/>
 </programlisting>
             </example>
             <example>
-                <title>Get the Launch Configuration for your Scaling Group</title>
+                <title>Get the Launch Configuration for your Scaling
+                    Group</title>
                 <para>The following example shows how to obtain the
                     launch configuration for a scaling group, which
                     includes the details of how to create a server,
@@ -806,7 +809,8 @@ format="SVG" scale="60"/>
 </programlisting>
             </example>
             <example>
-                <title>Edit the Launch Configuration for your Scaling Group</title>
+                <title>Edit the Launch Configuration for your Scaling
+                    Group</title>
                 <para>The following example shows how to edit the
                     launch configuration for a scaling group,
                     inlucding how to create a server, from what image,
@@ -819,18 +823,21 @@ format="SVG" scale="60"/>
 </programlisting>
             </example>
             <example>
-                <title>Pause Execution of all Policies for a Scaling Group</title>
-                <para>The following example shows how to pause execution of all policies for a specific scaling group. </para>
+                <title>Pause Execution of all Policies for a Scaling
+                    Group</title>
+                <para>The following example shows how to pause
+                    execution of all policies for a specific scaling
+                    group. </para>
                 <programlisting> POST /{tenantId}/groups/{groupId}/pause</programlisting>
-           
             </example>
             <example>
-                <title>Resume Execution of all Policies for a Scaling Group</title>
-                <para>The following example shows how to resume execution of all policies for a specific scaling group. </para>
+                <title>Resume Execution of all Policies for a Scaling
+                    Group</title>
+                <para>The following example shows how to resume
+                    execution of all policies for a specific scaling
+                    group. </para>
                 <programlisting> POST /{tenantId}/groups/{groupId}/resume</programlisting>
-                
             </example>
-  
         </section>
         <section xml:id="Create_Policy">
             <title>Create Scaling Policies</title>
@@ -853,7 +860,8 @@ format="SVG" scale="60"/>
                         execution successfully caused the scaling
                         group to scale. If some element of the
                         configuration is invalid, scaling can fail
-                        even if the scaling policy is executed. </para>
+                        even if the scaling policy is executed.
+                    </para>
                 </note>
             </para>
             <example>
@@ -875,8 +883,10 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
             </example>
             <example>
                 <title>Obtaining a List of Scaling Policies</title>
-                <para>The following example demonstrates how to obtain a list of scaling policies in the group. Each policy describes an id,
-                    name, type, adjustment, cooldown, and links. </para>
+                <para>The following example demonstrates how to obtain
+                    a list of scaling policies in the group. Each
+                    policy describes an id, name, type, adjustment,
+                    cooldown, and links. </para>
                 <programlisting>
 GET /{tenantId}/groups/{groupId}/policies
                 </programlisting>
@@ -886,8 +896,9 @@ GET /{tenantId}/groups/{groupId}/policies
             </example>
             <example>
                 <title>Getting an Individual Scaling Policy</title>
-                <para>The following example demonstrates how to get a scaling policy which describes an id, name, type, adjustment, and
-                    cooldown, and links. </para>
+                <para>The following example demonstrates how to get a
+                    scaling policy which describes an id, name, type,
+                    adjustment, and cooldown, and links. </para>
                 <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}
                 </programlisting>
@@ -919,7 +930,6 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}
                 <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
                 </programlisting>
-           
             </example>
         </section>
         <section xml:id="Create_Webhooks">
@@ -944,13 +954,16 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
             </example>
             <example>
                 <title>Creating a Scaling Webhook: Response</title>
-                <para>The following example shows the response that is received for a request to create a webhook for a scaling policy.</para>
+                <para>The following example shows the response that is
+                    received for a request to create a webhook for a
+                    scaling policy.</para>
                 <programlisting language="json">
 <xi:include href="./samples/resCreateWebhook.json" parse="text"/>
 </programlisting>
             </example>
             <example>
-                <title>Get a List of all Scaling Webhooks and their Ids</title>
+                <title>Get a List of all Scaling Webhooks and their
+                    Ids</title>
                 <para>The following example shows how to obtain a list
                     of all scaling webhooks and their corresponding
                     ids.</para>
@@ -974,7 +987,8 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
 </programlisting>
             </example>
             <example>
-                <title>Get Information about a Specific Webhook</title>
+                <title>Get Information about a Specific
+                    Webhook</title>
                 <para>The following example shows how to obtain
                     details about a specific webhook.</para>
                 <programlisting>
@@ -993,7 +1007,6 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </programlisting>
-  
             </example>
         </section>
         <section xml:id="Execute_Policy">
@@ -1021,11 +1034,11 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 the scaling policy is executed. </para>
         </section>
         <section xml:id="Delete_Group">
-            <title>Deactivate and Delete the Scaling
-                Group</title>
+            <title>Deactivate and Delete the Scaling Group</title>
+            <para/>
             <para> You can stop a <link linkend="Create_Group">scaling
                     group</link> from scaling by configuring both its
-                minimum and maximum sizes to <code>0</code>.  </para>
+                minimum and maximum sizes to <code>0</code>. </para>
             <para> Setting <code>maxEntities</code> to <code>0</code>
                 prevents the scaling group from expanding. </para>
             <example>
@@ -1073,8 +1086,8 @@ DELETE /{tenantId}/groups/{groupId}
         <para>Q: Can I suspend servers and restore them quickly to the
             same IP address? </para>
         <para>A: Autoscale will not suspend and restore servers to the
-            same IP address. Servers will be restored to a different IP
-            address.</para>
+            same IP address. Servers will be restored to a different
+            IP address.</para>
         <para>Q: Can I scale up servers in a particular order? (i.e.
             spinning up a DB server before a web server) </para>
         <para>A: Autoscale will not handle scaling up servers,
