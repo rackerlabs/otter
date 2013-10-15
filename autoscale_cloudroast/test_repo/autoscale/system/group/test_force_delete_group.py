@@ -19,7 +19,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         """
         group = self._create_group_given_minentities(self.gc_min_entities_alt)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
-        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, True)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'true')
         self.assertEquals(delete_group_response.status_code, 204,
                           msg='Could not force delete group {0} when active servers existed '
                           'on it '.format(group.id))
@@ -33,7 +33,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         """
         group = self._create_group_given_minentities(self.gc_min_entities)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
-        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, False)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'false')
         self.assertEquals(delete_group_response.status_code, 204,
                           msg='Force delete group {0} failed when there are no activer servers '
                           'on the group and force is set to false'.format(group.id))
@@ -46,10 +46,25 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         """
         group = self._create_group_given_minentities(self.gc_min_entities_alt)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
-        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, False)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'false')
         self.assertEquals(delete_group_response.status_code, 403,
                           msg='Force deleted group {0} when active servers existed '
                           'on it and force was set to false'.format(group.id))
+
+    @tags(speed='test')
+    def test_system_force_delete_group_with_invalid_force_attribute(self):
+        """
+        Force deleting a scaling group with active servers with force set to invalid characters,
+        does not result in error 500.
+        """
+        group = self._create_group_given_minentities(self.gc_min_entities_alt)
+        self.verify_group_state(group.id, group.groupConfiguration.minEntities)
+        params = ['True', 'False', True, False, 0, '']
+        for each_param in params:
+            delete_group_response = self.autoscale_client.delete_scaling_group(group.id, each_param)
+            self.assertEquals(delete_group_response.status_code, 403,
+                              msg='Force deleted group {0} when active servers existed '
+                              'on it and force was set to invalid option'.format(group.id))
 
     def _create_group_given_minentities(self, minentities):
         """
