@@ -11,7 +11,6 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
-from otter.util.config import set_config_data
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
@@ -34,14 +33,6 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     endpoint = "/v1.0/11111/groups/1/policies/2/webhooks/"
 
     invalid_methods = ("DELETE", "PUT")
-
-    def setUp(self):
-        """
-        Ensure that limits pagination has a value that we know
-        """
-        super(WebhookCollectionTestCase, self).setUp()
-        set_config_data({'limits': {'pagination': 100}})
-        self.addCleanup(set_config_data, {})
 
     def test_list_unknown_error_is_500(self):
         """
