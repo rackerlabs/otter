@@ -203,7 +203,7 @@ def get_policies_links(policies, tenant_id, group_id, rel='self', limit=None, ma
 
 
 def get_webhooks_links(webhooks, tenant_id, group_id, policy_id,
-                      rel='self', limit=None, marker=None):
+                       rel='self', limit=None, marker=None):
     """
     Get the links to webhooks along with 'next' link
     """

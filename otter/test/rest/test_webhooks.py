@@ -36,6 +36,9 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
     invalid_methods = ("DELETE", "PUT")
 
     def setUp(self):
+        """
+        Ensure that limits pagination has a value that we know
+        """
         super(WebhookCollectionTestCase, self).setUp()
         set_config_data({'limits': {'pagination': 100}})
         self.addCleanup(set_config_data, {})
