@@ -16,6 +16,7 @@ from otter.models.interface import (
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
+from otter.util.config import config_value
 from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
@@ -451,7 +452,8 @@ class CassScalingGroup(object):
             """
             Now that we know the group exists, get its policies
             """
-            d = self._naive_list_policies()
+            limit = config_value('limits.pagination') or 100
+            d = self._naive_list_policies(limit=limit)
             d.addCallback(lambda policies: {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),

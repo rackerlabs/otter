@@ -258,8 +258,7 @@ GET /{tenantId}/groups/{groupId}
 
 Delete a scaling group if there are no entities belonging to the scaling
 group.  If successful, no response body will be returned.  If there are
-pending or active entities, a 409 will be returned. Pass force=true to force
-delete the group, ignoring pending/active entities.
+pending or active entities, a 409 will be returned.
 
 DELETE /{tenantId}/groups/{groupId}
 < 204

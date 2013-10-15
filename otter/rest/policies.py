@@ -11,11 +11,11 @@ from twisted.internet import defer
 
 from otter.json_schema import rest_schemas, group_schemas
 from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, with_transaction_id)
+                                   succeeds_with, with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.rest.webhooks import OtterWebhooks
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util.http import get_autoscale_links, transaction_id, get_policies_links
 from otter import controller
 
 
@@ -42,7 +42,8 @@ class OtterPolicies(object):
     @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_policies(self, request):
+    @paginatable
+    def list_policies(self, request, paginate):
         """
         Get a list of scaling policies in the group. Each policy describes an id,
         name, type, adjustment, cooldown, and links. This data is returned in the
@@ -115,11 +116,12 @@ class OtterPolicies(object):
             linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {
                 'policies': policy_list,
-                "policies_links": []
+                "policies_links": get_policies_links(policy_list, self.tenant_id,
+                                                     self.scaling_group_id, None, **paginate)
             }
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.list_policies()
+        deferred = rec.list_policies(**paginate)
         deferred.addCallback(format_policies)
         deferred.addCallback(json.dumps)
         return deferred

@@ -12,7 +12,7 @@ from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
 from otter.test.utils import patch
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
-                             get_groups_links)
+                             get_groups_links, get_policies_links, get_webhooks_links)
 
 
 class LinkGenerationTestCase(TestCase):
@@ -328,6 +328,27 @@ class GetSpecificCollectionsLinks(TestCase):
         self.assertEqual(links, 'col links')
         self.gal.assert_called_once_with('tid', format=None)
         self.gcl.assert_called_once_with('groups', 'url', 'rel', 2, '3')
+
+    def test_get_policies_links(self):
+        """
+        `get_policies_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_policies_links('policies', 'tid', 'gid', rel='rel', limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', 'gid', '', format=None)
+        self.gcl.assert_called_once_with('policies', 'url', 'rel', 2, '3')
+
+    def test_get_webhooks_links(self):
+        """
+        `get_webhooks_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_webhooks_links('webhooks', 'tid', 'gid', 'pid', rel='rel',
+                                   limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', 'gid', 'pid', '', format=None)
+        self.gcl.assert_called_once_with('webhooks', 'url', 'rel', 2, '3')
 
 
 class RouteTests(RequestTestMixin, TestCase):

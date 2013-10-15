@@ -496,7 +496,8 @@
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation deletes the specified autoscaling group if the group is empty. 
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 error message is returned.
+                the group contains pending or active entities, deletion fails and a 409 error message is returned. Pass force=true to force
+                delete the group, ignoring pending/active entities.
             </p>
         </doc>
         <response status="204"/>
