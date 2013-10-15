@@ -51,7 +51,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
                           msg='Force deleted group {0} when active servers existed '
                           'on it and force was set to false'.format(group.id))
 
-    @tags(speed='test')
+    @tags(speed='quick')
     def test_system_force_delete_group_with_invalid_force_attribute(self):
         """
         Force deleting a scaling group with active servers with force set to invalid characters,
