@@ -54,7 +54,7 @@ def fails_with(mapping):
                         code=code
                     ).err(failure, 'Unhandled Error handling request')
                 request.setResponseCode(code)
-                return json.dumps(errorObj)
+                return json.dumps({'error': errorObj})
 
             d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addErrback(_fail, request)

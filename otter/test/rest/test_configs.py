@@ -45,7 +45,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_get_group_config_500(self):
@@ -58,7 +58,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_config.assert_called_once_with()
-        self.assertEqual(resp['type'], 'InternalError')
+        self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
     def test_get_group_config_succeeds(self):
@@ -108,7 +108,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
 
         self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_update_group_config_fail_500(self):
@@ -139,7 +139,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_config.assert_called_once_with(expected_config)
-        self.assertEqual(resp['type'], 'InternalError')
+        self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
     @mock.patch('otter.rest.configs.controller', spec=['obey_config_change'])
@@ -228,7 +228,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
                                                     body=request_body)
             resp = json.loads(response_body)
 
-            self.assertEqual(resp['type'], 'InvalidJsonError')
+            self.assertEqual(resp['error']['type'], 'InvalidJsonError')
             self.assertFalse(self.mock_group.update_config.called)
             self.flushLoggedErrors(InvalidJsonError)
 
@@ -248,7 +248,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
                 400, method='PUT', body=json.dumps(request_body))
             resp = json.loads(response_body)
 
-            self.assertEqual(resp['type'], 'ValidationError')
+            self.assertEqual(resp['error']['type'], 'ValidationError')
             self.assertFalse(self.mock_group.update_config.called)
             self.flushLoggedErrors(ValidationError)
 
@@ -266,7 +266,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             400, method='PUT', body=json.dumps(invalid))
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
+        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['message'])
 
     def test_group_modify_minEntities_eq_maxEntities_204(self):
         """
@@ -324,7 +324,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_get_launch_config_500(self):
@@ -338,7 +338,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.view_launch_config.assert_called_once_with()
-        self.assertEqual(resp['type'], 'InternalError')
+        self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
     def test_get_launch_config_succeeds(self):
@@ -370,7 +370,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_update_launch_config_fail_500(self):
@@ -387,7 +387,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(mock.ANY, '11111', '1')
         self.mock_group.update_launch_config.assert_called_once_with(
             launch_examples()[0])
-        self.assertEqual(resp['type'], 'InternalError')
+        self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
     def test_update_invalid_launch_config_fail_400(self):
@@ -426,7 +426,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
                                                     body=request_body)
             resp = json.loads(response_body)
 
-            self.assertEqual(resp['type'], 'InvalidJsonError')
+            self.assertEqual(resp['error']['type'], 'InvalidJsonError')
             self.assertFalse(self.mock_group.update_launch_config.called)
             self.flushLoggedErrors(InvalidJsonError)
 
@@ -442,6 +442,6 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
                 400, method='PUT', body=json.dumps(request_body))
             resp = json.loads(response_body)
 
-            self.assertEqual(resp['type'], 'ValidationError')
+            self.assertEqual(resp['error']['type'], 'ValidationError')
             self.assertFalse(self.mock_group.update_launch_config.called)
             self.flushLoggedErrors(ValidationError)
