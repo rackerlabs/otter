@@ -202,6 +202,15 @@ def get_policies_links(policies, tenant_id, group_id, rel='self', limit=None, ma
     return get_collection_links(policies, url, rel, limit, marker)
 
 
+def get_webhooks_links(webhooks, tenant_id, group_id, policy_id,
+                       rel='self', limit=None, marker=None):
+    """
+    Get the links to webhooks along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, group_id, policy_id, "", format=None)
+    return get_collection_links(webhooks, url, rel, limit, marker)
+
+
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,
                         webhook_id=None, capability_hash=None,
                         capability_version="1", format="json",
