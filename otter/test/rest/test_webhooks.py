@@ -11,6 +11,7 @@ import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
 
+from otter.util.config import set_config_data
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import (
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
@@ -34,6 +35,11 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
 
     invalid_methods = ("DELETE", "PUT")
 
+    def setUp(self):
+        super(WebhookCollectionTestCase, self).setUp()
+        set_config_data({'limits': {'pagination': 100}})
+        self.addCleanup(set_config_data, {})
+
     def test_list_unknown_error_is_500(self):
         """
         If an unexpected exception is raised, endpoint returns a 500.
@@ -41,7 +47,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         error = DummyException('what')
         self.mock_group.list_webhooks.return_value = defer.fail(error)
         self.assert_status_code(500)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
         self.flushLoggedErrors(DummyException)
 
     def test_list_webhooks_for_unknowns_is_404(self):
@@ -57,7 +64,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             self.mock_group.list_webhooks.return_value = defer.fail(error)
             self.assert_status_code(404)
             self.mock_group.list_webhooks.assert_called_once_with(
-                self.policy_id)
+                self.policy_id, limit=100)
             self.flushLoggedErrors(type(error))
             self.mock_group.list_webhooks.reset_mock()
 
@@ -68,14 +75,14 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_group.list_webhooks.return_value = defer.succeed({})
         body = self.assert_status_code(200)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
 
         resp = json.loads(body)
         self.assertEqual(resp, {"webhooks": [], "webhooks_links": []})
         validate(resp, rest_schemas.list_webhooks_response)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_returned_webhooks_list_gets_translated(self, mock_url):
+    def test_returned_webhooks_list_gets_translated(self):
         """
         Test that the webhooks list gets translated with links and capability
         removed.
@@ -88,7 +95,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
              'capability': {'hash': 'yyy', 'version': '1'}}
         ])
         body = self.assert_status_code(200)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
 
         resp = json.loads(body)
         validate(resp, rest_schemas.list_webhooks_response)
@@ -117,6 +125,29 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             ],
             "webhooks_links": []
         })
+
+    def test_list_webhooks_returns_next_webhook_link(self):
+        """
+        If as many webhooks as the limit is returned, a next link is provided.
+        """
+        base = {'name': 'x', 'metadata': {},
+                'capability': {'hash': 'xxx', 'version': '1'}}
+        self.mock_group.list_webhooks.return_value = defer.succeed(
+            [dict(id=str(i), **base) for i in range(3)])
+
+        body = self.assert_status_code(
+            200, endpoint="{0}?limit=3".format(self.endpoint))
+
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=3)
+
+        resp = json.loads(body)
+        validate(resp, rest_schemas.list_webhooks_response)
+        self.assertEqual(len(resp['webhooks']), 3)
+        self.assertEqual(resp['webhooks_links'], [{
+            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?marker=2&limit=3',
+            'rel': 'next'
+        }])
 
     def test_create_webhooks_unknown_error_is_500(self):
         """
