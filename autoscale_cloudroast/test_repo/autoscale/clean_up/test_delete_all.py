@@ -49,12 +49,10 @@ class DeleteAll(AutoscaleFixture):
         loadbalancer_id_list = [self.load_balancer_1, self.load_balancer_2, self.load_balancer_3]
         for each_load_balancer in loadbalancer_id_list:
             nodes = self.lbaas_client.list_nodes(each_load_balancer).entity
-            node_id_list = [each_node.id for each_node in nodes]
-            if len(node_id_list) is 1:
-                print 'Nothing to delete. Only one node on load balancer'
-            else:
-                node_id_list.pop()
+            if len(nodes) is not 0:
+                node_id_list = [each_node.id for each_node in nodes]
                 self.delete_nodes_in_loadbalancer(node_id_list, each_load_balancer)
                 list_nodes = (self.lbaas_client.list_nodes(each_load_balancer)).entity
                 print 'Deleted {0} nodes'.format(len(node_id_list))\
-                    if len(list_nodes) > 1 else 'Deleted {0} nodes one remains'.format(len(node_id_list))
+                    if len(list_nodes) is 0 else 'Deleted {0} nodes {1}remain'.format(len(node_id_list),
+                                                                                      len(list_nodes))
