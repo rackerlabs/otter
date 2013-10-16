@@ -353,7 +353,7 @@ format="SVG" scale="60"/>
         <section xml:id="Group_Configuration">
             <title>Scaling Group Configuration</title>
             <para>The scaling group configuration specifies the basic
-                elements of the Autoscale configuration. It manages
+                elements of the Auto Scale configuration. It manages
                 how many servers can participate in the scaling group. </para>
             <para> The group configuration specifies the following
                 items: <itemizedlist spacing="compact">
