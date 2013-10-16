@@ -136,7 +136,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_policy_create(self):
         """
@@ -218,7 +218,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(404, method="GET")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_policy_success(self):
@@ -250,7 +250,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.update_policy.assert_called_once_with(
             self.policy_id, policy_examples()[0])
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_policy_unknown_error_is_500(self):
@@ -286,7 +286,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_delete_policy_success(self):
         """
@@ -314,7 +314,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.delete_policy.assert_called_once_with(
             self.policy_id)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_execute_policy_success(self):
@@ -348,7 +348,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_execute_policy_failure_403(self):
@@ -364,9 +364,9 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'CannotExecutePolicyError')
+        self.assertEqual(resp['error']['type'], 'CannotExecutePolicyError')
         self.assertEqual(
-            resp['message'],
+            resp['error']['message'],
             'Cannot execute scaling policy 2 for group 1 for tenant 11111: meh')
         self.flushLoggedErrors(CannotExecutePolicyError)
 

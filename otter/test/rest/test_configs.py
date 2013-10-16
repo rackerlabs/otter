@@ -266,7 +266,7 @@ class GroupConfigTestCase(RestAPITestMixin, TestCase):
             400, method='PUT', body=json.dumps(invalid))
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['message'])
+        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
 
     def test_group_modify_minEntities_eq_maxEntities_204(self):
         """
@@ -401,7 +401,7 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
             400, method="PUT", body=json.dumps(launch_examples()[0]))
         resp = json.loads(response_body)
 
-        self.assertEqual(resp['message'], 'hmph')
+        self.assertEqual(resp['error']['message'], 'hmph')
         self.flushLoggedErrors(InvalidLaunchConfiguration)
 
     def test_update_launch_config_success(self):
