@@ -5,13 +5,15 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.util.config import set_config_data
 from otter.json_schema import group_examples
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection,
     MockAdmin)
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
-    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError,
+    OverLimitError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -733,6 +735,9 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
+        set_config_data({'limits': {'absolute': {'maxGroups': 10}}})
+        self.addCleanup(set_config_data, {})
+
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.config = {
@@ -805,6 +810,22 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch, 'policies': policies})
+
+    def test_max_groups_underlimit(self):
+        """
+        test scaling group creation when below maxGroups limit
+        """
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.assertTrue(isinstance(self.successResultOf(d), dict))
+
+    def test_max_groups_overlimit(self):
+        """
+        test scaling group creation when at maxGroups limit
+        """
+        set_config_data({'limits': {'absolute': {'maxGroups': 0}}})
+
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.failureResultOf(d, OverLimitError)
 
     def test_list_scaling_group_limits_number_of_groups(self):
         """
