@@ -37,7 +37,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         in any case deletes the group even if there are active servers on the group.
         """
         for param in self.params:
-            group = self._create_group_given_minentities(self.gc_min_entities_alt)
+            group = self._create_group_given_minentities(self.gc_min_entities)
             self.verify_group_state(group.id, group.groupConfiguration.minEntities)
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
             self.assertEquals(delete_group_response.status_code, 204,
@@ -55,7 +55,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         for param in self.invalid_params:
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
-            self.assertEquals(delete_group_response.status_code, 403,
+            self.assertEquals(delete_group_response.status_code, 400,
                               msg='Force deleted group {0} when active servers existed '
                               'on it and force was set to invalid option'.format(group.id))
 
@@ -69,7 +69,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         for param in self.invalid_params:
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
-            self.assertEquals(delete_group_response.status_code, 403,
+            self.assertEquals(delete_group_response.status_code, 400,
                               msg='Force deleted group {0} when active servers existed '
                               'on it and force was set to invalid option'.format(group.id))
 
