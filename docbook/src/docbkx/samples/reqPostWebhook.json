@@ -1,0 +1,9 @@
+{
+        "metadata": {
+            "notes": "PagerDuty will fire this webhook"
+        },
+        "name": "PagerDuty"
+},
+{
+        "name": "Nagios"
+}
