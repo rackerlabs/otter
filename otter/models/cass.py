@@ -12,7 +12,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
-    IScalingScheduleCollection, IAdmin)
+    IScalingScheduleCollection, IAdmin, OverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -949,6 +949,19 @@ class CassScalingGroupCollection:
         """
         scaling_group_id = generate_key_str('scalinggroup')
 
+        # obey limits
+        max_groups = config_value('limits.absolute.maxGroups')
+        d = self.connection.execute(_cql_count_for_tenant.format(
+            cf="scaling_group"), {'tenantId': tenant_id})
+
+        def check_groups(cur_groups, max_groups):
+            if cur_groups['count'] >= max_groups:
+                msg = 'client has reached maxGroups limit'
+                log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg(msg)
+                raise OverLimitError(tenant_id, max_groups)
+
+        d.addCallback(check_groups, max_groups)
+
         log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
 
         queries = [_cql_create_group.format(cf=self.group_table)]
@@ -980,15 +993,20 @@ class CassScalingGroupCollection:
 
         b = Batch(queries, data,
                   consistency=get_consistency_level('create', 'group'))
-        d = b.execute(self.connection)
-        d.addCallback(lambda _: {
-            'groupConfiguration': config,
-            'launchConfiguration': launch,
-            'scalingPolicies': outpolicies,
-            'id': scaling_group_id,
-            'state': scaling_group_state
-        })
-        return d
+
+        def execute_batch(_ignore):
+            bd = b.execute(self.connection)
+            bd.addCallback(lambda _: {
+                'groupConfiguration': config,
+                'launchConfiguration': launch,
+                'scalingPolicies': outpolicies,
+                'id': scaling_group_id,
+                'state': scaling_group_state
+            })
+
+            return bd
+
+        return d.addCallback(execute_batch)
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
