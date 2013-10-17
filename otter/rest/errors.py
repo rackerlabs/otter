@@ -8,7 +8,7 @@ from otter.controller import CannotExecutePolicyError
 
 from otter.models.interface import (
     GroupNotEmptyError, NoSuchScalingGroupError,
-    NoSuchPolicyError, NoSuchWebhookError)
+    NoSuchPolicyError, NoSuchWebhookError, OverLimitError)
 
 from otter.worker.validate_config import InvalidLaunchConfiguration
 
@@ -32,4 +32,5 @@ exception_codes = {
     CannotExecutePolicyError: 403,
     InvalidQueryArgument: 400,
     NotImplementedError: 501,
+    OverLimitError: 422,
 }
