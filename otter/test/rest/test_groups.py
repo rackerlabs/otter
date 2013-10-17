@@ -665,12 +665,14 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         """
         Deleting an existing group succeeds with a 204.
         """
+        self.mock_group.update_config.return_value = defer.succeed(None)
         self.mock_group.delete_group.return_value = defer.succeed(None)
 
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
+        self.assertEqual(0, self.mock_group.update_config.call_count)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force(self):
@@ -688,19 +690,34 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             {'maxEntities': 0, 'minEntities': 0})
         self.mock_group.delete_group.assert_called_once_with()
 
-    def test_group_delete_force_garbage_arg(self):
+    def test_group_delete_force_case_insensitive(self):
         """
-        Deleting a group with force sets min/max to zero and deletes it.
+        The 'true' specified in force is case insensitive.
         """
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
 
         self.assert_status_code(
-            204, endpoint="{0}?force=blah".format(self.endpoint),
+            204, endpoint="{0}?force=true".format(self.endpoint),
+            method="DELETE")
+
+        self.mock_group.update_config.assert_called_once_with(
+            {'maxEntities': 0, 'minEntities': 0})
+        self.mock_group.delete_group.assert_called_once_with()
+
+    def test_group_delete_force_garbage_arg(self):
+        """
+        Providing an force argument other than 'true' causes an error.
+        """
+        self.mock_group.delete_group.return_value = defer.succeed(None)
+        self.mock_group.update_config.return_value = defer.succeed(None)
+
+        self.assert_status_code(
+            400, endpoint="{0}?force=blah".format(self.endpoint),
             method="DELETE")
 
         self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.mock_group.delete_group.assert_called_once_with()
+        self.assertEqual(0, self.mock_group.delete_group.call_count)
 
     def test_group_delete_404(self):
         """

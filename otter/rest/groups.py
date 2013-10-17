@@ -5,6 +5,8 @@ Autoscale REST endpoints having to do with a group or collection of groups
 from functools import partial
 import json
 
+from twisted.internet import defer
+
 from otter import controller
 from otter.supervisor import get_supervisor
 
@@ -12,7 +14,8 @@ from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
-                                   with_transaction_id, paginatable)
+                                   with_transaction_id, paginatable,
+                                   InvalidQueryArgument)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
@@ -458,11 +461,18 @@ class OtterGroup(object):
         """
         group = self.store.get_scaling_group(self.log, self.tenant_id,
                                              self.group_id)
+        force = False
         try:
-            force = request.args.get('force')[0]
+            force_arg = request.args.get('force')[0].lower()
+            if force_arg == 'true':
+                force = True
+            else:
+                return defer.fail(InvalidQueryArgument(
+                    'Invalid query argument for "limit"'))
         except (IndexError, TypeError):
-            force = False
-        if force == 'true':
+            # There is no argument
+            pass
+        if force:
             d = group.update_config({'minEntities': 0, 'maxEntities': 0})
             return d.addCallback(lambda _: group.delete_group())
         else:
