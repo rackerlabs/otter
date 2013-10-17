@@ -202,8 +202,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                   has entities.
         :param group_id: The id of an existing scaling group.
         :type group_id: String
-        :param force: If force is set to true, a group is deleted even if the servers exist.
-        :type force: Boolean
+        :param force: If force is set to 'true', a group is deleted even if servers exist.
+        :type force: String
         :return: Response Object containing response code 204
                  on success and empty body
         :rtype: Response Object
