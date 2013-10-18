@@ -14,7 +14,6 @@ class ForceDeleteGroupTest(AutoscaleFixture):
 
     params = ['true', 'TRUE', 'TrUe', 'True', 'truE', True]
     invalid_params = [0, '', '$%^#', 'false', 'False', False, 'anything', 'truee']
-    gc_min_entities = 0
 
     @tags(speed='slow')
     def test_system_force_delete_group_with_minentities_over_zero(self):
@@ -38,7 +37,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         in any case deletes the group even if there are active servers on the group.
         """
         for param in self.params:
-            group = self._create_group_given_minentities(self.gc_min_entities)
+            group = self._create_group_given_minentities(0)
             self.verify_group_state(group.id, group.groupConfiguration.minEntities)
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
             self.assertEquals(delete_group_response.status_code, 204,
@@ -52,7 +51,7 @@ class ForceDeleteGroupTest(AutoscaleFixture):
         Force deleting a scaling group with no active servers with force set to invalid characters,
         does not result in error 500.
         """
-        group = self._create_group_given_minentities(self.gc_min_entities)
+        group = self._create_group_given_minentities(0)
         self.verify_group_state(group.id, group.groupConfiguration.minEntities)
         for param in self.invalid_params:
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
