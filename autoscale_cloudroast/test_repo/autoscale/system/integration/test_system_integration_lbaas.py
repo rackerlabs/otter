@@ -190,6 +190,26 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
 
     @tags(speed='slow')
+    def test_force_delete_group_with_load_balancer(self):
+        """
+        Force delete a scaling group with active servers and load balancer, deletes the servers and the
+        modes form the load balancer and then deletes the group.
+        """
+        group = self._create_group_given_lbaas_id(self.load_balancer_1)
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+        server_list = self.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        server_ip_list = self._get_ipv4_address_list_on_servers(server_list)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'true')
+        self.assertEquals(delete_group_response.status_code, 204,
+                          msg='Could not force delete group {0} when active servers existed '
+                          'on it '.format(group.id))
+        self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
+        node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
+        self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
+
+    @tags(speed='slow')
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load balancer id
