@@ -28,13 +28,13 @@ class ForceDeleteGroupTest(AutoscaleFixture):
             delete_group_response = self.autoscale_client.delete_scaling_group(group.id, param)
             self.assertEquals(delete_group_response.status_code, 204,
                               msg='Force delete group {0} failed when there are no activer servers '
-                              'on the group and force is set to false'.format(group.id))
+                              'on the group and force is set to true'.format(group.id))
             self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
 
     @tags(speed='quick')
     def test_system_force_delete_group_with_force_as_true_with_0_minentities(self):
         """
-        Force deleting a scaling group with active servers with force set to true,
+        Force deleting a scaling group with no active servers with force set to true,
         in any case deletes the group even if there are active servers on the group.
         """
         for param in self.params:
