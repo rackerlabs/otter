@@ -9,11 +9,12 @@ class ForceDeleteGroupTest(AutoscaleFixture):
 
     """
     System tests to verify various force delete scaling group scenarios.
-    self.gc_minentities is set to 0 and self.gc_min_entities_alt is set to >0 in the config.
+    self.gc_min_entities_alt is set to >0 in the config.
     """
 
     params = ['true', 'TRUE', 'TrUe', 'True', 'truE', True]
     invalid_params = [0, '', '$%^#', 'false', 'False', False, 'anything', 'truee']
+    gc_min_entities = 0
 
     @tags(speed='slow')
     def test_system_force_delete_group_with_minentities_over_zero(self):
