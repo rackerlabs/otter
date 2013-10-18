@@ -449,7 +449,7 @@
           &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroups" name="GET" rax:roles="autoscale:observer">
+    <method id="getGroups" name="GET" rax:roles="observer autoscale:observer">
         <wadl:doc title="List Scaling Groups" xml:lang="EN"
             xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
@@ -469,7 +469,7 @@
         &commonFaults; &getFaults;  
     </method>
 
-    <method id="getGroupManifest" name="GET" rax:roles="autoscale:observer">
+    <method id="getGroupManifest" name="GET" rax:roles="observer autoscale:observer">
         <wadl:doc title="List All Group Details" xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
                 This operation returns details about the configuration for a specified autoscaling group.
@@ -505,7 +505,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroupState" name="GET" rax:roles="autoscale:observer">
+    <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group State">
             <db:para role="shortdesc">
                This operation returns the state of an autoscaling group.
@@ -528,7 +528,7 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method id="getGroupConfig" name="GET" rax:roles="autoscale:observer">
+    <method id="getGroupConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group Configuration">
             <db:para role="shortdesc">
                This operation lists the configuration for an autoscaling group.
@@ -579,7 +579,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getLaunchConfig" name="GET" rax:roles="autoscale:observer">
+    <method id="getLaunchConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Launch Configuration">
             <db:para role="shortdesc">
                 This operation lists the launch configuration.
@@ -668,7 +668,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicies" rax:roles="autoscale:observer">
+    <method name="GET" id="getPolicies" rax:roles="observer autoscale:observer">
         <doc title="Get Policies List">
             <db:para role="shortdesc">
                 This operation lists scaling policies in the autoscaling group.
@@ -690,7 +690,7 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method name="POST" id="createPolicies" rax:roles="creator autoscale:creator">
+    <method name="POST" id="createPolicies" rax:roles="autoscale:creator">
         <doc title="Create Policy">
             <db:para role="shortdesc">
                 This operation creates an autoscaling policy.
@@ -771,7 +771,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicy" rax:roles="autoscale:observer">
+    <method name="GET" id="getPolicy" rax:roles="observer autoscale:observer">
         <doc title="Get Policy Details">
             <db:para role="shortdesc">
                 This operation returns details for a specified autoscaling policy.
@@ -849,7 +849,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getWebhooks" rax:roles="autoscale:observer">
+    <method name="GET" id="getWebhooks" rax:roles="observer autoscale:observer">
         <doc title="Get a list of webhooks for the policy">
             <db:para role="shortdesc">
                 This operation obtains a list of webhooks for the autoscaling policy.
@@ -869,7 +869,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="createWebhook" name="POST" rax:roles="creator autoscale:creator">
+    <method id="createWebhook" name="POST" rax:roles="autoscale:creator">
         <doc title="Create a webhook">
             <db:para role="shortdesc">
                 This operation creates a webhook.
@@ -898,7 +898,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getWebhook" name="GET" rax:roles="autoscale:observer">
+    <method id="getWebhook" name="GET" rax:roles="observer autoscale:observer">
         <doc title="View Webhook">
             <db:para role="shortdesc">
                 This operation returns the description for a webhook.
