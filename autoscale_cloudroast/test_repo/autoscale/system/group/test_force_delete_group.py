@@ -7,6 +7,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 
 
+@unittest.skip('PR-432')
 class ForceDeleteGroupTest(AutoscaleFixture):
 
     """
@@ -17,7 +18,6 @@ class ForceDeleteGroupTest(AutoscaleFixture):
     params = ['true', 'TRUE', 'TrUe', 'True', 'truE', True]
     invalid_params = [0, '', '$%^#', 'false', 'False', False, 'anything', 'truee']
 
-    @unittest.skip('PR-432')
     @tags(speed='slow')
     def test_system_force_delete_group_with_minentities_over_zero(self):
         """
