@@ -352,14 +352,12 @@ class OtterGroups(object):
         return deferred
 
     @app.route('/<string:group_id>/', branch=True)
-    @with_transaction_id()
-    def group(self, request, log, group_id):
+    def group(self, request, group_id):
         """
         Routes requiring a specific group_id are delegated to
         OtterGroup.
         """
-        return OtterGroup(self.store, log,
-                          self.tenant_id, group_id).app.resource()
+        return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
 
 
 class OtterGroup(object):
@@ -368,9 +366,11 @@ class OtterGroup(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id):
+        self.log = log.bind(system='otter.rest.group',
+                            tenant_id=tenant_id,
+                            group_id=group_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
 
@@ -535,25 +535,24 @@ class OtterGroup(object):
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/config/')
-    @with_transaction_id()
-    def config(self, request, log):
+    def config(self, request):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/launch/')
     @with_transaction_id()
-    def launch(self, request, log):
+    def launch(self, request):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/policies/', branch=True)
     @with_transaction_id()
-    def policies(self, request, log):
+    def policies(self, request):
         """
         policies routes handled by OtterPolicies
         """
-        return OtterPolicies(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterPolicies(self.store, self.tenant_id, self.group_id).app.resource()
