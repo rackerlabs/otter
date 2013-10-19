@@ -10,7 +10,6 @@ from twisted.trial.unittest import TestCase
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
-from otter.test.utils import patch
 from otter.util.http import get_autoscale_links, transaction_id
 
 
@@ -315,7 +314,7 @@ class DelegatedLogArgumentsTestCase(RequestTestMixin, TestCase):
         """
         Mock out the log in the `with_transaction_id` decorator.
         """
-        self.mock_log = patch(self, 'otter.rest.decorators.log')
+        self.mock_log = mock.MagicMock()
 
     def test_all_arguments_logged(self):
         """
@@ -324,11 +323,10 @@ class DelegatedLogArgumentsTestCase(RequestTestMixin, TestCase):
         """
         class FakeSubApp(object):
             app = OtterApp()
-
-            def __init__(self, log):
-                self.log = log
+            log = self.mock_log
 
             @app.route('/<string:extra_arg1>/')
+            @with_transaction_id()
             @log_arguments
             def doWork(self, request, extra_arg1):
                 return 'empty response'
@@ -337,12 +335,11 @@ class DelegatedLogArgumentsTestCase(RequestTestMixin, TestCase):
             app = OtterApp()
 
             @app.route('/', branch=True)
-            @with_transaction_id()
-            def delegate_to_dowork(self, request, log):
-                return FakeSubApp(log).app.resource()
+            def delegate_to_dowork(self, request):
+                return FakeSubApp().app.resource()
 
         self.assert_status_code(200, method='GET', endpoint='/some_data/',
                                 root=FakeApp().app.resource())
 
         kwargs = {'extra_arg1': 'some_data'}
-        self.mock_log.bind().bind().bind.assert_called_once_with(**kwargs)
+        self.mock_log.bind().bind.assert_called_with(**kwargs)
