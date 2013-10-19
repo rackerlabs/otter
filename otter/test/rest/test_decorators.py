@@ -15,7 +15,6 @@ from twisted.python.failure import Failure
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
     with_transaction_id, log_arguments, log_ignore_arguments)
-from otter.test.utils import patch
 
 
 class BlahError(Exception):
@@ -49,7 +48,7 @@ class TransactionIdTestCase(TestCase):
             self.mockRequest.code = code
         self.mockRequest.setResponseCode.side_effect = mockResponseCode
 
-        self.mock_log = patch(self, 'otter.rest.decorators.log')
+        self.mock_log = mock.MagicMock()
 
         self.hashkey_patch = mock.patch(
             'otter.rest.decorators.generate_transaction_id')
@@ -64,8 +63,10 @@ class TransactionIdTestCase(TestCase):
         """
 
         class FakeApp(object):
+            log = self.mock_log
+
             @with_transaction_id()
-            def doWork(self, request, log):
+            def doWork(self, request):
                 """ Test Work """
                 return defer.succeed('hello')
 
@@ -89,8 +90,11 @@ class TransactionIdTestCase(TestCase):
         the returned log is bound with kwargs passed
         """
         class FakeApp(object):
+            log = self.mock_log
+
             @with_transaction_id()
-            def doWork(self, request, log, arg1, arg2):
+            @log_arguments
+            def doWork(self, request, arg1, arg2):
                 """ Test Work """
                 return defer.succeed('hello')
 
