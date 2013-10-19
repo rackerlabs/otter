@@ -5,7 +5,7 @@ import json
 
 from otter.log import log
 from otter.rest.decorators import (fails_with, succeeds_with,
-                                   with_own_transaction_id)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 
@@ -24,7 +24,7 @@ class OtterMetrics(object):
         self.store = store
 
     @app.route('/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_metrics(self, request):

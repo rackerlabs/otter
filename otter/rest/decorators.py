@@ -11,7 +11,6 @@ from twisted.internet import defer
 from twisted.python import reflect
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
-from otter.log import log
 
 from otter.json_schema import validate
 
@@ -140,7 +139,7 @@ def log_ignore_arguments(*ignore):
     return wrapper
 
 
-def with_own_transaction_id():
+def with_transaction_id():
     """
     Adds a transaction id to the request, and update application log.
     """
@@ -160,30 +159,6 @@ def with_own_transaction_id():
                 useragent=request.getHeader("user-agent")
             ).msg("Received request")
             return f(self, request, *args, **kwargs)
-        return _
-    return decorator
-
-
-def with_transaction_id():
-    """
-    Generates a request txnid
-    """
-    def decorator(f):
-        @wraps(f)
-        def _(self, request, *args, **kwargs):
-            transaction_id = generate_transaction_id()
-            request.setHeader('X-Response-Id', transaction_id)
-            bound_log = log.bind(
-                system=reflect.fullyQualifiedName(f),
-                transaction_id=transaction_id)
-            bound_log.bind(
-                method=request.method,
-                uri=request.uri,
-                clientproto=request.clientproto,
-                referer=request.getHeader("referer"),
-                useragent=request.getHeader("user-agent")
-            ).msg("Received request")
-            return bind_log(f)(self, request, bound_log, *args, **kwargs)
         return _
     return decorator
 

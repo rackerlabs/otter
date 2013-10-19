@@ -12,7 +12,7 @@ from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import log
 from otter.rest.decorators import (validate_body, fails_with,
                                    succeeds_with, log_arguments,
-                                   with_own_transaction_id)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import policy_dict_to_list
 from otter.rest.errors import InvalidMinEntities
@@ -60,7 +60,7 @@ class OtterGroups(object):
         self.tenant_id = tenant_id
 
     @app.route('/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_all_scaling_groups(self, request):
@@ -125,7 +125,7 @@ class OtterGroups(object):
     # attached.  If we are going to create the scaling policies here too, we should
     # probably also return their ids and links, just like the manifest.
     @app.route('/', methods=['POST'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(create_group_request)
@@ -338,7 +338,7 @@ class OtterGroups(object):
         return deferred
 
     @app.route('/<string:scaling_group_id>/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @log_arguments
@@ -463,7 +463,7 @@ class OtterGroups(object):
     # Feature: Force delete, which stops scaling, deletes all servers for you, then
     #       deletes the scaling group.
     @app.route('/<string:scaling_group_id>/', methods=['DELETE'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments
@@ -475,7 +475,7 @@ class OtterGroups(object):
         return self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id).delete_group()
 
     @app.route('/<string:scaling_group_id>/state/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @log_arguments
@@ -535,7 +535,7 @@ class OtterGroups(object):
         return deferred
 
     @app.route('/<string:scaling_group_id>/pause/', methods=['POST'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments
@@ -549,7 +549,7 @@ class OtterGroups(object):
         return controller.pause_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/<string:scaling_group_id>/resume/', methods=['POST'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments

@@ -13,7 +13,7 @@ from otter.log import log
 from otter.rest.decorators import (validate_body, fails_with,
                                    succeeds_with, log_arguments,
                                    log_ignore_arguments,
-                                   with_own_transaction_id)
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 from otter.util.http import get_autoscale_links, transaction_id
@@ -50,7 +50,7 @@ class OtterPolicies(object):
         self.scaling_group_id = scaling_group_id
 
     @app.route('/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_policies(self, request):
@@ -135,7 +135,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/', methods=['POST'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_policies_request)
@@ -215,7 +215,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['GET'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @log_arguments
@@ -254,7 +254,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['PUT'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
@@ -280,7 +280,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', methods=['DELETE'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @log_arguments
@@ -293,7 +293,7 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/execute/', methods=['POST'])
-    @with_own_transaction_id()
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(202)
     @log_arguments
