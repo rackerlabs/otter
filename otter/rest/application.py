@@ -3,7 +3,6 @@ Contains the actual Klein app and base route handlers for the REST service.
 """
 from twisted.web.server import Request
 
-from otter.rest.decorators import with_transaction_id
 from otter.rest.otterapp import OtterApp
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.groups import OtterGroups

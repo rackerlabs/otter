@@ -23,12 +23,12 @@ class MetricsEndpointsTestCase(AdminRestAPITestMixin, TestCase):
         """
         metrics = [
             {
-                'id':'otter.metrics.foo',
+                'id': 'otter.metrics.foo',
                 'value': 10,
                 'time': '1234567890'
             },
             {
-                'id':'otter.metrics.bar',
+                'id': 'otter.metrics.bar',
                 'value': 42,
                 'time': '2345678901'
             }
