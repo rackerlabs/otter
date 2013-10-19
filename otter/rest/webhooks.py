@@ -220,12 +220,11 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/<string:webhook_id>/', branch=True)
-    @with_transaction_id()
-    def webhook(self, request, log, webhook_id):
+    def webhook(self, request, webhook_id):
         """
         Delegate routes for specific webhooks to OtterWebhook.
         """
-        return OtterWebhook(self.store, log, self.tenant_id,
+        return OtterWebhook(self.store, self.tenant_id,
                             self.group_id, self.policy_id,
                             webhook_id).app.resource()
 
@@ -236,10 +235,13 @@ class OtterWebhook(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id, policy_id,
-                 webhook_id):
+    def __init__(self, store, tenant_id, group_id, policy_id, webhook_id):
+        self.log = log.bind(system='otter.rest.webhook',
+                            tenant_id=tenant_id,
+                            group_id=group_id,
+                            policy_id=policy_id,
+                            webhook_id=webhook_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
