@@ -203,12 +203,11 @@ class OtterPolicies(object):
         return deferred
 
     @app.route('/<string:policy_id>/', branch=True)
-    @with_transaction_id()
-    def policy(self, request, log, policy_id):
+    def policy(self, request, policy_id):
         """
         Delegate routes for specific policies to OtterPolicy.
         """
-        return OtterPolicy(self.store, log, self.tenant_id,
+        return OtterPolicy(self.store, self.tenant_id,
                            self.scaling_group_id,
                            policy_id).app.resource()
 
@@ -219,14 +218,18 @@ class OtterPolicy(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, scaling_group_id, policy_id):
+    def __init__(self, store, tenant_id, scaling_group_id, policy_id):
+        self.log = log.bind(system='otter.log.policy',
+                            tenant_id=tenant_id,
+                            scaling_group_id=scaling_group_id,
+                            policy_id=policy_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
         self.policy_id = policy_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def get_policy(self, request):
@@ -324,10 +327,9 @@ class OtterPolicy(object):
         return d
 
     @app.route('/webhooks/', branch=True)
-    @with_transaction_id()
-    def webhooks(self, request, log):
+    def webhooks(self, request):
         """
         webhook routes handled by OtterWebhooks
         """
-        return OtterWebhooks(self.store, log, self.tenant_id,
+        return OtterWebhooks(self.store, self.tenant_id,
                              self.scaling_group_id, self.policy_id).app.resource()
