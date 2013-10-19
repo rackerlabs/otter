@@ -5,6 +5,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
 class GetListEntityStatusTest(AutoscaleFixture):
+
     """
     Verify list group state.
     """
@@ -37,16 +38,17 @@ class GetListEntityStatusTest(AutoscaleFixture):
         """
         Verify list status' data.
         """
-        self.assertEquals(len(self.group_state.active), self.group_state.activeCapacity)
-        self.assertEquals(self.group_state.desiredCapacity,
-                          self.group_state.activeCapacity + self.group_state.pendingCapacity)
-        self.assertEquals(self.group_state.paused, False,
-                          msg='The scaling group status is paused upon creation'
-                          ' for group {0}'.format(self.group.id))
-        self.assertGreaterEqual(self.group_state.desiredCapacity, self.gc_min_entities_alt,
-                                msg='Less than required number of servers in desired capacity'
-                                ' for group {0}'.format(self.group.id))
-        self.assertLessEqual(self.group_state.desiredCapacity, self.gc_max_entities,
-                             msg='Total server count is over maxEntities'
-                             ' for group {0}'.format(self.group.id))
+        self.assertEquals(
+            self.group_state.name, self.group.groupConfiguration.name,
+            msg='The group name does not match in group'
+            ' state for group {0}'.format(self.group.id))
+        self.assert_group_state(self.group_state)
+        self.assertGreaterEqual(
+            self.group_state.desiredCapacity, self.gc_min_entities_alt,
+            msg='Less than required number of servers in desired capacity'
+            ' for group {0}'.format(self.group.id))
+        self.assertLessEqual(
+            self.group_state.desiredCapacity, self.gc_max_entities,
+            msg='Total server count is over maxEntities'
+            ' for group {0}'.format(self.group.id))
         self.empty_scaling_group(self.group)

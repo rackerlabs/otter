@@ -12,7 +12,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter import controller
-from otter.supervisor import Supervisor
+from otter.supervisor import ISupervisor
 
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
@@ -39,7 +39,7 @@ class CalculateDeltaTestCase(TestCase):
         Only care about the active and pending values, so generate a whole
         :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, active, pending, None, {}, False)
+        return GroupState(1, 1, "test", active, pending, None, {}, False)
 
     def test_positive_change_within_min_max(self):
         """
@@ -489,7 +489,7 @@ class CheckCooldownsTestCase(TestCase):
         Only care about the group_touched and policy_touched values, so
         generate a whole :class:`GroupState` with other fake info
         """
-        return GroupState(1, 1, {}, {}, group_touched, policy_touched, False)
+        return GroupState(1, 1, "test", {}, {}, group_touched, policy_touched, False)
 
     def test_check_cooldowns_global_cooldown_and_policy_cooldown_pass(self):
         """
@@ -672,7 +672,7 @@ class FindPendingJobsToCancelTests(TestCase):
             '5': {'created': '0001-01-05T00:00:00Z'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.cancellable_state = GroupState('t', 'g', {}, self.data, None, {},
+        self.cancellable_state = GroupState('t', 'g', 'n', {}, self.data, None, {},
                                             False)
 
     def test_returns_most_recent_jobs(self):
@@ -715,7 +715,7 @@ class FindServersToEvictTests(TestCase):
             '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
 
-        self.deletable_state = GroupState('t', 'g', self.data, {}, None, {},
+        self.deletable_state = GroupState('t', 'g', 'n', self.data, {}, None, {},
                                           False)
 
     def test_returns_oldest_servers(self):
@@ -758,13 +758,13 @@ class DeleteActiveServersTests(TestCase):
                   'lb': 'lb'},
             '5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: 1, 4, 3, 2, 5
-        self.fake_state = GroupState('t', 'g', self.data, {}, False, False,
+        self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
                                      False)
         self.find_servers_to_evict = patch(
             self, 'otter.controller.find_servers_to_evict',
             return_value=[self.data[id] for id in ('1', '4', '3')])
 
-        self.supervisor = mock.Mock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.supervisor.execute_delete_server.side_effect = [
             defer.succeed(id) for id in range(3)]
 
@@ -841,7 +841,7 @@ class ExecScaleDownTests(TestCase):
                    'lb': 'lb'},
             'a5': {'created': '0001-01-05T00:00:00Z', 'id': '5', 'lb': 'lb'}
         }  # ascending order by time would be: a1, a4, a3, a2, a5
-        self.fake_state = GroupState('t', 'g', self.active, self.pending,
+        self.fake_state = GroupState('t', 'g', '', self.active, self.pending,
                                      False, False, False)
         self.find_pending_jobs_to_cancel = patch(
             self, 'otter.controller.find_pending_jobs_to_cancel')
@@ -1089,7 +1089,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
             self.execute_config_deferreds.append(d)
             return defer.succeed((str(len(self.execute_config_deferreds)), d))
 
-        self.supervisor = mock.Mock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.supervisor.execute_config.side_effect = fake_execute
 
         patch(self, 'otter.controller.get_supervisor', return_value=self.supervisor)
@@ -1174,7 +1174,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         removed from pending and the server is added to active.  It is also
         logged.
         """
-        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
 
         def fake_modify_state(callback, *args, **kwargs):
             callback(self.group, s, *args, **kwargs)
@@ -1201,7 +1201,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         """
         self.supervisor.execute_delete_server.return_value = defer.succeed(None)
 
-        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
 
         def fake_modify_state(callback, *args, **kwargs):
             callback(self.group, s, *args, **kwargs)
@@ -1222,7 +1222,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         ``execute_launch_config`` sets it up so that when a job fails, it is
         removed from pending.  It is also lgoged.
         """
-        s = GroupState('tenant', 'group', {}, {'1': {}}, None, {}, False)
+        s = GroupState('tenant', 'group', 'name', {}, {'1': {}}, None, {}, False)
         written = []
 
         # modify state writes on callback, doesn't write on error
@@ -1239,14 +1239,14 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.execute_config_deferreds[0].errback(f)
 
         # job is removed and no active servers added
-        self.assertEqual(s, GroupState('tenant', 'group', {}, {}, None, {},
+        self.assertEqual(s, GroupState('tenant', 'group', 'name', {}, {}, None, {},
                                        False))
         # state is written
         self.assertEqual(len(written), 1)
         self.assertEqual(written[0], s)
 
         self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind().err.assert_called_once_with(f)
+        self.log.bind().msg.assert_called_with('Job failed', reason=f)
 
     def test_modify_state_failure_logged(self):
         """
@@ -1284,7 +1284,7 @@ class PrivateJobHelperTestCase(TestCase):
         self.log = mock.MagicMock()
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.state = None
-        self.supervisor = mock.MagicMock(Supervisor)
+        self.supervisor = iMock(ISupervisor)
         self.completion_deferred = defer.Deferred()
 
         self.supervisor.execute_config.return_value = defer.succeed(
@@ -1359,7 +1359,7 @@ class PrivateJobHelperTestCase(TestCase):
         If the job succeeded, and the job ID is still in pending, it is removed
         and added to active.
         """
-        self.state = GroupState('tenant', 'group', {}, {self.job_id: {}}, None,
+        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
                                 {}, False)
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -1377,7 +1377,7 @@ class PrivateJobHelperTestCase(TestCase):
         If the job succeeded, but the job ID is no longer in pending, the
         server is deleted and the state not changed.  No error is logged.
         """
-        self.state = GroupState('tenant', 'group', {}, {}, None,
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
@@ -1399,7 +1399,7 @@ class PrivateJobHelperTestCase(TestCase):
         If the job failed, the job ID is removed from the pending state.  The
         failure is logged.
         """
-        self.state = GroupState('tenant', 'group', {}, {self.job_id: {}}, None,
+        self.state = GroupState('tenant', 'group', 'name', {}, {self.job_id: {}}, None,
                                 {}, False)
         self.job.start('launch')
         self.completion_deferred.errback(DummyException('e'))
@@ -1410,16 +1410,16 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+        self.log.bind.return_value.msg.assert_called_once_with(
+            'Job failed', reason=CheckFailure(DummyException))
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
         If the job failed, but the job ID is no longer in pending, the job id
         is not removed (and hence no error occurs).  The only error logged is
-        the failure.  Nothing else in the state changes.
+        the failure. Nothing else in the state changes.
         """
-        self.state = GroupState('tenant', 'group', {}, {}, None,
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
                                 {}, False)
         self.job.start('launch')
         self.completion_deferred.errback(DummyException('e'))
@@ -1430,8 +1430,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.err.assert_called_once_with(
-            CheckFailure(DummyException))
+        self.log.bind.return_value.msg.assert_called_with(
+            'Job failed', reason=CheckFailure(DummyException))
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """

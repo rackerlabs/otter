@@ -49,7 +49,7 @@ format="SVG" scale="60"/>
          xmlns:svg="http://www.w3.org/2000/svg"
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
-         xml:id="autoscale-getting-started">
+         xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
 <titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
@@ -336,7 +336,7 @@ format="SVG" scale="60"/>
                 units="linecolumn" coords="15 20"/>
             </areaspec>
             <programlisting language="json">
-<xi:include href="samples/credentials-20.json" parse="text"/>
+              <xi:include href="samples/reqAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>
@@ -376,7 +376,7 @@ format="SVG" scale="60"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
             <programlisting language="json">
-<xi:include href="samples/auth-20.json" parse="text"/>
+              <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>

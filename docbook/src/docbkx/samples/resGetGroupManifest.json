@@ -1,93 +1,55 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Wed, 11 Sep 2013 00:26:32 GMT
+Server: Jetty(8.0.y.z-SNAPSHOT)
+Transfer-Encoding: chunked
+Via: 1.1 Repose (Repose/2.8.2)
+x-response-id: f19a5888-61ff-4bbf-bc8e-6ac6c18f7839
+
 {
     "group": {
-        "id": "{groupId}",
+        "groupConfiguration": {
+            "cooldown": 60,
+            "maxEntities": 0,
+            "metadata": {},
+            "minEntities": 0,
+            "name": "smallest possible launch config group"
+        },
+        "state": {
+            "active": [],
+            "activeCapacity": 0,
+            "desiredCapacity": 0,
+            "paused": false,
+            "pendingCapacity": 0,
+            "name": "smallest possible launch config group"
+        },
+        "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
+        "launchConfiguration": {
+            "args": {
+                "server": {}
+            },
+            "type": "launch_server"
+        },
         "links": [
             {
-                "href": "{urlRoot}/v1.0/010101/groups/{groupId}",
+                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
                 "rel": "self"
             }
         ],
-        "groupConfiguration": {
-            "name": "workers",
-            "cooldown": 60,
-            "minEntities": 5,
-            "maxEntities": 100,
-            "metadata": {
-                "firstkey": "this is a string",
-                "secondkey": "1"
-            }
-        },
-        "launchConfiguration": {
-            "type": "launch_server",
-            "args": {
-                "server": {
-                    "flavorRef": 3,
-                    "name": "webhead",
-                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                    "OS-DCF:diskConfig": "AUTO",
-                    "metadata": {
-                        "mykey": "myvalue"
-                    },
-                    "personality": [
-                        {
-                            "path": "/root/.ssh/authorized_keys",
-                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                        }
-                    ],
-                    "networks": [
-                        {
-                            "uuid": "11111111-1111-1111-1111-111111111111"
-                        }
-                    ]
-                },
-                "loadBalancers": [
-                    {
-                        "loadBalancerId": 2200,
-                        "port": 8081
-                    }
-                ]
-            }
-        },
         "scalingPolicies": [
             {
-                "id": "{policyId1}",
+                "changePercent": -5.5,
+                "cooldown": 1800,
+                "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
                 "links": [
                     {
-                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId1}",
-                        "rel": "self"
-                    }
-                ],
-                "name": "scale up by 10",
-                "change": 10,
-                "cooldown": 5,
-                "type": "webhook"
-            },
-            {
-                "id": "{policyId2}",
-                "links": [
-                    {
-                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId2}",
+                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
                         "rel": "self"
                     }
                 ],
                 "name": "scale down by 5.5 percent",
-                "changePercent": -5.5,
-                "cooldown": 6,
                 "type": "webhook"
             },
-            {
-                "id": "{policyId3}",
-                "links": [
-                    {
-                        "href": "{urlRoot}/v1.0/010101/groups/{groupId}/policies/{policyId3}",
-                        "rel": "self"
-                    }
-                ],
-                "name": "set number of servers to 10",
-                "desiredCapacity": 10,
-                "cooldown": 3,
-                "type": "webhook"
-            }
         ]
     }
 }

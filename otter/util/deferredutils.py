@@ -119,3 +119,58 @@ def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
     timeout_deferred(d, timeout, clock=clock,
                      deferred_description=deferred_description)
     return d
+
+
+class DeferredPool(object):
+    """
+    Keep track of a pool of deferreds to finish, and notify waiting deferreds
+    when all in the pool are finished.
+
+    This is to be used rather than ``gatherDeferreds`` or ``DeferredList`` in
+    cases where maybe one or two more ``Deferreds`` might be added to the pool
+    while waiting for it to empty.  This should be an edge case though.
+
+    From http://www.verious.com/tool/graceful-shutdown-of-a-twisted-service-with-outstanding-deferreds/
+    """
+    def __init__(self):
+        self._pool = set()
+        self._waiting = []
+
+    def _fired(self, result, deferred):
+        """
+        Remove a pooled ``Deferred`` that has fired from the pool.  If removing
+        this deferred empties the pool, fire all the ``Deferreds`` waiting
+        for the pool to empty.
+
+        Also acts as a passthrough that returns whatever result was passed to it
+        """
+        self._pool.remove(deferred)
+        self._if_empty_notify()
+        return result
+
+    def add(self, deferred):
+        """
+        Add a ``Deferred`` to the pool.
+        """
+        self._pool.add(deferred)
+        deferred.addBoth(self._fired, deferred)
+
+    def _if_empty_notify(self):
+        """
+        Checks to see if the pool is empty.  If it is, notifies all the waiting
+        callbacks.
+        """
+        if not self._pool:
+            waiting, self._waiting = self._waiting, []
+            for waiter in waiting:
+                waiter.callback(None)
+
+    def notify_when_empty(self):
+        """
+        Return a deferred that fires (with None) when the pool empties (which
+        may be immediately)
+        """
+        d = defer.Deferred()
+        self._waiting.append(d)
+        self._if_empty_notify()
+        return d

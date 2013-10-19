@@ -14,7 +14,8 @@ from twisted.python.failure import Failure
 
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
-    with_transaction_id, log_arguments, log_ignore_arguments)
+    with_transaction_id, log_arguments, paginatable, InvalidQueryArgument)
+from otter.util.config import set_config_data
 
 
 class BlahError(Exception):
@@ -473,27 +474,84 @@ class LogArgumentsTestCase(TestCase):
 
         self.mockLog.bind.assert_called_once_with(**kwargs)
 
-    def test_items_ignored(self):
+
+class PaginatableTestCase(TestCase):
+    """
+    Tests for the `paginatable` decorator
+    """
+    def setUp(self):
         """
-        Arguments to the decorator will be ignored and not bound to the
-        log.
+        SetUp a mock request with query args for testing `paginatable`.
         """
+        self.mockRequest = mock.MagicMock()
+        self.mockRequest.args = {}
+
         class FakeApp(object):
-            log = self.mockLog
+            @paginatable
+            def paginate_me(self, request, paginate):
+                return defer.succeed(paginate)
 
-            @log_ignore_arguments('ignored', 'truth')
-            def doWork(self, request, **kwargs):
-                return defer.succeed('')
+        self.app = FakeApp()
 
-        kwargs = {'truth': 42,
-                  'list': [1, 2, 3],
-                  'dict': {'one': 1, 'two': 2},
-                  'ignored': 'too-much-data'}
+        set_config_data({'limits': {'pagination': 10}})
+        self.addCleanup(set_config_data, {})
 
-        d = FakeApp().doWork(self.mockRequest, **kwargs)
-        self.successResultOf(d)
+    def test_no_query_arguments(self):
+        """
+        When there are no query arguments in the request, the paginate
+        dictionary contains only the default limit value.
+        """
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
 
-        ignored_kwargs = kwargs.copy()
-        del ignored_kwargs['ignored']
-        del ignored_kwargs['truth']
-        self.mockLog.bind.assert_called_once_with(**ignored_kwargs)
+    def test_integer_limit_value(self):
+        """
+        Decorator turns the limit value into an integer
+        """
+        self.mockRequest.args['limit'] = ['5']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 5})
+
+    def test_non_integer_limit_value(self):
+        """
+        Decorator raises InvalidQueryArgument if the limit argument cannot be
+        coerced into an integer.
+        """
+        self.mockRequest.args['limit'] = ['x']
+        d = self.app.paginate_me(self.mockRequest)
+        self.failureResultOf(d, InvalidQueryArgument)
+
+    def test_zero_limit_value(self):
+        """
+        Decorator coerces limit to 1 if the limit argument is < 1
+        """
+        self.mockRequest.args['limit'] = ['0']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 1})
+
+    def test_too_high_limit_value(self):
+        """
+        Decorator coerces limit to the hard pagination limit if the limit
+        argument is too high
+        """
+        self.mockRequest.args['limit'] = ['100']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
+
+    def test_invalid_query_keys(self):
+        """
+        Decorator ignores invalid query keys (only propagates the 'limit' and
+        'marker' keys)
+        """
+        self.mockRequest.args['magnitude'] = ['pop', 'pop']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
+
+    def test_multiple_query_values(self):
+        """
+        Decorator picks only the first value matching valid query keys
+        """
+        self.mockRequest.args['marker'] = ['1234', '5678']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d),
+                         {'marker': '1234', 'limit': 10})

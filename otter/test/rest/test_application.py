@@ -10,7 +10,9 @@ from twisted.trial.unittest import TestCase
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util import patch
+from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
+                             get_groups_links, get_policies_links, get_webhooks_links)
 
 
 class LinkGenerationTestCase(TestCase):
@@ -249,6 +251,104 @@ class LinkGenerationTestCase(TestCase):
         snowman = get_autoscale_links('☃', group_id='☃', format=None)
         self.assertEqual(snowman, '/v1.0/%E2%98%83/groups/%E2%98%83/')
         self.assertTrue(isinstance(snowman, str))
+
+
+class CollectionLinksTests(TestCase):
+    """
+    Tests for `get_collection_links`
+    """
+
+    def setUp(self):
+        """
+        Setup sample collection
+        """
+        self.coll = [{'id': '23'}, {'id': '567'}, {'id': '3444'}]
+
+    def test_small_collection(self):
+        """
+        Collection len < limit gives self link only. No next link
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=20)
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'}])
+
+    def test_limit_collection(self):
+        """
+        Collection len == limit gives next link also
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=3)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
+
+    def test_big_collection(self):
+        """
+        Collection len > limit gives next link with marker based on limit
+        """
+        links = get_collection_links(self.coll, 'url', 'self', limit=2)
+        # FIXME: Cannot predict the sequence of marker and limit in URL
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=567&limit=2', 'rel': 'next'}])
+
+    @mock.patch('otter.util.http.config_value', return_value=3)
+    def test_no_limit(self, config_value):
+        """
+        Defaults to config limit if not given
+        """
+        links = get_collection_links(self.coll, 'url', 'self')
+        self.assertEqual(links, [{'href': 'url', 'rel': 'self'},
+                                 {'href': 'url?marker=3444&limit=3', 'rel': 'next'}])
+        config_value.assert_called_once_with('limits.pagination')
+
+    def test_rel_None(self):
+        """
+        Does not include self link if rel is None
+        """
+        links = get_collection_links(self.coll, 'url', None, limit=30)
+        self.assertEqual(links, [])
+
+
+class GetSpecificCollectionsLinks(TestCase):
+    """
+    Test for `get_groups_links`
+    """
+
+    def setUp(self):
+        """
+        Mock get_autoscale_links and get_collection_links
+        """
+        self.gal = patch(self, 'otter.util.http.get_autoscale_links', return_value='url')
+        self.gcl = patch(self, 'otter.util.http.get_collection_links', return_value='col links')
+
+    def test_get_groups_links(self):
+        """
+        `get_groups_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_groups_links('groups', 'tid', rel='rel', limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', format=None)
+        self.gcl.assert_called_once_with('groups', 'url', 'rel', 2, '3')
+
+    def test_get_policies_links(self):
+        """
+        `get_policies_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_policies_links('policies', 'tid', 'gid', rel='rel', limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', 'gid', '', format=None)
+        self.gcl.assert_called_once_with('policies', 'url', 'rel', 2, '3')
+
+    def test_get_webhooks_links(self):
+        """
+        `get_webhooks_links` gets link from `get_autoscale_links` and delegates to
+        get_collection_links
+        """
+        links = get_webhooks_links('webhooks', 'tid', 'gid', 'pid', rel='rel',
+                                   limit=2, marker='3')
+        self.assertEqual(links, 'col links')
+        self.gal.assert_called_once_with('tid', 'gid', 'pid', '', format=None)
+        self.gcl.assert_called_once_with('webhooks', 'url', 'rel', 2, '3')
 
 
 class RouteTests(RequestTestMixin, TestCase):

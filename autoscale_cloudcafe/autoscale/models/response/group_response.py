@@ -154,6 +154,10 @@ class PolicyArgs(AutoMarshallingModel):
     @classmethod
     def _dict_to_obj(cls, args_dict):
         args = PolicyArgs(**args_dict)
+        # if hasattr(policies, 'alarmTemplate'):
+        #     policies.alarmTemplate = Alarm._dict_to_obj(policies.alarmTemplate)
+        # if hasattr(policies, 'checkTemplate'):
+        #     policies.checkTemplate = Check._dict_to_obj(policies.checkTemplate)
         for each in args_dict:
             if each.startswith('{'):
                 newkey = re.split('}', each)[1]

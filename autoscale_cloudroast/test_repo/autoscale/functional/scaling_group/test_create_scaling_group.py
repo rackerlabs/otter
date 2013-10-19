@@ -51,7 +51,8 @@ class CreateScalingGroupTest(AutoscaleFixture):
             lc_disk_config=cls.lc_disk_config,
             lc_networks=cls.lc_networks,
             lc_load_balancers=cls.lc_load_balancers,
-            sp_list=cls.sp_list)
+            sp_list=cls.sp_list,
+            network_type='public')
         cls.scaling_group = cls.create_resp.entity
         cls.resources.add(cls.scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
@@ -145,3 +146,9 @@ class CreateScalingGroupTest(AutoscaleFixture):
                 self.scaling_group.scalingPolicies),
             msg='Scaling policies of the scaling group did not match'
             ' for group {0}'.format(self.scaling_group.id))
+
+    def test_created_scaling_group_state_fields(self):
+        """
+        Verify the state on the group is as expected.
+        """
+        self.assert_group_state(self.scaling_group.state)

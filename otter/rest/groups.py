@@ -6,18 +6,20 @@ from functools import partial
 import json
 
 from otter import controller
+from otter.supervisor import get_supervisor
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.log import log
-from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, log_arguments,
-                                   with_transaction_id)
+from otter.rest.configs import OtterConfig, OtterLaunch
+from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
+                                   with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
-from otter.rest.policies import policy_dict_to_list
+from otter.rest.policies import OtterPolicies, linkify_policy_list
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
+                             get_policies_links)
 from otter.rest.bobby import get_bobby
 
 
@@ -35,9 +37,8 @@ def format_state_dict(state):
         'activeCapacity': len(state.active),
         'pendingCapacity': len(state.pending),
         'desiredCapacity': len(state.active) + len(state.pending),
+        'name': state.group_name,
         'paused': state.paused,
-        'id': state.group_id,
-        'links': get_autoscale_links(state.tenant_id, state.group_id),
         'active': [
             {
                 'id': key,
@@ -63,55 +64,71 @@ class OtterGroups(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_all_scaling_groups(self, request):
+    @paginatable
+    def list_all_scaling_groups(self, request, paginate):
         """
         Lists all the autoscaling groups and their states per for a given tenant ID.
 
         Example response::
 
-          {
-            "groups": [
-              {
-                "id": "{groupId1}"
-                "links": [
-                  {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId1}"
-                    "rel": "self"
-                  }
+            {
+                "groups": [
+                    {
+                        "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
+                                v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
+                                "rel": "self"
+                            }
+                        ],
+                        "state": {
+                            "active": [],
+                            "activeCapacity": 0,
+                            "desiredCapacity": 0,
+                            "paused": false,
+                            "pendingCapacity": 0,
+                            "name": "testscalinggroup198547"
+                        }
+                    },
+                    {
+                        "id": "f82bb000-f451-40c8-9dc3-6919097d2f7e",
+                        "state": {
+                            "active": [],
+                            "activeCapacity": 0,
+                            "desiredCapacity": 0,
+                            "paused": false,
+                            "pendingCapacity": 0,
+                            "name": "testscalinggroup194547"
+                        },
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/
+                                v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                                "rel": "self"
+                            }
+                        ]
+                    }
                 ],
-                "active": [],
-                "activeCapacity": 0,
-                "pendingCapacity": 1,
-                "desiredCapacity": 1,
-                "paused": false
-              },
-              {
-                "id": "{groupId2}"
-                "links": [
-                  {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId2}",
-                    "rel": "self"
-                  }
-                ],
-                "active": [],
-                "activeCapacity": 0,
-                "pendingCapacity": 2,
-                "desiredCapacity": 2,
-                "paused": false
-              }
-            ],
-            "groups_links": []
-          }
-
-        TODO:
-        """
-        def format_list(group_states):
-            return {
-                "groups": [format_state_dict(state) for state in group_states],
                 "groups_links": []
             }
 
-        deferred = self.store.list_scaling_group_states(self.log, self.tenant_id)
+
+        """
+
+        def format_list(group_states):
+            groups = [{
+                'id': state.group_id,
+                'links': get_autoscale_links(state.tenant_id, state.group_id),
+                'state': format_state_dict(state)
+            } for state in group_states]
+            return {
+                "groups": groups,
+                "groups_links": get_groups_links(groups, self.tenant_id, None, **paginate)
+            }
+
+        deferred = self.store.list_scaling_group_states(
+            self.log, self.tenant_id, **paginate)
         deferred.addCallback(format_list)
         deferred.addCallback(json.dumps)
         return deferred
@@ -139,161 +156,151 @@ class OtterGroups(object):
         Example request body containing some scaling policies::
 
             {
-                "groupConfiguration": {
-                    "name": "workers",
-                    "cooldown": 60,
-                    "minEntities": 5,
-                    "maxEntities": 100,
+              "launchConfiguration": {
+                "args": {
+                  "loadBalancers": [
+                    {
+                      "port": 8080,
+                      "loadBalancerId": 9099
+                    }
+                  ],
+                  "server": {
+                    "name": "autoscale_server",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "flavorRef": "2",
+                    "OS-DCF:diskConfig": "AUTO",
                     "metadata": {
-                        "firstkey": "this is a string",
-                        "secondkey": "1"
-                    }
-                },
-                "launchConfiguration": {
-                    "type": "launch_server",
-                    "args": {
-                        "server": {
-                            "flavorRef": 3,
-                            "name": "webhead",
-                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                            "OS-DCF:diskConfig": "AUTO",
-                            "metadata": {
-                                "mykey": "myvalue"
-                            },
-                            "personality": [
-                                {
-                                    "path": '/root/.ssh/authorized_keys',
-                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                                }
-                            ],
-                            "networks": [
-                                {
-                                    "uuid": "11111111-1111-1111-1111-111111111111"
-                                }
-                            ],
-                        },
-                        "loadBalancers": [
-                            {
-                                "loadBalancerId": 2200,
-                                "port": 8081
-                            }
-                        ]
-                    }
-                },
-                "scalingPolicies": [
-                    {
-                        "name": "scale up by 10",
-                        "change": 10,
-                        "cooldown": 5
+                      "build_config": "core",
+                      "meta_key_1": "meta_value_1",
+                      "meta_key_2": "meta_value_2"
                     },
-                    {
-                        "name": 'scale down by 5.5 percent',
-                        "changePercent": -5.5,
-                        "cooldown": 6
-                    },
-                    {
-                        "name": 'set number of servers to 10',
-                        "desiredCapacity": 10,
-                        "cooldown": 3
-                    }
-                ]
+                    "networks": [
+                      {
+                        "uuid": "11111111-1111-1111-1111-111111111111"
+                      },
+                      {
+                        "uuid": "00000000-0000-0000-0000-000000000000"
+                      }
+                    ],
+                    "personality": [
+                      {
+                        "path": "/root/.csivh",
+                        "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+                      }
+                    ]
+                  }
+                },
+                "type": "launch_server"
+              },
+              "groupConfiguration": {
+                "maxEntities": 10,
+                "cooldown": 360,
+                "name": "testscalinggroup198547",
+                "minEntities": 0,
+                "metadata": {
+                  "gc_meta_key_2": "gc_meta_value_2",
+                  "gc_meta_key_1": "gc_meta_value_1"
+                }
+              },
+              "scalingPolicies": [
+                {
+                  "cooldown": 0,
+                  "type": "webhook",
+                  "name": "scale up by 1",
+                  "change": 1
+                }
+              ]
             }
+
 
         The ``scalingPolicies`` attribute can also be an empty list, or just left
         out entirely.
 
         Example response body to the above request::
 
-        {
-            "group": {
-                "id": "{groupId}",
+            {
+              "group": {
+                "launchConfiguration": {
+                  "args": {
+                    "loadBalancers": [
+                      {
+                        "port": 8080,
+                        "loadBalancerId": 9099
+                      }
+                    ],
+                    "server": {
+                      "name": "autoscale_server",
+                      "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                      "flavorRef": "2",
+                      "OS-DCF:diskConfig": "AUTO",
+                      "personality": [
+                        {
+                          "path": "/root/.csivh",
+                          "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+                        }
+                      ],
+                      "networks": [
+                        {
+                          "uuid": "11111111-1111-1111-1111-111111111111"
+                        },
+                        {
+                          "uuid": "00000000-0000-0000-0000-000000000000"
+                        }
+                      ],
+                      "metadata": {
+                        "build_config": "core",
+                        "meta_key_1": "meta_value_1",
+                        "meta_key_2": "meta_value_2"
+                      }
+                    }
+                  },
+                  "type": "launch_server"
+                },
+                "groupConfiguration": {
+                  "maxEntities": 10,
+                  "cooldown": 360,
+                  "name": "testscalinggroup198547",
+                  "minEntities": 0,
+                  "metadata": {
+                    "gc_meta_key_2": "gc_meta_value_2",
+                    "gc_meta_key_1": "gc_meta_value_1"
+                  }
+                },
+                "state": {
+                  "active": [],
+                  "activeCapacity": 0,
+                  "desiredCapacity": 0,
+                  "paused": false,
+                  "pendingCapacity": 0,
+                  "name": "testscalinggroup198547"
+                },
+                "scalingPolicies": [
+                  {
+                    "name": "scale up by 1",
+                    "links": [
+                      {
+                        "href": "https://ord.autoscale.api.rackspacecloud.com/
+                        v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/
+                        policies/dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1/",
+                        "rel": "self"
+                      }
+                    ],
+                    "cooldown": 0,
+                    "type": "webhook",
+                    "id": "dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1",
+                    "change": 1
+                  }
+                ],
                 "links": [
                   {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
+                    "href": "https://ord.autoscale.api.rackspacecloud.com/
+                    v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/",
                     "rel": "self"
                   }
                 ],
-                "groupConfiguration": {
-                    "name": "workers",
-                    "cooldown": 60,
-                    "minEntities": 5,
-                    "maxEntities": 100,
-                    "metadata": {
-                        "firstkey": "this is a string",
-                        "secondkey": "1"
-                    }
-                },
-                "launchConfiguration": {
-                    "type": "launch_server",
-                    "args": {
-                        "server": {
-                            "flavorRef": 3,
-                            "name": "webhead",
-                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                            "OS-DCF:diskConfig": "AUTO",
-                            "metadata": {
-                                "mykey": "myvalue"
-                            },
-                            "personality": [
-                                {
-                                    "path": '/root/.ssh/authorized_keys',
-                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                                }
-                            ],
-                            "networks": [
-                                {
-                                    "uuid": "11111111-1111-1111-1111-111111111111"
-                                }
-                            ],
-                        },
-                        "loadBalancers": [
-                            {
-                                "loadBalancerId": 2200,
-                                "port": 8081
-                            }
-                        ]
-                    }
-                },
-                "scalingPolicies": [
-                    {
-                        "id": "{policyId1}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": "scale up by 10",
-                        "change": 10,
-                        "cooldown": 5
-                    }
-                    {
-                        "id": "{policyId2}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": 'scale down by 5.5 percent',
-                        "changePercent": -5.5,
-                        "cooldown": 6
-                    },
-                    {
-                        "id": "{policyId3}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": 'set number of servers to 10',
-                        "desiredCapacity": 10,
-                        "cooldown": 3
-                    }
-                ]
+                "id": "6791761b-821a-4d07-820d-0b2afc7dd7f6"
+              }
             }
-        }
 
         """
         data['groupConfiguration'].setdefault('maxEntities', MAX_ENTITIES)
@@ -302,9 +309,14 @@ class OtterGroups(object):
         if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
             raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
-        deferred = self.store.create_scaling_group(
-            self.log, self.tenant_id, data['groupConfiguration'], data['launchConfiguration'],
-            data.get('scalingPolicies', None))
+        deferred = get_supervisor().validate_launch_config(
+            self.log, self.tenant_id, data['launchConfiguration'])
+
+        deferred.addCallback(
+            lambda _: self.store.create_scaling_group(self.log, self.tenant_id,
+                                                      data['groupConfiguration'],
+                                                      data['launchConfiguration'],
+                                                      data.get('scalingPolicies', None)))
 
         def _do_obey_config_change(result):
             group_id = result['id']
@@ -317,7 +329,7 @@ class OtterGroups(object):
         deferred.addCallback(_do_obey_config_change)
 
         def _add_to_bobby(result, client):
-            d = client.create_group(self.tenant_id, result["id"])
+            d = client.create_group(self.tenant_id, result['id'])
             return d.addCallback(lambda _: result)
 
         bobby = get_bobby()
@@ -326,23 +338,47 @@ class OtterGroups(object):
 
         def _format_output(result):
             uuid = result['id']
+            result["state"] = format_state_dict(result["state"])
             request.setHeader(
                 "Location", get_autoscale_links(self.tenant_id, uuid, format=None))
             result["links"] = get_autoscale_links(self.tenant_id, uuid)
-            result["scalingPolicies"] = policy_dict_to_list(
-                result["scalingPolicies"], self.tenant_id, uuid)
+            linkify_policy_list(result['scalingPolicies'], self.tenant_id, uuid)
+            result['scalingPolicies_links'] = get_policies_links(
+                result['scalingPolicies'], self.tenant_id, uuid, rel='policies')
             return {"group": result}
 
         deferred.addCallback(_format_output)
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:scaling_group_id>/', methods=['GET'])
+    @app.route('/<string:group_id>/', branch=True)
+    @with_transaction_id()
+    def group(self, request, log, group_id):
+        """
+        Routes requiring a specific group_id are delegated to
+        OtterGroup.
+        """
+        return OtterGroup(self.store, log,
+                          self.tenant_id, group_id).app.resource()
+
+
+class OtterGroup(object):
+    """
+    REST endpoints for managing a specific scaling group.
+    """
+    app = OtterApp()
+
+    def __init__(self, store, log, tenant_id, group_id):
+        self.store = store
+        self.log = log
+        self.tenant_id = tenant_id
+        self.group_id = group_id
+
+    @app.route('/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
-    def view_manifest_config_for_scaling_group(self, request, scaling_group_id):
+    def view_manifest_config_for_scaling_group(self, request):
         """
         View manifested view of the scaling group configuration, including the
         launch configuration, and the scaling policies.  This data is returned in
@@ -350,111 +386,66 @@ class OtterGroups(object):
 
         Example response::
 
-        {
-            "group": {
-                "id": "{groupId}",
-                "links": [
-                  {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/{groupId}/"
-                    "rel": "self"
-                  }
-                ],
-                "groupConfiguration": {
-                    "name": "workers",
-                    "cooldown": 60,
-                    "minEntities": 5,
-                    "maxEntities": 100,
-                    "metadata": {
-                        "firstkey": "this is a string",
-                        "secondkey": "1",
-                    }
-                },
-                "launchConfiguration": {
-                    "type": "launch_server",
-                    "args": {
-                        "server": {
-                            "flavorRef": 3,
-                            "name": "webhead",
-                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                            "OS-DCF:diskConfig": "AUTO",
-                            "metadata": {
-                                "mykey": "myvalue"
-                            },
-                            "personality": [
-                                {
-                                    "path": '/root/.ssh/authorized_keys',
-                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                                }
-                            ],
-                            "networks": [
-                                {
-                                    "uuid": "11111111-1111-1111-1111-111111111111"
-                                }
-                            ],
-                        },
-                        "loadBalancers": [
-                            {
-                                "loadBalancerId": 2200,
-                                "port": 8081
-                            }
-                        ]
-                    }
-                },
-                "scalingPolicies": [
-                    {
-                        "id": "{policyId1}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId1}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": "scale up by 10",
-                        "change": 10,
-                        "cooldown": 5
-                    }
-                    {
-                        "id": "{policyId2}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId2}/"
-                            "rel": "self"
-                          }
-                        ],
-                        "name": 'scale down by 5.5 percent',
-                        "changePercent": -5.5,
-                        "cooldown": 6
+
+            {
+                "group": {
+                    "groupConfiguration": {
+                        "cooldown": 60,
+                        "maxEntities": 0,
+                        "metadata": {},
+                        "minEntities": 0,
+                        "name": "smallest possible launch config group"
                     },
-                    {
-                        "id": "{policyId3}",
-                        "links": [
-                          {
-                            "href": "{url_root}/v1.0/010101/groups/{groupId}/policies/{policyId3}/"
+                    "state": {
+                        "active": [],
+                        "activeCapacity": 0,
+                        "desiredCapacity": 0,
+                        "paused": false,
+                        "pendingCapacity": 0
+                    },
+                    "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
+                    "launchConfiguration": {
+                        "args": {
+                            "server": {}
+                        },
+                        "type": "launch_server"
+                    },
+                    "links": [
+                        {
+                            "href": "https://dfw.autoscale.api.rackspacecloud.com/
+                            v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
                             "rel": "self"
-                          }
-                        ],
-                        "name": 'set number of servers to 10',
-                        "desiredCapacity": 10,
-                        "cooldown": 3
-                    }
-                ]
+                        }
+                    ],
+                    "scalingPolicies": [
+                        {
+                            "changePercent": -5.5,
+                            "cooldown": 1800,
+                            "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
+                            "links": [
+                                {
+                                    "href": "https://dfw.autoscale.api.rackspacecloud.com/
+                                    v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/
+                                    policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                                    "rel": "self"
+                                }
+                            ],
+                            "name": "scale down by 5.5 percent",
+                            "type": "webhook"
+                        },
+                    ]
+                }
             }
-        }
         """
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
-
-            policies = []
-            for policy_id, policy in data["scalingPolicies"].iteritems():
-                policy["id"] = policy_id
-                policy["links"] = get_autoscale_links(self.tenant_id, uuid, policy_id)
-                policies.append(policy)
-
-            data["scalingPolicies"] = policies
-
+            data["state"] = format_state_dict(data["state"])
+            linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
+            data['scalingPolicies_links'] = get_policies_links(
+                data['scalingPolicies'], self.tenant_id, uuid, rel='policies')
             return {"group": data}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = group.view_manifest()
         deferred.addCallback(openstack_formatting, group.uuid)
         deferred.addCallback(json.dumps)
@@ -462,24 +453,32 @@ class OtterGroups(object):
 
     # Feature: Force delete, which stops scaling, deletes all servers for you, then
     #       deletes the scaling group.
-    @app.route('/<string:scaling_group_id>/', methods=['DELETE'])
+    @app.route('/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
-    def delete_scaling_group(self, request, scaling_group_id):
+    def delete_scaling_group(self, request):
         """
         Delete a scaling group if there are no entities belonging to the scaling
         group.  If successful, no response body will be returned.
         """
-        return self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id).delete_group()
+        group = self.store.get_scaling_group(self.log, self.tenant_id,
+                                             self.group_id)
+        try:
+            force = request.args.get('force')[0]
+        except (IndexError, TypeError):
+            force = False
+        if force == 'true':
+            d = group.update_config({'minEntities': 0, 'maxEntities': 0})
+            return d.addCallback(lambda _: group.delete_group())
+        else:
+            return group.delete_group()
 
-    @app.route('/<string:scaling_group_id>/state/', methods=['GET'])
+    @app.route('/state/', methods=['GET'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
-    def get_scaling_group_state(self, request, scaling_group_id):
+    def get_scaling_group_state(self, request):
         """
         Get the current state of the scaling group, including the current set of
         active entities, number of pending entities, and the desired number
@@ -489,75 +488,72 @@ class OtterGroups(object):
 
         Example response::
 
-        {
-          "group": {
-            "id": "{groupId}",
-            "links": [
-              {
-                "href": "{url_root}/v1.0/010101/groups/{groupId},
-                "rel": "self"
-              }
-            ],
-            "active": [
-              {
-                "id": "{instanceId1}"
-                "links": [
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId1}",
-                    "rel": "self"
-                  }
-                ]
-              },
-              {
-                "id": "{instanceId2}"
-                "links": [
-                  {
-                    "href": "https://dfw.servers.api.rackspacecloud.com/v2/010101/servers/{instanceId2}",
-                    "rel": "self"
-                  }
-                ]
-              }
-            ],
-            "activeCapacity": 2,
-            "pendingCapacity": 2,
-            "desiredCapacity": 4,
-            "paused": false
-          }
-        }
+            {
+                "group": {
+                    "paused": false,
+                    "pendingCapacity": 0,
+                    "name": "testscalinggroup198547",
+                    "active": [],
+                    "activeCapacity": 0,
+                    "desiredCapacity": 0
+                }
+            }
         """
         def _format_and_stackify(state):
             return {"group": format_state_dict(state)}
 
-        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = group.view_state()
         deferred.addCallback(_format_and_stackify)
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:scaling_group_id>/pause/', methods=['POST'])
+    @app.route('/pause/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
-    def pause_scaling_group(self, request, scaling_group_id):
+    def pause_scaling_group(self, request):
         """
         Pause a scaling group.  This means that no scaling policies will get
         executed (execution will be rejected).  This is an idempotent operation -
         pausing an already paused group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         return controller.pause_scaling_group(self.log, transaction_id(request), group)
 
-    @app.route('/<string:scaling_group_id>/resume/', methods=['POST'])
+    @app.route('/resume/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
-    def resume_scaling_group(self, request, scaling_group_id):
+    def resume_scaling_group(self, request):
         """
         Resume a scaling group.  This means that scaling policies will now get
         executed as usual.  This is an idempotent operation - resuming an already
         running group does nothing.
         """
-        group = self.store.get_scaling_group(self.log, self.tenant_id, scaling_group_id)
+        group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
+
+    @app.route('/config/')
+    @with_transaction_id()
+    def config(self, request, log):
+        """
+        config route handled by OtterConfig
+        """
+        return OtterConfig(self.store, log, self.tenant_id, self.group_id).app.resource()
+
+    @app.route('/launch/')
+    @with_transaction_id()
+    def launch(self, request, log):
+        """
+        launch route handled by OtterLaunch
+        """
+        return OtterLaunch(self.store, log, self.tenant_id, self.group_id).app.resource()
+
+    @app.route('/policies/', branch=True)
+    @with_transaction_id()
+    def policies(self, request, log):
+        """
+        policies routes handled by OtterPolicies
+        """
+        return OtterPolicies(self.store, log, self.tenant_id, self.group_id).app.resource()

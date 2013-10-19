@@ -11,28 +11,20 @@ import json
 from otter.json_schema import rest_schemas, group_schemas
 from otter.log import log
 from otter.rest.decorators import (validate_body, fails_with,
-                                   succeeds_with, log_arguments,
-                                   log_ignore_arguments,
-                                   with_transaction_id)
+                                   succeeds_with, with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
-from otter.util.http import get_autoscale_links, transaction_id
+from otter.rest.webhooks import OtterWebhooks
+from otter.util.http import get_autoscale_links, transaction_id, get_policies_links
 from otter import controller
 
 
-def policy_dict_to_list(policy_dict, tenantId, groupId):
+def linkify_policy_list(policy_list, tenantId, groupId):
     """
-    Takes dictionary of policies mapping policy ids to the policy blobs, and
-    transforms them into a list of dictionaries that contain the keys 'id' and
-    'links'.
+    Takes list of policies and adds 'links'.
     """
-    policy_list = []
-    for policy_uuid, policy_item in policy_dict.iteritems():
-        policy_item['id'] = policy_uuid
-        policy_item['links'] = get_autoscale_links(
-            tenantId, groupId, policy_uuid)
-        policy_list.append(policy_item)
-    return policy_list
+    for policy in policy_list:
+        policy['links'] = get_autoscale_links(tenantId, groupId, policy['id'])
 
 
 class OtterPolicies(object):
@@ -53,7 +45,8 @@ class OtterPolicies(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def list_policies(self, request):
+    @paginatable
+    def list_policies(self, request, paginate):
         """
         Get a list of scaling policies in the group. Each policy describes an id,
         name, type, adjustment, cooldown, and links. This data is returned in the
@@ -122,14 +115,16 @@ class OtterPolicies(object):
                 ]
             }
         """
-        def format_policies(policy_dict):
+        def format_policies(policy_list):
+            linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {
-                'policies': policy_dict_to_list(policy_dict, self.tenant_id, self.scaling_group_id),
-                "policies_links": []
+                'policies': policy_list,
+                "policies_links": get_policies_links(policy_list, self.tenant_id,
+                                                     self.scaling_group_id, None, **paginate)
             }
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.list_policies()
+        deferred = rec.list_policies(**paginate)
         deferred.addCallback(format_policies)
         deferred.addCallback(json.dumps)
         return deferred
@@ -193,19 +188,12 @@ class OtterPolicies(object):
             }
         """
 
-        def format_policies_and_send_redirect(policy_dict):
+        def format_policies_and_send_redirect(policy_list):
             request.setHeader(
                 "Location",
                 get_autoscale_links(self.tenant_id, self.scaling_group_id, "", format=None)
             )
-
-            policy_list = []
-            for policy_uuid, policy_item in policy_dict.iteritems():
-                policy_item['id'] = policy_uuid
-                policy_item['links'] = get_autoscale_links(
-                    self.tenant_id, self.scaling_group_id, policy_uuid)
-                policy_list.append(policy_item)
-
+            linkify_policy_list(policy_list, self.tenant_id, self.scaling_group_id)
             return {'policies': policy_list}
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
@@ -214,12 +202,34 @@ class OtterPolicies(object):
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:policy_id>/', methods=['GET'])
+    @app.route('/<string:policy_id>/', branch=True)
     @with_transaction_id()
+    def policy(self, request, log, policy_id):
+        """
+        Delegate routes for specific policies to OtterPolicy.
+        """
+        return OtterPolicy(self.store, log, self.tenant_id,
+                           self.scaling_group_id,
+                           policy_id).app.resource()
+
+
+class OtterPolicy(object):
+    """
+    REST endpoints for a specific policy of a scaling group.
+    """
+    app = OtterApp()
+
+    def __init__(self, store, log, tenant_id, scaling_group_id, policy_id):
+        self.store = store
+        self.log = log
+        self.tenant_id = tenant_id
+        self.scaling_group_id = scaling_group_id
+        self.policy_id = policy_id
+
+    @app.route('/', methods=['GET'])
     @fails_with(exception_codes)
     @succeeds_with(200)
-    @log_arguments
-    def get_policy(self, request, policy_id):
+    def get_policy(self, request):
         """
         Get a scaling policy which describes an id, name, type, adjustment, and
         cooldown, and links.  This data is returned in the body of the response in
@@ -243,23 +253,24 @@ class OtterPolicies(object):
             }
         """
         def openstackify(policy_dict):
-            policy_dict['id'] = policy_id
-            policy_dict['links'] = get_autoscale_links(self.tenant_id, self.scaling_group_id, policy_id)
+            policy_dict['id'] = self.policy_id
+            policy_dict['links'] = get_autoscale_links(self.tenant_id,
+                                                       self.scaling_group_id,
+                                                       self.policy_id)
             return {'policy': policy_dict}
 
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.get_policy(policy_id)
+        deferred = rec.get_policy(self.policy_id)
         deferred.addCallback(openstackify)
         deferred.addCallback(json.dumps)
         return deferred
 
-    @app.route('/<string:policy_id>/', methods=['PUT'])
+    @app.route('/', methods=['PUT'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.policy)
-    @log_ignore_arguments('data')
-    def update_policy(self, request, policy_id, data):
+    def update_policy(self, request, data):
         """
         Updates a scaling policy. Scaling policies must include a name, type,
         adjustment, and cooldown.
@@ -276,28 +287,26 @@ class OtterPolicies(object):
 
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.update_policy(policy_id, data)
+        deferred = rec.update_policy(self.policy_id, data)
         return deferred
 
-    @app.route('/<string:policy_id>/', methods=['DELETE'])
+    @app.route('/', methods=['DELETE'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @log_arguments
-    def delete_policy(self, request, policy_id):
+    def delete_policy(self, request):
         """
         Delete a scaling policy. If successful, no response body will be returned.
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.delete_policy(policy_id)
+        deferred = rec.delete_policy(self.policy_id)
         return deferred
 
-    @app.route('/<string:policy_id>/execute/', methods=['POST'])
+    @app.route('/execute/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(202)
-    @log_arguments
-    def execute_policy(self, request, policy_id):
+    def execute_policy(self, request):
         """
         Execute this scaling policy.
 
@@ -310,6 +319,15 @@ class OtterPolicies(object):
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
         d = group.modify_state(partial(controller.maybe_execute_scaling_policy,
                                        self.log, transaction_id(request),
-                                       policy_id=policy_id))
+                                       policy_id=self.policy_id))
         d.addCallback(lambda _: "{}")  # Return value TBD
         return d
+
+    @app.route('/webhooks/', branch=True)
+    @with_transaction_id()
+    def webhooks(self, request, log):
+        """
+        webhook routes handled by OtterWebhooks
+        """
+        return OtterWebhooks(self.store, log, self.tenant_id,
+                             self.scaling_group_id, self.policy_id).app.resource()

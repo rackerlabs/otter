@@ -43,11 +43,12 @@ class SchedulerService(TimerService):
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
         from otter.models.cass import LOCK_TABLE_NAME
-        self.lock = BasicLock(slv_client, LOCK_TABLE_NAME, 'schedule', max_retry=0)
+        self.lock_table = LOCK_TABLE_NAME
+        self.slv_client = slv_client
+        self.log = otter_log.bind(system='otter.scheduler')
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.store = store
         self.clock = clock
-        self.log = otter_log.bind(system='otter.scheduler')
 
     def check_for_events(self, batchsize):
         """
@@ -62,9 +63,12 @@ class SchedulerService(TimerService):
             return None
 
         def _do_check():
-            d = with_lock(self.lock, self.fetch_and_process, batchsize)
+            lock_log = self.log.bind(category='locking')
+            lock = BasicLock(self.slv_client, self.lock_table, 'schedule', max_retry=0,
+                             log=lock_log)
+            d = with_lock(lock, self.fetch_and_process, batchsize)
             d.addCallback(check_for_more)
-            d.addErrback(ignore_and_log, BusyLockError, self.log,
+            d.addErrback(ignore_and_log, BusyLockError, lock_log,
                          "Couldn't get lock to process events")
             d.addErrback(self.log.err)
             return d
@@ -83,7 +87,7 @@ class SchedulerService(TimerService):
             if not len(events):
                 return events, set()
 
-            log.msg('Processing events', num_events=len(events))
+            log.msg('Processing {num_events} events', num_events=len(events))
 
             deleted_policy_ids = set()
 
@@ -110,8 +114,10 @@ class SchedulerService(TimerService):
                 else:
                     events_to_delete.append(event['policyId'])
 
-            log.msg('Deleting events', num_policy_ids_deleting=len(events_to_delete))
-            log.msg('Updating events', num_policy_ids_updating=len(events_to_update))
+            log.msg('Deleting {policy_ids_deleting} events',
+                    policy_ids_deleting=len(events_to_delete))
+            log.msg('Updating {policy_ids_updating} events',
+                    policy_ids_updating=len(events_to_update))
             d = self.store.update_delete_events(events_to_delete, events_to_update)
 
             return d.addCallback(lambda _: events)
@@ -119,7 +125,6 @@ class SchedulerService(TimerService):
         # utcnow because of cass serialization issues
         utcnow = datetime.utcnow()
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
-        log.msg('Checking for events')
         deferred = self.store.fetch_batch_of_events(utcnow, batchsize)
         deferred.addCallback(process_events)
         deferred.addCallback(update_delete_events)

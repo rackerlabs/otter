@@ -42,7 +42,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         If there are no policies for that account, a JSON blob consisting of an
         empty list is returned with a 200 (OK) status
         """
-        self.mock_group.list_policies.return_value = defer.succeed({})
+        self.mock_group.list_policies.return_value = defer.succeed([])
         response_body = self.assert_status_code(200)
         self.mock_group.list_policies.assert_called_once()
 
@@ -53,32 +53,68 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             "policies_links": []
         })
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policy_dictionary_gets_translated(self, url_root):
+    def test_policy_dictionary_gets_linkified(self):
         """
-        When there are policies returned as a dict, a properly formed JSON blob
-        containing ids and links are returned with a 200 (OK) status
+        When policies are returned, a properly formed JSON blob containing ids
+        and links are returned with a 200 (OK) status
         """
-        self.mock_group.list_policies.return_value = defer.succeed({
-            '5': policy_examples()[0]
-        })
+        self.mock_group.list_policies.return_value = defer.succeed(
+            [dict(id='5', **policy_examples()[0])])
         response_body = self.assert_status_code(200)
         self.mock_group.list_policies.assert_called_once()
 
         resp = json.loads(response_body)
         validate(resp, rest_schemas.list_policies_response)
-        expected = policy_examples()[0]
-        expected['id'] = '5'
-        expected['links'] = [
-            {
+        expected = dict(
+            id='5',
+            links=[{
                 'rel': 'self',
                 'href': '/v1.0/11111/groups/1/policies/5/'
-            }
-        ]
+            }],
+            **policy_examples()[0]
+        )
+
         self.assertEqual(resp, {
             "policies": [expected],
             "policies_links": []
         })
+
+    @mock.patch('otter.rest.policies.get_policies_links')
+    def test_pagination(self, get_policies_links):
+        """
+        `list_policies` and `get_policies_links` is called with pagination arguments
+        passed. The returned value from `get_policies_links` is put in 'policies_links'
+        """
+        get_policies_links.return_value = [{'href': 'someurl', 'rel': 'next'}]
+        self.mock_group.list_policies.return_value = defer.succeed([])
+        response_body = self.assert_status_code(
+            200, endpoint='{}?limit=3&marker=m'.format(self.endpoint))
+        self.mock_group.list_policies.assert_called_once_with(limit=3, marker='m')
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        get_policies_links.assert_called_once_with(
+            [], '11111', '1', None, limit=3, marker='m')
+        self.assertEqual(resp['policies_links'], get_policies_links.return_value)
+
+    def test_policies_links_next(self):
+        """
+        When more than limit policies are returned, a properly formed JSON blob with
+        policies_links containing next link is returned with a 200 (OK) status
+        """
+        self.mock_group.list_policies.return_value = defer.succeed(
+            [dict(id='{}'.format(i), **policy_examples()[0])
+             for i in range(1, 102)])
+        response_body = self.assert_status_code(200)
+        self.mock_group.list_policies.assert_called_once()
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.list_policies_response)
+        expected_links = [
+            {'href': '/v1.0/11111/groups/1/policies/?marker=100&limit=100',
+             'rel': 'next'}
+        ]
+        self.assertEqual(resp['policies_links'], expected_links)
 
     def test_policy_create_bad_input_400(self):
         """
@@ -102,14 +138,12 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_policy_create(self, mock_url):
+    def test_policy_create(self):
         """
         Tries to create a set of policies.
         """
-        self.mock_group.create_policies.return_value = defer.succeed({
-            '5': policy_examples()[0]
-        })
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **policy_examples()[0])])
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(policy_examples()[:1]),
             # location header points to the policy list
@@ -151,8 +185,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.mock_controller = controller_patcher.start()
         self.addCleanup(controller_patcher.stop)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_get_policy(self, url_root):
+    def test_get_policy(self):
         """
         Get details of a specific policy.  The response should conform with
         the json schema.

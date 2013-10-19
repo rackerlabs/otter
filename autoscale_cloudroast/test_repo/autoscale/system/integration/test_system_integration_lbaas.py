@@ -4,7 +4,6 @@ System Integration tests autoscaling with lbaas
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import random
-import unittest
 import time
 
 
@@ -65,7 +64,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         policy_data = {'change': self.sp_change}
         group = (self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=self.gc_min_entities_alt)).entity
+            gc_min_entities=self.gc_min_entities_alt,
+            network_type='public')).entity
         active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
@@ -118,7 +118,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.load_balancer_1)]
         self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
 
-    @unittest.skip('AUTO-504')
+    @tags(speed='slow')
     def test_delete_group_when_autoscale_server_is_the_last_node_on_lb(self):
         """
         Create a scaling group with load balancer. After the servers on the group are added to
@@ -134,14 +134,11 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.gc_min_entities_alt)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list,
                                                         load_balancer)
-        lb_node_addresses_list = [each_node.address for each_node in self._get_node_list_from_lb(
-            load_balancer)]
-        for each_node_id in lb_node_id_list_before_scale:
-            self.lbaas_client.delete_node(load_balancer, each_node_id)
+        self.delete_nodes_in_loadbalancer(lb_node_id_list_before_scale, load_balancer)
+        self.empty_scaling_group(group=group, delete=False)
         self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
-        # will the same server ip remain as node on load balancer? if not validate
-        server_ip = self._get_ipv4_address_list_on_servers(active_server_list)
-        self.assertTrue(set(server_ip) not in set(lb_node_addresses_list))
+        lb_node_after_del = self._get_node_list_from_lb(load_balancer)
+        self.assertEquals(len(lb_node_after_del), 0)
 
     @tags(speed='slow')
     def test_existing_nodes_on_lb_unaffected_by_scaling(self):
@@ -192,21 +189,39 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
 
-    @unittest.skip('AUTO-378')
+    @tags(speed='slow')
+    def test_force_delete_group_with_load_balancer(self):
+        """
+        Force delete a scaling group with active servers and load balancer, deletes the servers and the
+        modes form the load balancer and then deletes the group.
+        """
+        group = self._create_group_given_lbaas_id(self.load_balancer_1)
+        self.verify_group_state(group.id, self.gc_min_entities_alt)
+        server_list = self.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        server_ip_list = self._get_ipv4_address_list_on_servers(server_list)
+        delete_group_response = self.autoscale_client.delete_scaling_group(group.id, 'true')
+        self.assertEquals(delete_group_response.status_code, 204,
+                          msg='Could not force delete group {0} when active servers existed '
+                          'on it '.format(group.id))
+        self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
+        node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
+        self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
+
+    @tags(speed='slow')
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load balancer id
         and verify the scaling group deletes the servers after trying to add loadbalancer.
         Also, when 25 nodes already exist on a lb
         """
-        load_balancer_list = [00000, self.lb_other_region]
+        load_balancer_list = [self.lb_other_region]
         for each_load_balancer in load_balancer_list:
             group = self._create_group_given_lbaas_id(each_load_balancer)
             self._wait_for_servers_to_be_deleted_when_lb_invalid(
                 group.id, group.groupConfiguration.minEntities)
-            self.assertEquals(len(self.get_servers_containing_given_name_on_tenant(group_id=group.id)),
-                              0, msg='Servers created on the group before trying to add the '
-                              'invalid load balancer were not deleted on group {0}'.format(group.id))
+            self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
 
     def _create_group_given_lbaas_id(self, *lbaas_ids):
         """
@@ -216,7 +231,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         create_group_response = self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             lc_load_balancers=self._create_lbaas_list(*lbaas_ids),
-            gc_cooldown=0)
+            gc_cooldown=0, network_type='public')
         group = create_group_response.entity
         self.resources.add(group, self.empty_scaling_group)
         return group
