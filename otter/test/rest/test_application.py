@@ -265,10 +265,11 @@ class RouteTests(RequestTestMixin, TestCase):
 
         class FakeApp(object):
             app = OtterApp()
+            log = mock.Mock()
 
             @app.route('/v1.0/foo/')
             @with_transaction_id()
-            def foo(self, request, log):
+            def foo(self, request):
                 requests[0] += 1
                 return 'ok'
 
