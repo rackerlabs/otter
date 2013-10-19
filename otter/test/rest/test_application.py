@@ -293,10 +293,11 @@ class TransactionIdExtraction(RequestTestMixin, TestCase):
 
         class FakeApp(object):
             app = OtterApp()
+            log = mock.Mock()
 
             @app.route('/v1.0/foo')
             @with_transaction_id()
-            def foo(self, request, log):
+            def foo(self, request):
                 transaction_ids.append(transaction_id(request))
                 return 'ok'
 
