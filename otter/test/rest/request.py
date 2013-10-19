@@ -311,9 +311,6 @@ class AdminRestAPITestMixin(RequestTestMixin):
         """
         self.mock_store = iMock(IAdmin)
 
-        #self.mock_store = MockAdmin()
-        #self.root = OtterAdmin(self.mock_store).app.resource()
-
         self.mock_generate_transaction_id = patch(
             self, 'otter.rest.decorators.generate_transaction_id',
             return_value='a-wild-transaction-id')

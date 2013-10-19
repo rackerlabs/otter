@@ -3,7 +3,9 @@ Classes and functions for managing metrics around Otter.
 """
 import json
 
-from otter.rest.decorators import fails_with, succeeds_with
+from otter.log import log
+from otter.rest.decorators import (fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
 
@@ -14,14 +16,15 @@ class OtterMetrics(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log):
+    def __init__(self, store):
         """
         Initialize OtterMetrics with a data store and log.
         """
+        self.log = log.bind(system='otter.rest.metrics')
         self.store = store
-        self.log = log
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_metrics(self, request):

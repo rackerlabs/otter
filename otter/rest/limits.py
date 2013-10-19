@@ -6,8 +6,10 @@ rest endpoints that return group limits
 import json
 from lxml import etree
 
+from otter.log import log
 from otter.rest.otterapp import OtterApp
-from otter.rest.decorators import fails_with, succeeds_with
+from otter.rest.decorators import (fails_with, succeeds_with,
+                                   with_transaction_id)
 from otter.rest.errors import exception_codes
 from otter.util.config import config_value
 
@@ -18,12 +20,14 @@ class OtterLimits(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id):
+    def __init__(self, store, tenant_id):
+        self.log = log.bind(system='otter.log.limits',
+                            tenant_id=tenant_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def list_limits(self, request):
