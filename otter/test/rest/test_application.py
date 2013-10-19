@@ -10,7 +10,7 @@ from twisted.trial.unittest import TestCase
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin
-from otter.util import patch
+from otter.test.utils import patch
 from otter.util.http import (get_autoscale_links, transaction_id, get_collection_links,
                              get_groups_links, get_policies_links, get_webhooks_links)
 
