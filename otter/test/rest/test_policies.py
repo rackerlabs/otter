@@ -140,6 +140,77 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         resp = json.loads(response_body)
         self.assertEqual(resp['type'], 'ValidationError')
 
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_policy_create_bobby_without_bobby(self, mock_url):
+        """
+        Tries to create a Bobby policy without Bobby being active
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_policy_create_bad_args(self, mock_url):
+        """
+        Verifies that a schedule with the paramaters for cloud_monitoring still
+        fails
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "schedule",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
+
     def test_policy_create(self):
         """
         Tries to create a set of policies.
@@ -193,7 +264,7 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
     @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
     def test_policy_create_bobby_null(self, create_policy, mock_url):
         """
-        Tries to create a set of policies.
+        Tries to create a regular policy with bobby active
         """
 
         self.mock_group.create_policies.return_value = defer.succeed([
@@ -223,13 +294,34 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
-    def test_policy_create_bobby(self, create_policy, mock_url):
+    def test_policy_create_bobby_bad_args(self, create_policy, mock_url):
         """
-        Tries to create a set of policies.
+        Tries to create a policy with bobby on and invalid args
         """
 
         bobby_policy = {
-            "name": "Schedule policy for MaaS",
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring",
+            "args": {
+                "at": "2015-05-20T00:00:00Z"
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby(self, create_policy, mock_url):
+        """
+        Tries to create a Bobby policy
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
             "cooldown": 3,
             "change": 10,
             "type": "cloud_monitoring",

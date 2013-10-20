@@ -17,6 +17,7 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.webhooks import OtterWebhooks
 from otter.util.http import get_autoscale_links, transaction_id, get_policies_links
 from otter import controller
+from jsonschema import ValidationError
 
 
 def linkify_policy_list(policy_list, tenantId, groupId):
@@ -25,6 +26,26 @@ def linkify_policy_list(policy_list, tenantId, groupId):
     """
     for policy in policy_list:
         policy['links'] = get_autoscale_links(tenantId, groupId, policy['id'])
+
+
+def extra_policy_validation(policy_list, bobby):
+    """
+    Ensure that cloud_monitoring policies don't look like scheduled policies and
+    vice versa
+    """
+    for policy in policy_list:
+        if policy['type'] == 'cloud_monitoring':
+            if bobby is None:
+                e = ValidationError('cloud_monitoring policy disabled')
+                return e
+            if 'at' in policy['args'] or 'cron' in policy['args']:
+                e = ValidationError('Incorrect args for cloud_monitoring policy')
+                return e
+        if policy['type'] == 'schedule':
+            if 'check' in policy['args'] or 'alarm_criteria' in policy['args']:
+                e = ValidationError('Incorrect args for schedule policy')
+                return e
+    return None
 
 
 class OtterPolicies(object):
@@ -201,12 +222,16 @@ class OtterPolicies(object):
                                          policy_item['args']['alarm_criteria']['criteria'])
             return d.addCallback(lambda _: policy_list)
 
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
-        deferred = rec.create_policies(data)
-
         from otter.rest.bobby import get_bobby
 
         bobby = get_bobby()
+        e = extra_policy_validation(data, bobby)
+        if e is not None:
+            return defer.fail(e)
+
+        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.scaling_group_id)
+        deferred = rec.create_policies(data)
+
         if bobby is not None:
             deferred.addCallback(_add_to_bobby, bobby)
 
