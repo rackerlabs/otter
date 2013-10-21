@@ -287,11 +287,11 @@ _policy_base_type = {
 # Hence, this dirty hack: It creates all possible types
 _policy_types = []
 for change in ['change', 'changePercent', 'desiredCapacity']:
-    for _type in ['schedule', 'webhook']:
+    for _type in ['schedule', 'webhook', 'cloud_monitoring']:
         _policy_type = deepcopy(_policy_base_type)
         _policy_type['properties'][change] = {'required': True}
         _policy_type['properties']['type'] = {'pattern': _type}
-        if _type == 'schedule':
+        if _type == 'schedule' or _type == 'cloud_monitoring':
             _policy_type['properties']['args'] = {'required': True}
         _policy_types.append(_policy_type)
 
@@ -357,7 +357,7 @@ policy = {
             "required": True
         },
         "type": {
-            "enum": ["webhook", "schedule"],
+            "enum": ["webhook", "schedule", "cloud_monitoring"],
             "required": True
         },
         "args": {
@@ -370,6 +370,12 @@ policy = {
                 {
                     "type": "object",
                     "properties": {"cron": {"required": True}},
+                    "additionalProperties": False
+                },
+                {
+                    "type": "object",
+                    "properties": {"alarm_criteria": {"required": True},
+                                   "check": {"required":True}},
                     "additionalProperties": False
                 }
             ],
@@ -396,10 +402,10 @@ policy = {
     },
     "dependencies": {
         "args": {
-            # args can be there only when type is 'schedule'
+            # args can be there only when type is 'schedule' or 'cloud_monitoring'
             "type": "object",
             "properties": {
-                "type": {"pattern": "schedule"}
+                "type": {"enum": ["schedule", "cloud_monitoring"]}
             }
         }
     }
