@@ -45,12 +45,11 @@ class ScalingGroup(AutoMarshallingModel):
         if hasattr(scaling_group, 'id'):
             setattr(scaling_group, 'id', getattr(scaling_group, 'id'))
         if hasattr(scaling_group, 'groupConfiguration'):
-            scaling_group.groupConfiguration = Group._dict_to_obj(scaling_group.groupConfiguration)
-        if hasattr(scaling_group, 'state'):
-            scaling_group.state = Group._dict_to_obj(scaling_group.state)
+            scaling_group.groupConfiguration = Group._dict_to_obj(
+                scaling_group.groupConfiguration)
         if hasattr(scaling_group, 'launchConfiguration'):
-            scaling_group.launchConfiguration = scaling_group.launchConfiguration[
-                'args']
+            scaling_group.launchConfiguration = \
+                scaling_group.launchConfiguration['args']
             scaling_group.launchConfiguration = Config._dict_to_obj(
                 scaling_group.launchConfiguration)
         if hasattr(scaling_group, 'scalingPolicies'):
@@ -196,6 +195,11 @@ class Policy(AutoMarshallingModel):
 
     """
     works for the autoscaling policies
+
+     LK NOTE: This class does not support a "policies_links" attribute
+     >> handle the singular "policy" case
+     ?? WHy would this be called?
+
     """
 
     def __init__(self, **kwargs):
@@ -213,11 +217,8 @@ class Policy(AutoMarshallingModel):
         json_dict = json.loads(serialized_str)
         if 'policy' in json_dict.keys():
             ret = cls._dict_to_obj(json_dict['policy'])
-        if any(['policies' in json_dict.keys(), 'scalingPolicies' in json_dict.keys()]):
-            ret = []
-            for policy in json_dict['policies']:
-                s = cls._dict_to_obj(policy)
-                ret.append(s)
+        # LK NOTE: It seems that nothing was done with the 'scalingPolicies'
+        # why? Legacy?
         return ret
 
     @classmethod
@@ -240,6 +241,43 @@ class Policy(AutoMarshallingModel):
                 newkey = re.split('}', each)[1]
                 setattr(policy, newkey, policy_dict[each])
         return policy
+
+
+class Policies(AutoMarshallingModel):
+    """
+    A marshalling object that works for paginated scaling group policies
+    """
+
+    def __init__(self, **kwargs):
+        super(Policies, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    # LK NOTE: Where is this called?
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Return an object with attributes corresponding to the json serialized
+        string for paged policy listings
+        """
+
+        json_dict = json.loads(serialized_str)
+        # use the Policies dict_to_object classmethod to create the object
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, policies_dict):
+        """
+        Helper method to transform a dictionary into a Policies instance
+        """
+
+        policies = Policies(**policies_dict)
+        if hasattr(policies, 'policies_links'):
+            policies.policies_links = Links._dict_to_obj(policies.policies_links)
+        if hasattr(policies, 'policies'):
+            policies.policies = [
+                Policy._dict_to_obj(p) for p in policies.policies]
+        return policies
 
 
 class Webhook(AutoMarshallingModel):
