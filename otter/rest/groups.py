@@ -473,13 +473,26 @@ class OtterGroup(object):
             # There is no argument
             pass
         if force:
+            config = []
             d = group.view_config()
 
-            def update_config(config):
-                config['minEntities'] = 0
-                config['maxEntities'] = 0
-                return group.update_config(config)
+            def update_config(_config):
+                _config['minEntities'] = 0
+                _config['maxEntities'] = 0
+                config.append(_config)
+                return group.update_config(_config)
             d.addCallback(update_config)
+
+            def view_state(_):
+                return group.view_state()
+            d.addCallback(view_state)
+
+            def obey_config(group_state):
+                _config = config[0]
+                return controller.obey_config_change(
+                    self.log, transaction_id(request), _config, group, group_state)
+            d.addCallback(obey_config)
+
             return d.addCallback(lambda _: group.delete_group())
         else:
             return group.delete_group()
