@@ -1904,6 +1904,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
         set_config_data({'limits': {'absolute': {'maxGroups': 1000}}})
+        self.addCleanup(set_config_data, {})
 
         self.returns = [{"count": 0}, None]
 
@@ -2095,6 +2096,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedData = {'tenantId': '1234'}
         expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
 
+        self.connection.execute.assert_called_once_with(expectedCQL,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
+
         d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
         self.assertTrue(isinstance(self.successResultOf(d), dict))
 
@@ -2109,6 +2114,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         expectedData = {'tenantId': '1234'}
         expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
+
+        self.connection.execute.assert_called_once_with(expectedCQL,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
 
         d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
         self.failureResultOf(d, OverLimitError)
