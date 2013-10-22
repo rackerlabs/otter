@@ -2090,7 +2090,6 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         test scaling group creation when below maxGroups limit
         """
-        set_config_data({'limits': {'absolute': {'maxGroups': 10}}})
         self.returns = [{'count': 1}, None]
 
         expectedData = {'tenantId': '1234'}
