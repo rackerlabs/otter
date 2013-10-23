@@ -187,10 +187,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "BlahError",
-            "details": ""
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "BlahError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
@@ -219,10 +221,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "DetailsError",
-            "details": "this is a detail"
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "DetailsError",
+                "details": "this is a detail"
+            }
         })
         self.flushLoggedErrors(DetailsError)
 
@@ -248,10 +252,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "DetailsError",
-            "details": "this is a detail"
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "DetailsError",
+                "details": "this is a detail"
+            }
         })
         self.flushLoggedErrors(DetailsError)
 
@@ -291,10 +297,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 400,
-            "type": "BlahError",
-            "details": ""
+            "error": {
+                "message": "fail",
+                "code": 400,
+                "type": "BlahError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
@@ -333,10 +341,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "An Internal Error was encountered",
-            "code": 500,
-            "type": "InternalError",
-            "details": ""
+            "error": {
+                "message": "An Internal Error was encountered",
+                "code": 500,
+                "type": "InternalError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
