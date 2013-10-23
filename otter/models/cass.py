@@ -946,28 +946,27 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection)
 
-    def fetch_and_delete(self, log, now, size=100):
+    def fetch_and_delete(self, log, bucket, now, size=100):
         """
         Fetch events to be occurring now and delete them after fetching
         """
         def _fetch_and_delete(now, size):
             d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
-                                        {"size": size, "now": now},
+                                        {"size": size, "now": now, "bucket": bucket},
                                         get_consistency_level('list', 'event'))
             return d.addCallback(delete_events)
 
         def delete_events(events):
-            # delete events
-            policy_ids = [event['policyId'] for event in events]
-            cql, data = '', {}
-            for i, policy_id in enumerate(policy_ids):
-                cql += ':policyid{},'.format(i)
-                data['policyid{}'.format(i)] = policy_id
-            cql = cql.rstrip(',')
-            d = self.connection.execute(_cql_delete_events.format(cf=self.event_table,
-                                                                  policy_ids=cql),
-                                        {'trigger': now, 'policy_ids': data},
-                                        get_consistency_level('delete', 'event'))
+            if not events:
+                return events
+            data = {'trigger': now}
+            queries = []
+            for i, event in enumerate(events):
+                policy_id = event['policyId']
+                pol_num = 'policyid{}'.format(i)
+                queries.append(_cql_delete_event.format(policy_id=pol_num))
+                data[pol_num] = policy_id
+            d = Batch(queries, data, get_consistency_level('delete', 'event')).execute(client)
             return d.addCallback(lambda _: events)
 
         lock = BasicLock(self.connection, LOCK_TABLE_NAME, now.isoformat(), max_retry=0)
@@ -978,7 +977,7 @@ class CassScalingGroupCollection:
         Add cron events to event table
         """
         queries, data = list(), dict()
-        for i, event in enumerate(update_events):
+        for i, event in enumerate(cron_events):
             polname = 'policy{}'.format(i)
             queries.append(_cql_insert_cron_event.format(cf=self.event_table, name=':' + polname))
             data.update({polname + key: event[key] for key in event})
