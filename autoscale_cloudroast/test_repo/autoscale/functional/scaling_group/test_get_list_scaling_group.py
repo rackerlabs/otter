@@ -48,7 +48,7 @@ class ScalingGroupListTest(AutoscaleFixture):
         self.assertEqual(group_info.groupConfiguration.name,
                          self.first_scaling_group.groupConfiguration.name,
                          msg='Group name did not match for group '
-                         '{0}'.format(self.first_scaling_group.id))
+                         '{0}'.format(self.first_scaling_group.id))nti
         self.assertEqual(group_info.groupConfiguration.minEntities,
                          self.first_scaling_group.groupConfiguration.minEntities,
                          msg="Group's minimum entities did not match for group "

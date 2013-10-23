@@ -36,7 +36,7 @@ class ListScalingPolicies(ScalingGroupPolicyFixture):
                           msg='Create webhook for a policy failed with {0} for group'
                           ' {1}'.format(list_policies_resp.status_code, self.group.id))
         self.validate_headers(list_policies_resp.headers)
-        for i in list_policies_resp.entity:
+        for i in (list_policies_resp.entity).policies:
             policy_id_list.append(i.id)
         self.assertTrue(self.policy1['id'] in policy_id_list)
         self.assertTrue(self.policy2['policy_id'] in policy_id_list)
