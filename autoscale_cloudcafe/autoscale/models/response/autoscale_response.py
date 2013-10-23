@@ -194,12 +194,7 @@ class Config(AutoMarshallingModel):
 class Policy(AutoMarshallingModel):
 
     """
-    works for the autoscaling policies
-
-     LK NOTE: This class does not support a "policies_links" attribute
-     >> handle the singular "policy" case
-     ?? WHy would this be called?
-
+    works for the autoscaling policies, but does not include a "policies_links" attribute.
     """
 
     def __init__(self, **kwargs):
@@ -256,7 +251,6 @@ class Policies(AutoMarshallingModel):
         for keys, values in kwargs.items():
             setattr(self, keys, values)
 
-    # LK NOTE: Where is this called?
     @classmethod
     def _json_to_obj(cls, serialized_str):
         """
