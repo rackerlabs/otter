@@ -113,7 +113,7 @@
     <!-- ======================================================================================= -->
     <!-- Methods -->
     <!-- ======================================================================================= -->
-      <method id="createGroup" name="POST">
+      <method id="createGroup" name="POST" rax:roles="autoscale:creator">
           <wadl:doc title="Create Group" xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
                 This operation creates an autoscaling group.
@@ -552,7 +552,7 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method id="putGroupConfig" name="PUT">
+    <method id="putGroupConfig" name="PUT" rax:roles="autoscale:creator">
         <doc title="Replace Group Configuration">
             <db:para role="shortdesc">
                 This operation updates the configuration for the autoscaling group.
@@ -690,7 +690,7 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method name="POST" id="createPolicies">
+    <method name="POST" id="createPolicies" rax:roles="autoscale:creator">
         <doc title="Create Policy">
             <db:para role="shortdesc">
                 This operation creates an autoscaling policy.
@@ -849,7 +849,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getWebhooks">
+    <method name="GET" id="getWebhooks" rax:roles="observer autoscale:observer">
         <doc title="Get a list of webhooks for the policy">
             <db:para role="shortdesc">
                 This operation obtains a list of webhooks for the autoscaling policy.
@@ -869,7 +869,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="createWebhook" name="POST">
+    <method id="createWebhook" name="POST" rax:roles="autoscale:creator">
         <doc title="Create a webhook">
             <db:para role="shortdesc">
                 This operation creates a webhook.
@@ -898,7 +898,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getWebhook" name="GET">
+    <method id="getWebhook" name="GET" rax:roles="observer autoscale:observer">
         <doc title="View Webhook">
             <db:para role="shortdesc">
                 This operation returns the description for a webhook.
