@@ -1,7 +1,7 @@
 """
 Test to verify pagination for a list of scaling policies.
 """
-#import unittest
+import unittest
 
 from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 
@@ -11,8 +11,6 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
     """
     This class implements a set of test cases to verify pagination for a
     list of autoscale policies.
-
-    Assume: The functionality of various types of policies has been tested elsewhere
     """
 
     def setUp(self):
@@ -20,8 +18,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         """
         super(ScalingGroupPolicyFixture, self).setUp()
         self._create_multiple_scaling_policies(3)
-        self.total_policies = self._get_total_num_policies
-        print "LK_DEBUG: SetUp policy pagination test"
+        self.total_policies = self._get_total_num_policies()
 
     def tearDown(self):
         """
@@ -30,7 +27,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         super(ScalingGroupPolicyFixture, self).tearDown()
         try:
             print "LK_DEBUG: From TearDown"
-            print self._get_total_num_policies
+            print self._get_total_num_policies()
         except:
             pass
 
@@ -48,15 +45,8 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         and specifying a limit greater than the default. Confirm that items are
         in batches of 'default limit' with a link to the next batch.
         Note: This test only checks for the first batch.
-
-        Expected Results:
-
         """
-        try:
-            print "LK_DEBUG: From test defualt limit start"
-            print str(self._get_total_num_policies)
-        except:
-            pass
+
         # Create a number of scaling groups greater than the limit
         self._create_multiple_scaling_policies(self.pagination_limit+5)
         params = [None, 100000]
@@ -70,11 +60,6 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
                                                     url=list_policies.policies_links.next).entity
             # Check that there is at least on policy on the next page
             self._assert_list_policies_with_limits_and_next_link(1, rem_list_policy, False)
-        try:
-            print "LK_DEBUG: From test defualt limit end"
-            print str(self._get_total_num_policies)
-        except:
-            pass
 
     def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
         """
@@ -84,8 +69,6 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         """
         # Specify the limit to be ome less than the current number of policies
         param = self.total_policies - 1
-        print "Class number of policies is: ", self.total_policies
-        print "Current number of policies is >>> ", self._get_total_num_policies
         list_policies = self._list_policies_with_given_limit(param)
         self._assert_list_policies_with_limits_and_next_link(param, list_policies)
         rem_list_policy =\
@@ -94,6 +77,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         # Verify there is at least one item in the second batch, and no next link
         self._assert_list_policies_with_limits_and_next_link(1, rem_list_policy, False)
 
+    @unittest.skip('AUTO-711')
     def test_list_policies_with_limit_equal_to_number_of_policies(self):
         """
         List the scaling policies with the limit set equal to the number of policies
@@ -115,12 +99,13 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
 
     def test_list_policies_with_limits_above_set_limit(self):
         """
-        Verify that wehn the limit is set over the set limit (100), all policies
+        Verify that when the limit is set over the set limit (100), all policies
         up to 100 are returned with a link to the next page.
+        Note Only 4 scaling groups are listed since the purpose of this test case is to ensure that
+        the invalid limit does not produce an error The case to verify limiting of results to the
+        maximum is handled in test_list_policies_when_list_greater_than_default_limit.
         """
         params = [101, 1000]
-        # Create 100 scaling groups
-        self._create_multiple_scaling_policies(100)
         num_policies = self._get_total_num_policies()
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(each_param)
@@ -169,7 +154,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         """
         policies_page = self.autoscale_client.list_policies(self.group.id).entity
         num_policies = len(policies_page.policies)
-        while (policies_page.policies_links.next):  # if there are more pages
+        while (hasattr(policies_page.policies_links, 'next')):  # if there are more pages
             policies_page =\
                 self.autoscale_client.list_policies(self.group.id,
                                                     url=policies_page.policies_links.next).entity
@@ -186,12 +171,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         Is there any reason the pagination could be different for different types?
         """
         for n in range(num):
-            policyn_data = {'change': n}
-            self.autoscale_behaviors.create_policy_webhook(self.group.id, policyn_data)
-            #policy_response = self.autoscale_behaviors.create_policy_webhook(self.group.id,
-            # policyn_data)
-            #self.policy = policy_response.entity
-            #self.resources.add()
+            self.autoscale_behaviors.create_policy_given(self.group.id, sp_change=1)
 
     def _list_policies_with_given_limit(self, param, response=200):
         """

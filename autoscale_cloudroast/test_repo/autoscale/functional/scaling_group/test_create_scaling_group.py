@@ -54,7 +54,7 @@ class CreateScalingGroupTest(AutoscaleFixture):
             sp_list=cls.sp_list,
             network_type='public')
         cls.scaling_group = cls.create_resp.entity
-        print cls.scaling_group
+        print cls.scaling_group.state
         cls.resources.add(cls.scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
 

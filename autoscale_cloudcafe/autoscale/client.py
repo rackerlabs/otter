@@ -99,7 +99,6 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         '/{tenantId}/groups'
         """
         url = '%s/groups' % (self.url)
-        print "create scaling group with url: ", url
         # Option "core" - Creates rack user only. See servermill build config
         # option
         if lc_metadata:

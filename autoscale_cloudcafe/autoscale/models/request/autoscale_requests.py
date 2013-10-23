@@ -294,7 +294,6 @@ class ScalingGroup_Request(AutoMarshallingModel):
                  lc_personality=None, lc_metadata=None,
                  lc_disk_config=None, lc_networks=None,
                  lc_load_balancers=None, sp_list=None):
-        print "DEBUG: Reached ScalingGroup_Request"
         super(ScalingGroup_Request, self).__init__()
         self.gc_name = gc_name
         self.gc_cooldown = gc_cooldown

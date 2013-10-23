@@ -47,6 +47,8 @@ class ScalingGroup(AutoMarshallingModel):
         if hasattr(scaling_group, 'groupConfiguration'):
             scaling_group.groupConfiguration = Group._dict_to_obj(
                 scaling_group.groupConfiguration)
+        if hasattr(scaling_group, 'state'):
+            scaling_group.state = Group._dict_to_obj(scaling_group.state)
         if hasattr(scaling_group, 'launchConfiguration'):
             scaling_group.launchConfiguration = \
                 scaling_group.launchConfiguration['args']
@@ -217,8 +219,11 @@ class Policy(AutoMarshallingModel):
         json_dict = json.loads(serialized_str)
         if 'policy' in json_dict.keys():
             ret = cls._dict_to_obj(json_dict['policy'])
-        # LK NOTE: It seems that nothing was done with the 'scalingPolicies'
-        # why? Legacy?
+        if any(['policies' in json_dict.keys(), 'scalingPolicies' in json_dict.keys()]):
+            ret = []
+            for policy in json_dict['policies']:
+                s = cls._dict_to_obj(policy)
+                ret.append(s)
         return ret
 
     @classmethod
