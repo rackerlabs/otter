@@ -25,12 +25,30 @@ def next_cron_occurrence(cron):
     return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
+class RoundRobinItems(object):
+    """
+    List of items that will give next item from the list in round robin fashion
+    """
+
+    def __init__(self, items):
+        self.items = items
+        self._index = 0
+
+    def next_item(self):
+        """
+        Return next item
+        """
+        self._index = (self._index + 1) % len(items)
+        return self.items[self._index]
+
+
 class SchedulerService(TimerService):
     """
     Service to trigger scheduled events
     """
 
-    def __init__(self, batchsize, interval, slv_client, store, clock=None):
+    def __init__(self, batchsize, interval, slv_client, store, zk_hosts,
+                 zk_partition_path, clock=None):
         """
         Initializes the scheduler service with batch size and interval
 
@@ -43,11 +61,47 @@ class SchedulerService(TimerService):
         TimerService.__init__(self, interval, self.check_for_events, batchsize)
         self.store = store
         self.clock = clock
+        self.zk_host = zk_host
+        self.zk_partition_path = zk_partition_path
+        self.kz_client, self.kz_partition = None, None
         self.log = otter_log.bind(system='otter.scheduler')
+
+    def startService(self):
+        """
+        Start this service. This will start partitoning
+        """
+        super(SchedulerService, self).startService()
+        self.kz_client = TxKazooClient(hosts=self.zk_hosts)
+        d = self.kz_client.start()
+        d.addCallback(self.start_partitioner)
+
+    def start_partitioner(self, _):
+        self.kz_partition = self.kz_client.SetPartition(self.zk_partition_path)
 
     def check_for_events(self, batchsize):
         """
-        Check for events in the database before the present time.
+        Check for events occurring now and earlier
+        """
+        if not self.kz_partition or self.kz_partition.allocating:
+            self.log.msg('Partition allocating')
+            return
+        if self.kz_partition.release:
+            self.log.msg('Partition changed. Repartitioning')
+            return self.kz_partition.release_set()
+        if self.kz_partition.failed:
+            self.log.msg('Partition failed. Starting new')
+            self.start_partitioner(None)
+            return
+
+        buckets = list(self.kz_partition)
+        utcnow = datetime.utcnow()
+
+        return defer.gatherResults(
+            [self.check_for_events_in_bucket(bucket, now, batchsize) for bucket in buckets])
+
+    def check_for_events_in_bucket(self, bucket, now, batchsize):
+        """
+        Check for events in the given bucket before `now`
 
         :return: a deferred that fires with None
         """
@@ -58,12 +112,8 @@ class SchedulerService(TimerService):
             return None
 
         def _do_check():
-            # utcnow because of cass serialization issues
-            utcnow = datetime.utcnow().replace(seconds=0, microseconds=0)
-            d = self.store.fetch_and_delete(utcnow, batchsize)
-            d.addErrback(ignore_and_log, BusyLockError, self.log,
-                         "Couldn't get lock to fetch events")
-            d.addCallback(self.process_events, utcnow)
+            d = self.store.fetch_and_delete(now, batchsize)
+            d.addCallback(self.process_events, now)
             d.addCallback(check_for_more)
             d.addErrback(self.log.err)
             return d
@@ -77,11 +127,10 @@ class SchedulerService(TimerService):
 
         :return: a deferred that fires with list of events processed
         """
-        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=now)
-
         if not events:
             return events
 
+        log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=now)
         log.msg('Processing {num_events} events', num_events=len(events))
 
         deleted_policy_ids = set()

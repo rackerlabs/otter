@@ -68,20 +68,20 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
 _cql_view_group_state = ('SELECT "tenantId", "groupId", active, pending, "groupTouched", '
                          '"policyTouched", paused, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
-_cql_insert_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger) '
-                     'VALUES (:tenantId, :groupId, {name}Id, {name}Trigger)')
-_cql_insert_event_with_cron = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", '
+_cql_insert_event = ('INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger) '
+                     'VALUES (:{name}bucket, :tenantId, :groupId, {name}Id, {name}Trigger)')
+_cql_insert_event_with_cron = ('INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", '
                                'trigger, cron) '
-                               'VALUES (:tenantId, :groupId, {name}Id, '
+                               'VALUES (:{name}bucket, :tenantId, :groupId, {name}Id, '
                                '{name}Trigger, {name}cron)')
-_cql_insert_cron_event = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", trigger, cron) '
-                          'VALUES ({name}tenantId, {name}groupId, {name}policyId, '
+_cql_insert_cron_event = ('INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, cron) '
+                          'VALUES ({name}bucket, {name}tenantId, {name}groupId, {name}policyId, '
                           '{name}trigger, {name}cron);')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger", cron FROM {cf} WHERE '
-    'trigger == :now LIMIT :size;')
-_cql_delete_events = 'DELETE FROM {cf} WHERE trigger = :trigger AND "policyId" IN ({policy_ids});'
-_cql_delete_policy_events = 'DELETE FROM {cf} WHERE "policyId" = :policyId;'
+    'bucket = :bucket AND trigger <= :now LIMIT :size;')
+_cql_delete_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
+                     'AND trigger = :{trigger} AND "policyId" = :{policy_id};')
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
     '"webhookKey") VALUES (:tenantId, :groupId, :policyId, :{name}Id, :{name}, '
@@ -117,7 +117,7 @@ _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
 # Store consistency levels
-_consistency_levels = {'event': {'list': ConsistencyLevel.QUORUM, 'insert': ConsistencyLevel.QUORUM,
+_consistency_levels = {'event': {'list': ConsistencyLevel.QUORUM, 'insert': ConsistencyLevel.ONE,
                        'delete': ConsistencyLevel.QUORUM}}
 
 
@@ -145,7 +145,7 @@ def get_consistency_level(operation, resource):
         return ConsistencyLevel.ONE
 
 
-def _build_policies(policies, policies_table, event_table, queries, data, outpolicies):
+def _build_policies(policies, policies_table, event_table, queries, data, outpolicies, bucketlist):
     """
     Because inserting many values into a table with compound keys with one
     insert statement is hard. This builds a bunch of insert statements and a
@@ -180,19 +180,19 @@ def _build_policies(policies, policies_table, event_table, queries, data, outpol
 
             if "type" in policy:
                 if policy["type"] == 'schedule':
-                    _build_schedule_policy(policy, event_table, queries, data, polname)
+                    _build_schedule_policy(policy, event_table, queries, data, polname, bucketlist)
 
             outpolicies[polId] = policy
 
 
-def _build_schedule_policy(policy, event_table, queries, data, polname):
+def _build_schedule_policy(policy, event_table, queries, data, polname, bucketlist):
     """
     Build schedule-type policy
     """
+    data[polname + 'bucket'] = bucketlist.next_item()
     if 'at' in policy["args"]:
         queries.append(_cql_insert_event.format(cf=event_table, name=':' + polname))
-        at_time = timestamp.from_timestamp(policy["args"]["at"]).replace(seconds=0,
-                                                                         microseconds=0)
+        at_time = timestamp.from_timestamp(policy["args"]["at"])
         data[polname + "Trigger"] = at_time
     elif 'cron' in policy["args"]:
         queries.append(_cql_insert_event_with_cron.format(cf=event_table, name=':' + polname))
@@ -202,9 +202,17 @@ def _build_schedule_policy(policy, event_table, queries, data, polname):
 
 
 def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_id, group_id):
+    d = _find_event(connection, policy_id, buckets)
+
+    def _delete_event(event):
+        return connection.execute(_cql_delete_event.format(cf=event_table, trigger='trigger',
+                                                           policy_id='policy_id'),
+                                  {'bucket': event['bucket'], 'policyId': policy_id,
+                                   'trigger': event['trigger']},
+                                  get_consistency_level('delete', 'event'))
+
     # Delete existing entry in event table
-    d = connection.execute(_cql_delete_policy_events.format(cf=event_table),
-                           {'policyId': policy_id}, get_consistency_level('delete', 'event'))
+    d.addCallback(_delete_event)
 
     def _insert_event(_):
         queries, data = [], {}
@@ -214,7 +222,26 @@ def _update_schedule_policy(connection, policy, policy_id, event_table, tenant_i
         _build_schedule_policy(policy, event_table, queries, data, 'policy')
         return Batch(queries, data, get_consistency_level('update', 'event')).execute(connection)
 
+    # Then, insert new one
     return d.addCallback(_insert_event)
+
+
+@defer.inlineCallbacks
+def _find_event(connection, policy_id, buckets):
+    """
+    Find the event corresponding to given policy id and return the row
+
+    Note: This method can be very time consuming as it will go through each event
+    in each bucket one after other in blocks of 100. So, if there are 1000 events in 10
+    buckets this method will do 10 buckets * 10 100-size reads at-max
+    """
+    def _find_event_in_bucket(bucket):
+        pass
+
+    for bucket in buckets:
+        event = yield _find_event_in_bucket(bucket)
+        if event:
+            defer.returnValue(event)
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,
@@ -578,7 +605,7 @@ class CassScalingGroup(object):
             outpolicies = {}
 
             _build_policies(data, self.policies_table, self.event_table, queries, cqldata,
-                            outpolicies)
+                            outpolicies, self.bucketlist)
 
             b = Batch(queries, cqldata,
                       consistency=get_consistency_level('create', 'policy'))
@@ -626,8 +653,7 @@ class CassScalingGroup(object):
         def _do_delete(_):
             queries = [
                 _cql_delete_all_in_policy.format(cf=self.policies_table),
-                _cql_delete_all_in_policy.format(cf=self.webhooks_table),
-                _cql_delete_policy_events.format(cf=self.event_table)]
+                _cql_delete_all_in_policy.format(cf=self.webhooks_table)]
             b = Batch(queries, {"tenantId": self.tenant_id,
                                 "groupId": self.uuid,
                                 "policyId": policy_id},
@@ -865,6 +891,13 @@ class CassScalingGroupCollection:
         self.webhooks_table = "policy_webhooks"
         self.state_table = "group_state"
         self.event_table = "scaling_schedule"
+        self.bucketlist = None
+
+    def set_scheduler_bucket_list(self, bucketlist):
+        """
+        Store round-robin list of buckets that will be used to store scheduled events
+        """
+        self.bucketlist = self.bucketlist
 
     def create_scaling_group(self, log, tenant_id, config, launch, policies=None):
         """
@@ -944,33 +977,33 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
-                                self.connection)
+                                self.connection, self.bucketlist)
 
     def fetch_and_delete(self, log, bucket, now, size=100):
         """
-        Fetch events to be occurring now and delete them after fetching
+        Fetch events to be occurring now or before in a bucket
+        and delete them after fetching
         """
-        def _fetch_and_delete(now, size):
-            d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
-                                        {"size": size, "now": now, "bucket": bucket},
-                                        get_consistency_level('list', 'event'))
-            return d.addCallback(delete_events)
-
         def delete_events(events):
             if not events:
                 return events
-            data = {'trigger': now}
+            data = {'bucket': bucket}
             queries = []
             for i, event in enumerate(events):
-                policy_id = event['policyId']
                 pol_num = 'policyid{}'.format(i)
-                queries.append(_cql_delete_event.format(policy_id=pol_num))
-                data[pol_num] = policy_id
-            d = Batch(queries, data, get_consistency_level('delete', 'event')).execute(client)
+                trigger_num = 'trigger{}'.format(i)
+                queries.append(
+                    _cql_delete_event.format(cf=self.event_table, policy_id=pol_num,
+                                             trigger=trigger_num))
+                data[pol_num] = event['policyId']
+                data[trigger_num] = event['trigger']
+            d = Batch(queries, data, ConsistencyLevel.QUORUM).execute(client)
             return d.addCallback(lambda _: events)
 
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, now.isoformat(), max_retry=0)
-        return with_lock(lock, _fetch_and_delete, now, size)
+        d = self.connection.execute(_cql_fetch_batch_of_events.format(cf=self.event_table),
+                                    {"size": size, "now": now, "bucket": bucket},
+                                    get_consistency_level('list', 'event'))
+        return d.addCallback(delete_events)
 
     def add_cron_events(self, cron_events):
         """
@@ -981,6 +1014,7 @@ class CassScalingGroupCollection:
             polname = 'policy{}'.format(i)
             queries.append(_cql_insert_cron_event.format(cf=self.event_table, name=':' + polname))
             data.update({polname + key: event[key] for key in event})
+            data[polname + 'bucket'] = self.bucketlist.next_item()
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
 

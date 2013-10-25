@@ -18,12 +18,13 @@ USE @@KEYSPACE@@;
 -- will probably get the giggles looking at this.
 
 CREATE TABLE scaling_schedule (
+    bucket int,
     "tenantId" ascii,
     "groupId" ascii,
     "policyId" ascii,
     trigger timestamp,
     cron ascii,
-    PRIMARY KEY(trigger, "policyId")
+    PRIMARY KEY(bucket, trigger, "policyId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',
     'min_threshold' : '2'

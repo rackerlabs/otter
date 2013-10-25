@@ -21,7 +21,7 @@ from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.models.mock import MockAdmin, MockScalingGroupCollection
-from otter.scheduler import SchedulerService
+from otter.scheduler import SchedulerService, RoundRobinItems
 
 from otter.supervisor import Supervisor, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
@@ -144,9 +144,13 @@ def makeService(config):
 
     # Setup scheduler service
     if config_value('scheduler') and not config_value('mock'):
+        bucketlist = RoundRobinItems(range(1, int(config_value('scheduler.buckets')) + 1))
+        store.set_scheduler_bucket_list(bucketlist)
+        zk_hosts = [str(host) for host in config_value('scheduler.zk_hosts')]
+        partition_path = config_value('scheduler.partition_path')
         scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                              int(config_value('scheduler.interval')),
-                                             cassandra_cluster, store)
+                                             cassandra_cluster, store, zk_hosts, partition_path)
         scheduler_service.setServiceParent(s)
 
     return s
