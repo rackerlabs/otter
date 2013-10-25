@@ -639,6 +639,7 @@
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation pauses the execution of all autoscaling policies for the specified autoscaling group.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </p>
         </doc>
         <request>
@@ -654,6 +655,7 @@
         <doc title="Resume Group Policy Execution">
             <db:para role="shortdesc">
                 This operation resumes the execution of an autoscaling policy.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation resumes the execution of all autoscaling policies for the specified autoscaling group.
