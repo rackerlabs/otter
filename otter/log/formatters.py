@@ -165,13 +165,13 @@ def ObserverWrapper(observer, hostname, seconds=None):
             full_message = " ".join([str(m) for m in eventDict["message"]])
 
         log_params = {
-            "version": "1.0",
-            "host": hostname,
+            "@version": "1",
+            "source_host": hostname,
             "short_message": short_message,
-            "full_message": full_message,
-            "timestamp": eventDict.get("time", seconds()),
+            "message": full_message,
+            "@timestamp": eventDict.get("time", seconds()),
             "level": eventDict.get("level", level),
-            "facility": eventDict.get("system", ""),
+            "type": eventDict.get("system", ""),
         }
 
         if "file" in eventDict:

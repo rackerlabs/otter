@@ -299,12 +299,12 @@ class ObserverWrapperTests(TestCase):
         self.wrapper({'message': ('Hello',)})
 
         self.observer.assert_called_once_with({
-            'host': 'localhost',
-            'version': '1.0',
+            'source_host': 'localhost',
+            '@version': '1',
             'short_message': 'Hello',
-            'full_message': 'Hello',
-            'facility': '',
-            'timestamp': 0,
+            'message': 'Hello',
+            'type': '',
+            '@timestamp': 0,
             'level': 6,
         })
 
@@ -315,7 +315,7 @@ class ObserverWrapperTests(TestCase):
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'full_message': Contains('Traceback')})))
+            matches(ContainsDict({'message': Contains('Traceback')})))
 
     def test_failure_repr_in_short_message(self):
         """
@@ -334,7 +334,7 @@ class ObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'short_message': Equals('uh oh'),
-                                  'full_message': Equals('uh oh')})))
+                                  'message': Equals('uh oh')})))
 
     def test_isError_sets_level_3(self):
         """
