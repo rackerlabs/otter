@@ -1906,7 +1906,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         set_config_data({'limits': {'absolute': {'maxGroups': 1000}}})
         self.addCleanup(set_config_data, {})
 
-        self.returns = [{"count": 0}, None]
+        self.returns = [[{"count": 0}], None]
 
         def _responses(*args):
             result = _de_identify(self.returns.pop(0))
@@ -2090,38 +2090,34 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         """
         test scaling group creation when below maxGroups limit
         """
-        self.returns = [{'count': 1}, None]
+        self.returns = [[{'count': 1}], None]
 
         expectedData = {'tenantId': '1234'}
         expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
 
-        self.connection.execute.assert_called_once_with(expectedCQL,
-                                                        expectedData,
-                                                        ConsistencyLevel.TWO)
-
         d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
         self.assertTrue(isinstance(self.successResultOf(d), dict))
 
-        self.addCleanup(set_config_data, {})
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)
+        self.assertEqual(self.connection.execute.mock_calls[0],
+                         mock.call(expectedCQL, expectedData, ConsistencyLevel.TWO))
 
     def test_max_groups_overlimit(self):
         """
         test scaling group creation when at maxGroups limit
         """
         set_config_data({'limits': {'absolute': {'maxGroups': 1}}})
-        self.returns = [{'count': 1}]
+        self.returns = [[{'count': 1}]]
 
         expectedData = {'tenantId': '1234'}
         expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
 
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
         self.connection.execute.assert_called_once_with(expectedCQL,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
         self.failureResultOf(d, OverLimitError)
-
-        self.addCleanup(set_config_data, {})
 
     def test_list_states(self):
         """

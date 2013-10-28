@@ -952,10 +952,11 @@ class CassScalingGroupCollection:
         # obey limits
         max_groups = config_value('limits.absolute.maxGroups')
         d = self.connection.execute(_cql_count_for_tenant.format(
-            cf="scaling_group"), {'tenantId': tenant_id})
+            cf="scaling_group"), {'tenantId': tenant_id},
+            get_consistency_level('create', 'group'))
 
         def check_groups(cur_groups, max_groups):
-            if cur_groups['count'] >= max_groups:
+            if cur_groups[0]['count'] >= max_groups:
                 msg = 'client has reached maxGroups limit'
                 log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg(msg)
                 raise OverLimitError(tenant_id, max_groups)
