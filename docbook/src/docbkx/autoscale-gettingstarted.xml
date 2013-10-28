@@ -870,7 +870,16 @@ format="SVG" scale="60"/>
                     response body will be returned.</para>
             </example>
             <example>
-                <title>Pause Execution of all Policies for a Scaling Group</title>
+                <title>Pause Execution of all Policies for a Scaling
+                    Group<?sbr?></title>
+                <para>
+                    <note>
+                        <para>The Pause feature has not been
+                            implemented in the Auto Scale API yet but
+                            will be implemented in a future
+                            release.</para>
+                    </note>
+                </para>
                 <para>To pause all execution of scaling policies for a
                     scaling group, submit a <command>POST</command>
                     request with the <parameter>tenantId</parameter>
@@ -883,6 +892,14 @@ format="SVG" scale="60"/>
             </example>
             <example>
                 <title>Resume Execution of all Policies for a Scaling Group</title>
+                <para>
+                    <note>
+                        <para>The Resume feature has not been
+                            implemented in the Auto Scale API yet but
+                            will be implemented in a future
+                            release.</para>
+                    </note>
+                </para>
                 <para>To resume execution of all scaling policies for
                     a scaling group, submit a <command>POST</command>
                     request with the <parameter>tenantId</parameter>

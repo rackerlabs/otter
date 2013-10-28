@@ -19,12 +19,13 @@
     xmlns:osapi="http://docs.openstack.org/compute/api/v1.1"
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+    xmlns:rax="http://docs.rackspace.com/api"
     xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
     <!-- ======================================================================================= -->
     <!-- Resources -->
     <!-- ======================================================================================= -->
     <resources base="https://{region}.autoscale.api.rackspacecloud.com/">
-        <resource id="version" path="v1.0/">
+        <resource id="version" path="v1.0/" rax:roles="admin autoscale:admin autoscale:service-admin">
 
             <!-- GROUPS resource -->
             <resource id="tenantid" path="/{tenantId}">
@@ -448,7 +449,7 @@
           &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroups" name="GET">
+    <method id="getGroups" name="GET" rax:roles="observer autoscale:observer">
         <wadl:doc title="List Scaling Groups" xml:lang="EN"
             xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
@@ -468,7 +469,7 @@
         &commonFaults; &getFaults;  
     </method>
 
-    <method id="getGroupManifest" name="GET">
+    <method id="getGroupManifest" name="GET" rax:roles="observer autoscale:observer">
         <wadl:doc title="List All Group Details" xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
                 This operation returns details about the configuration for a specified autoscaling group.
@@ -504,7 +505,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroupState" name="GET">
+    <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group State">
             <db:para role="shortdesc">
                This operation returns the state of an autoscaling group.
@@ -527,7 +528,7 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method id="getGroupConfig" name="GET">
+    <method id="getGroupConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group Configuration">
             <db:para role="shortdesc">
                This operation lists the configuration for an autoscaling group.
@@ -578,7 +579,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getLaunchConfig" name="GET">
+    <method id="getLaunchConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Launch Configuration">
             <db:para role="shortdesc">
                 This operation lists the launch configuration.
@@ -638,6 +639,7 @@
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation pauses the execution of all autoscaling policies for the specified autoscaling group.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </p>
         </doc>
         <request>
@@ -653,6 +655,7 @@
         <doc title="Resume Group Policy Execution">
             <db:para role="shortdesc">
                 This operation resumes the execution of an autoscaling policy.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation resumes the execution of all autoscaling policies for the specified autoscaling group.
@@ -667,7 +670,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicies">
+    <method name="GET" id="getPolicies" rax:roles="observer autoscale:observer">
         <doc title="Get Policies List">
             <db:para role="shortdesc">
                 This operation lists scaling policies in the autoscaling group.
@@ -770,7 +773,7 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicy">
+    <method name="GET" id="getPolicy" rax:roles="observer autoscale:observer">
         <doc title="Get Policy Details">
             <db:para role="shortdesc">
                 This operation returns details for a specified autoscaling policy.
