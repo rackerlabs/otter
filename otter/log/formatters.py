@@ -132,7 +132,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
     :param str hostname: The hostname to be used.
     :param ILogObserver observer: The log observer to call with our
         formatted data.
-    :param seconds: A 0-argument callable that returns a UNIX timestamp.
+    :param seconds: A 0-argument callable that returns a datetime.
 
     :rtype: ILogObserver
     """
@@ -169,7 +169,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
             "source_host": hostname,
             "short_message": short_message,
             "message": full_message,
-            "@timestamp": eventDict.get("time", seconds()),
+            "@timestamp": datetime.fromtimestamp(eventDict.get("time", seconds())).isoformat(),
             "level": eventDict.get("level", level),
             "type": eventDict.get("system", ""),
         }

@@ -304,7 +304,7 @@ class ObserverWrapperTests(TestCase):
             'short_message': 'Hello',
             'message': 'Hello',
             'type': '',
-            '@timestamp': 0,
+            '@timestamp': '1969-12-31T16:00:00',
             'level': 6,
         })
 
