@@ -52,8 +52,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(params)
             # check that at least (limit) items are listed, and a next link was provided
-            self._assert_list_groups_with_limits_and_next_link(self.pagination_limit,
-                                                               list_policies)
+            self._assert_list_policies_with_limits_and_next_link(self.pagination_limit,
+                                                                 list_policies)
             rem_list_policy =\
                 self.autoscale_client.list_policies(self.group.id,
                                                     url=list_policies.policies_links.next).entity
@@ -100,7 +100,7 @@ class PolicyPaginationTest(AutoscaleFixture):
         """
         Verify that when the limit is set over the set limit (100), all policies
         up to 100 are returned with a link to the next page.
-        Note Only 4 scaling groups are listed since the purpose of this test case is to ensure that
+        Note Only 3 scaling policies are listed since the purpose of this test case is to ensure that
         the invalid limit does not produce an error The case to verify limiting of results to the
         maximum is handled in test_list_policies_when_list_greater_than_default_limit.
         """
@@ -108,14 +108,14 @@ class PolicyPaginationTest(AutoscaleFixture):
         num_policies = self._get_total_num_policies()
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(each_param)
-            self._assert_list_policies_with_limits_and_next_link(num_policies, list_policies)
+            self._assert_list_policies_with_limits_and_next_link(num_policies, list_policies, False)
 
     def test_list_policies_with_marker(self):
         """ List the scaling polices with the marker set to be a scaling policy id
         and verify.
         """
-        policy = (self.autoscale_behaviors.create_policy_min(self.group.id)).entity
-        policies_response = self.autoscale_client.list_policies(self.group.id, marker=policy.id)
+        policy = (self.autoscale_behaviors.create_policy_min(self.group.id))
+        policies_response = self.autoscale_client.list_policies(self.group.id, marker=policy['id'])
         self.assertEquals(policies_response.status_code, 200, msg='list policies failed'
                           ' with {0}'.format(policies_response.status_code))
 
@@ -141,7 +141,8 @@ class PolicyPaginationTest(AutoscaleFixture):
         """
         self.assertGreaterEqual(len(list_policies.policies), policy_len)
         if next_link:
-            self.assertTrue(list_policies.policies_links.next)
+            self.assertTrue(hasattr(list_policies.policies_links, 'next'))
+            #self.assertTrue(list_policies.policies_links.next)
         else:
             self.assertDictEqual(list_policies.policies_links.links, {},
                                  msg='Links to next provided even when'
