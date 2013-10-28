@@ -58,7 +58,7 @@ class GroupPaginationTest(AutoscaleFixture):
             list_group.groups_links.next).entity
         self._assert_list_groups_with_limits_and_next_link(1, rem_list_group, False)
 
-    @unittest.skip('AUTO-700')
+    @unittest.skip('AUTO-711')
     def test_list_groups_with_limit_equal_to_number_of_groups(self):
         """
         List the scaling groups with the limit set to be equal to the number of groups
@@ -67,7 +67,7 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         param = self.total_groups
         list_groups = self._list_group_with_given_limit(param)
-        self._assert_list_groups_with_limits_and_next_link(param, list_groups)
+        self._assert_list_groups_with_limits_and_next_link(param, list_groups, False)
 
     def test_list_groups_with_limit_greater_than_number_of_groups(self):
         """

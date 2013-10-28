@@ -3,10 +3,10 @@ Test to verify pagination for a list of scaling policies.
 """
 import unittest
 
-from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
-class PolicyPaginationTest(ScalingGroupPolicyFixture):
+class PolicyPaginationTest(AutoscaleFixture):
 
     """
     This class implements a set of test cases to verify pagination for a
@@ -16,7 +16,11 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
     def setUp(self):
         """
         """
-        super(ScalingGroupPolicyFixture, self).setUp()
+        super(PolicyPaginationTest, self).setUp()
+
+        # Create a new scaling group for each test case
+        create_resp = self.autoscale_behaviors.create_scaling_group_min()
+        self.group = create_resp.entity
         self._create_multiple_scaling_policies(3)
         self.total_policies = self._get_total_num_policies()
 
@@ -24,12 +28,8 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         """
         Delete resources created for the tests
         """
-        super(ScalingGroupPolicyFixture, self).tearDown()
-        try:
-            print "LK_DEBUG: From TearDown"
-            print self._get_total_num_policies()
-        except:
-            pass
+        super(PolicyPaginationTest, self).tearDown()
+        self.autoscale_client.delete_scaling_group(self.group.id)
 
     def test_list_policies_when_list_greater_than_default_limit(self):
         """
@@ -47,8 +47,8 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         Note: This test only checks for the first batch.
         """
 
-        # Create a number of scaling groups greater than the limit
-        self._create_multiple_scaling_policies(self.pagination_limit+5)
+        # There are already 3 policies from setUp
+        self._create_multiple_scaling_policies(self.pagination_limit)
         params = [None, 100000]
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(params)
@@ -67,7 +67,7 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
         on the tenant and verify groups are listed in batches of the limit specified.
         Verify the presence of a link to the next batch of scaling policies.
         """
-        # Specify the limit to be ome less than the current number of policies
+        # Specify the limit to be one less than the current number of policies
         param = self.total_policies - 1
         list_policies = self._list_policies_with_given_limit(param)
         self._assert_list_policies_with_limits_and_next_link(param, list_policies)

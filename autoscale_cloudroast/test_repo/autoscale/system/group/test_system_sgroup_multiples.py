@@ -116,8 +116,8 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         for policy in (range(self.max_policies)):
             self.autoscale_behaviors.create_policy_min(
                 self.first_scaling_group.id)
-        self.assertEquals(len(self.autoscale_client.list_policies(
-            self.first_scaling_group.id).entity), self.max_policies)
+        self.assertEquals(len(self.autoscale_client.list_policies((
+            self.first_scaling_group.id).entity).policies), self.max_policies)
         policy_beyond_max = self.autoscale_behaviors.create_policy_min(
             self.first_scaling_group.id)
         self.assertEquals(policy_beyond_max['status_code'], 429,
@@ -133,8 +133,8 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.autoscale_behaviors.create_schedule_policy_given(
                 self.first_scaling_group.id,
                 sp_change_percent=100)
-        self.assertEquals(len(self.autoscale_client.list_policies(
-            self.first_scaling_group.id).entity), self.max_policies,
+        self.assertEquals(len(self.autoscale_client.list_policies((
+            self.first_scaling_group.id).entity).policies), self.max_policies,
             msg='Policies on the group {0} is under/over max allowed'.format(
                 self.first_scaling_group.id))
         policy_beyond_max = self.autoscale_behaviors.create_schedule_policy_given(
