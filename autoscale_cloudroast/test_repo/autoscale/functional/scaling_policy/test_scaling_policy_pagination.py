@@ -15,10 +15,9 @@ class PolicyPaginationTest(AutoscaleFixture):
 
     def setUp(self):
         """
+        Create a new scaling group for each test case and create three policies on the group
         """
         super(PolicyPaginationTest, self).setUp()
-
-        # Create a new scaling group for each test case
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         self.group = create_resp.entity
         self._create_multiple_scaling_policies(3)
