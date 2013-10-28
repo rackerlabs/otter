@@ -26,10 +26,10 @@ class GroupStateTestCase(TestCase):
         """
         repr(GroupState) returns something human readable
         """
-        state = GroupState('tid', 'gid', {'1': {}}, {}, 'date', {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, 'date', {}, True)
         self.assertEqual(
             repr(state),
-            "GroupState(tid, gid, {'1': {}}, {}, date, {}, True)")
+            "GroupState(tid, gid, name, {'1': {}}, {}, date, {}, True)")
 
     def test_two_states_are_equal_if_all_vars_are_equal(self):
         """
@@ -37,15 +37,15 @@ class GroupStateTestCase(TestCase):
         equal
         """
         self.assertEqual(
-            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True),
-            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True,
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True),
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True,
                        now=lambda: 'meh'))
 
     def test_two_states_are_unequal_if_vars_different(self):
         """
         Two groups with any different parameters are unequal
         """
-        args = ('tid', 'gid', {}, {}, 'date', {}, True)
+        args = ('tid', 'gid', 'name', {}, {}, 'date', {}, True)
 
         def perterb(args, index):
             copy = [arg for arg in args]
@@ -65,18 +65,18 @@ class GroupStateTestCase(TestCase):
         The classes of the two objects have to be the same.
         """
         _GroupState = namedtuple('_GroupState',
-                                 ['tenant_id', 'group_id', 'active', 'pending',
+                                 ['tenant_id', 'group_id', 'group_name', 'active', 'pending',
                                   'group_touched', 'policy_touched', 'paused'])
         self.assertNotEqual(
-            _GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True),
-            GroupState('tid', 'gid', {'1': {}}, {'2': {}}, 'date', {}, True))
+            _GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True),
+            GroupState('tid', 'gid', 'name', {'1': {}}, {'2': {}}, 'date', {}, True))
 
     def test_group_touched_is_min_if_None(self):
         """
         If a group_touched of None is provided, groupTouched is
         '0001-01-01T00:00:00Z'
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, False)
+        state = GroupState('tid', 'gid', '', {}, {}, None, {}, False)
         self.assertEqual(state.group_touched, '0001-01-01T00:00:00Z')
 
     def test_add_job_success(self):
@@ -84,7 +84,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is not in the pending list, ``add_job`` adds it along with
         the creation time.
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
                            now=lambda: 'datetime')
         state.add_job('1')
         self.assertEqual(state.pending, {'1': {'created': 'datetime'}})
@@ -94,7 +94,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is in the pending list, ``add_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True)
         self.assertRaises(AssertionError, state.add_job, '1')
         self.assertEqual(state.pending, {'1': {}})
 
@@ -102,7 +102,7 @@ class GroupStateTestCase(TestCase):
         """
         If the job ID is in the pending list, ``remove_job`` removes it.
         """
-        state = GroupState('tid', 'gid', {}, {'1': {}}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {'1': {}}, None, {}, True)
         state.remove_job('1')
         self.assertEqual(state.pending, {})
 
@@ -111,7 +111,7 @@ class GroupStateTestCase(TestCase):
         If the job ID is not in the pending list, ``remove_job`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True)
         self.assertRaises(AssertionError, state.remove_job, '1')
         self.assertEqual(state.pending, {})
 
@@ -121,7 +121,7 @@ class GroupStateTestCase(TestCase):
         with server info, and adds the creation time to server info that
         does not already have it.
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
                            now=lambda: 'datetime')
         state.add_active('1', {'stuff': 'here'})
         self.assertEqual(state.active,
@@ -132,7 +132,7 @@ class GroupStateTestCase(TestCase):
         If the server ID is not in the active list, ``add_active`` adds it along
         with server info, and does not change the server info's creation time.
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True,
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True,
                            now=lambda: 'other_now')
         state.add_active('1', {'stuff': 'here', 'created': 'now'})
         self.assertEqual(state.active,
@@ -143,7 +143,7 @@ class GroupStateTestCase(TestCase):
         If the server ID is in the active list, ``add_active`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {'1': {}}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True)
         self.assertRaises(AssertionError, state.add_active, '1', {'1': '2'})
         self.assertEqual(state.active, {'1': {}})
 
@@ -151,7 +151,7 @@ class GroupStateTestCase(TestCase):
         """
         If the server ID is in the active list, ``remove_active`` removes it.
         """
-        state = GroupState('tid', 'gid', {'1': {}}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {'1': {}}, {}, None, {}, True)
         state.remove_active('1')
         self.assertEqual(state.active, {})
 
@@ -160,7 +160,7 @@ class GroupStateTestCase(TestCase):
         If the server ID is not in the active list, ``remove_active`` raises an
         AssertionError.
         """
-        state = GroupState('tid', 'gid', {}, {}, None, {}, True)
+        state = GroupState('tid', 'gid', 'name', {}, {}, None, {}, True)
         self.assertRaises(AssertionError, state.remove_active, '1')
         self.assertEqual(state.active, {})
 
@@ -170,7 +170,7 @@ class GroupStateTestCase(TestCase):
         same time.
         """
         t = ['0']
-        state = GroupState('tid', 'gid', {}, {}, 'date', {}, True, now=t.pop)
+        state = GroupState('tid', 'gid', 'name', {}, {}, 'date', {}, True, now=t.pop)
         state.mark_executed('pid')
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
@@ -266,8 +266,8 @@ class IScalingGroupProviderMixin(object):
 
     def validate_list_policies_return_value(self, *args, **kwargs):
         """
-        Calls ``list_policies``, and validates that it returns a policy
-        dictionary containing the policies mapped to their IDs
+        Calls ``list_policies``, and validates that it returns a list
+        containing the policies with their IDs
 
         :return: the return value of ``list_policies()``
         """
@@ -279,7 +279,7 @@ class IScalingGroupProviderMixin(object):
     def validate_create_policies_return_value(self, *args, **kwargs):
         """
         Calls ``list_policies``, and validates that it returns a policy
-        dictionary containing the policies mapped to their IDs
+        list containing the policies mapped to their IDs
 
         :return: the return value of ``list_policies()``
         """
@@ -291,7 +291,7 @@ class IScalingGroupProviderMixin(object):
     def validate_list_webhooks_return_value(self, *args, **kwargs):
         """
         Calls ``list_webhooks(policy_id)`` and validates that it returns a
-        dictionary uuids mapped to webhook JSON blobs.
+        list of webhook blobs.
 
         :return: the return value of ``list_webhooks(policy_id)``
         """
@@ -302,8 +302,8 @@ class IScalingGroupProviderMixin(object):
 
     def validate_create_webhooks_return_value(self, *args, **kwargs):
         """
-        Calls ``create_webhooks(policy_id, data)`` and validates that it returns
-        a dictionary uuids mapped to webhook JSON blobs.
+        Calls ``create_webhooks(policy_id, data)`` and validates that it
+        returns a list of webhook blobs.
 
         :return: the return value of ``create_webhooks(policy_id, data)``
         """

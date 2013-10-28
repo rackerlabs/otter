@@ -41,7 +41,8 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         error = DummyException('what')
         self.mock_group.list_webhooks.return_value = defer.fail(error)
         self.assert_status_code(500)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
         self.flushLoggedErrors(DummyException)
 
     def test_list_webhooks_for_unknowns_is_404(self):
@@ -57,7 +58,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             self.mock_group.list_webhooks.return_value = defer.fail(error)
             self.assert_status_code(404)
             self.mock_group.list_webhooks.assert_called_once_with(
-                self.policy_id)
+                self.policy_id, limit=100)
             self.flushLoggedErrors(type(error))
             self.mock_group.list_webhooks.reset_mock()
 
@@ -68,27 +69,28 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         """
         self.mock_group.list_webhooks.return_value = defer.succeed({})
         body = self.assert_status_code(200)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
 
         resp = json.loads(body)
         self.assertEqual(resp, {"webhooks": [], "webhooks_links": []})
         validate(resp, rest_schemas.list_webhooks_response)
 
-    @mock.patch('otter.util.http.get_url_root', return_value="")
-    def test_returned_webhooks_dict_gets_translated(self, mock_url):
+    def test_returned_webhooks_list_gets_translated(self):
         """
-        Test that the webhooks dict gets translated into a list of webhooks
-        with ids and links.
+        Test that the webhooks list gets translated with links and capability
+        removed.
         """
         # return two webhook objects
-        self.mock_group.list_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {},
-                  'capability': {'hash': 'xxx', 'version': '1'}},
-            "4": {'name': 'four', 'metadata': {},
-                  'capability': {'hash': 'yyy', 'version': '1'}}
-        })
+        self.mock_group.list_webhooks.return_value = defer.succeed([
+            {'id': '3', 'name': 'three', 'metadata': {},
+             'capability': {'hash': 'xxx', 'version': '1'}},
+            {'id': '4', 'name': 'four', 'metadata': {},
+             'capability': {'hash': 'yyy', 'version': '1'}}
+        ])
         body = self.assert_status_code(200)
-        self.mock_group.list_webhooks.assert_called_once_with(self.policy_id)
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=100)
 
         resp = json.loads(body)
         validate(resp, rest_schemas.list_webhooks_response)
@@ -117,6 +119,29 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
             ],
             "webhooks_links": []
         })
+
+    def test_list_webhooks_returns_next_webhook_link(self):
+        """
+        If as many webhooks as the limit is returned, a next link is provided.
+        """
+        base = {'name': 'x', 'metadata': {},
+                'capability': {'hash': 'xxx', 'version': '1'}}
+        self.mock_group.list_webhooks.return_value = defer.succeed(
+            [dict(id=str(i), **base) for i in range(3)])
+
+        body = self.assert_status_code(
+            200, endpoint="{0}?limit=3".format(self.endpoint))
+
+        self.mock_group.list_webhooks.assert_called_once_with(
+            self.policy_id, limit=3)
+
+        resp = json.loads(body)
+        validate(resp, rest_schemas.list_webhooks_response)
+        self.assertEqual(len(resp['webhooks']), 3)
+        self.assertEqual(resp['webhooks_links'], [{
+            'href': '/v1.0/11111/groups/1/policies/2/webhooks/?marker=2&limit=3',
+            'rel': 'next'
+        }])
 
     def test_create_webhooks_unknown_error_is_500(self):
         """
@@ -166,7 +191,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_webhooks_create(self, mock_url):
@@ -174,12 +199,12 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         Tries to create a set of webhooks.
         """
         creation = [{'name': 'three'}, {'name': 'four'}]
-        self.mock_group.create_webhooks.return_value = defer.succeed({
-            "3": {'name': 'three', 'metadata': {},
-                  'capability': {'hash': 'xxx', 'version': '1'}},
-            "4": {'name': 'four', 'metadata': {},
-                  'capability': {'hash': 'yyy', 'version': '1'}}
-        })
+        self.mock_group.create_webhooks.return_value = defer.succeed([
+            {'id': '3', 'name': 'three', 'metadata': {},
+             'capability': {'hash': 'xxx', 'version': '1'}},
+            {'id': '4', 'name': 'four', 'metadata': {},
+             'capability': {'hash': 'yyy', 'version': '1'}}
+        ])
         response_body = self.assert_status_code(
             201, None, 'POST', json.dumps(creation),
             # location header points to the webhooks list
@@ -377,7 +402,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_update_valid_webhook(self):
         """
@@ -429,7 +454,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             204, None, 'DELETE')
         self.assertEqual(response_body, "")
 
-    @mock.patch('otter.rest.decorators.log')
+    @mock.patch('otter.rest.webhooks.log')
     def test_execute_webhook(self, log):
         """
         Execute a webhook by hash returns a 202
@@ -444,8 +469,9 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.mock_store.get_scaling_group.assert_called_once_with(
             log.bind(), self.tenant_id, self.group_id)
 
-        self.assertEqual(log.bind.call_args_list[0],
-                         mock.call(tenant_id=self.tenant_id, scaling_group_id=self.group_id,
+        self.assertEqual(log.bind.call_args_list[1],
+                         mock.call(tenant_id=self.tenant_id,
+                                   scaling_group_id=self.group_id,
                                    policy_id=self.policy_id))
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
@@ -496,7 +522,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         excs = self.flushLoggedErrors(ValueError)
         self.assertEqual(excs[0].value, exc)
 
-    @mock.patch('otter.rest.decorators.log')
+    @mock.patch('otter.rest.webhooks.log')
     def test_execute_webhook_logs_info_message_when_policy_cannot_be_executed(self, log):
         """
         Executing a webhook logs an information message about non-fatal, policy

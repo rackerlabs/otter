@@ -9,7 +9,7 @@ from otter.log.formatters import (
     StreamObserverWrapper,
     SystemFilterWrapper,
     PEP3101FormattingWrapper,
-    GELFObserverWrapper
+    ObserverWrapper
 )
 
 
@@ -19,7 +19,7 @@ def make_observer_chain(ultimate_observer, indent):
     """
     return PEP3101FormattingWrapper(
         SystemFilterWrapper(
-            GELFObserverWrapper(
+            ObserverWrapper(
                 JSONObserverWrapper(
                     ultimate_observer,
                     sort_keys=True,
@@ -29,13 +29,13 @@ def make_observer_chain(ultimate_observer, indent):
 
 def observer_factory():
     """
-    Log non-pretty JSON formatted GELF structures to sys.stdout.
+    Log non-pretty JSON formatted structures to sys.stdout.
     """
     return make_observer_chain(StreamObserverWrapper(sys.stdout), False)
 
 
 def observer_factory_debug():
     """
-    Log pretty JSON formatted GELF structures to sys.stdout.
+    Log pretty JSON formatted structures to sys.stdout.
     """
     return make_observer_chain(StreamObserverWrapper(sys.stdout), 2)

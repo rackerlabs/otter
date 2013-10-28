@@ -14,8 +14,8 @@ from twisted.python.failure import Failure
 
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
-    with_transaction_id, log_arguments)
-from otter.test.utils import patch
+    with_transaction_id, log_arguments, paginatable, InvalidQueryArgument)
+from otter.util.config import set_config_data
 
 
 class BlahError(Exception):
@@ -49,7 +49,7 @@ class TransactionIdTestCase(TestCase):
             self.mockRequest.code = code
         self.mockRequest.setResponseCode.side_effect = mockResponseCode
 
-        self.mock_log = patch(self, 'otter.rest.decorators.log')
+        self.mock_log = mock.MagicMock()
 
         self.hashkey_patch = mock.patch(
             'otter.rest.decorators.generate_transaction_id')
@@ -64,8 +64,10 @@ class TransactionIdTestCase(TestCase):
         """
 
         class FakeApp(object):
+            log = self.mock_log
+
             @with_transaction_id()
-            def doWork(self, request, log):
+            def doWork(self, request):
                 """ Test Work """
                 return defer.succeed('hello')
 
@@ -89,8 +91,11 @@ class TransactionIdTestCase(TestCase):
         the returned log is bound with kwargs passed
         """
         class FakeApp(object):
+            log = self.mock_log
+
             @with_transaction_id()
-            def doWork(self, request, log, arg1, arg2):
+            @log_arguments
+            def doWork(self, request, arg1, arg2):
                 """ Test Work """
                 return defer.succeed('hello')
 
@@ -182,10 +187,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "BlahError",
-            "details": ""
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "BlahError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
@@ -214,10 +221,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "DetailsError",
-            "details": "this is a detail"
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "DetailsError",
+                "details": "this is a detail"
+            }
         })
         self.flushLoggedErrors(DetailsError)
 
@@ -243,10 +252,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 404,
-            "type": "DetailsError",
-            "details": "this is a detail"
+            "error": {
+                "message": "fail",
+                "code": 404,
+                "type": "DetailsError",
+                "details": "this is a detail"
+            }
         })
         self.flushLoggedErrors(DetailsError)
 
@@ -286,10 +297,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "fail",
-            "code": 400,
-            "type": "BlahError",
-            "details": ""
+            "error": {
+                "message": "fail",
+                "code": 400,
+                "type": "BlahError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
@@ -328,10 +341,12 @@ class FaultTestCase(TestCase):
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
-            "message": "An Internal Error was encountered",
-            "code": 500,
-            "type": "InternalError",
-            "details": ""
+            "error": {
+                "message": "An Internal Error was encountered",
+                "code": 500,
+                "type": "InternalError",
+                "details": ""
+            }
         })
         self.flushLoggedErrors(BlahError)
 
@@ -468,3 +483,85 @@ class LogArgumentsTestCase(TestCase):
         self.successResultOf(d)
 
         self.mockLog.bind.assert_called_once_with(**kwargs)
+
+
+class PaginatableTestCase(TestCase):
+    """
+    Tests for the `paginatable` decorator
+    """
+    def setUp(self):
+        """
+        SetUp a mock request with query args for testing `paginatable`.
+        """
+        self.mockRequest = mock.MagicMock()
+        self.mockRequest.args = {}
+
+        class FakeApp(object):
+            @paginatable
+            def paginate_me(self, request, paginate):
+                return defer.succeed(paginate)
+
+        self.app = FakeApp()
+
+        set_config_data({'limits': {'pagination': 10}})
+        self.addCleanup(set_config_data, {})
+
+    def test_no_query_arguments(self):
+        """
+        When there are no query arguments in the request, the paginate
+        dictionary contains only the default limit value.
+        """
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
+
+    def test_integer_limit_value(self):
+        """
+        Decorator turns the limit value into an integer
+        """
+        self.mockRequest.args['limit'] = ['5']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 5})
+
+    def test_non_integer_limit_value(self):
+        """
+        Decorator raises InvalidQueryArgument if the limit argument cannot be
+        coerced into an integer.
+        """
+        self.mockRequest.args['limit'] = ['x']
+        d = self.app.paginate_me(self.mockRequest)
+        self.failureResultOf(d, InvalidQueryArgument)
+
+    def test_zero_limit_value(self):
+        """
+        Decorator coerces limit to 1 if the limit argument is < 1
+        """
+        self.mockRequest.args['limit'] = ['0']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 1})
+
+    def test_too_high_limit_value(self):
+        """
+        Decorator coerces limit to the hard pagination limit if the limit
+        argument is too high
+        """
+        self.mockRequest.args['limit'] = ['100']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
+
+    def test_invalid_query_keys(self):
+        """
+        Decorator ignores invalid query keys (only propagates the 'limit' and
+        'marker' keys)
+        """
+        self.mockRequest.args['magnitude'] = ['pop', 'pop']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d), {'limit': 10})
+
+    def test_multiple_query_values(self):
+        """
+        Decorator picks only the first value matching valid query keys
+        """
+        self.mockRequest.args['marker'] = ['1234', '5678']
+        d = self.app.paginate_me(self.mockRequest)
+        self.assertEqual(self.successResultOf(d),
+                         {'marker': '1234', 'limit': 10})

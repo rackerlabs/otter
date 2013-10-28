@@ -49,7 +49,7 @@ format="SVG" scale="60"/>
          xmlns:svg="http://www.w3.org/2000/svg"
          xmlns:m="http://www.w3.org/1998/Math/MathML"
          xmlns:html="http://www.w3.org/1999/xhtml"
-         xml:id="autoscale-getting-started">
+         xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
 <titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
@@ -336,7 +336,7 @@ format="SVG" scale="60"/>
                 units="linecolumn" coords="15 20"/>
             </areaspec>
             <programlisting language="json">
-<xi:include href="samples/credentials-20.json" parse="text"/>
+              <xi:include href="samples/reqAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>
@@ -376,7 +376,7 @@ format="SVG" scale="60"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
             </areaspec>	
             <programlisting language="json">
-<xi:include href="samples/auth-20.json" parse="text"/>
+              <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
           </programlistingco>
         </example>
@@ -590,8 +590,10 @@ format="SVG" scale="60"/>
           <parameter>1234</parameter>, with your actual Tenant ID.</para>
       <para>You will find your account number after the final '/' in
         the <code>publicURL</code> field returned by the
-        authentication response. For example, in <xref
-          linkend="auth-response-example-json"/>,  the
+        authentication response. For example, in <olink
+          targetdoc="autoscale-devguide"
+          targetptr="auth-response-example-json">Example 2,
+          “Authentication Response for US Endpoint: JSON”</olink> the
           <code>publicURL</code> field for <code>autoscale</code>
           ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
           role="bold">1100111</emphasis>") shows that the account
@@ -829,12 +831,206 @@ format="SVG" scale="60"/>
         </tbody>
       </table>   
     </section>
-    <section xml:id="removing-servers">
-      <title>Removing Servers</title>
-      <para>Servers are removed in reverse order of creation. However,
-        servers that are in the process of building are not
-        removed.</para>
-        </section> 
+        <section xml:id="pagination">
+      <title>Pagination</title>
+      <para>The Auto Scale API supports pagination of items that are
+        returned in API call responses. Pagination enables users to
+        view all responses even if the number of items returned in the
+        response body is longer than what fits on one page. </para>
+      <para>The pagination limit for the Auto Scale API is 100. This
+        means you can view 100 items at a time. </para>
+      <para>For example, if you want to get a list of all the scaling
+        groups, and there are more than 100 groups, you will see the
+        first 100 groups on one page and then a link at the bottom of
+        the page that takes you to the next page, which contains the
+        next 100 items. </para>
+      <para>A pagination limit that is set beyond 100 is defaulted to
+        100. And a limit that is set to smaller than 1 is defaulted to
+        1. </para>
+      <para>The Auto Scale API paginates the following items:</para>
+      <itemizedlist>
+        <listitem>
+          <para>scaling groups</para>
+        </listitem>
+        <listitem>
+          <para>scaling policies </para>
+        </listitem>
+        <listitem>
+          <para>webhooks</para>
+        </listitem>
+      </itemizedlist>
+      <para>You can specify further pages with the
+          <parameter>?page</parameter> parameter in the Link header in
+        the URI request, and set the number of items to be displayed
+        per page in the <parameter>per_page</parameter> parameter as
+        shown in the following example:</para>
+      <para>
+        <programlisting>Link: &lt;https://api.github.com/user/repos?page=3&amp;per_page=100&gt;; rel="next",
+      &lt;https://api.github.com/user/repos?page=50&amp;per_page=100&gt;; rel="last"</programlisting>
+      </para>
+      <para>To navigate the collection of items that are returned in
+        the request body, you can set the following parameters in the
+        URI:</para>
+      <para>
+        <table rules="all">
+          <caption>Limit and Marker Pagination Parameters</caption>
+          <thead>
+            <tr>
+              <td>Parameter</td>
+              <td>Description</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>limit</td>
+              <td>Specifies the number of items that can be returned
+                on one page. If the client requests a <emphasis
+                  role="italic">limit</emphasis> beyond the 100 items
+                supported byAuto Scale, an overLimit (413) response
+                code will be returned.</td>
+            </tr>
+            <tr>
+              <td>marker</td>
+              <td>Specifies the Id of the last item in the previous
+                list. Items are sorted by create time in descending
+                order. When a create time is not available they are
+                sorted by Id. If the Id specified for this parameter
+                is invalid, a 400 response code (badRequest) will be
+                returned.</td>
+            </tr>
+          </tbody>
+        </table>
+      </para>
+      <para>
+        <note>
+          <para>The limit and marker parameters are both
+            optional.</para>
+        </note>
+      </para>
+      <para>To specify the direction for the next page of results, you
+        need to set the <parameter>rel</parameter> parameter at the
+        end of the request URI. The following values can be
+        set:</para>
+      <table rules="all">
+        <caption>Values for Rel Parameter</caption>
+        <thead>
+          <tr>
+            <td>Value</td>
+            <td>Description</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>next</td>
+            <td>Shows the URL of the immediate next page of
+              results.</td>
+          </tr>
+          <tr>
+            <td>last</td>
+            <td>Shows the URL of the last page of results.</td>
+          </tr>
+          <tr>
+            <td>first</td>
+            <td>Shows the URL of the first page of results.</td>
+          </tr>
+          <tr>
+            <td>prev</td>
+            <td>Shows the URL of the immediate previous page of
+              results.</td>
+          </tr>
+        </tbody>
+      </table>
+      <example>
+        <title>Paginating Group Lists</title>
+        <para>When submitting a request for a group manifest, you
+          receive a list of all the available scaling groups and
+          associated policies. However, if there are too many, the
+          response body will only list 100, and provide a next link in
+          the <parameter>rel</parameter> parameter as shown in the
+          following example: </para>
+        <programlisting language="json">{
+       "groups": [
+            ...
+       ],
+       "group_links": [
+           {
+               "href":
+"https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e"
+               "rel": "next"
+           }
+       ]
+   }
+
+</programlisting>
+      </example>
+      <para>The <parameter>limit</parameter> parameter in the example
+        above is set to 100, which means no more than 100 items can be
+        displayed on one page. For Auto Scale, this number must be
+        between 1 and 100, inclusive. So if you provide a query
+        argument of more than 100, it will default to 100, and if you
+        set the limit to less than 1, it will default to 1. </para>
+      <para>If you provide an invalid query argument for
+          <parameter>limit</parameter>, a 400 response code will be
+        returned. The <parameter>marker</parameter>parameter specifies
+        the last seen group Id. When you click on the link that is
+        returned, all the groups displayed will have group Ids that
+        are greater than
+        "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+      <para>
+        <example>
+          <title>Paginating Policy Lists</title>
+          <para>When you submit a request to obtain all the policies
+            associated with a scaling group, a list of policies will
+            be returned. However, if there are too many policies, the
+            response body will only list 100, and provide a next link
+            in the <parameter>rel</parameter> parameter as shown in
+            the following example: </para>
+          <programlisting language="json">  {
+       "policies": [
+            ...
+       ],
+       "policies_links": [
+           {
+               "href":
+"http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
+               "rel": "next"
+           }
+       ]
+   }
+</programlisting>
+          <para>The <parameter>marker</parameter> parameter points to
+            the last seen policy Id. When you click on the link that
+            is returned, all the policies displayed will have policy
+            Ids that are greater than
+            "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+        </example>
+        <example>
+      <title>Paginating Webhook Lists</title>
+      <para>When you submit a request to obtain all the webhooks
+            associated with a policy, a list of webhooks will be
+            returned. However, if there are too many webhooks, the
+            response body will only list 100, and provide a next link
+            in the <parameter>rel</parameter> parameter as shown in
+            the following example: </para>
+      <programlisting language="json">  {
+       "webhooks": [
+            ...
+       ],
+       "webhooks_links": [
+           {
+               "href":
+"http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/5783f588-eba6-4ca2-a9c5-ce04f2c32992/webhooks/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
+               "rel": "next"
+           }
+       ]
+   }</programlisting>
+          <para>The <parameter>marker</parameter> parameter points to
+            the last seen webhook Id. When you click on the link that
+            is provided in the response body, all the webhooks
+            displayed will have webhook Ids that are greater than
+            "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+          </example></para>
+    </section> 
       <section xml:id="audit-log">
         <title>Audit Log</title>
       <para>Because of the deferred nature of Autoscale, most errors

@@ -3,7 +3,6 @@ Deletes.
 """
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
-import time
 
 
 class DeleteAll(AutoscaleFixture):
@@ -18,12 +17,11 @@ class DeleteAll(AutoscaleFixture):
         Delete all groups on the account
         """
         list_groups_response = self.autoscale_client.list_scaling_groups()
-        list_groups = list_groups_response.entity
+        list_groups = (list_groups_response.entity).groups
         for each_group in list_groups:
             self.empty_scaling_group(each_group)
             self.autoscale_client.delete_scaling_group(each_group.id)
-        list_groups_again = (
-            self.autoscale_client.list_scaling_groups()).entity
+        list_groups_again = ((self.autoscale_client.list_scaling_groups()).entity).groups
         print 'Deleting {0} groups, {1} still exist'.format(len(list_groups), len(list_groups_again))\
             if len(list_groups_again) is not 0 else "Deleted {0} groups".format(len(list_groups))
 
@@ -51,24 +49,10 @@ class DeleteAll(AutoscaleFixture):
         loadbalancer_id_list = [self.load_balancer_1, self.load_balancer_2, self.load_balancer_3]
         for each_load_balancer in loadbalancer_id_list:
             nodes = self.lbaas_client.list_nodes(each_load_balancer).entity
-            node_id_list = [each_node.id for each_node in nodes]
-            if len(node_id_list) is 1:
-                print 'Nothing to delete. Only one node on load balancer'
-            else:
-                node_id_list.pop()
-                for each_node_id in node_id_list:
-                    end_time = time.time() + 120
-                    while time.time() < end_time:
-                        delete_response = self.lbaas_client.delete_node(
-                            each_load_balancer, each_node_id)
-                        if 'PENDING_UPDATE' in delete_response.text:
-                            time.sleep(1)
-                        else:
-                            break
-                    else:
-                        print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE '
-                        'state'.format(each_load_balancer)
-                list_nodes = (
-                    self.lbaas_client.list_nodes(each_load_balancer)).entity
+            if len(nodes) is not 0:
+                node_id_list = [each_node.id for each_node in nodes]
+                self.delete_nodes_in_loadbalancer(node_id_list, each_load_balancer)
+                list_nodes = (self.lbaas_client.list_nodes(each_load_balancer)).entity
                 print 'Deleted {0} nodes'.format(len(node_id_list))\
-                    if len(list_nodes) > 1 else 'Deleted {0} nodes one remains'.format(len(node_id_list))
+                    if len(list_nodes) is 0 else 'Deleted {0} nodes {1}remain'.format(len(node_id_list),
+                                                                                      len(list_nodes))

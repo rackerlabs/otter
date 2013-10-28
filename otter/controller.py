@@ -361,9 +361,9 @@ class _Job(object):
 
     def _job_failed(self, f):
         """
-        Job has failed.  Remove the job, if it exists, and log the error.
+        Job has failed. Remove the job, if it exists, and log the error.
         """
-        self.log.err(f)
+        self.log.msg('Job failed', reason=f)
 
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before

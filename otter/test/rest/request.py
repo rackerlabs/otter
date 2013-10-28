@@ -14,11 +14,13 @@ from twisted.internet import defer
 from twisted.web import server, http
 from twisted.web.resource import getChildForRequest
 from twisted.web.server import Request
+from twisted.web.http import parse_qs
 
 from otter.models.interface import IAdmin, IScalingGroup, IScalingGroupCollection
 from otter.rest.application import Otter
 from otter.rest.admin import OtterAdmin
 from otter.test.utils import iMock, patch
+from otter.util.config import set_config_data
 
 
 def _render(resource, request):
@@ -55,8 +57,16 @@ def request(root_resource, method, endpoint, headers=None, body=None):
     :param body: the body to include in the request
     :type body: ``str``
     """
-    # build mock request
-    mock_request = requestMock(endpoint, method, headers=headers, body=body)
+    # handle query args, since requestMock does not (see
+    # twisted.web.http.py:Request.requestReceived)
+    with_query = endpoint.split(b'?', 1)
+    if len(with_query) == 1:
+        mock_request = requestMock(endpoint, method, headers=headers, body=body)
+        mock_request.args = {}
+    else:
+        mock_request = requestMock(with_query[0], method, headers=headers,
+                                   body=body)
+        mock_request.args = parse_qs(with_query[1])
 
     # these are used when writing the response
     mock_request.code = 200
@@ -270,6 +280,16 @@ class RestAPITestMixin(RequestTestMixin):
 
         self.mock_group.modify_state.side_effect = _mock_modify_state
         self.root = Otter(self.mock_store).app.resource()
+        self.get_url_root = patch(self, 'otter.util.http.get_url_root', return_value="")
+
+        # set pagination limits as it'll be used by all rest interfaces
+        set_config_data({'limits': {'pagination': 100}})
+
+    def tearDown(self):
+        """
+        Reset config data
+        """
+        set_config_data({})
 
     def test_invalid_methods_are_405(self):
         """
@@ -290,9 +310,6 @@ class AdminRestAPITestMixin(RequestTestMixin):
         Mock out the data store and logger.
         """
         self.mock_store = iMock(IAdmin)
-
-        #self.mock_store = MockAdmin()
-        #self.root = OtterAdmin(self.mock_store).app.resource()
 
         self.mock_generate_transaction_id = patch(
             self, 'otter.rest.decorators.generate_transaction_id',

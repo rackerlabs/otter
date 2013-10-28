@@ -1,7 +1,6 @@
 """
 Autoscale REST endpoints having to do with administration of Otter.
 """
-from otter.rest.decorators import with_transaction_id
 from otter.rest.metrics import OtterMetrics
 from otter.rest.otterapp import OtterApp
 
@@ -19,17 +18,15 @@ class OtterAdmin(object):
         self.store = store
 
     @app.route('/', methods=['GET'])
-    @with_transaction_id()
-    def root(self, request, log):
+    def root(self, request):
         """
         Root response for OtterAdmin.
         """
         return ''
 
     @app.route('/metrics/', branch=True)
-    @with_transaction_id()
-    def metrics(self, request, log):
+    def metrics(self, request):
         """
         Routes related to metrics are delegated to OtterMetrics.
         """
-        return OtterMetrics(self.store, log).app.resource()
+        return OtterMetrics(self.store).app.resource()

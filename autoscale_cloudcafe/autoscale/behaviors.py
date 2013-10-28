@@ -45,12 +45,12 @@ class AutoscaleBehaviors(BaseBehavior):
         if lc_flavor_ref is None:
             lc_flavor_ref = self.autoscale_config.lc_flavor_ref
         create_response = self.autoscale_client.create_scaling_group(
-            gc_name,
-            gc_cooldown,
-            gc_min_entities,
-            lc_name,
-            lc_image_ref,
-            lc_flavor_ref)
+            gc_name=gc_name,
+            gc_cooldown=gc_cooldown,
+            gc_min_entities=gc_min_entities,
+            lc_name=lc_name,
+            lc_image_ref=lc_image_ref,
+            lc_flavor_ref=lc_flavor_ref)
         return create_response
 
     def create_scaling_group_given(self, gc_name=None, gc_cooldown=None,
@@ -59,7 +59,8 @@ class AutoscaleBehaviors(BaseBehavior):
                                    lc_image_ref=None, lc_flavor_ref=None,
                                    lc_personality=None, lc_metadata=None,
                                    lc_disk_config=None, lc_networks=None,
-                                   lc_load_balancers=None, sp_list=None):
+                                   lc_load_balancers=None, sp_list=None,
+                                   network_type=None):
         """
         Creates a scaling group with given parameters and default the other
         required fields if not already given
@@ -75,12 +76,12 @@ class AutoscaleBehaviors(BaseBehavior):
         if lc_flavor_ref is None:
             lc_flavor_ref = self.autoscale_config.lc_flavor_ref
         create_response = self.autoscale_client.create_scaling_group(
-            gc_name,
-            gc_cooldown,
-            gc_min_entities,
-            lc_name,
-            lc_image_ref,
-            lc_flavor_ref,
+            gc_name=gc_name,
+            gc_cooldown=gc_cooldown,
+            gc_min_entities=gc_min_entities,
+            lc_name=lc_name,
+            lc_image_ref=lc_image_ref,
+            lc_flavor_ref=lc_flavor_ref,
             gc_max_entities=gc_max_entities,
             gc_metadata=gc_metadata,
             lc_personality=lc_personality,
@@ -88,7 +89,8 @@ class AutoscaleBehaviors(BaseBehavior):
             lc_disk_config=lc_disk_config,
             lc_networks=lc_networks,
             lc_load_balancers=lc_load_balancers,
-            sp_list=sp_list)
+            sp_list=sp_list,
+            network_type=network_type)
         return create_response
 
     def create_policy_min(self, group_id, sp_name=None, sp_cooldown=None,
@@ -184,6 +186,75 @@ class AutoscaleBehaviors(BaseBehavior):
                 group_id=group_id,
                 name=sp_name, cooldown=sp_cooldown,
                 change=sp_change, policy_type=sp_policy_type, args=args)
+        if create_response.status_code != 201:
+            return dict(status_code=create_response.status_code)
+        else:
+            policy = AutoscaleBehaviors.get_policy_properties(
+                self, policy_list=create_response.entity, status_code=create_response.status_code,
+                headers=create_response.headers)
+            return policy
+
+    def create_monitoring_policy_given(self, group_id, sp_name=None, sp_cooldown=None,
+                                       sp_change=None, sp_change_percent=None,
+                                       sp_desired_capacity=None, sp_policy_type='cloud_monitoring',
+                                       check_label=None, check_type=None, check_url=None,
+                                       check_method=None, monitoring_zones=None,
+                                       check_timeout=None, check_period=None,
+                                       alarm_criteria=None, check_disabled=None,
+                                       check_metadata=None, target_alias=None,
+                                       target_hostname=None, target_resolver=None):
+        """
+        :summary: creates a monitoring policy for the given check type, target.
+        :return: returns the newly created policy object
+        :rtype: returns the policy object
+        """
+        sp_name = sp_name and str(sp_name) or rand_name('test_maas_policy_')
+        sp_cooldown = sp_cooldown or int(self.autoscale_config.sp_cooldown)
+        check_type = check_type or self.autoscale_config.check_type
+        check_label = check_label or rand_name('scaling_group_check')
+        check_timeout = check_timeout or int(self.autoscale_config.check_timeout)
+        check_period = check_period or int(self.autoscale_config.check_period)
+        alarm_criteria = alarm_criteria or self.autoscale_config.alarm_criteria
+        monitoring_zones = monitoring_zones or ['mzord', 'mzdfw', 'mziad']
+        if check_type == 'remote.http':
+            check_url = self.autoscale_config.check_url
+            check_method = self.autoscale_config.check_method
+        if not target_hostname or target_resolver or target_alias:
+            target_alias = self.autoscale_config.target_alias
+        if sp_change_percent is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change_percent=sp_change_percent, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
+        elif sp_desired_capacity is not None:
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                desired_capacity=sp_desired_capacity, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
+        else:
+            sp_change = sp_change or int(self.autoscale_config.sp_change)
+            create_response = self.autoscale_client.create_policy(
+                group_id=group_id,
+                name=sp_name, cooldown=sp_cooldown,
+                change=sp_change, policy_type=sp_policy_type,
+                check_label=check_label, check_type=check_type, check_url=check_url,
+                check_method=check_method, monitoring_zones=monitoring_zones,
+                check_timeout=check_timeout, check_period=check_period,
+                alarm_criteria=alarm_criteria, check_disabled=check_disabled,
+                check_metadata=check_metadata, target_alias=target_alias,
+                target_hostname=target_hostname, target_resolver=target_resolver)
         if create_response.status_code != 201:
             return dict(status_code=create_response.status_code)
         else:
@@ -350,6 +421,67 @@ class AutoscaleBehaviors(BaseBehavior):
                         if policy_type.args.cron:
                             policy['schedule_type'] = 'cron'
                             policy['schedule_value'] = policy_type.args.cron
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.url:
+                            policy['check_url'] = policy_type.args.check.url
+                            policy['check_method'] = policy_type.args.check.method
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.type:
+                            policy['check_type'] = policy_type.args.check.type
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.label:
+                            policy['check_label'] = policy_type.args.check.label
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.disabled:
+                            policy['check_disabled'] = policy_type.args.check.disabled
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.metadata:
+                            policy['check_metadata'] = policy_type.args.check.metadata
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.period:
+                            policy['check_period'] = policy_type.args.check.period
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.timeout:
+                            policy['check_timeout'] = policy_type.args.check.timeout
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.monitoring_zones_poll:
+                            policy['monitoring_zones'] = policy_type.args.check.monitoring_zones_poll
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_alias:
+                            policy['target_alias'] = policy_type.args.check.target_alias
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_hostname:
+                            policy['target_hostname'] = policy_type.args.check.target_hostname
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.check.target_resolver:
+                            policy['target_resolver'] = policy_type.args.check.target_resolver
+                    except AttributeError:
+                        pass
+                    try:
+                        if policy_type.args.alarm_criteria:
+                            policy['alarm_criteria'] = policy_type.args.alarm_criteria.criteria
                     except AttributeError:
                         pass
             except AttributeError:

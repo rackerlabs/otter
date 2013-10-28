@@ -9,6 +9,7 @@ from jsonschema import Draft3Validator, ValidationError
 
 from otter.json_schema import validate
 from otter.json_schema import group_schemas, group_examples, rest_schemas
+from otter.util.config import set_config_data
 
 
 class ScalingGroupConfigTestCase(TestCase):
@@ -126,6 +127,12 @@ class GeneralLaunchConfigTestCase(TestCase):
     """
     Verification that the general JSON schema for launch configs is correct.
     """
+    def setUp(self):
+        """
+        Store launch configuration
+        """
+        self.launch = group_examples.launch_server_config()[0]
+
     def test_schema_valid(self):
         """
         The schema itself is a valid Draft 3 schema
@@ -138,7 +145,8 @@ class GeneralLaunchConfigTestCase(TestCase):
         """
         self.assertRaisesRegexp(
             ValidationError, "'type' is a required property",
-            validate, {"args": {"server": {}}}, group_schemas.launch_config)
+            validate, {"args": {"server": self.launch['args']['server']}},
+            group_schemas.launch_config)
 
     def test_invalid_launch_config_type_does_not_validate(self):
         """
@@ -263,6 +271,82 @@ class ServerLaunchConfigTestCase(TestCase):
             validate, invalid, group_schemas.launch_server)
         self.assertRaisesRegexp(ValidationError, 'not of type',
                                 validate, invalid, group_schemas.launch_config)
+
+
+class LaunchConfigServerPayloadValidationTests(TestCase):
+    """
+    Tests to verify json schema of 'server' attribute used to create servers
+    Valid tests are already done in ServerLaunchConfigTestCase.test_valid_examples_validate
+    """
+    def setUp(self):
+        """
+        Keep valid payload
+        """
+        self.server = group_examples.launch_server_config()[0]['args']['server']
+
+    def test_invalid_image(self):
+        """
+        invalidates if imageRef is not a string
+        """
+        self.server['imageRef'] = 3
+        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_flavor(self):
+        """
+        invalidates if flavorRef is not a string
+        """
+        self.server['flavorRef'] = 3
+        self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_object(self):
+        """
+        Invalidates if personality contains object instead of array
+        """
+        self.server['personality'] = {'b': 'lah'}
+        self.assertRaisesRegexp(ValidationError, "{'b': 'lah'} is not of type 'array'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_no_path(self):
+        """
+        Invalidates if personality item does not contain path
+        """
+        del self.server['personality'][0]['path']
+        self.assertRaisesRegexp(ValidationError, "'path' is a required property",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_path_not_string(self):
+        """
+        Invalidates if personality path is not string
+        """
+        self.server['personality'][0]['path'] = 4
+        self.assertRaisesRegexp(ValidationError, "4 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_path_exceeds_255(self):
+        """
+        Invalidates if personality path is > 255 chars
+        """
+        self.server['personality'][0]['path'] = 'abc' * 100
+        self.assertRaisesRegexp(ValidationError, "'{}' is too long".format('abc' * 100),
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_contents_not_string(self):
+        """
+        Invalidates if personality item contents is not a string
+        """
+        self.server['personality'][0]['contents'] = 4
+        self.assertRaisesRegexp(ValidationError, "4 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_invalid_personality_no_contents(self):
+        """
+        Invalidates if personality item does not contain contents
+        """
+        del self.server['personality'][0]['contents']
+        self.assertRaisesRegexp(ValidationError, "'contents' is a required property",
+                                validate, self.server, group_schemas.server)
 
 
 class ScalingPolicyTestCase(TestCase):
@@ -608,11 +692,12 @@ class CreateScalingPoliciesTestCase(TestCase):
         """
         Draft3Validator.check_schema(rest_schemas.create_policies_request)
 
-    def test_empty_array_valid(self):
+    def test_empty_array_invalid(self):
         """
-        Seems pointless to disallow empty arrays, so empty arrays validate.
+        Empty arrays fail to validate
         """
-        validate([], rest_schemas.create_policies_request)
+        self.assertRaises(ValidationError, validate, [],
+                          rest_schemas.create_policies_request)
 
     def test_duplicate_policies_valid(self):
         """
@@ -626,6 +711,20 @@ class CreateScalingPoliciesTestCase(TestCase):
         A single policy, not in an array, fails to validate.
         """
         self.assertRaises(ValidationError, validate, self.one_policy,
+                          rest_schemas.create_policies_request)
+
+    def test_too_many_policies_fail(self):
+        """
+        If the number of policies is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.assertRaises(ValidationError, validate, [self.one_policy] * 6,
                           rest_schemas.create_policies_request)
 
 
@@ -668,15 +767,41 @@ class CreateScalingGroupTestCase(TestCase):
             'scalingPolicies': []
         }, rest_schemas.create_group_request)
 
-    def test_creation_with_scaling_policies_valid(self):
+    def test_creation_with_one_scaling_policy_valid(self):
         """
-        Creation with an array of scaling policies validates
+        Creation with an array of one scaling policy validates
         """
         validate({
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
             'scalingPolicies': [self.policy]
         }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_valid(self):
+        """
+        Creation with an array of many scaling policies
+        """
+        validate({
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': group_examples.policy()
+        }, rest_schemas.create_group_request)
+
+    def test_creation_with_scaling_policies_invalid(self):
+        """
+        Creation with an array of many scaling policies validates each scaling policy.
+        It raises error if any of the policies is invalid
+        """
+        policy2 = deepcopy(self.policy)
+        policy2['type'] = 'junk'
+        invalid = {
+            'groupConfiguration': self.config,
+            'launchConfiguration': self.launch,
+            'scalingPolicies': [self.policy, policy2]
+        }
+        self.assertRaisesRegexp(
+            ValidationError, 'scalingPolicies',
+            validate, invalid, rest_schemas.create_group_request)
 
     def test_creation_with_duplicate_scaling_policies_valid(self):
         """
@@ -687,6 +812,27 @@ class CreateScalingGroupTestCase(TestCase):
             'launchConfiguration': self.launch,
             'scalingPolicies': [self.policy] * 5
         }, rest_schemas.create_group_request)
+
+    def test_creation_with_too_many_policies_fail(self):
+        """
+        If the number of policies is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.assertRaises(
+            ValidationError,
+            validate,
+            {
+                'groupConfiguration': self.config,
+                'launchConfiguration': self.launch,
+                'scalingPolicies': [self.policy] * 6
+            },
+            rest_schemas.create_group_request)
 
     def test_wrong_launch_config_fails(self):
         """
@@ -728,7 +874,7 @@ class CreateScalingGroupTestCase(TestCase):
                 }, rest_schemas.create_group_request)
 
 
-class CreateWebhookTestCase(TestCase):
+class SingleWebhookTestCase(TestCase):
     """
     Verify the webhook schema.
     """
@@ -750,6 +896,54 @@ class CreateWebhookTestCase(TestCase):
         Metadata is optional.
         """
         validate({'name': 'foo'}, group_schemas.webhook)
+
+
+class CreateWebhooksTestCase(TestCase):
+    """
+    Verification that the JSON schema for creating scaling policies is correct
+    """
+    one_webhook = {'name': 'foo'}
+
+    def test_schema_valid(self):
+        """
+        The schema itself is a valid Draft 3 schema
+        """
+        Draft3Validator.check_schema(rest_schemas.create_webhooks_request)
+
+    def test_empty_array_invalid(self):
+        """
+        Empty arrays fail to validate
+        """
+        self.assertRaises(ValidationError, validate, [],
+                          rest_schemas.create_webhooks_request)
+
+    def test_duplicate_webhooks_valid(self):
+        """
+        Duplicate webhooks are valid
+        """
+        validate([self.one_webhook] * 5,
+                 rest_schemas.create_webhooks_request)
+
+    def test_non_array_webhook_fails(self):
+        """
+        A single webhook, not in an array, fails to validate.
+        """
+        self.assertRaises(ValidationError, validate, self.one_webhook,
+                          rest_schemas.create_policies_request)
+
+    def test_too_many_webhooks_fail(self):
+        """
+        If the number of webhooks is over the configured limit, fail to validate
+        """
+        def cleanup():
+            set_config_data({})
+            reload(rest_schemas)
+
+        set_config_data({"limits": {"pagination": 5}})
+        self.addCleanup(cleanup)
+        reload(rest_schemas)
+        self.assertRaises(ValidationError, validate, [self.one_webhook] * 6,
+                          rest_schemas.create_policies_request)
 
 
 class UpdateWebhookTestCase(TestCase):

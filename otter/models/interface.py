@@ -15,6 +15,8 @@ class GroupState(object):
 
     :ivar str group_id: the ID of the scaling group whose state this
         object represents
+    :ivar str group_name: the name of the scaling group whose state this
+        object represents
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar bool paused: whether the scaling group is paused in scaling activities
@@ -27,10 +29,11 @@ class GroupState(object):
 
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
-    def __init__(self, tenant_id, group_id, active, pending, group_touched,
+    def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
                  policy_touched, paused, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.group_name = group_name
         self.active = active
         self.pending = pending
         self.paused = paused
@@ -47,7 +50,7 @@ class GroupState(object):
         Two states are equal if all of the parameters are equal (except for
         the now callable)
         """
-        params = ('tenant_id', 'group_id', 'active', 'pending', 'paused',
+        params = ('tenant_id', 'group_id', 'group_name', 'active', 'pending', 'paused',
                   'policy_touched', 'group_touched')
         return all((getattr(self, param) == getattr(other, param)
                     for param in params))
@@ -62,8 +65,8 @@ class GroupState(object):
         """
         Prints out a representation of self
         """
-        return "GroupState({}, {}, {}, {}, {}, {}, {})".format(
-            self.tenant_id, self.group_id, repr(self.active),
+        return "GroupState({}, {}, {}, {}, {}, {}, {}, {})".format(
+            self.tenant_id, self.group_id, self.group_name, repr(self.active),
             repr(self.pending), self.group_touched, repr(self.policy_touched),
             self.paused
         )
@@ -311,10 +314,9 @@ class IScalingGroup(Interface):
             :data:`otter.json_schema.group_schemas.policy`
         :type data: ``list`` of ``dict``
 
-        :return: dictionary of UUIDs to their matching newly created scaling
-            policies, as specified by
-            :data:`otter.json_schema.model_schemas.policy_list`
-        :rtype: ``dict`` of ``dict``
+        :return: list of newly created scaling policies and their ids, as
+            specified by :data:`otter.json_schema.model_schemas.policy_list`
+        :rtype: ``list`` of ``dict``
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
@@ -337,14 +339,19 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
-    def list_policies():
+    def list_policies(limit=100, marker=None):
         """
         Gets all the policies associated with particular scaling group.
 
-        :return: a dict of the policies, as specified by
+        :param int limit: the maximum number of policies to return
+            (for pagination purposes)
+        :param str marker: the policy ID of the last seen policy (for
+            pagination purposes - page offsets)
+
+        :return: a list of the policies, as specified by
             :data:`otter.json_schema.model_schemas.policy_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with
-            ``dict``
+            ``list``
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
@@ -383,14 +390,19 @@ class IScalingGroup(Interface):
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
 
-    def list_webhooks(policy_id):
+    def list_webhooks(policy_id, limit=100, marker=None):
         """
         Gets all the capability URLs created for one particular scaling policy
+
+        :param int limit: the maximum number of policies to return
+            (for pagination purposes)
+        :param str marker: the policy ID of the last seen policy (for
+            pagination purposes - page offsets)
 
         :param policy_id: the uuid of the policy to be deleted
         :type policy_id: ``str``
 
-        :return: a dict of the webhooks, as specified by
+        :return: a list of the webhooks, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with None
 
@@ -408,10 +420,10 @@ class IScalingGroup(Interface):
             specified by :data:`otter.json_schema.group_schemas.webhook`
         :type data: ``list``
 
-        :return: a dict of the webhooks mapped to their ids, as specified by
+        :return: a list of the webhooks with their ids, as specified by
             :data:`otter.json_schema.model_schemas.webhook_list`
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with said
-            ``dict``
+            ``list``
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
         """
@@ -555,12 +567,17 @@ class IScalingGroupCollection(Interface):
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with ``dict``
         """
 
-    def list_scaling_group_states(log, tenant_id):
+    def list_scaling_group_states(log, tenant_id, limit=100, marker=None):
         """
         List the scaling groups states for this tenant ID
 
         :param tenant_id: the tenant ID of the scaling group info to list
         :type tenant_id: ``str``
+
+        :param int limit: the maximum number of scaling group states to return
+            (for pagination purposes)
+        :param str marker: the group ID of the last seen group (for
+            pagination purposes - page offsets)
 
         :return: a list of scaling group states
         :rtype: a :class:`twisted.internet.defer.Deferred` that fires with a

@@ -3,7 +3,7 @@ HTTP utils, such as formulation of URLs
 """
 
 from itertools import chain
-from urllib import quote
+from urllib import quote, urlencode
 
 import treq
 
@@ -88,14 +88,17 @@ class APIError(Exception):
 
     :param int code: HTTP Response code for this error.
     :param str body: HTTP Response body for this error or None.
+    :param Headers headers: HTTP Response headers for this error, or None
     """
-    def __init__(self, code, body):
+    def __init__(self, code, body, headers=None):
         Exception.__init__(
             self,
-            'API Error code={0!r}, body={1!r}'.format(code, body))
+            'API Error code={0!r}, body={1!r}, headers={2!r}'.format(
+                code, body, headers))
 
         self.code = code
         self.body = body
+        self.headers = headers
 
 
 def check_success(response, success_codes):
@@ -113,7 +116,7 @@ def check_success(response, success_codes):
     :return: response or a deferred that errbacks with an APIError.
     """
     def _raise_api_error(body):
-        raise APIError(response.code, body)
+        raise APIError(response.code, body, response.headers)
 
     if response.code not in success_codes:
         return treq.content(response).addCallback(_raise_api_error)
@@ -143,6 +146,69 @@ def get_url_root():
     :return: string containing the URL root
     """
     return config_value('url_root')
+
+
+def get_collection_links(collection, url, rel, limit=None, marker=None):
+    """
+    Return links `dict` for given collection like below. The 'next' link is
+    added only if number of items in `collection` has reached `limit`
+
+        [
+          {
+            "href": <url with api version>,
+            "rel": "self"
+          },
+          {
+            "href": <url of next link>,
+            "rel": "next"
+          }
+        ]
+
+    :param collection: the collection whose links are required.
+    :type collection: list of dict that has 'id' in it
+
+    :param url: URL of the collection
+
+    :param rel: What to put under 'rel'
+
+    :param limit: pagination limit
+
+    :param marker: pagination marker
+    """
+    limit = limit or config_value('limits.pagination') or 100
+    links = []
+    if not marker and rel is not None:
+        links.append({'href': url, 'rel': rel})
+    if len(collection) >= limit:
+        query_params = {'limit': limit, 'marker': collection[limit - 1]['id']}
+        next_url = "{0}?{1}".format(url, urlencode(query_params))
+        links.append({'href': next_url, 'rel': 'next'})
+    return links
+
+
+def get_groups_links(groups, tenant_id, rel='self', limit=None, marker=None):
+    """
+    Get the links to groups along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, format=None)
+    return get_collection_links(groups, url, rel, limit, marker)
+
+
+def get_policies_links(policies, tenant_id, group_id, rel='self', limit=None, marker=None):
+    """
+    Get the links to groups along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, group_id, "", format=None)
+    return get_collection_links(policies, url, rel, limit, marker)
+
+
+def get_webhooks_links(webhooks, tenant_id, group_id, policy_id,
+                       rel='self', limit=None, marker=None):
+    """
+    Get the links to webhooks along with 'next' link
+    """
+    url = get_autoscale_links(tenant_id, group_id, policy_id, "", format=None)
+    return get_collection_links(webhooks, url, rel, limit, marker)
 
 
 def get_autoscale_links(tenant_id, group_id=None, policy_id=None,

@@ -9,9 +9,9 @@ from jsonschema import ValidationError
 
 from twisted.internet import defer
 from twisted.python import reflect
+from otter.util.config import config_value
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
-from otter.log import log
 
 from otter.json_schema import validate
 
@@ -53,7 +53,7 @@ def fails_with(mapping):
                         code=code
                     ).err(failure, 'Unhandled Error handling request')
                 request.setResponseCode(code)
-                return json.dumps(errorObj)
+                return json.dumps({'error': errorObj})
 
             d = defer.maybeDeferred(f, self, request, *args, **kwargs)
             d.addErrback(_fail, request)
@@ -123,26 +123,43 @@ def log_arguments(f):
     return _
 
 
+def log_ignore_arguments(*ignore):
+    """
+    Binds all arguments that are not 'self' or 'request' to self.log
+
+    :param ignore: parameters to be ignored when logging
+    """
+    def wrapper(f):
+        @wraps(f)
+        def _(self, request, *args, **kwargs):
+            revised_kwargs = {key: kwargs[key] for key in kwargs
+                              if key not in ignore}
+            self.log = self.log.bind(**revised_kwargs)
+            return f(self, request, *args, **kwargs)
+        return _
+    return wrapper
+
+
 def with_transaction_id():
     """
-    Generates a request txnid
+    Adds a transaction id to the request, and update application log.
     """
     def decorator(f):
         @wraps(f)
         def _(self, request, *args, **kwargs):
             transaction_id = generate_transaction_id()
             request.setHeader('X-Response-Id', transaction_id)
-            bound_log = log.bind(
+            self.log = self.log.bind(
                 system=reflect.fullyQualifiedName(f),
                 transaction_id=transaction_id)
-            bound_log.bind(
+            self.log.bind(
                 method=request.method,
                 uri=request.uri,
                 clientproto=request.clientproto,
                 referer=request.getHeader("referer"),
                 useragent=request.getHeader("user-agent")
             ).msg("Received request")
-            return bind_log(f)(self, request, bound_log, *args, **kwargs)
+            return f(self, request, *args, **kwargs)
         return _
     return decorator
 
@@ -175,3 +192,42 @@ def validate_body(schema):
 
         return _
     return decorator
+
+
+class InvalidQueryArgument(Exception):
+    """
+    Something is wrong with a query arg
+    """
+
+
+def paginatable(f):
+    """
+    Is a paginatable endpoint, which means that it accepts the limit and marker
+    query args.  This decorator validates them and puts them into a pagination
+    dictionary.  It also sets a default limit based on the config value for
+    the pagination limit, if no query argument for limit is passed.
+
+    If a pagination limit is passed that exceeds the hard limit or is less than
+    1, it is coerced into the correct range.
+    """
+    @wraps(f)
+    def _(self, request, *args, **kwargs):
+        paginate = {}
+        hard_limit = config_value('limits.pagination')
+        if 'limit' in request.args:
+            try:
+                paginate['limit'] = int(request.args['limit'][0])
+            except:
+                return defer.fail(InvalidQueryArgument(
+                    'Invalid query argument for "limit"'))
+
+            paginate['limit'] = max(min(paginate['limit'], hard_limit), 1)
+        else:
+            paginate['limit'] = hard_limit
+
+        if 'marker' in request.args:
+            paginate['marker'] = request.args['marker'][0]
+
+        kwargs['paginate'] = paginate
+        return f(self, request, *args, **kwargs)
+    return _

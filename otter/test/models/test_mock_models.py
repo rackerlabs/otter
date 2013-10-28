@@ -18,7 +18,7 @@ from otter.test.models.test_interface import (
     IScalingGroupCollectionProviderMixin,
     IScalingScheduleCollectionProviderMixin)
 
-from otter.test.utils import patch
+from otter.test.utils import mock_log, patch
 
 
 class GenerateEntityLinksTestCase(TestCase):
@@ -95,10 +95,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             'maxEntities': None,
             'metadata': {}
         }
-        self.launch_config = {
-            "type": "launch_server",
-            "args": {"server": {"these are": "some args"}}
-        }
+        self.launch_config = group_examples.launch_server_config()[0]
         self.policies = group_examples.policy()[:1]
         self.group = MockScalingGroup(
             self.mock_log, self.tenant_id, self.group_id, self.collection,
@@ -106,6 +103,15 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
              'policies': self.policies})
 
         self.collection.data[self.tenant_id]['1'] = self.group
+
+        self.counter = 0
+
+        def generate_uuid():
+            self.counter += 1
+            return self.counter
+
+        self.mock_uuid = patch(self, 'otter.models.mock.uuid4',
+                               side_effect=generate_uuid)
 
     def test_view_manifest_has_all_info(self):
         """
@@ -115,8 +121,17 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         result = self.validate_view_manifest_return_value()
         self.assertEqual(result['groupConfiguration'], self.output_config)
         self.assertEqual(result['launchConfiguration'], self.launch_config)
-        self.assertEqual(result['scalingPolicies'].values(), self.policies)
         self.assertEqual(result['id'], '1')
+        self.assertEqual(
+            result['state'], GroupState(self.tenant_id, '1', '', {}, {}, None, {}, False)
+        )
+
+        policies = result['scalingPolicies']
+        for policy in policies:
+            del policy['id']
+            assert policy in self.policies
+
+        self.assertEqual(len(policies), len(self.policies))
 
     def test_default_view_config_has_all_info(self):
         """
@@ -140,7 +155,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``view_state`` a group state with empty info
         """
         result = self.successResultOf(self.group.view_state())
-        self.assertEqual(result, GroupState(self.tenant_id, '1', {}, {},
+        self.assertEqual(result, GroupState(self.tenant_id, '1', '', {}, {},
                                             None, {}, False))
 
     def test_modify_state(self):
@@ -148,7 +163,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``modify_state`` saves the new state returned by the function if the
         tenant ids and group ids match
         """
-        new_state = GroupState(self.tenant_id, self.group_id, {1: {}}, {},
+        new_state = GroupState(self.tenant_id, self.group_id, 'aname', {1: {}}, {},
                                'date', {}, True)
 
         def modifier(group, state):
@@ -163,7 +178,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         the tenant IDs do not match
         """
         def modifier(group, state):
-            return GroupState('tid', self.group_id, {}, {}, 'date', {}, True)
+            return GroupState('tid', self.group_id, 'aname', {}, {}, 'date', {}, True)
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)
@@ -175,7 +190,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         the tenant IDs do not match
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, 'meh', {}, {}, 'date', {}, True)
+            return GroupState(self.tenant_id, 'meh', 'aname', {}, {}, 'date', {}, True)
 
         d = self.group.modify_state(modifier)
         f = self.failureResultOf(d)
@@ -264,19 +279,19 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
                 "name": "scale down by 20",
                 "change": -20,
                 "cooldown": 300,
-                "type": "webhook"
+                "type": "webhook",
             },
             {
                 "name": 'scale down 10 percent',
                 "changePercent": -10,
                 "cooldown": 200,
-                "type": "webhook"
+                "type": "webhook",
             }
         ])
         list_result = self.successResultOf(self.group.list_policies())
         self.assertGreater(len(list_result), len(create_response))
-        for key, value in create_response.iteritems():
-            self.assertEqual(list_result[key], value)
+        for item in create_response:
+            self.assertIn(item, list_result)
 
     def test_delete_group_removes_self_from_collection_if_state_empty(self):
         """
@@ -306,26 +321,55 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
             self.mock_log, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch_config,
              'policies': None})
-        self.assertEqual(self.validate_list_policies_return_value(), {})
+        self.assertEqual(self.validate_list_policies_return_value(), [])
 
     def test_list_all_policies(self):
         """
         List existing policies returns a dictionary of the policy mapped to the
         ID
         """
-        policies_dict = self.validate_list_policies_return_value()
-        self.assertEqual(len(policies_dict), len(self.policies))
-        policies = policies_dict.values()
+        policies = self.validate_list_policies_return_value()
+        self.assertEqual(len(policies), len(self.policies))
+        for policy in policies:
+            del policy['id']
+
         for a_policy in self.policies:
             self.assertIn(a_policy, policies)
+
+    def test_list_policies_limits_number_of_policies(self):
+        """
+        Listing all policies limits the number of policies by the limit
+        specified
+        """
+        self.policies = group_examples.policy()[:3]
+        self.group = MockScalingGroup(
+            self.mock_log, self.tenant_id, self.group_id, self.collection,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': self.policies})
+
+        policies = self.validate_list_policies_return_value(limit=2)
+        self.assertEqual([p['id'] for p in policies], ['1', '2'])
+
+    def test_list_policies_offsets_by_marker(self):
+        """
+        Listing all policies will offset the list by the last seen parameter
+        """
+        self.policies = group_examples.policy()[:3]
+        self.group = MockScalingGroup(
+            self.mock_log, self.tenant_id, self.group_id, self.collection,
+            {'config': self.config, 'launch': self.launch_config,
+             'policies': self.policies})
+
+        policies = self.validate_list_policies_return_value(limit=2, marker='1')
+        self.assertEqual([p['id'] for p in policies], ['2', '3'])
 
     def test_get_policy_succeeds(self):
         """
         Try to get a policy by looking up all available UUIDs, and getting one.
         """
         policy_list = self.successResultOf(self.group.list_policies())
-        uuid = policy_list.keys()[0]
-        value = policy_list.values()[0]
+        value = policy_list[0]
+        uuid = value.pop('id')
         result = self.successResultOf(self.group.get_policy(uuid))
         self.assertEqual(value, result)
 
@@ -342,11 +386,13 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Delete a policy, check that it is actually deleted.
         """
         policy_list = self.successResultOf(self.group.list_policies())
-        uuid = policy_list.keys()[0]
+        uuid = policy_list[0]['id']
         self.successResultOf(self.group.delete_policy(uuid))
+
         result = self.successResultOf(self.group.list_policies())
-        self.assertNotIn(uuid, result)
-        self.assertEqual({}, result)
+        ids = [policy['id'] for policy in result]
+        self.assertNotIn(uuid, ids)
+        self.assertEqual([], result)
 
     def test_delete_nonexistent_policy_fails(self):
         """
@@ -369,7 +415,7 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         Get a UUID and attempt to update the policy.
         """
         policy_list = self.successResultOf(self.group.list_policies())
-        uuid = policy_list.keys()[0]
+        uuid = policy_list[0]['id']
         update_data = {
             "name": "Otters are not good pets",
             "change": 1234,
@@ -408,9 +454,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         ``list_webhooks`` is called
         """
         policy_list = self.successResultOf(self.group.list_policies())
-        uuid = policy_list.keys()[0]
+        uuid = policy_list[0]['id']
         result = self.validate_list_webhooks_return_value(uuid)
-        self.assertEqual(result, {})
+        self.assertEqual(result, [])
 
     def test_list_webhooks_succeeds(self):
         """
@@ -418,14 +464,51 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         a dictionary for all of them
         """
         policy_list = self.successResultOf(self.group.list_policies())
-        uuid = policy_list.keys()[0]
+        uuid = policy_list[0]['id']
         webhooks = {
             '10': self.sample_webhook_data,
             '11': self.sample_webhook_data
         }
         self.group.webhooks = {uuid: webhooks}
         result = self.validate_list_webhooks_return_value(uuid)
-        self.assertEqual(result, webhooks)
+        self.assertEqual(result, [
+            dict(id='10', **self.sample_webhook_data),
+            dict(id='11', **self.sample_webhook_data)
+        ])
+
+    def test_list_webhooks_limits_number_of_webhooks(self):
+        """
+        Listing all webhooks limits the number of webhooks by the limit
+        specified
+        """
+        policy_id = self.group.policies.keys()[0]
+        self.group.webhooks = {
+            policy_id: {
+                '10': self.sample_webhook_data,
+                '11': self.sample_webhook_data
+            }
+        }
+        result = self.validate_list_webhooks_return_value(policy_id, limit=1)
+        self.assertEqual(result, [
+            dict(id='10', **self.sample_webhook_data)
+        ])
+
+    def test_list_webooks_offsets_by_marker(self):
+        """
+        Listing all webhooks will offset the list by the last seen parameter
+        """
+        policy_id = self.group.policies.keys()[0]
+        self.group.webhooks = {
+            policy_id: {
+                '10': self.sample_webhook_data,
+                '11': self.sample_webhook_data
+            }
+        }
+        result = self.validate_list_webhooks_return_value(
+            policy_id, limit=2, marker='10')
+        self.assertEqual(result, [
+            dict(id='11', **self.sample_webhook_data)
+        ])
 
     def test_create_webhooks_nonexistant_policy_fails(self):
         """
@@ -460,17 +543,20 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         # create two webhooks, both empty
         creation = self.validate_create_webhooks_return_value(
             '2', [{'name': 'one'}, {'name': 'two'}])
-        self.assertEqual(len(creation), 2)
-        for name in ('one', 'two'):
-            self.assertIn({
+        for item in creation:
+            self.assertIn('id', item)
+            del item['id']
+
+        self.assertEqual(creation, [
+            {
                 'name': name,
                 'metadata': {},
                 'capability': {
                     'hash': 'hash',
                     'version': 'ver'
                 },
-            }, creation.values())
-
+            } for name in ('one', 'two')
+        ])
         # listing should return 3
         listing = self.successResultOf(self.group.list_webhooks('2'))
         self.assertGreater(len(listing), len(creation))
@@ -699,10 +785,16 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         self.assertEqual(self.mock_uuid.call_count, 3)  # 1 group, 3 policies
 
+        expected_policies = [
+            dict(id='2', **policies[0]),
+            dict(id='3', **policies[1])
+        ]
+
         self.assertEqual(manifest, {
             'groupConfiguration': self.config,
             'launchConfiguration': self.launch,
-            'scalingPolicies': dict(zip(('2', '3'), policies)),
+            'state': GroupState(self.tenant_id, "1", "", {}, {}, "0001-01-01T00:00:00Z", {}, False),
+            'scalingPolicies': expected_policies,
             'id': '1'
         })
 
@@ -713,6 +805,32 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch, 'policies': policies})
+
+    def test_list_scaling_group_limits_number_of_groups(self):
+        """
+        Listing all scaling groups limits the number of groups by the limit
+        specified
+        """
+        log = mock_log()
+        for i in range(9):
+            self.collection.create_scaling_group(log, '1', '', '', [])
+
+        result = self.successResultOf(
+            self.collection.list_scaling_group_states(log, '1', limit=3))
+        self.assertEqual([g.group_id for g in result], ['1', '2', '3'])
+
+    def test_list_scaling_group_offsets_by_marker(self):
+        """
+        Listing all scaling groups will offset the list by the last seen
+        parameter
+        """
+        log = mock_log()
+        for i in range(9):
+            self.collection.create_scaling_group(log, '1', '', '', [])
+
+        result = self.successResultOf(
+            self.collection.list_scaling_group_states(log, '1', marker='5'))
+        self.assertEqual([g.group_id for g in result], ['6', '7', '8', '9'])
 
     @mock.patch('otter.models.mock.MockScalingGroup', wraps=MockScalingGroup)
     def test_create_group_with_no_policies(self, mock_sgrp):
@@ -754,7 +872,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
-        pol_uuid = pol_rec.keys()[0]
+        pol_uuid = pol_rec[0]['id']
 
         self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
@@ -783,7 +901,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
         pol_rec = self.successResultOf(group.create_policies([policy]))
 
-        pol_uuid = pol_rec.keys()[0]
+        pol_uuid = pol_rec[0]['id']
 
         self.successResultOf(group.create_webhooks(pol_uuid, [{}]))
 
@@ -810,7 +928,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             group.view_launch_config(),
             group.view_state(),
             group.update_config({
-                'name': '1',
+                'name': 'aname',
                 'minEntities': 0,
                 'cooldown': 0,
                 'maxEntities': None,

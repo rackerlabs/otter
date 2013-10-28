@@ -23,6 +23,7 @@ from otter.models.interface import (
     GroupState, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.models.cass import CassScalingGroupCollection
 from otter.rest.application import Otter
+from otter.supervisor import set_supervisor
 
 from otter.test.resources import OtterKeymaster
 
@@ -91,17 +92,23 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.resume()
         self.root = Otter(store).app.resource()
-        set_config_data({'url_root': 'http://127.0.0.1'})
+        set_config_data({'url_root': 'http://127.0.0.1',
+                         'limits': {'pagination': 5}})
         self.addCleanup(set_config_data, {})
 
         self.config = config()[0]
         self.config['minEntities'] = 0
-        self.active_pending_etc = ({}, {}, 'date', {}, False)
+        self.active_pending_etc = (self.config['name'], {}, {}, 'date', {}, False)
 
         # patch both the config and the groups
         self.mock_controller = patch(self, 'otter.rest.configs.controller',
                                      spec=['obey_config_change'])
         patch(self, 'otter.rest.groups.controller', new=self.mock_controller)
+
+        # Patch supervisor
+        supervisor = mock.Mock(spec=['validate_launch_config'])
+        supervisor.validate_launch_config.return_value = defer.succeed(None)
+        set_supervisor(supervisor)
 
         def _mock_obey_config_change(log, trans, config, group, state):
             return defer.succeed(GroupState(
@@ -120,6 +127,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         keyspace.dirtied()
         keyspace.pause()
         keyspace.reset(self.mktemp())
+        set_supervisor(None)
 
     def create_scaling_group(self):
         """
@@ -265,7 +273,8 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         self.config['minEntities'] = 2
         self.config['maxEntities'] = 25
         self.config['metadata'] = {}
-        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
+        self.config['name'] = 'next_name'
+        self.active_pending_etc = (self.config['name'], {}, {'1': {}, '2': {}}, 'date', {}, False)
 
         wrapper = yield request(self.root, 'PUT', config_path,
                                 body=json.dumps(self.config))
@@ -280,7 +289,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         Create a scaling group with >0 min entities calls obey config changes
         """
         self.config['minEntities'] = 2
-        self.active_pending_etc = ({}, {'1': {}, '2': {}}, 'date', {}, False)
+        self.active_pending_etc = (self.config['name'], {}, {'1': {}, '2': {}}, 'date', {}, False)
 
         path = yield self.create_scaling_group()
         yield self.assert_state(path, 2, False)
@@ -314,12 +323,13 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
         def _set_group_id(manifest):
-            self.group_id = manifest['id']
+            self.group_id = manifest['state'].group_id
             self.policies_url = (
                 '/v1.0/{tenant}/groups/{group}/policies/'.format(
                     tenant=self.tenant_id, group=self.group_id))
             self.mock_controller.maybe_execute_scaling_policy.return_value = defer.succeed(
-                GroupState(self.tenant_id, self.group_id, {}, {}, 'date', {}, False))
+                GroupState(self.tenant_id, self.group_id,
+                           self._config['name'], {}, {}, 'date', {}, False))
 
         mock_log = mock.MagicMock()
         d = store.create_scaling_group(mock_log, self.tenant_id,
@@ -385,7 +395,6 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
                      for link in pol["links"] if link["rel"] == "self"
                      for pol in response["policies"]]
             return links
-
         d = request(self.root, 'POST', self.policies_url,
                     body=json.dumps(request_body))
         return d.addCallback(_verify_create_response)

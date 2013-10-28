@@ -290,13 +290,11 @@ def prepare_launch_config(scaling_group_uuid, launch_config):
 
     server_config['metadata']['rax:auto_scaling_group_id'] = scaling_group_uuid
 
-    name_parts = [generate_server_name()]
-
-    server_name_suffix = server_config.get('name')
-    if server_name_suffix:
-        name_parts.append(server_name_suffix)
-
-    server_config['name'] = '-'.join(name_parts)
+    if server_config.get('name'):
+        server_name = server_config.get('name')
+        server_config['name'] = '{0}-{1}'.format(server_name, generate_server_name())
+    else:
+        server_config['name'] = generate_server_name()
 
     for lb_config in launch_config.get('loadBalancers', []):
         if 'metadata' not in lb_config:
@@ -379,6 +377,19 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         return lbd
 
     d.addCallback(add_lb)
+
+    def _add_to_bobby(result, client):
+        server, lb_response = result
+
+        d = client.create_server(scaling_group.tenant_id, scaling_group.uuid, server["server"]["id"])
+        return d.addCallback(lambda _: result)
+
+    from otter.rest.bobby import get_bobby
+
+    bobby = get_bobby()
+    if bobby is not None:
+        d.addCallback(_add_to_bobby, bobby)
+
     return d
 
 

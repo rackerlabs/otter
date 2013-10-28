@@ -19,12 +19,13 @@
     xmlns:osapi="http://docs.openstack.org/compute/api/v1.1"
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+    xmlns:rax="http://docs.rackspace.com/api"
     xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
     <!-- ======================================================================================= -->
     <!-- Resources -->
     <!-- ======================================================================================= -->
     <resources base="https://{region}.autoscale.api.rackspacecloud.com/">
-        <resource id="version" path="v1.0/">
+        <resource id="version" path="v1.0/" rax:roles="admin autoscale:admin autoscale:service-admin">
 
             <!-- GROUPS resource -->
             <resource id="tenantid" path="/{tenantId}">
@@ -113,30 +114,331 @@
     <!-- Methods -->
     <!-- ======================================================================================= -->
       <method id="createGroup" name="POST">
-        <doc title="Create Group">
-            <db:para role="shortdesc">
-                Create an autoscaling group.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation creates an autoscaling group. To describe the group you wish to create, 
-                specify the scaling group
-                configuration, launch configuration, and optional scaling policies in the request body in JSON format. 
-                If the group is created successfuly, the response body describes the created group in JSON format. The response includes an ID and
-                links for the group.
-            </p>
-        </doc>
+          <wadl:doc title="Create Group" xmlns="http://docbook.org/ns/docbook">
+            <para role="shortdesc">
+                This operation creates an autoscaling group.
+            </para>
+            <para>
+                This operation creates an autoscaling group or a collection of servers and load balancers that are managed by a scaling policy. 
+                To describe the group you wish to create, specify the scaling group configuration, launch configuration, and optional scaling 
+                policies in the request body in JSON format. For a successful request, the response body describes 
+                the created group in JSON format. The response includes an ID and links for the group.
+            </para>
+        </wadl:doc>
         <request>
             <representation mediaType="application/json">
-                <doc xml:lang="en">
+                <wadl:doc xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+                    <p>The request is divided into three top-level sections:
+                        <ul>
+                            <li><code>launchConfiguration</code></li>
+                            <li><code>groupConfiguration</code></li>
+                            <li><code>scalingPolicies</code></li>
+                        </ul>
+                        More narrative description could go here.
+                    </p>
                     <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
-                </doc>
-                
+                </wadl:doc>
+                <param name="group" style="plain" path="$['group']" required="true">
+                    <doc>Wrapper for the request.</doc>
+                </param>
+                <param name="launchConfiguration"
+                    style="plain"
+                    path="$['group']['launchConfiguration']"
+                    required="true">
+                    <doc>One of three top-level sections. This section defines the configuration for the items controlled by this group.
+                    </doc>
+                </param>
+                <param name="args"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']"
+                    required="true">
+                    <doc>
+                        The arguments passed in to the launch configuration.
+                    </doc>
+                </param>
+                <param name="loadBalancers"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']">
+                    <doc>
+                        An array of load balancers.
+                    </doc>
+                </param>
+                <param name="port"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']['port']">
+                    <doc>
+                        The port for a load balancer.
+                    </doc>
+                </param>
+                <param name="loadBalancerId"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['loadBalancers']['loadBalancerId']">
+                    <doc>
+                        The load balancer id. 
+                    </doc>
+                </param>
+                <param name="server"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="imageRef"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['imageRef']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="flavorRef"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['flavorRef']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="diskConfig"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['diskConfig']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="personality"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="path"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']['path']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="contents"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['personality']['contents']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="networks"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="uuid"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']['uuid']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="networks"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="uuid"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['networks']['uuid']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="metadata"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="build_config"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['build_config']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="meta_key_1"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['meta_key_1']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="meta_key_2"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['args']['server']['metadata']['meta_key_2']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="type"
+                    style="plain"
+                    path="$['group']['launchConfiguration']['type']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="groupConfiguration"
+                    style="plain"
+                    path="$['group']['groupConfiguration']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="maxEntities"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['maxEntities']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="cooldown"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['cooldown']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="minEntities"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['minEntities']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="metadata"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="gc_meta_key_2"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']['gc_meta_key_2']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="gc_meta_key_1"
+                    style="plain"
+                    path="$['group']['groupConfiguration']['metadata']['gc_meta_key_1']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="scalingPolicies"
+                    style="plain"
+                    path="$['group']['scalingPolicies']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="name"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['name']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="links"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="href"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']['href']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="rel"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['links']['rel']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="cooldown"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['cooldown']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="type"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['type']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="id" style="plain" path="$['group']['scalingPolicies']['id']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="change"
+                    style="plain"
+                    path="$['group']['scalingPolicies']['change']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="links" style="plain" path="$['group']['links']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="href" style="plain" path="$['group']['links']['href']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="rel" style="plain" path="$['group']['links']['rel']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
+                <param name="id" style="plain" path="$['group']['id']">
+                    <doc>
+                        WRITEME
+                    </doc>
+                </param>
             </representation>
         </request>
         <response status="201">
             <param name="location" style="header"
                    required="true" type="xsd:anyURI">
-            <doc>An autoscaling endpoint</doc>
+            <doc>This operation creates an autoscaling endpoint</doc>
             </param>
             <representation mediaType="application/json">
                 <doc xml:lang="en">
@@ -147,39 +449,36 @@
           &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroups" name="GET">
-        <doc title="List Scaling Groups" xml:lang="EN">
-            <db:para role="shortdesc">
-                List the autoscaling groups available to the specified tenant.
-            </db:para>
-            <db:para>
-                For the tenant specified by
-                <code>tenantID</code>
-                , 
-                this operation returns a list of autoscaling groups.
-            </db:para>
-        </doc>
+    <method id="getGroups" name="GET" rax:roles="observer autoscale:observer">
+        <wadl:doc title="List Scaling Groups" xml:lang="EN"
+            xmlns="http://docbook.org/ns/docbook">
+            <para role="shortdesc">
+                This operation lists the autoscaling groups that are available for the specified tenant.
+            </para>
+            <para>
+                This operation returns a list of autoscaling groups that have been created for the tenant specified by
+                <code>tenantID</code>.</para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
-                    <xsdxt:code href="../docbkx/samples/listGroups.json"/>
+                    <xsdxt:code href="../docbkx/samples/resGetGroups.json"/>
                 </doc>
             </representation>
         </response>
         &commonFaults; &getFaults;  
     </method>
 
-    <method id="getGroupManifest" name="GET">
-        <doc title="List All Group Details">
-            <db:para role="shortdesc">
-                List detailed autoscaling group configuration.
-            </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group configuration,
-                this operation returns details including the launch configuration and the scaling policies. These 
-                details are returned in the response body in JSON format.
-            </p>
-        </doc>
+    <method id="getGroupManifest" name="GET" rax:roles="observer autoscale:observer">
+        <wadl:doc title="List All Group Details" xmlns="http://docbook.org/ns/docbook">
+            <para role="shortdesc">
+                This operation returns details about the configuration for a specified autoscaling group.
+            </para>
+            <para>
+                This operation returns details including the launch configuration and the scaling policies  for the specified autoscaling group configuration. These 
+                details are returned in the response body in JSON format. 
+            </para>
+        </wadl:doc>
         <response status="200">
             <representation mediaType="application/json">
                 <doc xml:lang="en">
@@ -193,22 +492,23 @@
     <method id="deleteGroup" name="DELETE">
         <doc title="Delete Group">
             <db:para role="shortdesc">
-                Delete autoscaling group.
+                This operation deletes an  autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation deletes the specified autoscaling group if the group is empty. 
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 is returned.
+                the group contains pending or active entities, deletion fails and a 409 error message is returned. Pass force=true to force
+                delete the group, ignoring pending/active entities.
             </p>
         </doc>
         <response status="204"/>
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getGroupState" name="GET">
+    <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group State">
             <db:para role="shortdesc">
-                Report autoscaling group state.
+               This operation returns the state of an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation retrieves the current state of the specified autoscaling group.
@@ -228,13 +528,13 @@
         &commonFaults; &getFaults; 
     </method>
 
-    <method id="getGroupConfig" name="GET">
+    <method id="getGroupConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group Configuration">
             <db:para role="shortdesc">
-                List autoscaling group configuration.
+               This operation lists the configuration for an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation lists the group's configuration. 
+                This operation lists the configuration for a specified autoscaling group. 
                 The configuration describes the
                 minimum number of entities in the group, 
                 the maximum number of entities in the group, 
@@ -255,16 +555,16 @@
     <method id="putGroupConfig" name="PUT">
         <doc title="Replace Group Configuration">
             <db:para role="shortdesc">
-                Update autoscaling group configuration.
+                This operation updates the configuration for the autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
             This operation changes the configuration of an existing autoscaling group.
             To change the configuration, 
-            describe the new configuration in the request body in JSON format. 
-            Configuration elements you can describe include 
+            specify the new configuration in the request body in JSON format. 
+            Configuration elements include 
             the
             minimum number of entities, the maximum number of entities, the global
-            cooldown time, and other metadata. If the change is successful, no response body is
+            cooldown time, and other metadata. If the update is successful, no response body is
             returned.
             </p>
         </doc>
@@ -279,13 +579,13 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method id="getLaunchConfig" name="GET">
+    <method id="getLaunchConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Launch Configuration">
             <db:para role="shortdesc">
-                List launch configuration.
+                This operation lists the launch configuration.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation lists the group's launch configuration. 
+                This operation lists the launch configuration for the specified autoscaling group. 
                 The launch configuration describes the details of how to create a server, 
                 from what image to create a server, 
                 which load
@@ -307,18 +607,18 @@
     <method id="putLaunchConfig" name="PUT">
         <doc title="Replace Launch Configuration">
             <db:para role="shortdesc">
-                Update launch group configuration.
+                This operation updates the launch group configuration.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation changes an existing launch configuration for the specified autoscaling group.
                 To change the launch configuration, 
-                describe the new configuration in the request body in JSON format. 
-                Configuration elements you can describe include 
+                specify the new configuration in the request body in JSON format. 
+                Configuration elements include 
                 how to create a server, 
                 from what image to create a server, 
                 which load
                 balancers to join the server to, which networks to add the server to, and other
-                metadata. If the change is successful, no response body is returned.
+                metadata. If the update is successful, no response body is returned.
             </p>
         </doc>
         <request>
@@ -335,10 +635,11 @@
     <method id="pauseGroup" name="POST">
         <doc title="Pause Group Policy Execution">
             <db:para role="shortdesc">
-                Pause policy execution.
+                This operation pauses the execution of a scaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation pauses all execution of autoscaling policies.
+                This operation pauses the execution of all autoscaling policies for the specified autoscaling group.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </p>
         </doc>
         <request>
@@ -353,10 +654,11 @@
     <method id="resumeGroup" name="POST">
         <doc title="Resume Group Policy Execution">
             <db:para role="shortdesc">
-                Resume policy execution.
+                This operation resumes the execution of an autoscaling policy.
+IMPORTANT: This operation has not been implemented in the Auto Scale API yet and will be implemented in a future release.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                For the specified autoscaling group, this operation resumes all execution of autoscaling policies.
+                This operation resumes the execution of all autoscaling policies for the specified autoscaling group.
             </p>
         </doc>
         <request>
@@ -368,13 +670,13 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicies">
+    <method name="GET" id="getPolicies" rax:roles="observer autoscale:observer">
         <doc title="Get Policies List">
             <db:para role="shortdesc">
-                List scaling policies in the autoscaling group.
+                This operation lists scaling policies in the autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling group, this operation returns a list of the scaling policies that are available to the group. 
+            This operation returns a list of the scaling policies that are available to the specified autoscaling group. 
             Each policy is described in terms of an ID, 
             name, type, adjustment, cooldown time, and links. These
             descriptions are returned in the response body in JSON format.
@@ -393,15 +695,15 @@
     <method name="POST" id="createPolicies">
         <doc title="Create Policy">
             <db:para role="shortdesc">
-                Create autoscaling policy.
+                This operation creates an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling group, this operation creates one or multiple autoscaling policies. 
-            To create a policy, describe it in the request body in JSON format.
+            This operation creates one or multiple autoscaling policies for the specified autoscaling group. 
+            To create a policy, specify it in the request body in JSON format.
             Each description must include a name, type, adjustment, and cooldown time.
             </p>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            Use the JSON response to obtain information about the newly-created policy or policies.
+            Use the JSON response to obtain information about the newly-created policy or policies:
             <ul>
                 <li>The response header points to the List Policies endpoint.</li>
                 <li>The response body provides an array of scaling policies.</li>
@@ -471,13 +773,13 @@
         &commonFaults; &getFaults; &postPutFaults; 
     </method>
 
-    <method name="GET" id="getPolicy">
+    <method name="GET" id="getPolicy" rax:roles="observer autoscale:observer">
         <doc title="Get Policy Details">
             <db:para role="shortdesc">
-                Describe one policy.
+                This operation returns details for a specified autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified autoscaling policy, this operation returns a description. 
+            This operation returns a description for the specified autoscaling policy. 
             The description includes an ID, name, type,
             adjustment, cooldown time, and links. The description is returned in the
             response body in JSON format.
@@ -496,13 +798,12 @@
     <method id="putPolicy" name="PUT">
         <doc title="Replace Policy">
             <db:para role="shortdesc">
-                Update policy.
+                This operation updates an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            This operation changes an existing autoscaling policy for the specified tenant.
-            To change the policy, describe the new policy in the request body in JSON format.
-            Updates a scaling policy. You must describe the policy's name,
-            type, adjustment, and cooldown time. If the change is successful, no response body
+            This operation modifies an existing autoscaling policy for the specified tenant.
+            To update the policy, specify the policy's name,
+            type, adjustment, and cooldown time in the request body in JSON format. If the change is successful, no response body
             is returned.
             </p>
         </doc>
@@ -520,7 +821,7 @@
     <method id="deletePolicy" name="DELETE">
         <doc title="Delete Policy">
             <db:para role="shortdesc">
-                Delete policy.
+                This operation deletes an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation deletes the specified autoscaling policy from the specified tenant. 
@@ -534,7 +835,7 @@
     <method id="executePolicy" name="POST">
         <doc title="Execute Policy">
             <db:para role="shortdesc">
-                Execute policy.
+                This operation executes an autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This operation executes the specified autoscaling policy. If execution is successful, a response body is
@@ -553,10 +854,10 @@
     <method name="GET" id="getWebhooks">
         <doc title="Get a list of webhooks for the policy">
             <db:para role="shortdesc">
-                Get a list of webhooks for the policy.
+                This operation obtains a list of webhooks for the autoscaling policy.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Get a list of webhooks and their IDs. This data is returned in
+                This operation obtains a list of webhooks and their IDs for the specified autoscaling policy. This data is returned in
                 the response body in JSON format.
             </p>
         </doc>
@@ -573,12 +874,12 @@
     <method id="createWebhook" name="POST">
         <doc title="Create a webhook">
             <db:para role="shortdesc">
-                Create a Webhook.
+                This operation creates a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                Create one or more new scaling policy webhooks. Webhooks must
-            have a name. If successful, the created response body will contain
-            the IDs and links to the newly created webhooks. This data provided
+            This operation creates one or more webhooks for the specified autoscaling policy. Webhooks must
+            have a name. If successful, the response body will contain
+            the IDs and links to the newly created webhooks. This data is provided
             in the request body in JSON format.
             </p>
         </doc>
@@ -602,11 +903,10 @@
     <method id="getWebhook" name="GET">
         <doc title="View Webhook">
             <db:para role="shortdesc">
-                Describe one webhook.
+                This operation returns the description for a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified tenant and the specified autoscaling policy, 
-            this operation returns a description of the specified webhook. 
+            This operation returns a description of a webhook for the specified tenant and the specified autoscaling policy. 
             The description is returned in the response body in JSON format.
             </p>
         </doc>
@@ -623,12 +923,12 @@
     <method id="putWebhook" name="PUT">
         <doc title="Update Webhook">
             <db:para role="shortdesc">
-                Update webhook.
+                This operation updates a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            For the specified tenant and policy, this operation changes the specified webhook. 
+            This operation changes the specified webhook for a specified enant and autoscaling policy.
             If the specified webhook is not recognized, the change is ignored. 
-            If a URL is submitted, the URL is ignored but that does not invalidate the request. 
+            If you submit a URL, the URL is ignored but that does not invalidate the request. 
             If the change is successful, no
             response body is returned.
             </p>
@@ -647,10 +947,10 @@
     <method id="deleteWebhook" name="DELETE">
         <doc title="Delete Webhook">
             <db:para role="shortdesc">
-                Delete webhook.
+                This operation deletes a webhook.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation deletes the specified autoscaling policy webhook. If deletion is successful, no response body
+                This operation deletes the webhook for a specified autoscaling policy. If deletion is successful, no response body
                 is returned.
             </p>
         </doc>
@@ -661,9 +961,9 @@
     <method id="anonymousExecute" name="POST">
         <doc title="Execute Anonymous Webhook">
             <db:para role="shortdesc">
-                Execute anonymous webhook.
+                This operation executes an anonymous webhook.
             </db:para>
-            <p xmlns="http://www.w3.org/1999/xhtml">This operation executes an anonymous webhook.</p>
+            <p xmlns="http://www.w3.org/1999/xhtml">This method executes an anonymous webhook.</p>
         </doc>
         <request>
             <representation mediaType="application/json">
