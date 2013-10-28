@@ -57,7 +57,7 @@ class PolicyPaginationTest(AutoscaleFixture):
             rem_list_policy =\
                 self.autoscale_client.list_policies(self.group.id,
                                                     url=list_policies.policies_links.next).entity
-            # Check that there is at least on policy on the next page
+            # Check that there is at least one policy on the next page
             self._assert_list_policies_with_limits_and_next_link(1, rem_list_policy, False)
 
     def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
