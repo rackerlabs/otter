@@ -189,7 +189,7 @@ def _build_schedule_policy(policy, event_table, queries, data, polname, bucketli
     """
     Build schedule-type policy
     """
-    data[polname + 'bucket'] = bucketlist.next_item()
+    data[polname + 'bucket'] = bucketlist.next()
     if 'at' in policy["args"]:
         queries.append(_cql_insert_event.format(cf=event_table, name=':' + polname))
         at_time = timestamp.from_timestamp(policy["args"]["at"])
@@ -233,15 +233,18 @@ def _find_event(connection, policy_id, buckets):
 
     Note: This method can be very time consuming as it will go through each event
     in each bucket one after other in blocks of 100. So, if there are 1000 events in 10
-    buckets this method will do 10 buckets * 10 100-size reads at-max
+    buckets this method will do 10 * 10 = 100 reads at-max
     """
-    def _find_event_in_bucket(bucket):
-        pass
+    def _check_event(events):
+        # Could do a binary search since policyId will be sorted
+        for event in events:
+            if event['policyId'] == policy_id:
+                return event
 
-    for bucket in buckets:
-        event = yield _find_event_in_bucket(bucket)
-        if event:
-            defer.returnValue(event)
+    def _fetch_after(event):
+        d = connection.execute(_cql_fetch_all_events_batch, {'marker': event['policyId']},
+                           get_consistency_level('fetch', 'event'))
+        return d.addCallback(_check_event)
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters,

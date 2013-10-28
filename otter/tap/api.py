@@ -142,15 +142,24 @@ def makeService(config):
     admin_service = service(str(config_value('admin')), admin_site)
     admin_service.setServiceParent(s)
 
-    # Setup scheduler service
-    if config_value('scheduler') and not config_value('mock'):
-        bucketlist = RoundRobinItems(range(1, int(config_value('scheduler.buckets')) + 1))
-        store.set_scheduler_bucket_list(bucketlist)
-        zk_hosts = [str(host) for host in config_value('scheduler.zk_hosts')]
-        partition_path = config_value('scheduler.partition_path')
-        scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
-                                             int(config_value('scheduler.interval')),
-                                             cassandra_cluster, store, zk_hosts, partition_path)
-        scheduler_service.setServiceParent(s)
+    # Setup Kazoo client
+    if config_value('zookeeper'):
+        kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'))
+        d = kz_client.start()
+        d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
 
     return s
+
+
+def setup_scheduler(parent, store, kz_client):
+    # Setup scheduler service
+    if not config_value('scheduler') or config_value('mock'):
+        return
+    bucketlist = itertools.cycle(range(1, int(config_value('scheduler.buckets')) + 1))
+    store.set_scheduler_bucket_list(bucketlist)
+    partition_path = config_value('scheduler.partition_path') or '/scheduler_partition'
+    scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
+                                         int(config_value('scheduler.interval')),
+                                         store, kz_client, partition_path)
+    scheduler_service.setServiceParent(parent)
+
