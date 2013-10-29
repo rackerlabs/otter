@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book [
 <!-- Some useful entities borrowed from HTML -->
-<!ENTITY ndash  "&#x2013;">
-<!ENTITY mdash  "&#x2014;">
+<!ENTITY ndash "&#x2013;">
+<!ENTITY mdash "&#x2014;">
 <!ENTITY hellip "&#x2026;">
 
 <!-- Useful for describing APIs -->
-<!ENTITY GET    '<command xmlns="http://docbook.org/ns/docbook">GET</command>'>
-<!ENTITY PUT    '<command xmlns="http://docbook.org/ns/docbook">PUT</command>'>
-<!ENTITY POST   '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
+<!ENTITY GET '<command xmlns="http://docbook.org/ns/docbook">GET</command>'>
+<!ENTITY PUT '<command xmlns="http://docbook.org/ns/docbook">PUT</command>'>
+<!ENTITY POST '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
 <!ENTITY DELETE '<command xmlns="http://docbook.org/ns/docbook">DELETE</command>'>
 
 <!ENTITY PRODNAME "Rackspace Auto Scale"> <!-- in PDF: for line 1 on the cover page -->
 <!ENTITY PRODABBV "Rackspace Auto Scale"> <!-- in PDF: for page headers -->
-<!ENTITY PROD "Auto Scale">               <!-- in body -->
+<!ENTITY PROD "Auto Scale"> <!-- in body -->
 
 <!-- changing authentication endpoints; define entities for US & UK rather than maintaining in text -->
 <!ENTITY ENDPOINT-US "https://identity.api.rackspacecloud.com/v1.1/">
@@ -21,14 +21,14 @@
 <!ENTITY ENDPOINT-US-20 "https://identity.api.rackspacecloud.com/v2.0/">
 <!ENTITY ENDPOINT-UK-20 "https://lon.identity.api.rackspacecloud.com/v2.0/">
 
-<!ENTITY CHECK  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<!ENTITY CHECK '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
 <imageobject>
 <imagedata fileref="img/Check_mark_23x20_02.svg"
 format="SVG" scale="60"/>
 </imageobject>
 </inlinemediaobject>'>
 
-<!ENTITY ARROW  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<!ENTITY ARROW '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
 <imageobject>
 <imagedata fileref="img/Arrow_east.svg"
 format="SVG" scale="60"/>
@@ -36,10 +36,10 @@ format="SVG" scale="60"/>
 </inlinemediaobject>'>
 
 <!-- Useful for specs -->
-<!ENTITY MAY    '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MAY</emphasis>'>
+<!ENTITY MAY '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MAY</emphasis>'>
 <!ENTITY SHOULD '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">SHOULD</emphasis>'>
-<!ENTITY MUST   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
-<!ENTITY MUST_NOT   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
+<!ENTITY MUST '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
+<!ENTITY MUST_NOT '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
 ]>
 
 <book version="5.0"
@@ -52,15 +52,15 @@ format="SVG" scale="60"/>
          xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
-<titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
+<titleabbrev>&PRODABBV; DevGuide</titleabbrev>
 <?rax title.font.size="35px" subtitle.font.size="20px"
-      status.bar.text="Early Access" 
-      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
+status.bar.text="Early Access"
+canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-21</pubdate>
+        <pubdate>2013-10-25</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -71,6 +71,16 @@ format="SVG" scale="60"/>
             </annotation>
         </legalnotice>
         <revhistory>
+          <revision>
+            <date>2013-10-25</date>
+            <revdescription>
+              <itemizedlist spacing="compact">
+                <listitem>
+                  <para>Added content on Pagination.</para>
+                </listitem>
+              </itemizedlist>
+            </revdescription>
+          </revision>
           <revision>
             <date>2013-08-21</date>
             <revdescription>
@@ -101,7 +111,7 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision> 
+            </revision>
              <revision>
                 <date>2013-07-02</date>
                 <revdescription>
@@ -113,10 +123,10 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision>           
+            </revision>
         </revhistory>
       <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
-	<raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
+        <raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
@@ -128,8 +138,8 @@ format="SVG" scale="60"/>
       capacity to meet current needs. </para>
   <para>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
-      Then you define cloud monitoring alerts to watch the group's activity, 
-      and you define scaling rules to change the scaling group's configuration in response to alerts. 
+      Then you define cloud monitoring alerts to watch the group's activity,
+      and you define scaling rules to change the scaling group's configuration in response to alerts.
       Because you can change a
       scaling group's configuration in response to changing
       workloads, you can begin with a minimal cloud
@@ -142,7 +152,7 @@ format="SVG" scale="60"/>
       triggered by Cloud Monitoring. You can also specify a minimum
       and maximum number of cloud servers, the amount of resources
       that you want to increase or decrease, and the thresholds in
-      Cloud Monitoring that trigger the scaling activities. &PROD; 
+      Cloud Monitoring that trigger the scaling activities. &PROD;
       requires the following services to work together: <itemizedlist>
         <listitem>
           <para> Cloud Monitoring </para>
@@ -182,8 +192,8 @@ format="SVG" scale="60"/>
         </para>
         <?rax revhistory?>
     </section>
-    <!-- Resources section, suggesting other places to go for info, 
-         is external so it's handy for Getting Started to share -->    
+    <!-- Resources section, suggesting other places to go for info,
+is external so it's handy for Getting Started to share -->
             <xi:include href="chapters/resources.xml"/>
     <!-- -->
     <section xml:id="API_Contract_Changes-d1e363">
@@ -229,10 +239,10 @@ format="SVG" scale="60"/>
     <chapter xml:id="Concepts-dle001">
         <title>Concepts</title>
         <para> To use the &PROD; API effectively, you should
-            understand several key concepts: 
+            understand several key concepts:
         </para>
-      <!-- Glossary section, defining basic terms, 
-         is external so it's handy for Getting Started to share -->
+      <!-- Glossary section, defining basic terms,
+is external so it's handy for Getting Started to share -->
       <xi:include href="chapters/glossary.xml"/>
       <!-- -->
     </chapter>
@@ -288,7 +298,7 @@ format="SVG" scale="60"/>
             <para> If your account was created via <link
                 xlink:href="http://www.rackspace.co.uk"
                 >http://www.rackspace.co.uk</link>, it is a UK-based
-              account.  </para>
+              account. </para>
           </listitem>
         </itemizedlist>
       </section>
@@ -303,7 +313,7 @@ format="SVG" scale="60"/>
           authenticate successfully, the response to your
           authentication request includes a catalog of the
           services to which you have subscribed rather than the sample
-          values shown. </para> 
+          values shown. </para>
         <table rules="all">
           <caption>Request for Authentication Token</caption>
           <tbody>
@@ -361,20 +371,20 @@ format="SVG" scale="60"/>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.json.token"       units="linecolumn" coords="10 8"/>
-              <area xml:id="response.json.dfltregion"  units="linecolumn" coords="17 12"/>
-              <area xml:id="response.json.role"        units="linecolumn" coords="18 12"/>
-              <area xml:id="response.json.catalog"     units="linecolumn" coords="31 8"/>
-              <area xml:id="response.json.service-lb"         units="linecolumn" coords="49 16"/>
-              <area xml:id="response.json.service-compute"    units="linecolumn" coords="65 16"/>
-              <area xml:id="response.json.service-monitor"    units="linecolumn" coords="87 16"/>
-              <area xml:id="response.json.service-autoscale"  units="linecolumn" coords="97 16"/>
-              <area xml:id="response.json.tenant"      units="linecolumn" coords="121 24"/>
-              <area xml:id="response.json.url"         units="linecolumn" coords="122 24"/>
-              <area xml:id="response.json.region"      units="linecolumn" coords="124 24"/>
+              <area xml:id="response.json.token" units="linecolumn" coords="10 8"/>
+              <area xml:id="response.json.dfltregion" units="linecolumn" coords="17 12"/>
+              <area xml:id="response.json.role" units="linecolumn" coords="18 12"/>
+              <area xml:id="response.json.catalog" units="linecolumn" coords="31 8"/>
+              <area xml:id="response.json.service-lb" units="linecolumn" coords="49 16"/>
+              <area xml:id="response.json.service-compute" units="linecolumn" coords="65 16"/>
+              <area xml:id="response.json.service-monitor" units="linecolumn" coords="87 16"/>
+              <area xml:id="response.json.service-autoscale" units="linecolumn" coords="97 16"/>
+              <area xml:id="response.json.tenant" units="linecolumn" coords="121 24"/>
+              <area xml:id="response.json.url" units="linecolumn" coords="122 24"/>
+              <area xml:id="response.json.region" units="linecolumn" coords="124 24"/>
               <area xml:id="response.json.servicename" units="linecolumn" coords="133 16"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
-            </areaspec>	
+            </areaspec>        
             <programlisting language="json">
               <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
@@ -401,9 +411,9 @@ format="SVG" scale="60"/>
               will reach that lifespan. Clients are encouraged to
               cache a token until it expires. </para>
             <para>
-              Authentication tokens are typically valid for 24 hours. 
-              Applications should be designed to re-authenticate after 
-              receiving a <errorcode>401</errorcode> (Unauthorized) response from a service endpoint. 
+              Authentication tokens are typically valid for 24 hours.
+              Applications should be designed to re-authenticate after
+              receiving a <errorcode>401</errorcode> (Unauthorized) response from a service endpoint.
             </para>
             <note>
               <para>The token's expiration time is formatted
@@ -531,7 +541,7 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
         </calloutlist>
-      </section>  
+      </section>
     </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access Endpoints</title>
@@ -583,6 +593,11 @@ format="SVG" scale="60"/>
                 <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
+            <tr align="left">
+              <td colspan="2">Hong Kong (HKG)</td>
+              <td colspan="5">
+                <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
+            </tr>
           </tbody>
         </table>
       </para>
@@ -590,8 +605,10 @@ format="SVG" scale="60"/>
           <parameter>1234</parameter>, with your actual Tenant ID.</para>
       <para>You will find your account number after the final '/' in
         the <code>publicURL</code> field returned by the
-        authentication response. For example, in <xref
-          linkend="auth-response-example-json"/>,  the
+        authentication response. For example, in <olink
+          targetdoc="autoscale-devguide"
+          targetptr="auth-response-example-json">Example 2,
+          “Authentication Response for US Endpoint: JSON”</olink> the
           <code>publicURL</code> field for <code>autoscale</code>
           ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
           role="bold">1100111</emphasis>") shows that the account
@@ -649,7 +666,7 @@ format="SVG" scale="60"/>
             <td>No</td>
           </tr>
         </tbody>
-      </table> 
+      </table>
     </section>
     <?hard-pagebreak?>
     <section xml:id="Limits-d1e1208">
@@ -662,10 +679,10 @@ format="SVG" scale="60"/>
         reset after a certain amount of time passes. Absolute limits
         are fixed. </para>
       <section xml:id="Rate_Limits-d1e1222">
-        <!-- 
-        rate limits are managed by Repose rate limiting filter, 
-        config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
-        -->
+        <!--
+rate limits are managed by Repose rate limiting filter,
+config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
+-->
         <title>Rate Limits</title>
         <para> Rate limits are specified in terms of both a
           human-readable wildcard URI and a machine-processable
@@ -718,7 +735,7 @@ format="SVG" scale="60"/>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <para>&PRODNAME; does not use absolute limits. It does use 
+        <para>&PRODNAME; does not use absolute limits. It does use
           <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
         <table rules="all">
           <caption>Absolute Limits</caption>
@@ -827,21 +844,215 @@ format="SVG" scale="60"/>
             <td>May 19th, 2013 at 8:07:08 AM, GMT</td>
           </tr>
         </tbody>
-      </table>   
+      </table>
     </section>
-    <section xml:id="removing-servers">
-      <title>Removing Servers</title>
-      <para>Servers are removed in reverse order of creation. However,
-        servers that are in the process of building are not
-        removed.</para>
-        </section> 
+        <section xml:id="pagination">
+      <title>Pagination</title>
+      <para>The Auto Scale API supports pagination of items that are
+        returned in API call responses. Pagination enables users to
+        view all responses even if the number of items returned in the
+        response body is longer than what fits on one page. </para>
+      <para>The pagination limit for the Auto Scale API is 100. This
+        means you can view 100 items at a time. </para>
+      <para>For example, if you want to get a list of all the scaling
+        groups, and there are more than 100 groups, you will see the
+        first 100 groups on one page and then a link at the bottom of
+        the page that takes you to the next page, which contains the
+        next 100 items. </para>
+      <para>A pagination limit that is set beyond 100 is defaulted to
+        100. And a limit that is set to smaller than 1 is defaulted to
+        1. </para>
+      <para>The Auto Scale API paginates the following items:</para>
+      <itemizedlist>
+        <listitem>
+          <para>scaling groups</para>
+        </listitem>
+        <listitem>
+          <para>scaling policies </para>
+        </listitem>
+        <listitem>
+          <para>webhooks</para>
+        </listitem>
+      </itemizedlist>
+      <para>You can specify further pages with the
+          <parameter>?page</parameter> parameter in the Link header in
+        the URI request, and set the number of items to be displayed
+        per page in the <parameter>per_page</parameter> parameter as
+        shown in the following example:</para>
+      <para>
+        <programlisting>Link: &lt;https://api.github.com/user/repos?page=3&amp;per_page=100&gt;; rel="next",
+      &lt;https://api.github.com/user/repos?page=50&amp;per_page=100&gt;; rel="last"</programlisting>
+      </para>
+      <para>To navigate the collection of items that are returned in
+        the request body, you can set the following parameters in the
+        URI:</para>
+      <para>
+        <table rules="all">
+          <caption>Limit and Marker Pagination Parameters</caption>
+          <thead>
+            <tr>
+              <td>Parameter</td>
+              <td>Description</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>limit</td>
+              <td>Specifies the number of items that can be returned
+                on one page. If the client requests a <emphasis
+                  role="italic">limit</emphasis> beyond the 100 items
+                supported byAuto Scale, an overLimit (413) response
+                code will be returned.</td>
+            </tr>
+            <tr>
+              <td>marker</td>
+              <td>Specifies the Id of the last item in the previous
+                list. Items are sorted by create time in descending
+                order. When a create time is not available they are
+                sorted by Id. If the Id specified for this parameter
+                is invalid, a 400 response code (badRequest) will be
+                returned.</td>
+            </tr>
+          </tbody>
+        </table>
+      </para>
+      <para>
+        <note>
+          <para>The limit and marker parameters are both
+            optional.</para>
+        </note>
+      </para>
+      <para>To specify the direction for the next page of results, you
+        need to set the <parameter>rel</parameter> parameter at the
+        end of the request URI. The following values can be
+        set:</para>
+      <table rules="all">
+        <caption>Values for Rel Parameter</caption>
+        <thead>
+          <tr>
+            <td>Value</td>
+            <td>Description</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>next</td>
+            <td>Shows the URL of the immediate next page of
+              results.</td>
+          </tr>
+          <tr>
+            <td>last</td>
+            <td>Shows the URL of the last page of results.</td>
+          </tr>
+          <tr>
+            <td>first</td>
+            <td>Shows the URL of the first page of results.</td>
+          </tr>
+          <tr>
+            <td>prev</td>
+            <td>Shows the URL of the immediate previous page of
+              results.</td>
+          </tr>
+        </tbody>
+      </table>
+      <example>
+        <title>Paginating Group Lists</title>
+        <para>When submitting a request for a group manifest, you
+          receive a list of all the available scaling groups and
+          associated policies. However, if there are too many, the
+          response body will only list 100, and provide a next link in
+          the <parameter>rel</parameter> parameter as shown in the
+          following example: </para>
+        <programlisting language="json">{
+       "groups": [
+            ...
+       ],
+       "group_links": [
+           {
+               "href":
+"https://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e"
+               "rel": "next"
+           }
+       ]
+   }
+
+</programlisting>
+      </example>
+      <para>The <parameter>limit</parameter> parameter in the example
+        above is set to 100, which means no more than 100 items can be
+        displayed on one page. For Auto Scale, this number must be
+        between 1 and 100, inclusive. So if you provide a query
+        argument of more than 100, it will default to 100, and if you
+        set the limit to less than 1, it will default to 1. </para>
+      <para>If you provide an invalid query argument for
+          <parameter>limit</parameter>, a 400 response code will be
+        returned. The <parameter>marker</parameter>parameter specifies
+        the last seen group Id. When you click on the link that is
+        returned, all the groups displayed will have group Ids that
+        are greater than
+        "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+      <para>
+        <example>
+          <title>Paginating Policy Lists</title>
+          <para>When you submit a request to obtain all the policies
+            associated with a scaling group, a list of policies will
+            be returned. However, if there are too many policies, the
+            response body will only list 100, and provide a next link
+            in the <parameter>rel</parameter> parameter as shown in
+            the following example: </para>
+          <programlisting language="json"> {
+       "policies": [
+            ...
+       ],
+       "policies_links": [
+           {
+               "href":
+"http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
+               "rel": "next"
+           }
+       ]
+   }
+</programlisting>
+          <para>The <parameter>marker</parameter> parameter points to
+            the last seen policy Id. When you click on the link that
+            is returned, all the policies displayed will have policy
+            Ids that are greater than
+            "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+        </example>
+        <example>
+      <title>Paginating Webhook Lists</title>
+      <para>When you submit a request to obtain all the webhooks
+            associated with a policy, a list of webhooks will be
+            returned. However, if there are too many webhooks, the
+            response body will only list 100, and provide a next link
+            in the <parameter>rel</parameter> parameter as shown in
+            the following example: </para>
+      <programlisting language="json"> {
+       "webhooks": [
+            ...
+       ],
+       "webhooks_links": [
+           {
+               "href":
+"http://dfw.autoscale.api.rackspacecloud.com/v1.0/010101/groups/b5210aa2-5c8f-4c17-9fb4-71a351e519cd/policies/5783f588-eba6-4ca2-a9c5-ce04f2c32992/webhooks/?limit=100&amp;marker=f82bb000-f451-40c8-9dc3-6919097d2f7e",
+               "rel": "next"
+           }
+       ]
+   }</programlisting>
+          <para>The <parameter>marker</parameter> parameter points to
+            the last seen webhook Id. When you click on the link that
+            is provided in the response body, all the webhooks
+            displayed will have webhook Ids that are greater than
+            "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
+          </example></para>
+    </section>
       <section xml:id="audit-log">
         <title>Audit Log</title>
       <para>Because of the deferred nature of Autoscale, most errors
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
         the events that have occurred within a user's scaling group. </para>
-        </section> 
+        </section>
       <section xml:id="faults-dle101">
         <title>Faults</title>
       <para>If any &PRODNAME; request results in an error, the service
@@ -887,7 +1098,7 @@ Content-Type: application/json
       <para>Error information for each API operation is included with
         the description of that operation in <xref linkend="API_Operations"
         />.</para>
-    </section> 
+    </section>
         <xi:include href="./chapters/rbac.xml"/>
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
