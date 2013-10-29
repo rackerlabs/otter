@@ -142,7 +142,6 @@ class PolicyPaginationTest(AutoscaleFixture):
         self.assertGreaterEqual(len(list_policies.policies), policy_len)
         if next_link:
             self.assertTrue(hasattr(list_policies.policies_links, 'next'))
-            #self.assertTrue(list_policies.policies_links.next)
         else:
             self.assertDictEqual(list_policies.policies_links.links, {},
                                  msg='Links to next provided even when'
