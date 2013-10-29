@@ -22,7 +22,7 @@ from otter.controller import CannotExecutePolicyError
 from datetime import datetime
 
 
-class SchedulerTestCase(TestCase):
+class SchedulerServiceTests(TestCase):
     """
     Tests for :mod:`SchedulerService`
     """
@@ -47,7 +47,7 @@ class SchedulerTestCase(TestCase):
                 return defer.fail(result)
             return defer.succeed(result)
 
-        self.mock_store.fetch_batch_of_events.side_effect = _responses
+        self.mock_store.fetch_and_delete.side_effect = _responses
 
         self.mock_store.update_delete_events.return_value = defer.succeed(None)
 
@@ -86,6 +86,169 @@ class SchedulerTestCase(TestCase):
 
         self.next_cron_occurrence = patch(self, 'otter.scheduler.next_cron_occurrence')
         self.next_cron_occurrence.return_value = 'newtrigger'
+
+    def test_start_service(self):
+        """
+        startService() calls super's startService() and creates SetPartition object
+        """
+        pass
+
+    def test_stop_service(self):
+        """
+        stopService() calls super's stopService() and stops the allocation
+        """
+        pass
+
+    def test_check_events_allocating(self):
+        """
+        `check_events` logs message and does not check events in buckets when
+        buckets are still allocating
+        """
+        pass
+
+    def test_check_events_release(self):
+        """
+        `check_events` logs message and does not check events in buckets when
+        partitioning has changed. It calls release_set() to re-partition
+        """
+        pass
+
+    def test_check_events_failed(self):
+        """
+        `check_events` logs message and does not check events in buckets when
+        partitioning has failed. It creates a new partition
+        """
+        pass
+
+    def test_check_events_allocated(self):
+        """
+        `check_events` checks events in each bucket when they are partitoned.
+        """
+        pass
+
+
+class CheckEventsInBucketTests(TestCase):
+    """
+    Tests for `check_events_in_bucket`
+    """
+
+    def setUp(self):
+        """
+        Mock parameters
+        """
+
+    def test_fetch_called(self):
+        """
+        `fetch_and_delete` called correctly
+        """
+
+    def test_no_events(self):
+        """
+        When no events are fetched, they are not processed
+        """
+
+    def test_events_in_limit(self):
+        """
+        When events fetched < 100, they are processed
+        """
+
+    def test_events_process_error(self):
+        """
+        error is logged if `process_events` returns error
+        """
+
+    def test_events_more_limit(self):
+        """
+        When events fetched > 100, they are processed in 2 batches
+        """
+
+    def test_events_batch_process(self):
+        """
+        When events fetched > 100, they are processed in batches untill all
+        events are processed
+        """
+
+
+class ProcessEventsTests(TestCase):
+    """
+    Tests for `process_events`
+    """
+
+    def setUp(self):
+        """
+        Mock args
+        """
+
+    def test_no_events(self):
+        """
+        Does nothing on no events
+        """
+
+    def test_success(self):
+        """
+        Test success path: Logs number of events, calls `execute_event` on each event
+        and calls `add_cron_events`
+        """
+
+
+class AddCronEventsTests(TestCase):
+    """
+    Tests for `add_cron_events`
+    """
+
+    def setUp(self):
+        """
+        Mock args
+        """
+
+    def test_no_events(self):
+        """
+        Does nothing on no events
+        """
+
+    def test_store_add_cron_called(self):
+        """
+        Updates cron events for non-deleted policies by calling store.add_cron_events
+        """
+
+
+class ExecuteEventTests(TestCase):
+    """
+    Tests for `execute_event`
+    """
+
+    def setUp(self):
+        """
+        Mock args
+        """
+
+    def test_event_executed(self):
+        """
+        Event is executed successfully and appropriate logs logged
+        """
+
+    def test_deleted_event(self):
+        """
+        Policy corresponding to the event has deleted. It captures
+        policyId in deleted_policy_ids
+        """
+
+    def test_semantic_prob(self):
+        """
+        Policy execution causes semantic error like cooldowns not met.
+        i.e. CannotExecutePolicyError is captured and logged
+        """
+
+    def test_unknown_error(self):
+        """
+        Unknown error occurs. It is logged and not propogated
+        """
+
+
+
+
+
+
 
     def validate_calls(self, d, fetch_returns, update_delete_args):
         """

@@ -61,7 +61,7 @@ class SchedulerService(TimerService):
         super(SchedulerService, self).stopService()
         return self.kz_partition.finish()
 
-    def check_for_events(self, batchsize):
+    def check_events(self, batchsize):
         """
         Check for events occurring now and earlier
         """
@@ -81,16 +81,18 @@ class SchedulerService(TimerService):
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
 
         return defer.gatherResults(
-            [check_for_events_in_bucket(
+            [check_events_in_bucket(
                 log, self.store, bucket, utcnow, batchsize) for bucket in buckets])
 
 
-def check_for_events_in_bucket(log, store, bucket, now, batchsize):
+def check_events_in_bucket(log, store, bucket, now, batchsize):
     """
     Check for events in the given bucket before `now`
 
     :return: a deferred that fires with None
     """
+
+    log = log.bind(bucket=bucket)
 
     def check_for_more(events):
         if events and len(events) == batchsize:
