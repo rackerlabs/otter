@@ -145,7 +145,7 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         self.assertGreaterEqual(len(list_group.groups), group_len)
         if next_link:
-            self.assertTrue(list_group.groups_links.next)
+            self.assertTrue(hasattr(list_group.groups_links, 'next'))
         else:
             self.assertDictEqual(list_group.groups_links.links, {}, msg='Links to next provided'
                                  ' even when there are no more groups to list')
