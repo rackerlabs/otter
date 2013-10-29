@@ -250,9 +250,7 @@ def validate_datetime(dt_str):
         # and http://code.google.com/p/pyiso8601/issues/detail?id=24
         raise ValueError('Error parsing datetime str')
     # Ensure time is in future
-    time = datetime.utcfromtimestamp(
-        calendar.timegm(dt.utctimetuple())).repalce(seconds=0, microseconds=0
-    if time <= datetime.utcnow().replace(seconds=0, microseconds=0):
+    if datetime.utcfromtimestamp(calendar.timegm(dt.utctimetuple())) <= datetime.utcnow():
         raise ValidationError('Invalid "{}" datetime: It must be in the future'.format(dt_str))
     return True
 
