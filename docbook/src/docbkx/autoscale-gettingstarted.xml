@@ -125,12 +125,10 @@ format="SVG" scale="60"/>
     </info>
     <chapter xml:id="Overview">
         <title>Overview</title>
-        <para> The &PRODNAME; service responds to events by changing
-            server capacity to meet current needs. This ability to
-            expand the cloud server configuration in response to
-            increased workload means that you can begin with a minimal
-            cloud configuration and grow only when the cost of that
-            growth is justified. </para>
+        <para>Rackspace Auto Scale is an API-based tool that
+            automatically scales resources in response to an increase
+            or decrease in overall workload based on user-defined
+            thresholds. </para>
         <section xml:id="Doc_Change_History">
             <title>Document Change History</title>
             <para> This version of the document replaces and obsoletes
