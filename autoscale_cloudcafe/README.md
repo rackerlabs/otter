@@ -59,3 +59,17 @@ cafe-runner autoscale dev -p functional --parallel
     runs all the autoscale tests under the functional folder in parallel
 cafe runner autoscale dev -m test_create_scaling_group
 	runs the test 'test_create_scaling_group'
+
+Options:
+----------
+cafe-runner autoscale dev -p functional (runs all functional tests)
+cafe-runner autoscale dev -p system -t speed=quick (runs all quick system tests)
+cafe-runner autoscale dev -p system -t speed=slow (runs all system tests that require servers to build to active state)
+cafe-runner autoscale dev -p system -t type=lbaas (runs load balancer intergration tests)
+cafe-runner autoscale dev -p system -t type=repose (runs repose intergration tests)
+cafe-runner autoscale dev -p system -t type=rbac (runs rbac intergration tests)
+cafe-runner autoscale dev -p system -t type=one-time (runs system tests, that are not intended to be run frequently in production
+
+cafe-runner autoscale dev -m test_delete_all -t groups (deletes all the groups on the account)
+cafe-runner autoscale dev -m test_delete_all -t servers (deletes all the servers on the account)
+cafe-runner autoscale dev -m test_delete_all -t lbaas (deletes all the nodes on the load balancers)
