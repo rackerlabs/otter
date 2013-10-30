@@ -191,7 +191,7 @@ class WebhookCollectionTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     def test_webhooks_create(self, mock_url):
@@ -402,7 +402,7 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_update_valid_webhook(self):
         """
