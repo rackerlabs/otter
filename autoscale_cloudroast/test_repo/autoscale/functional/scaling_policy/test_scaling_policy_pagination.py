@@ -3,10 +3,10 @@ Test to verify pagination for a list of scaling policies.
 """
 import unittest
 
-from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
-class PolicyPaginationTest(ScalingGroupPolicyFixture):
+class PolicyPaginationTest(AutoscaleFixture):
 
     """
     This class implements a set of test cases to verify pagination for a
@@ -15,9 +15,17 @@ class PolicyPaginationTest(ScalingGroupPolicyFixture):
 
     def setUp(self):
         """
+        Create a scaling group, a scaling policy, and 5 webhooks on the scaling policy.
+        The group will be deleted after each test case, which will also delete the policy
+        and all associated webhooks.
         """
-        super(ScalingGroupPolicyFixture, self).setUp()
-        self._create_multiple_scaling_policies(3)
+        super(PolicyPaginationTest, self).setUp()
+        group_response = self.autoscale_behaviors.create_scaling_group_min()
+        self.group = group_response.entity
+        # Add the created group to the resources pool for later deletion
+        self.resources.add(self.group.id, self.autoscale_client.delete_scaling_group)
+        # Create the scaling policy
+        policy_response = self.autoscale_behaviors.create
         self.total_policies = self._get_total_num_policies()
 
     def tearDown(self):
