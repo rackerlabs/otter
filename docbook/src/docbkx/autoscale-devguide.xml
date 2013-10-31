@@ -124,28 +124,29 @@ format="SVG" scale="60"/>
     </info>
 <chapter xml:id="Overview">
     <title>Overview</title>
-    <para> The &PRODNAME; service responds to events by changing
-      capacity to meet current needs. </para>
+    <para> The &PRODNAME; is a web service that automatically scales
+        resources in response to an increase or decrease in overall
+        workload based on user-defined policies. You can set up a
+        schedule for launching &PROD; or define an event that is
+        triggered by Cloud Monitoring. You can also specify a minimum
+        and maximum number of cloud servers, the amount of resources
+        that you want to increase or decrease, and the thresholds in
+        Cloud Monitoring that trigger the scaling activities. </para>
   <para>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
-      Then you define cloud monitoring alerts to watch the group's activity, 
+      Then you define policies, either schedule-based or monitoring-based. For monitoring-based policies,
+      you define cloud monitoring alerts to watch the group's activity,
       and you define scaling rules to change the scaling group's configuration in response to alerts. 
+      For schedule-based policies, you simply set a schedule.
       Because you can change a
       scaling group's configuration in response to changing
       workloads, you can begin with a minimal cloud
       configuration and grow only when the cost of that growth is
       justified. </para>
-    <para> &PROD; is a web service that automatically scales
-      resources in response to an increase or decrease in overall
-      workload based on user-defined thresholds. You can set up a
-      schedule for launching &PROD; or define an event that is
-      triggered by Cloud Monitoring. You can also specify a minimum
-      and maximum number of cloud servers, the amount of resources
-      that you want to increase or decrease, and the thresholds in
-      Cloud Monitoring that trigger the scaling activities. &PROD; 
+    <para> &PROD;
       requires the following services to work together: <itemizedlist>
         <listitem>
-          <para> Cloud Monitoring </para>
+          <para> Cloud Monitoring (for monitoring-based policies) </para>
         </listitem>
         <listitem>
           <para> Cloud Servers </para>
