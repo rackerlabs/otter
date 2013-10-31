@@ -2,19 +2,27 @@
 Test to verify the pagination of a list of webhooks.
 """
 
-from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 
 
-class PaginateWebhooks(ScalingGroupWebhookFixture):
+class PaginateWebhooks(AutoscaleFixture):
     """
     Verify pagination for list webhooks
     """
 
     def setUp(self):
         """
-        Create three webhooks to use for testing
+        Create a group, a scaling policy, and three webhooks for testing. A new group is created
+        for each test case, and all the groups are deleted upon test completion, which will also
+        delete the associated policy and webhooks.
         """
         super(PaginateWebhooks, self).setUp()
+        group_response = self.autoscale_behaviors.create_scaling_group_min()
+        self.group = group_response.entity
+        # Add the gruop to the resources pool for automatic deletion
+        self.resources.add(self.group.id, self.autoscale_client.delete_scaling_group)
+        policy_response = self.autoscale_behaviors.create_policy_given(self.group.id, sp_change=1)
+        
         self._create_multiple_webhooks(3)
         self.total_webhooks = len((self.autoscale_client.list_webhooks().entity).webhooks)
         print self.total_webhooks
