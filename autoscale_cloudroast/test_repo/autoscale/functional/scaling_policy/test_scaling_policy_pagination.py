@@ -20,15 +20,9 @@ class PolicyPaginationTest(AutoscaleFixture):
         super(PolicyPaginationTest, self).setUp()
         create_resp = self.autoscale_behaviors.create_scaling_group_min()
         self.group = create_resp.entity
+        self.resources.add(self.group.id, self.autoscale_client.delete_scaling_group)
         self._create_multiple_scaling_policies(3)
         self.total_policies = self._get_total_num_policies()
-
-    def tearDown(self):
-        """
-        Delete resources created for the tests
-        """
-        super(PolicyPaginationTest, self).tearDown()
-        self.autoscale_client.delete_scaling_group(self.group.id)
 
     def test_list_policies_when_list_greater_than_default_limit(self):
         """
