@@ -103,8 +103,11 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         max_groups = self.max_groups - current_group_count
         for _ in (range(max_groups)):
             create_group_reponse = self.autoscale_behaviors.create_scaling_group_min()
+            self.assertEquals(create_group_reponse.status_code, 201, msg='{0}'
+                              'groups exist already'.format(self.get_total_num_groups()))
             self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
-        self.assertEquals(self.get_total_num_groups(), self.max_groups)
+        self.assertEquals(self.get_total_num_groups(), self.max_groups, msg='{0} groups'
+                          'exist'.format(self.get_total_num_groups()))
         create_group_beyond_max = self.autoscale_behaviors.create_scaling_group_min()
         self.assertEquals(create_group_beyond_max.status_code, 422,
                           msg='{0} groups exist on the tenant'.format(self.get_total_num_groups()))
