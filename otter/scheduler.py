@@ -18,13 +18,6 @@ from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.util.deferredutils import ignore_and_log
 
 
-def next_cron_occurrence(cron):
-    """
-    Return next occurence of given cron entry
-    """
-    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
-
-
 class SchedulerService(TimerService):
     """
     Service to trigger scheduled events
@@ -39,7 +32,7 @@ class SchedulerService(TimerService):
         :param int interval: time between each iteration
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
-        TimerService.__init__(self, interval, self.check_for_events, batchsize)
+        TimerService.__init__(self, interval, self.check_events, batchsize)
         self.store = store
         self.clock = clock
         self.kz_client = kz_client
@@ -51,14 +44,14 @@ class SchedulerService(TimerService):
         """
         Start this service. This will start buckets partitioning
         """
-        super(SchedulerService, self).startService()
         self.kz_partition = self.kz_client.SetPartition(self.zk_partition_path)
+        TimerService.startService(self)
 
     def stopService(self):
         """
         Stop this service. This will release buckets partitions it holds
         """
-        super(SchedulerService, self).stopService()
+        TimerService.stopService(self)
         return self.kz_partition.finish()
 
     def check_events(self, batchsize):
@@ -94,10 +87,9 @@ def check_events_in_bucket(log, store, bucket, now, batchsize):
 
     log = log.bind(bucket=bucket)
 
-    def check_for_more(events):
-        if events and len(events) == batchsize:
+    def check_for_more(num_events):
+        if num_events == batchsize:
             return _do_check()
-        return None
 
     def _do_check():
         d = store.fetch_and_delete(bucket, now, batchsize)
@@ -113,10 +105,10 @@ def process_events(events, store, log):
     """
     Process events
 
-    :return: a deferred that fires with list of events processed
+    :return: a deferred that fires with number of events processed
     """
     if not events:
-        return events
+        return 0
 
     log.msg('Processing {num_events} events', num_events=len(events))
 
@@ -127,7 +119,15 @@ def process_events(events, store, log):
         for event in events
     ]
     d = defer.gatherResults(deferreds, consumeErrors=True)
-    return d.addCallback(lambda _: add_cron_events(store, log, events, deleted_policy_ids))
+    d.addCallback(lambda _: add_cron_events(store, log, events, deleted_policy_ids))
+    return d.addCallback(lambda _: len(events))
+
+
+def next_cron_occurrence(cron):
+    """
+    Return next occurence of given cron entry
+    """
+    return croniter(cron, start_time=datetime.utcnow()).get_next(ret_type=datetime)
 
 
 def add_cron_events(store, log, events, deleted_policy_ids):
@@ -135,17 +135,16 @@ def add_cron_events(store, log, events, deleted_policy_ids):
     Update events with cron entry with next trigger time
     """
     if not events:
-        return events
+        return
 
-    new_cron_event = []
+    new_cron_events = []
     for event in events:
         if event['cron'] and event['policyId'] not in deleted_policy_ids:
             event['trigger'] = next_cron_occurrence(event['cron'])
-            new_cron_event.append(event)
+            new_cron_events.append(event)
 
     log.msg('Adding {new_cron_events} cron events', new_cron_events=len(new_cron_events))
-    d = store.add_cron_events(new_cron_events)
-    return d.addCallback(lambda _: events)
+    return store.add_cron_events(new_cron_events)
 
 
 def execute_event(store, log, event, deleted_policy_ids):
@@ -167,12 +166,12 @@ def execute_event(store, log, event, deleted_policy_ids):
                                    log, generate_transaction_id(),
                                    policy_id=policy_id))
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
-                 log, 'Scheduler cannot execute policy')
+                 log, 'Scheduler cannot execute policy {}'.format(policy_id))
 
     def collect_deleted_policy(failure):
         failure.trap(NoSuchScalingGroupError, NoSuchPolicyError)
         deleted_policy_ids.add(policy_id)
 
     d.addErrback(collect_deleted_policy)
-    d.addErrback(log.err, 'Scheduler failed to execute policy')
+    d.addErrback(log.err, 'Scheduler failed to execute policy {}'.format(policy_id))
     return d

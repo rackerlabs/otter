@@ -1073,7 +1073,7 @@ class CassScalingGroupCollection:
         return CassScalingGroup(log, tenant_id, scaling_group_id,
                                 self.connection, self.bucketlist)
 
-    def fetch_and_delete(self, log, bucket, now, size=100):
+    def fetch_and_delete(self, bucket, now, size=100):
         """
         Fetch events to be occurring now or before in a bucket
         and delete them after fetching
