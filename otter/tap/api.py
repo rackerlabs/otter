@@ -15,13 +15,15 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
+from kazoo.txkazoo import TxKazooClient
+
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
 from otter.util.config import set_config_data, config_value
 from otter.models.cass import CassAdmin, CassScalingGroupCollection
 from otter.models.mock import MockAdmin, MockScalingGroupCollection
-from otter.scheduler import SchedulerService, RoundRobinItems
+from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
@@ -154,6 +156,9 @@ def makeService(config):
 
 
 def setup_scheduler(parent, store, kz_client):
+    """
+    Setup scheduler service
+    """
     # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
         return
@@ -164,4 +169,3 @@ def setup_scheduler(parent, store, kz_client):
                                          int(config_value('scheduler.interval')),
                                          store, kz_client, partition_path, bucketlist)
     scheduler_service.setServiceParent(parent)
-

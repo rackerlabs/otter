@@ -8,9 +8,6 @@ from twisted.internet.task import Clock
 
 import mock
 
-from silverberg.lock import BusyLockError
-from silverberg.cassandra.ttypes import TimedOutException
-
 from otter.scheduler import (
     SchedulerService, check_events_in_bucket, process_events, add_cron_events, execute_event)
 from otter.test.utils import iMock, patch, CheckFailure, mock_log
@@ -18,8 +15,6 @@ from otter.models.interface import (
     IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection)
 from otter.models.interface import NoSuchPolicyError, NoSuchScalingGroupError
 from otter.controller import CannotExecutePolicyError
-
-from datetime import datetime
 
 
 class SchedulerTests(TestCase):
