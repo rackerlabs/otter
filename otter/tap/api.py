@@ -148,6 +148,7 @@ def makeService(config):
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'))
         d = kz_client.start()
         d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
+        d.addErrback(log.err, 'Could not start KazooClient')
 
     return s
 
@@ -156,11 +157,11 @@ def setup_scheduler(parent, store, kz_client):
     # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
         return
-    bucketlist = itertools.cycle(range(1, int(config_value('scheduler.buckets')) + 1))
+    bucketlist = range(1, int(config_value('scheduler.buckets')) + 1)
     store.set_scheduler_bucket_list(bucketlist)
     partition_path = config_value('scheduler.partition_path') or '/scheduler_partition'
     scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                          int(config_value('scheduler.interval')),
-                                         store, kz_client, partition_path)
+                                         store, kz_client, partition_path, bucketlist)
     scheduler_service.setServiceParent(parent)
 

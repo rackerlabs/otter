@@ -24,18 +24,22 @@ class SchedulerService(TimerService):
     """
 
     def __init__(self, batchsize, interval, store, kz_client,
-                 zk_partition_path, clock=None):
+                 zk_partition_path, buckets, clock=None):
         """
-        Initializes the scheduler service with batch size and interval
+        Initialize the scheduler service
 
         :param int batchsize: number of events to fetch on each iteration
         :param int interval: time between each iteration
+        :param kz_client: `TxKazooClient` instance
+        :param buckets: an iterable containing the buckets which contains scheduled events
+        :param zk_partition_path: Partiton path used by kz_client to partition the buckets
         :param clock: An instance of IReactorTime provider that defaults to reactor if not provided
         """
         TimerService.__init__(self, interval, self.check_events, batchsize)
         self.store = store
         self.clock = clock
         self.kz_client = kz_client
+        self.buckets = buckets
         self.zk_partition_path = zk_partition_path
         self.kz_partition = None
         self.log = otter_log.bind(system='otter.scheduler')
@@ -44,7 +48,8 @@ class SchedulerService(TimerService):
         """
         Start this service. This will start buckets partitioning
         """
-        self.kz_partition = self.kz_client.SetPartition(self.zk_partition_path)
+        self.kz_partition = self.kz_client.SetPartition(
+            self.zk_partition_path, set=set(self.buckets))
         TimerService.startService(self)
 
     def stopService(self):
@@ -66,12 +71,23 @@ class SchedulerService(TimerService):
             return self.kz_partition.release_set()
         if self.kz_partition.failed:
             self.log.msg('Partition failed. Starting new')
-            self.kz_partition = self.kz_client.SetPartition(self.zk_partition_path)
+            self.kz_partition = self.kz_client.SetPartition(
+                self.zk_partition_path, set=set(self.buckets))
+            return
+        if not self.kz_partition.allocated:
+            self.log.err('Unknown state {}. This cannot happen. Starting new'.format(
+                self.kz_partition.state))
+            self.kz_partition.finish()
+            self.kz_partition = self.kz_client.SetPartition(
+                self.zk_partition_path, set=set(self.buckets))
             return
 
         buckets = list(self.kz_partition)
         utcnow = datetime.utcnow()
         log = self.log.bind(scheduler_run_id=generate_transaction_id(), utcnow=utcnow)
+        # TODO: This log might feel like spam since it'll occur on every tick. But
+        # it'll be useful to debug partitioning problems (at least in initial deployment)
+        log.msg('Got buckets {buckets}', buckets=buckets)
 
         return defer.gatherResults(
             [check_events_in_bucket(

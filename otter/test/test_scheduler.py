@@ -29,10 +29,7 @@ class SchedulerTests(TestCase):
 
     def setUp(self):
         """
-        mock all the dependencies of SchedulingService that includes cass store,
-        store's fetch and delete events methods, scaling group on which controller
-        will execute scaling policy. Hence, controller.maybe_execute_scaling_policy.
-        twisted.internet.task.Clock is used to simulate time
+        mock common dependencies of methods in scheduler.py
         """
         self.mock_store = iMock(IScalingGroupCollection, IScalingScheduleCollection)
         self.mock_generate_transaction_id = patch(
@@ -47,7 +44,9 @@ class SchedulerServiceTests(SchedulerTests):
 
     def setUp(self):
         """
-        Mock
+        mock all the dependencies of SchedulingService that includes logging,
+        store's fetch_and_delete, TxKazooClient stuff, TimerService, check_events_in_bucket
+        and twisted.internet.task.Clock is used to simulate time
         """
         super(SchedulerServiceTests, self).setUp()
 
@@ -56,13 +55,16 @@ class SchedulerServiceTests(SchedulerTests):
         otter_log.bind.return_value = self.log
 
         self.kz_client = mock.Mock(spec=['SetPartition'])
-        self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False)
+        self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False,
+                                           allocated=False)
         self.kz_client.SetPartition.return_value = self.kz_partition
         self.zk_partition_path = '/part_path'
+        self.buckets = range(1, 10)
 
         self.clock = Clock()
         self.scheduler_service = SchedulerService(
-            100, 1, self.mock_store, self.kz_client, self.zk_partition_path, self.clock)
+            100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
+            self.buckets, self.clock)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
@@ -73,7 +75,8 @@ class SchedulerServiceTests(SchedulerTests):
         startService() calls super's startService() and creates SetPartition object
         """
         self.scheduler_service.startService()
-        self.kz_client.SetPartition.assert_called_once_with(self.zk_partition_path)
+        self.kz_client.SetPartition.assert_called_once_with(
+            self.zk_partition_path, set=set(self.buckets))
         self.assertEqual(self.scheduler_service.kz_partition, self.kz_partition)
         self.timer_service.startService.assert_called_once_with(self.scheduler_service)
 
@@ -134,7 +137,34 @@ class SchedulerServiceTests(SchedulerTests):
 
         # Called once when starting and now again when partition failed
         self.assertEqual(self.kz_client.SetPartition.call_args_list,
-                         [mock.call(self.zk_partition_path)] * 2)
+                         [mock.call(self.zk_partition_path, set=set(self.buckets))] * 2)
+        self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
+
+        # Ensure others are not called
+        self.assertFalse(self.kz_partition.__iter__.called)
+        self.assertFalse(self.check_events_in_bucket.called)
+
+    def test_check_events_bad_state(self):
+        """
+        `self.kz_partition.state` is none of the exepected values. `check_events`
+        logs it as err and starts a new partition
+        """
+        self.kz_partition.state = 'bad'
+        self.scheduler_service.startService()
+
+        # after starting change SetPartition return value to check if
+        # new value is set in self.scheduler_service.kz_partition
+        new_kz_partition = mock.Mock()
+        self.kz_client.SetPartition.return_value = new_kz_partition
+
+        self.scheduler_service.check_events(100)
+
+        self.log.err.assert_called_with('Unknown state bad. This cannot happen. Starting new')
+        self.kz_partition.finish.assert_called_once_with()
+
+        # Called once when starting and now again when got bad state
+        self.assertEqual(self.kz_client.SetPartition.call_args_list,
+                         [mock.call(self.zk_partition_path, set=set(self.buckets))] * 2)
         self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
 
         # Ensure others are not called
@@ -146,6 +176,7 @@ class SchedulerServiceTests(SchedulerTests):
         """
         `check_events` checks events in each bucket when they are partitoned.
         """
+        self.kz_partition.allocated = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.scheduler_service.log = mock.Mock()
@@ -161,6 +192,7 @@ class SchedulerServiceTests(SchedulerTests):
         self.scheduler_service.log.bind.assert_called_once_with(
             scheduler_run_id='transaction-id', utcnow='utcnow')
         log = self.scheduler_service.log.bind.return_value
+        log.msg.assert_called_once_with('Got buckets {buckets}', buckets=[2, 3])
         self.assertEqual(self.check_events_in_bucket.mock_calls,
                          [mock.call(log, self.mock_store, 2, 'utcnow', 100),
                           mock.call(log, self.mock_store, 3, 'utcnow', 100)])
@@ -173,7 +205,7 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def setUp(self):
         """
-        Mock parameters
+        Mock store.fetch_and_delete and `process_events`
         """
         super(CheckEventsInBucketTests, self).setUp()
 
@@ -319,7 +351,7 @@ class ProcessEventsTests(SchedulerTests):
 
     def setUp(self):
         """
-        Mock args
+        Mock `execute_event` and `add_cron_events`
         """
         super(ProcessEventsTests, self).setUp()
         self.execute_event = patch(self, 'otter.scheduler.execute_event',
@@ -360,7 +392,7 @@ class AddCronEventsTests(SchedulerTests):
 
     def setUp(self):
         """
-        Mock args
+        Mock store.add_cron_events and next_cron_occurrence
         """
         super(AddCronEventsTests, self).setUp()
         self.mock_store.add_cron_events.return_value = defer.succeed(None)
@@ -404,7 +436,7 @@ class ExecuteEventTests(SchedulerTests):
 
     def setUp(self):
         """
-        Mock args
+        Mock execution of scaling policy
         """
         super(ExecuteEventTests, self).setUp()
         self.mock_group = iMock(IScalingGroup)
