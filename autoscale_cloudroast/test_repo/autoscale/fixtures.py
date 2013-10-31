@@ -399,6 +399,42 @@ class AutoscaleFixture(BaseTestFixture):
                 print 'Tried deleting node for 2 mins but lb {0} remained in PENDING_UPDATE'
                 ' state'.format(load_balancer)
 
+    def get_total_num_groups(self):
+        """
+        Returns the total number of groups on an account.
+        """
+        list_groups = self.autoscale_client.list_scaling_groups().entity
+        group_num = len(list_groups.groups)
+        while (hasattr(list_groups.groups_links, 'next')):
+            list_groups = self.autoscale_client.list_scaling_groups(
+                url=list_groups.groups_links.next).entity
+            group_num += len(list_groups.groups)
+        return group_num
+
+    def get_total_num_policies(self, group_id):
+        """
+        Returns the total number of policies on the given scaling group.
+        """
+        list_policies = self.autoscale_client.list_policies(group_id).entity
+        policies_num = len(list_policies.policies)
+        while (hasattr(list_policies.policies_links, 'next')):
+            list_policies = self.autoscale_client.list_scaling_policies(
+                url=list_policies.policies_links.next).entity
+            policies_num += len(list_policies.policies)
+        return policies_num
+
+    def get_total_num_webhooks(self, group_id, policy_id):
+        """
+        Returns the total number of webhooks on a given policy.
+        """
+        list_webhooks = self.autoscale_client.list_webhooks().entity
+        webhooks_num = len(list_webhooks.webhooks)
+        while (hasattr(list_webhooks.webhooks_links, 'next')):
+            list_webhooks = self.autoscale_client.list_webhooks(
+                url=list_webhooks.webhooks_links.next).entity
+            webhooks_num += len(list_webhooks.webhooks)
+        return webhooks_num
+
     @classmethod
     def tearDownClass(cls):
         """
