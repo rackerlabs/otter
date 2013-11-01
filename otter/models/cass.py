@@ -954,7 +954,7 @@ class CassScalingGroupCollection:
         max_groups = config_value('limits.absolute.maxGroups')
         d = self.connection.execute(_cql_count_for_tenant.format(
             cf="scaling_group"), {'tenantId': tenant_id},
-            get_consistency_level('create', 'group'))
+            get_consistency_level('list', 'group'))
 
         def check_groups(cur_groups, max_groups):
             if cur_groups[0]['count'] >= max_groups:
