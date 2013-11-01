@@ -948,6 +948,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         scaling_group_id = generate_key_str('scalinggroup')
+        log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
 
         # obey limits
         max_groups = config_value('limits.absolute.maxGroups')
@@ -957,13 +958,12 @@ class CassScalingGroupCollection:
 
         def check_groups(cur_groups, max_groups):
             if cur_groups[0]['count'] >= max_groups:
-                msg = 'client has reached maxGroups limit'
-                log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg(msg)
+                log.msg('client has reached maxGroups limit')
                 raise OverLimitError(tenant_id, max_groups)
 
         d.addCallback(check_groups, max_groups)
 
-        log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
+        log.msg("Creating scaling group")
 
         queries = [_cql_create_group.format(cf=self.group_table)]
 
