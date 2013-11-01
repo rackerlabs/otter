@@ -13,7 +13,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     System tests to verify lbaas integration with autoscale
     """
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_add_multiple_lbaas_to_group(self):
         """
         Adding multiple load balancers within the launch config when creating the group,
@@ -29,7 +29,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2,
                                                         self.load_balancer_3)
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_update_launch_config_to_include_multiple_lbaas(self):
         """
         Updating the launch config to add multiple load balancer to a group that had
@@ -55,7 +55,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2,
                                                         self.load_balancer_3)
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_update_launch_config_to_include_lbaas(self):
         """
         Update the launch config to add a load balancer to a group that did not
@@ -81,7 +81,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                                                         self.load_balancer_2,
                                                         self.load_balancer_3)
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_update_existing_lbaas_in_launch_config(self):
         """
         Create a scaling group with a given load balancer and verify the servers on the scaling group
@@ -118,7 +118,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
             self.load_balancer_1)]
         self.assertTrue(set(scaled_down_server_ip) not in set(lb_node_list))
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_delete_group_when_autoscale_server_is_the_last_node_on_lb(self):
         """
         Create a scaling group with load balancer. After the servers on the group are added to
@@ -140,7 +140,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         lb_node_after_del = self._get_node_list_from_lb(load_balancer)
         self.assertEquals(len(lb_node_after_del), 0)
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_existing_nodes_on_lb_unaffected_by_scaling(self):
         """
         Get load balancer node id list before anyscale operation, create a scaling group
@@ -166,7 +166,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
                                                                 load_balancer)
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_remove_existing_lbaas_in_launch_config(self):
         """
         Remove lbaas id in the launch config and verify a scale up after the update,
@@ -189,7 +189,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_force_delete_group_with_load_balancer(self):
         """
         Force delete a scaling group with active servers and load balancer, deletes the servers and the
@@ -209,7 +209,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         node_list_on_lb = [node.address for node in self._get_node_list_from_lb(self.load_balancer_1)]
         self.assertTrue(all([server_ip not in node_list_on_lb for server_ip in server_ip_list]))
 
-    @tags(speed='slow')
+    @tags(speed='slow', type='lbaas')
     def test_negative_create_group_with_invalid_load_balancer(self):
         """
         Create group with a random number/lb from a differnt region as the load balancer id
