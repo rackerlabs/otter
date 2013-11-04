@@ -453,10 +453,10 @@
         <wadl:doc title="List Scaling Groups" xml:lang="EN"
             xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
-                This operation lists the autoscaling groups that are available for the specified tenant.
+                This operation lists the scaling groups that are available for the specified tenant.
             </para>
             <para>
-                This operation returns a list of autoscaling groups that have been created for the tenant specified by
+                This operation returns a list of scaling groups that have been created for the tenant specified by
                 <code>tenantID</code>.</para>
         </wadl:doc>
         <response status="200">
@@ -472,10 +472,10 @@
     <method id="getGroupManifest" name="GET" rax:roles="observer autoscale:observer">
         <wadl:doc title="List All Group Details" xmlns="http://docbook.org/ns/docbook">
             <para role="shortdesc">
-                This operation returns details about the configuration for a specified autoscaling group.
+                This operation returns details about the configuration for a specified scaling group.
             </para>
             <para>
-                This operation returns details including the launch configuration and the scaling policies  for the specified autoscaling group configuration. These 
+                This operation returns details including the launch configuration and the scaling policies for the specified autoscaling group configuration. These 
                 details are returned in the response body in JSON format. 
             </para>
         </wadl:doc>
@@ -492,10 +492,10 @@
     <method id="deleteGroup" name="DELETE">
         <doc title="Delete Group">
             <db:para role="shortdesc">
-                This operation deletes an  autoscaling group.
+                This operation deletes a scaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation deletes the specified autoscaling group if the group is empty. 
+                This operation deletes the specified scaling group if the group is empty. 
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
                 the group contains pending or active entities, deletion fails and a 409 error message is returned. Pass force=true to force
                 delete the group, ignoring pending/active entities.
@@ -511,7 +511,7 @@
                This operation returns the state of an autoscaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation retrieves the current state of the specified autoscaling group.
+                This operation retrieves the current state of the specified scaling group.
                 It describes the state of the group in terms of its 
                 current set of active entities, the number of pending entities, and
                 the desired number of entities. The description is returned in the response body
@@ -531,10 +531,10 @@
     <method id="getGroupConfig" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group Configuration">
             <db:para role="shortdesc">
-               This operation lists the configuration for an autoscaling group.
+               This operation lists the configuration for a scaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation lists the configuration for a specified autoscaling group. 
+                This operation lists the configuration for a specified scaling group. 
                 The configuration describes the
                 minimum number of entities in the group, 
                 the maximum number of entities in the group, 
@@ -555,10 +555,10 @@
     <method id="putGroupConfig" name="PUT">
         <doc title="Replace Group Configuration">
             <db:para role="shortdesc">
-                This operation updates the configuration for the autoscaling group.
+                This operation updates the configuration for the scaling group.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-            This operation changes the configuration of an existing autoscaling group.
+            This operation changes the configuration of an existing scaling group.
             To change the configuration, 
             specify the new configuration in the request body in JSON format. 
             Configuration elements include 
@@ -585,7 +585,7 @@
                 This operation lists the launch configuration.
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
-                This operation lists the launch configuration for the specified autoscaling group. 
+                This operation lists the launch configuration for the specified scaling group. 
                 The launch configuration describes the details of how to create a server, 
                 from what image to create a server, 
                 which load

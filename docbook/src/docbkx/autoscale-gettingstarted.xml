@@ -1295,10 +1295,13 @@ DELETE /{tenantId}/groups/{groupId}
                     <warning>
                         <para>Using Force Delete will remove all
                             servers that are associated with the
-                            scaling group immediately. Users are
+                            scaling group immediately. Servers are
+                            removed in reverse order of creation.
+                            However, servers that are in the process
+                            of building are not removed. Users are
                             discouraged from using the Force Delete
                             option and to manually delete servers
-                            instead.</para>
+                            instead. </para>
                     </warning>
                 </para>
                 <para>To use the Force Delete option, submit a
