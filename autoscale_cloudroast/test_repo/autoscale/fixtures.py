@@ -414,7 +414,7 @@ class AutoscaleFixture(BaseTestFixture):
     def get_total_num_policies(self, group_id):
         """
         Returns the total number of policies on the given scaling group.
-        Note: This will work only after the policy pagination branch is merged
+        Note: This will work only after the test policy pagination branch is merged
         """
         list_policies = self.autoscale_client.list_policies(group_id).entity
         policies_num = len(list_policies.policies)
@@ -427,7 +427,7 @@ class AutoscaleFixture(BaseTestFixture):
     def get_total_num_webhooks(self, group_id, policy_id):
         """
         Returns the total number of webhooks on a given policy.
-        Note: This will work only after the webhook pagination branch is merged
+        Note: This will work only after the test webhook pagination branch is merged
         """
         list_webhooks = self.autoscale_client.list_webhooks().entity
         webhooks_num = len(list_webhooks.webhooks)

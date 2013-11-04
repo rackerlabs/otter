@@ -14,6 +14,16 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
     System tests to verify multiple groups on an account
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize autoscale configs, behaviors and client
+        """
+        super(ScalingGroupMultiplesTest, cls).setUpClass()
+        cls.limits_response = cls.autoscale_client.view_limits().entity
+        cls.max_policies = cls.limits_response.absolute.maxPoliciesPerGroup
+        cls.max_webhooks = cls.limits_response.absolute.maxWebhooksPerPolicy
+
     def setUp(self):
         """
         Create 3 scaling groups
@@ -100,11 +110,11 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         Trying to create groups beyond max results in 422.
         """
         current_group_count = self.get_total_num_groups()
-        max_groups = self.max_groups - current_group_count
-        for _ in (range(max_groups)):
+        max_groups = self.limits_response.absolute.maxGroups - current_group_count
+        for _ in range(max_groups):
             create_group_reponse = self.autoscale_behaviors.create_scaling_group_min()
-            self.assertEquals(create_group_reponse.status_code, 201, msg='{0}'
-                              'groups exist already'.format(self.get_total_num_groups()))
+            self.assertEquals(create_group_reponse.status_code, 201, msg='Create group'
+                              'returned response {0}'.format(create_group_reponse.status_code))
             self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
         self.assertEquals(self.get_total_num_groups(), self.max_groups, msg='{0} groups'
                           'exist'.format(self.get_total_num_groups()))
@@ -119,7 +129,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         Verify maximum scaling policies are allowed on a scaling group.
         Trying to create policies beyond max results in 422
         """
-        for policy in (range(self.max_policies)):
+        for policy in range(self.max_policies):
             self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
         self.assertEquals(self.get_total_num_policies(self.first_scaling_group.id),
                           self.max_policies)
@@ -137,7 +147,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         Verify maximum scaling policies are allowed on a scaling group.
         Trying to create policies beyond max results in 422.
         """
-        for _ in (range(self.max_policies)):
+        for _ in range(self.max_policies):
             self.autoscale_behaviors.create_schedule_policy_given(
                 self.first_scaling_group.id,
                 sp_change_percent=100)
