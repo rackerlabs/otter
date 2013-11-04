@@ -2141,9 +2141,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                        '"groupTouched", "policyTouched", paused, created_at FROM '
                        'scaling_group WHERE "tenantId" = :tenantId LIMIT :limit;')
         r = self.validate_list_states_return_value(self.mock_log, '123')
-        self.connection.execute.assert_called_with(expectedCql,
-                                                   expectedData,
-                                                   ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_once_with(expectedCql,
+                                                        expectedData,
+                                                        ConsistencyLevel.TWO)
         self.assertEqual(r, [
             GroupState('123', 'group0', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False),
             GroupState('123', 'group1', 'test', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
