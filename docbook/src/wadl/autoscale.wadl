@@ -19,7 +19,11 @@
     xmlns:osapi="http://docs.openstack.org/compute/api/v1.1"
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
-    xmlns:rax="http://docs.rackspace.com/api".api.rackspacecloud.com/">
+    xmlns:rax="http://docs.rackspace.com/api"    xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
+    <!-- ======================================================================================= -->
+    <!-- Resources -->
+    <!-- ======================================================================================= -->
+    <resources base="https://{region}.autoscale.api.rackspacecloud.com/">
         <resource id="version" path="v1.0/" rax:roles="admin autoscale:admin autoscale:service-admin">
 
             <!-- GROUPS resource -->
@@ -34,11 +38,7 @@
 
                     <method href="#getGroups"/>
                     <method href="#createGroup"/>
-    xmlns:xsdxt="http://docs.rackspacecloud.com/xsd-ext/v1.0">
-    <!-- ======================================================================================= -->
-    <!-- Resources -->
-    <!-- ======================================================================================= -->
-    <resources base="https://{region}.autoscale
+
 
                     <resource id="group" path="/{groupId}">
 
