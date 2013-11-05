@@ -60,7 +60,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/co
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-21</pubdate>
+        <pubdate>2013-11-01</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -1002,7 +1002,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         Rackspace API. The following table outlines the mapping
         between flavor Id and the available flavors in the Control
         Panel.</para>
-              <table frame="void">
+            <table rules="all">
                 <caption>Flavors</caption>
                 <col width="16%"/>
                 <col width="27%"/>
