@@ -286,7 +286,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebySchedule.png"
+                                fileref="images/ScalebySchedule.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -352,7 +352,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <para>The following example shows how to send a
                     webhook with cURL:</para>
                 <para>
-                    <programlisting>curl -v  <link xlink:href="http://example.com/webhook">http://example.com/webhook</link> -X POST -d 'payload=payload'</programlisting>
+                    <programlisting>curl -v  http://example.com/webhook -X POST -d 'payload=payload'</programlisting>
                 </para>
                 <para>For more information about how webhooks are used
                     in the Rackspace API, see </para>
@@ -701,7 +701,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebyPercentage.png"
+                                fileref="images/ScalebyPercentage.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -726,7 +726,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <informalfigure>
                     <mediaobject>
                         <imageobject>
-                            <imagedata fileref="Images/Minandmax.png"
+                            <imagedata fileref="images/Minandmax.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -761,7 +761,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/DeletePolicy.png"
+                                fileref="images/DeletePolicy.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -956,7 +956,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 </itemizedlist>
             </para>
             <para> With the Cloud Servers API, you can use a <link
-                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
+                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/images-d1e4427.html"
                     >List Images</link> request to retrieve a list of
                 options available for configuring your server. <example>
                     <title>Requesting a List of Cloud Server
