@@ -858,12 +858,6 @@ class CassScalingGroup(object):
                 _cql_delete_all_in_group.format(cf=table) for table in
                 (self.group_table, self.policies_table, self.webhooks_table)]
 
-            if len(policies) > 0:
-                events_query, events_params = _delete_many_query_and_params(
-                    self.event_table, '"policyId"', [p['id'] for p in policies])
-                queries.append(events_query)
-                params.update(events_params)
-
             b = Batch(queries, params,
                       consistency=get_consistency_level('delete', 'group'))
 

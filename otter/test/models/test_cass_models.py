@@ -1483,15 +1483,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         mock_naive.assert_called_once_with()
 
         expected_data = {'tenantId': self.tenant_id,
-                         'groupId': self.group_id,
-                         'column_value0': 'policyA',
-                         'column_value1': 'policyB'}
+                         'groupId': self.group_id}
         expected_cql = (
             'BEGIN BATCH '
             'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM scaling_policies WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
             'DELETE FROM policy_webhooks WHERE "tenantId" = :tenantId AND "groupId" = :groupId '
-            'DELETE FROM scaling_schedule WHERE "policyId" IN (:column_value0,:column_value1); '
             'APPLY BATCH;')
 
         self.connection.execute.assert_called_once_with(
