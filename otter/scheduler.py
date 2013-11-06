@@ -48,8 +48,8 @@ class SchedulerService(TimerService):
         """
         Start this service. This will start buckets partitioning
         """
-        self.kz_partition = self.kz_client.SetPartition(
-            self.zk_partition_path, set=set(self.buckets))
+        self.kz_partition = self.kz_client.SetPartitioner(
+            self.zk_partition_path, set=set(self.buckets), time_boundary=15)
         TimerService.startService(self)
 
     def stopService(self):
@@ -71,15 +71,15 @@ class SchedulerService(TimerService):
             return self.kz_partition.release_set()
         if self.kz_partition.failed:
             self.log.msg('Partition failed. Starting new')
-            self.kz_partition = self.kz_client.SetPartition(
-                self.zk_partition_path, set=set(self.buckets))
+            self.kz_partition = self.kz_client.SetPartitioner(
+                self.zk_partition_path, set=set(self.buckets), time_boundary=15)
             return
         if not self.kz_partition.allocated:
             self.log.err('Unknown state {}. This cannot happen. Starting new'.format(
                 self.kz_partition.state))
             self.kz_partition.finish()
-            self.kz_partition = self.kz_client.SetPartition(
-                self.zk_partition_path, set=set(self.buckets))
+            self.kz_partition = self.kz_client.SetPartitioner(
+                self.zk_partition_path, set=set(self.buckets), time_boundary=15)
             return
 
         buckets = list(self.kz_partition)
