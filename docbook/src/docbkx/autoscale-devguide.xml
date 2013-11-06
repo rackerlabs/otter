@@ -998,29 +998,24 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         server flavor. A flavor is an available hardware configuration
         for a server. Each flavor has a unique combination of disk
         space and memory capacity. The server flavor that is specified
-        in the Control Panel, maps to a specific flavor id in the
+        in the Control Panel maps to a specific flavor id in the
         Rackspace API. The following table outlines the mapping
         between flavor Id and the available flavors in the Control
-        Panel.</para>
+        Panel. </para>
             <table rules="all">
-                <caption>Flavors</caption>
-                <col width="16%"/>
-                <col width="27%"/>
-                <col width="8%"/>
-                <col width="6%"/>
-                <col width="9%"/>
-                <col width="6%"/>
-                <col width="8%"/>
-                <col width="12%"/>
-                <col width="9%"/>
+                <caption>Rackspace Cloud Server Flavors</caption>
+              <col width="30%"/>
+              <col width="30%"/>
+              <col width="20%"/>
+              <col width="10%"/>
+              <col width="10%"/>
+        
                 <thead>
                   <tr>
                     <td align="center">Flavor ID</td>
                     <td align="center">Name</td>
-                    <td align="center">Memory_MB</td>
+                    <td align="center">Memory (MB)</td>
                     <td align="center">Disk</td>
-                    <td align="center">Ephemeral</td>
-                    <td align="center">Swap</td>
                     <td align="center">VCPUs</td>
                   </tr>
                 </thead>
@@ -1030,8 +1025,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>512 MB Standard Instance</td>
                     <td>512</td>
                     <td>20</td>
-                    <td>0</td>
-                    <td>512</td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1039,8 +1032,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>1 GB Standard Instance</td>
                     <td>1024</td>
                     <td>40</td>
-                    <td>0</td>
-                    <td>1024</td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1048,8 +1039,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>2 GB Standard Instance</td>
                     <td>2048</td>
                     <td>80</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1057,8 +1046,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>4 GB Standard Instance</td>
                     <td>4096</td>
                     <td>160</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1066,8 +1053,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>8 GB Standard Instance</td>
                     <td>8192</td>
                     <td>320</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1075,8 +1060,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>15 GB Standard Instance </td>
                     <td>15360</td>
                     <td>620</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>6</td>
                   </tr>
                   <tr>
@@ -1084,8 +1067,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>30 GB Standard Instance </td>
                     <td>30720</td>
                     <td>1200</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1093,8 +1074,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>1 GB Performance</td>
                     <td>1024</td>
                     <td>20</td>
-                    <td>0</td>
-                    <td></td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1102,8 +1081,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>2 GB Performance</td>
                     <td>2048</td>
                     <td>40</td>
-                    <td>20</td>
-                    <td></td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1111,8 +1088,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>4 GB Performance</td>
                     <td>4096</td>
                     <td>40</td>
-                    <td>40</td>
-                    <td></td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1120,8 +1095,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>8 GB Performance</td>
                     <td>8192</td>
                     <td>40</td>
-                    <td>80</td>
-                    <td></td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1129,8 +1102,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>120 GB Performance</td>
                     <td>122880</td>
                     <td>40</td>
-                    <td>1200</td>
-                    <td></td>
                     <td>32</td>
                   </tr>
                   <tr>
@@ -1138,8 +1109,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>15 GB Performance</td>
                     <td>15360</td>
                     <td>40</td>
-                    <td>150</td>
-                    <td></td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1147,8 +1116,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>30 GB Performance</td>
                     <td>30720</td>
                     <td>40</td>
-                    <td>300</td>
-                    <td></td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1156,8 +1123,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>60 GB Performance</td>
                     <td>61440</td>
                     <td>40</td>
-                    <td>600</td>
-                    <td></td>
                     <td>16</td>
                   </tr>
                   <tr>
@@ -1165,8 +1130,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>90 GB Performance</td>
                     <td>92160</td>
                     <td>40</td>
-                    <td>900</td>
-                    <td></td>
                     <td>24</td>
                   </tr>
                 </tbody>
