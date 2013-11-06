@@ -454,7 +454,7 @@ class ExecuteEventTests(SchedulerTests):
         self.log = mock.Mock()
         self.log_args = {'tenant_id': '1234', 'scaling_group_id': 'scal44', 'policy_id': 'pol44'}
         self.event = {'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol44',
-                      'trigger': 'now', 'cron': '*', 'bucket': 1}
+                      'trigger': 'now', 'cron': '*', 'bucket': 1, 'version': 'v2'}
 
     def test_event_executed(self):
         """
@@ -468,7 +468,8 @@ class ExecuteEventTests(SchedulerTests):
         log = self.log.bind.return_value
         log.msg.assert_called_once_with('Scheduler executing policy pol44')
         self.maybe_exec_policy.assert_called_once_with(
-            log, 'transaction-id', self.mock_group, self.mock_state, policy_id=self.event['policyId'])
+            log, 'transaction-id', self.mock_group, self.mock_state,
+            policy_id=self.event['policyId'], version=self.event['version'])
         self.assertTrue(self.mock_group.modify_state.called)
         self.assertEqual(self.new_state, 'newstate')
         self.assertEqual(len(del_pol_ids), 0)

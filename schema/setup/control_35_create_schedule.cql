@@ -24,6 +24,7 @@ CREATE TABLE scaling_schedule (
     "policyId" ascii,
     trigger timestamp,
     cron ascii,
+    version timeuuid,
     PRIMARY KEY(bucket, trigger, "policyId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',

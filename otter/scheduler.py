@@ -180,7 +180,7 @@ def execute_event(store, log, event, deleted_policy_ids):
     group = store.get_scaling_group(log, tenant_id, group_id)
     d = group.modify_state(partial(maybe_execute_scaling_policy,
                                    log, generate_transaction_id(),
-                                   policy_id=policy_id))
+                                   policy_id=policy_id, version=event['version']))
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
                  log, 'Scheduler cannot execute policy {}'.format(policy_id))
 

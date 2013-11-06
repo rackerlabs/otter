@@ -357,12 +357,15 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def get_policy(policy_id):
+    def get_policy(policy_id, version=None):
         """
         Gets the specified policy on this particular scaling group.
 
         :param policy_id: the uuid of the policy
         :type policy_id: ``str``
+
+        :param version: version of policy to check as Type-1 UUID
+        :type version: ``UUID``
 
         :return: a policy, as specified by
             :data:`otter.json_schema.group_schemas.policy`
