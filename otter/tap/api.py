@@ -162,10 +162,10 @@ def setup_scheduler(parent, store, kz_client):
     # Setup scheduler service
     if not config_value('scheduler') or config_value('mock'):
         return
-    bucketlist = range(1, int(config_value('scheduler.buckets')) + 1)
-    store.set_scheduler_bucket_list(bucketlist)
+    buckets = range(1, int(config_value('scheduler.buckets')) + 1)
+    store.set_scheduler_buckets(buckets)
     partition_path = config_value('scheduler.partition_path') or '/scheduler_partition'
     scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
                                          int(config_value('scheduler.interval')),
-                                         store, kz_client, partition_path, bucketlist)
+                                         store, kz_client, partition_path, buckets)
     scheduler_service.setServiceParent(parent)
