@@ -324,7 +324,7 @@ of entities.  This data is returned in the body of the response in JSON format.
 
 # Group Configuration
 
-## Config Resource [/{tenantId}/groups/{groupId}/config]
+## Group Configuration Resource [/{tenantId}/groups/{groupId}/config]
 Autoscale REST endpoints having to do with editing/modifying the configuration
 or launch configuration for a scaling group.
 
@@ -351,7 +351,7 @@ format.
             }
 
 
-### Put Group Configruation [PUT]
+### Update Group Configruation [PUT]
 Edit the configuration for a scaling group, which includes the minimum
 number of entities, the maximum number of entities, global cooldown, and
 other metadata.  This data provided in the request body in JSON format.
@@ -373,7 +373,7 @@ If successful, no response body will be returned.
 
 + Response 204
 
-##Launch Resource [/{tenantId}/groups/{groupId}/launch]
+## Launch Configuration Resource [/{tenantId}/groups/{groupId}/launch]
 Get the launch configuration for a scaling group, which includes the
 details of how to create a server, from what image, which load balancers to
 join it to, and what networks to add it to, and other metadata.
@@ -570,7 +570,7 @@ body of the response in JSON format.
                 "policies_links": []
             }
 
-###  Create one or many new scaling policies. [POST]
+###  Create one or many new scaling policies [POST]
 Scaling policies must include a name, type, adjustment, and cooldown.
 The response header will point to the list policies endpoint.
 An array of scaling policies is provided in the request body in JSON format.
@@ -700,7 +700,7 @@ An array of scaling policies is provided in the request body in JSON format.
 
 ## Policy Resource [/{tenantId}/groups/{groupId}/policies/{policyId}]
 
-### Get Policy Details [GET]
+### Get policy details [GET]
 Get a scaling policy which describes an id, name, type, adjustment, and
 cooldown, and links.  This data is returned in the body of the response in
 JSON format.
@@ -727,7 +727,7 @@ JSON format.
                 }
             }
 
-### Updates a scaling policy. [PUT]
+### Updates scaling policy [PUT]
 Scaling policies must include a name, type,
 adjustment, and cooldown.
 If successful, no response body will be returned.
@@ -744,14 +744,14 @@ If successful, no response body will be returned.
 + Response 204
 
 
-### Delete a scaling policy. [DELETE] 
+### Delete scaling policy [DELETE] 
 If successful, no response body will be returned.
 
 + Response 204
 
 ## Execute Policy [/{tenantId}/groups/{groupId}/policies/{policyId}/execute]
 
-### Execute a scaling policy. [POST]
+### Execute scaling policy [POST]
 If successful, a response body will be returned.
 
 + Response 202
@@ -761,11 +761,11 @@ If successful, a response body will be returned.
 
 # Group Anonymous Capability URLs
 
-## Webhook Resource [/execute/{capabilityVersion}/{capabilityHash}/]
+## Execute Resource [/execute/{capabilityVersion}/{capabilityHash}/]
 Autoscale REST Endpoints having to do with executing policies without
 authentication.
 
-### Execute a webhook [POST]
+### Execute an anonymous capability URL [POST]
 
 + Response 202 (application/json)
     + Body
@@ -780,7 +780,7 @@ Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the webhooks associated with a particular scaling group's particular scaling
 policy.
 
-### Get a list of webhooks and their IDs. [GET]
+### Get webhooks [GET]
 This data is returned in the body of the response in JSON format.
 
 + Response 200
@@ -825,7 +825,7 @@ This data is returned in the body of the response in JSON format.
             }
 
 
-### Create one or more new scaling policy webhooks. [POST]
+### Create one or more scaling policy webhooks. [POST]
 Webhooks must have a name. If successful, the created response body will contain the IDs and links to the
 newly created webhooks.
 This data provided in the request body in JSON format.
@@ -890,7 +890,7 @@ This data provided in the request body in JSON format.
 ## Webhook Details [/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}]
 
 
-### Get information about a specific scaling policy webhook. [GET]
+### Get webhook details [GET]
 This data is returned in the body of the response in JSON format.
 
 + Response 200 (application/json)
@@ -914,7 +914,7 @@ This data is returned in the body of the response in JSON format.
                 }
             }
 
-### Update an existing webhook. [PUT]
+### Update webhook. [PUT]
 WebhookIds not recognized will be ignored with accompanying data.
 URLs will be ignored if submitted, but that will not invalidate the request.
 If successful, no response body will be returned.
@@ -931,7 +931,7 @@ If successful, no response body will be returned.
 + Response 204
 
 
-### Delete a scaling policy webhook. [DELETE]
+### Delete webhook. [DELETE]
 If successful, no response body will be returned.
 
 + Response 204
