@@ -1,862 +1,939 @@
-HOST: https://{region}.autoscale.api.rackspacecloud.com/v1.0/
+FORMAT: 1A
 
---- Rackspace Autoscale ---
----
-All comments can be written in [Markdown](http://daringfireball.net/projects/markdown/syntax) syntax
----
---
-Group Resource
-Autoscale REST endpoints having to do with a group or collection of groups
-(/tenantId/groups and /tenantId/groups/groupId)
---
+# Rackspace Autoscale
+
+# Group Groups
+Autoscale REST endpoints having to do with a group or collection of groups (/tenantId/groups and /tenantId/groups/groupId)
+
+## Groups [/{tenantId}/groups]
+
+### List Groups [GET]
 Lists all the autoscaling groups per for a given tenant ID.
-GET /{tenantId}/groups
-< 200
-< Content-Type: application/json
-{
-    "groups": [
-        {
-            "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
-                    "rel": "self"
-                }
-            ],
-            "state": {
-                "active": [],
-                "activeCapacity": 0,
-                "desiredCapacity": 0,
-                "paused": false,
-                "pendingCapacity": 0,
-                "name": "testscalinggroup198547"
+
++ Response 200 (application/json)
+    + Body
+
+            {
+                "groups": [
+                    {
+                        "id": "e41380ae-173c-4b40-848a-25c16d7fa83d",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/e41380ae-173c-4b40-848a-25c16d7fa83d/",
+                                "rel": "self"
+                            }
+                        ],
+                        "state": {
+                            "active": [],
+                            "activeCapacity": 0,
+                            "desiredCapacity": 0,
+                            "paused": false,
+                            "pendingCapacity": 0,
+                            "name": "testscalinggroup198547"
+                        }
+                    },
+                    {
+                        "id": "f82bb000-f451-40c8-9dc3-6919097d2f7e",
+                        "state": {
+                            "active": [],
+                            "activeCapacity": 0,
+                            "desiredCapacity": 0,
+                            "paused": false,
+                            "pendingCapacity": 0,
+                            "name": "testscalinggroup198547"
+                        },
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
+                                "rel": "self"
+                            }
+                        ]
+                    }
+                ],
+                "groups_links": []
             }
-        },
-        {
-            "id": "f82bb000-f451-40c8-9dc3-6919097d2f7e",
-            "state": {
-                "active": [],
-                "activeCapacity": 0,
-                "desiredCapacity": 0,
-                "paused": false,
-                "pendingCapacity": 0,
-                "name": "testscalinggroup198547"
-            },
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/f82bb000-f451-40c8-9dc3-6919097d2f7e/",
-                    "rel": "self"
-                }
-            ]
-        }
-    ],
-    "groups_links": []
-}
 
 
-
+### Create Group [POST]
 Create a new scaling group, given the general scaling group configuration,
 launch configuration, and optional scaling policies.  This data provided
 in the request body in JSON format. If successful, the created group in JSON
 format containing id and links is returned.
-POST /{tenantId}/groups
-> Accept: application/json
-{
-  "launchConfiguration": {
-    "args": {
-      "loadBalancers": [
-        {
-          "port": 8080,
-          "loadBalancerId": 9099
-        }
-      ],
-      "server": {
-        "name": "autoscale_server",
-        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-        "flavorRef": "2",
-        "OS-DCF:diskConfig": "AUTO",
-        "metadata": {
-          "build_config": "core",
-          "meta_key_1": "meta_value_1",
-          "meta_key_2": "meta_value_2"
-        },
-        "networks": [
-          {
-            "uuid": "11111111-1111-1111-1111-111111111111"
-          },
-          {
-            "uuid": "00000000-0000-0000-0000-000000000000"
-          }
-        ],
-        "personality": [
-          {
-            "path": "/root/.csivh",
-            "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
-          }
-        ]
-      }
-    },
-    "type": "launch_server"
-  },
-  "groupConfiguration": {
-    "maxEntities": 10,
-    "cooldown": 360,
-    "name": "testscalinggroup198547",
-    "minEntities": 0,
-    "metadata": {
-      "gc_meta_key_2": "gc_meta_value_2",
-      "gc_meta_key_1": "gc_meta_value_1"
-    }
-  },
-  "scalingPolicies": [
-    {
-      "cooldown": 0,
-      "type": "webhook",
-      "name": "scale up by 1",
-      "change": 1
-    }
-  ]
-}
-< 201
-< Content-Type: application/json
-{
-  "group": {
-    "launchConfiguration": {
-      "args": {
-        "loadBalancers": [
-          {
-            "port": 8080,
-            "loadBalancerId": 9099
-          }
-        ],
-        "server": {
-          "name": "autoscale_server",
-          "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-          "flavorRef": "2",
-          "OS-DCF:diskConfig": "AUTO",
-          "personality": [
-            {
-              "path": "/root/.csivh",
-              "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
-            }
-          ],
-          "networks": [
-            {
-              "uuid": "11111111-1111-1111-1111-111111111111"
-            },
-            {
-              "uuid": "00000000-0000-0000-0000-000000000000"
-            }
-          ],
-          "metadata": {
-            "build_config": "core",
-            "meta_key_1": "meta_value_1",
-            "meta_key_2": "meta_value_2"
-          }
-        }
-      },
-      "type": "launch_server"
-    },
-    "groupConfiguration": {
-      "maxEntities": 10,
-      "cooldown": 360,
-      "name": "testscalinggroup198547",
-      "minEntities": 0,
-      "metadata": {
-        "gc_meta_key_2": "gc_meta_value_2",
-        "gc_meta_key_1": "gc_meta_value_1"
-      }
-    },
-    "state": {
-      "active": [],
-      "activeCapacity": 0,
-      "desiredCapacity": 0,
-      "paused": false,
-      "pendingCapacity": 0,
-      "name": "testscalinggroup198547"
-    },
-    "scalingPolicies": [
-      {
-        "name": "scale up by 1",
-        "links": [
-          {
-            "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/policies/dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1/",
-            "rel": "self"
-          }
-        ],
-        "cooldown": 0,
-        "type": "webhook",
-        "id": "dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1",
-        "change": 1
-      }
-    ],
-    "links": [
-      {
-        "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/",
-        "rel": "self"
-      }
-    ],
-    "id": "6791761b-821a-4d07-820d-0b2afc7dd7f6"
-  }
-}
 
++ Request (application/json)
+    + Body
+       
+            {
+              "launchConfiguration": {
+                "args": {
+                  "loadBalancers": [
+                    {
+                      "port": 8080,
+                      "loadBalancerId": 9099
+                    }
+                  ],
+                  "server": {
+                    "name": "autoscale_server",
+                    "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                    "flavorRef": "2",
+                    "OS-DCF:diskConfig": "AUTO",
+                    "metadata": {
+                      "build_config": "core",
+                      "meta_key_1": "meta_value_1",
+                      "meta_key_2": "meta_value_2"
+                    },
+                    "networks": [
+                      {
+                        "uuid": "11111111-1111-1111-1111-111111111111"
+                      },
+                      {
+                        "uuid": "00000000-0000-0000-0000-000000000000"
+                      }
+                    ],
+                    "personality": [
+                      {
+                        "path": "/root/.csivh",
+                        "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+                      }
+                    ]
+                  }
+                },
+                "type": "launch_server"
+              },
+              "groupConfiguration": {
+                "maxEntities": 10,
+                "cooldown": 360,
+                "name": "testscalinggroup198547",
+                "minEntities": 0,
+                "metadata": {
+                  "gc_meta_key_2": "gc_meta_value_2",
+                  "gc_meta_key_1": "gc_meta_value_1"
+                }
+              },
+              "scalingPolicies": [
+                {
+                  "cooldown": 0,
+                  "type": "webhook",
+                  "name": "scale up by 1",
+                  "change": 1
+                }
+              ]
+            }
 
++ Response 201 (application/json)
+    + Body
+        
+            {
+              "group": {
+                "launchConfiguration": {
+                  "args": {
+                    "loadBalancers": [
+                      {
+                        "port": 8080,
+                        "loadBalancerId": 9099
+                      }
+                    ],
+                    "server": {
+                      "name": "autoscale_server",
+                      "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                      "flavorRef": "2",
+                      "OS-DCF:diskConfig": "AUTO",
+                      "personality": [
+                        {
+                          "path": "/root/.csivh",
+                          "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+                        }
+                      ],
+                      "networks": [
+                        {
+                          "uuid": "11111111-1111-1111-1111-111111111111"
+                        },
+                        {
+                          "uuid": "00000000-0000-0000-0000-000000000000"
+                        }
+                      ],
+                      "metadata": {
+                        "build_config": "core",
+                        "meta_key_1": "meta_value_1",
+                        "meta_key_2": "meta_value_2"
+                      }
+                    }
+                  },
+                  "type": "launch_server"
+                },
+                "groupConfiguration": {
+                  "maxEntities": 10,
+                  "cooldown": 360,
+                  "name": "testscalinggroup198547",
+                  "minEntities": 0,
+                  "metadata": {
+                    "gc_meta_key_2": "gc_meta_value_2",
+                    "gc_meta_key_1": "gc_meta_value_1"
+                  }
+                },
+                "state": {
+                  "active": [],
+                  "activeCapacity": 0,
+                  "desiredCapacity": 0,
+                  "paused": false,
+                  "pendingCapacity": 0,
+                  "name": "testscalinggroup198547"
+                },
+                "scalingPolicies": [
+                  {
+                    "name": "scale up by 1",
+                    "links": [
+                      {
+                        "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/policies/dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1/",
+                        "rel": "self"
+                      }
+                    ],
+                    "cooldown": 0,
+                    "type": "webhook",
+                    "id": "dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1",
+                    "change": 1
+                  }
+                ],
+                "links": [
+                  {
+                    "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/",
+                    "rel": "self"
+                  }
+                ],
+                "id": "6791761b-821a-4d07-820d-0b2afc7dd7f6"
+              }
+            }
+
+## Specific Groups [/{tenantId}/groups/{groupId}]
+
+### List Group Information [GET]
 View manifested view of the scaling group configuration, including the
 launch configuration, and the scaling policies.  This data is returned in
 the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}
-< 200
-< Content-Type: application/json
-{
-    "group": {
-        "groupConfiguration": {
-            "cooldown": 60,
-            "maxEntities": 0,
-            "metadata": {},
-            "minEntities": 0,
-            "name": "smallest possible launch config group"
-        },
-        "state": {
-            "active": [],
-            "activeCapacity": 0,
-            "desiredCapacity": 0,
-            "paused": false,
-            "pendingCapacity": 0,
-            "name": "smallest possible launch config group"
-        },
-        "id": "605e13f6-1452-4588-b5da-ac6bb468c5bf",
-        "launchConfiguration": {
-            "args": {
-                "server": {}
-            },
-            "type": "launch_server"
-        },
-        "links": [
+
++ Response 200 (application/json)
+    + Body
+        
             {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/",
-                "rel": "self"
-            }
-        ],
-        "scalingPolicies": [
-            {
-                "changePercent": -5.5,
-                "cooldown": 1800,
-                "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
-                "links": [
-                    {
-                        "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
-                        "rel": "self"
+              "group": {
+                "launchConfiguration": {
+                  "args": {
+                    "loadBalancers": [
+                      {
+                        "port": 8080,
+                        "loadBalancerId": 9099
+                      }
+                    ],
+                    "server": {
+                      "name": "autoscale_server",
+                      "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                      "flavorRef": "2",
+                      "OS-DCF:diskConfig": "AUTO",
+                      "personality": [
+                        {
+                          "path": "/root/.csivh",
+                          "contents": "VGhpcyBpcyBhIHRlc3QgZmlsZS4="
+                        }
+                      ],
+                      "networks": [
+                        {
+                          "uuid": "11111111-1111-1111-1111-111111111111"
+                        },
+                        {
+                          "uuid": "00000000-0000-0000-0000-000000000000"
+                        }
+                      ],
+                      "metadata": {
+                        "build_config": "core",
+                        "meta_key_1": "meta_value_1",
+                        "meta_key_2": "meta_value_2"
+                      }
                     }
+                  },
+                  "type": "launch_server"
+                },
+                "groupConfiguration": {
+                  "maxEntities": 10,
+                  "cooldown": 360,
+                  "name": "testscalinggroup198547",
+                  "minEntities": 0,
+                  "metadata": {
+                    "gc_meta_key_2": "gc_meta_value_2",
+                    "gc_meta_key_1": "gc_meta_value_1"
+                  }
+                },
+                "state": {
+                  "active": [],
+                  "activeCapacity": 0,
+                  "desiredCapacity": 0,
+                  "paused": false,
+                  "pendingCapacity": 0,
+                  "name": "testscalinggroup198547"
+                },
+                "scalingPolicies": [
+                  {
+                    "name": "scale up by 1",
+                    "links": [
+                      {
+                        "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/policies/dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1/",
+                        "rel": "self"
+                      }
+                    ],
+                    "cooldown": 0,
+                    "type": "webhook",
+                    "id": "dceb14ac-b2b3-4f06-aac9-a5b6cd5d40e1",
+                    "change": 1
+                  }
                 ],
-                "name": "scale down by 5.5 percent",
-                "type": "webhook"
-            },
-        ]
-    }
-}
+                "links": [
+                  {
+                    "href": "https://ord.autoscale.api.rackspacecloud.com/v1.0/829409/groups/6791761b-821a-4d07-820d-0b2afc7dd7f6/",
+                    "rel": "self"
+                  }
+                ],
+                "id": "6791761b-821a-4d07-820d-0b2afc7dd7f6"
+              }
+            }
 
+### Delete Group [DELETE]
+Delete a scaling group if there are no entities belonging to the scaling group.  If successful, no response body will be returned.  If there are pending or active entities, a 409 will be returned.
 
-Delete a scaling group if there are no entities belonging to the scaling
-group.  If successful, no response body will be returned.  If there are
-pending or active entities, a 409 will be returned.
++ Response 204
 
-DELETE /{tenantId}/groups/{groupId}
-< 204
+## State [/{tenantId}/groups/{groupId}/state]
 
-
+### Get Group State [GET]
 Get the current state of the scaling group, including the current set of
 active entities, the number of pending entities, and the desired number
 of entities.  This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/state
-< 200
-< Content-Type: application/json
-{
-    "group": {
-        "paused": false,
-        "pendingCapacity": 0,
-        "name": "testscalinggroup198547",
-        "active": [],
-        "activeCapacity": 0,
-        "desiredCapacity": 0
-    }
-}
 
---
-Config Resource
++ Response 200
+    + Body
+       
+            {
+                "group": {
+                    "paused": false,
+                    "pendingCapacity": 0,
+                    "name": "testscalinggroup198547",
+                    "active": [],
+                    "activeCapacity": 0,
+                    "desiredCapacity": 0
+                }
+            }
+
+
+# Group Configuration
+
+## Group Configuration Resource [/{tenantId}/groups/{groupId}/config]
 Autoscale REST endpoints having to do with editing/modifying the configuration
 or launch configuration for a scaling group.
 
-(/tenantId/groups/groupId/config and /tenantId/groups/groupId/launch)
-
---
-
+### Get Group Configuration [GET]
 Get the configuration for a scaling group, which includes the minimum
 number of entities, the maximum number of entities, global cooldown, and
 other metadata.  This data is returned in the body of the response in JSON
 format.
-GET /{tenantId}/groups/{groupId}/config
-< 200
-< Content-Type: application/json
-{
-    "groupConfiguration": {
-        "cooldown": 60,
-        "maxEntities": 0,
-        "metadata": {},
-        "minEntities": 0,
-        "name": "smallest possible group"
-    }
-}
 
++ Response 200 (application/json)
+    + Body
+        
+            {
+                "groupConfiguration": {
+                    "name": "workers",
+                    "cooldown": 60,
+                    "minEntities": 5,
+                    "maxEntities": 100,
+                    "metadata": {
+                        "firstkey": "this is a string",
+                        "secondkey": "1"
+                    }
+                }
+            }
+
+
+### Update Group Configruation [PUT]
 Edit the configuration for a scaling group, which includes the minimum
 number of entities, the maximum number of entities, global cooldown, and
 other metadata.  This data provided in the request body in JSON format.
 If successful, no response body will be returned.
-PUT /{tenantId}/groups/{groupId}/config
-> Accept: application/json
-{
-    "name": "workers",
-    "cooldown": 60,
-    "minEntities": 5,
-    "maxEntities": 100,
-    "metadata": {
-        "firstkey": "this is a string",
-        "secondkey": "1",
-    }
-}
-< 204
-< Content-Type: application/json
 
++ Request 
+    + Body
+        
+            {
+                "name": "workers",
+                "cooldown": 60,
+                "minEntities": 5,
+                "maxEntities": 100,
+                "metadata": {
+                    "firstkey": "this is a string",
+                    "secondkey": "1",
+                }
+            }
 
++ Response 204
+
+## Launch Configuration Resource [/{tenantId}/groups/{groupId}/launch]
 Get the launch configuration for a scaling group, which includes the
 details of how to create a server, from what image, which load balancers to
 join it to, and what networks to add it to, and other metadata.
 This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/launch
-< 200
-< Content-Type: application/json
-{
-    "launchConfiguration": {
-        "type": "launch_server",
-        "args": {
-            "server": {
-                "flavorRef": 3,
-                "name": "webhead",
-                "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-                "OS-DCF:diskConfig": "AUTO",
-                "metadata": {
-                    "mykey": "myvalue"
-                },
-                "personality": [
-                    {
-                        "path": "/root/.ssh/authorized_keys",
-                        "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+
+### Get Launch Configuration [GET]
+
++ Response 200
+    + Body
+        
+            {
+                "launchConfiguration": {
+                    "type": "launch_server",
+                    "args": {
+                        "server": {
+                            "flavorRef": 3,
+                            "name": "webhead",
+                            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                            "OS-DCF:diskConfig": "AUTO",
+                            "metadata": {
+                                "mykey": "myvalue"
+                            },
+                            "personality": [
+                                {
+                                    "path": "/root/.ssh/authorized_keys",
+                                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                                }
+                            ],
+                            "networks": [
+                                {
+                                    "uuid": "11111111-1111-1111-1111-111111111111"
+                                }
+                            ],
+                        },
+                        "loadBalancers": [
+                            {
+                                "loadBalancerId": 2200,
+                                "port": 8081
+                            }
+                        ]
                     }
-                ],
-                "networks": [
-                    {
-                        "uuid": "11111111-1111-1111-1111-111111111111"
-                    }
-                ],
-            },
-            "loadBalancers": [
-                {
-                    "loadBalancerId": 2200,
-                    "port": 8081
                 }
-            ]
-        }
-    }
-}
+            }
 
-
+### Update Launch Configuration [PUT]
 Edit the launch configuration for a scaling group, which includes the
 details of how to create a server, from what image, which load balancers to
 join it to, and what networks to add it to, and other metadata.
 This data provided in the request body in JSON format.
 If successful, no response body will be returned.
-PUT /{tenantId}/groups/{groupId}/launch
-> Accept: application/json
-{
-    "type": "launch_server",
-    "args": {
-        "server": {
-            "flavorRef": 3,
-            "name": "webhead",
-            "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-            "OS-DCF:diskConfig": "AUTO",
-            "metadata": {
-                "mykey": "myvalue"
-            },
-            "personality": [
-                {
-                    "path": "/root/.ssh/authorized_keys",
-                    "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
-                }
-            ],
-            "networks": [
-                {
-                    "uuid": "11111111-1111-1111-1111-111111111111"
-                }
-            ],
-        },
-        "loadBalancers": [
+
++ Request
+    + Body
+        
             {
-                "loadBalancerId": 2200,
-                "port": 8081
+                "type": "launch_server",
+                "args": {
+                    "server": {
+                        "flavorRef": 3,
+                        "name": "webhead",
+                        "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
+                        "OS-DCF:diskConfig": "AUTO",
+                        "metadata": {
+                            "mykey": "myvalue"
+                        },
+                        "personality": [
+                            {
+                                "path": "/root/.ssh/authorized_keys",
+                                "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                            }
+                        ],
+                        "networks": [
+                            {
+                                "uuid": "11111111-1111-1111-1111-111111111111"
+                            }
+                        ],
+                    },
+                    "loadBalancers": [
+                        {
+                            "loadBalancerId": 2200,
+                            "port": 8081
+                        }
+                    ]
+                }
             }
-        ]
-    }
-}
-< 204
-< Content-Type: application/json
 
++ Response 204
 
+## Pause Scaling Group [/{tenantId}/groups/{groupId}/pause]
 Pause all execution of scaling policies for this scaling group.
-POST /{tenantId}/groups/{groupId}/pause
-< 204
+Not Yet Implemented
+
+### Pause Scaling Group [POST]
+
++ Response 501
 
 
+## Resume Scaling Group [/{tenantId}/groups/{groupId}/resume]
 Resume all execution of scaling policies for this scaling group.
-POST /{tenantId}/groups/{groupId}/resume
-< 204
 
---
-Policies Resource
+### Resume Scaling Group [POST]
+
++ Response 501
+
+# Group Policies
+
+## Policies Resource [/{tenantId}/groups/{groupId}/policies]
 Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the scaling policies associated with a particular scaling group.
 
-(/tenantId/groups/groupId/policies and /tenantId/groups/groupId/policies/policyId)
---
 
-
+### List Scaling Policies [GET]
 Get a list of scaling policies in the group. Each policy describes an id,
 name, type, adjustment, cooldown, and links. This data is returned in the
 body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/policies
-< 200
-< Content-Type: application/json
-{
-    "policies": [
-        {
-            "args": {
-                "cron": "23 * * * *"
-            },
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent at 11pm",
-            "type": "schedule"
-        },
-        {
-            "args": {
-                "at": "2013-12-05T03:12:00Z"
-            },
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "9f7c5801-6b25-4f5a-af07-4bb752e23d53",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/9f7c5801-6b25-4f5a-af07-4bb752e23d53/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent on the 5th",
-            "type": "schedule"
-        },
-        {
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent",
-            "type": "webhook"
-        },
-        {
-            "cooldown": 1800,
-            "desiredCapacity": 5,
-            "id": "2f45092a-fde7-4461-a67a-3519e0366cd6",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/2f45092a-fde7-4461-a67a-3519e0366cd6/",
-                    "rel": "self"
-                }
-            ],
-            "name": "set group to 5 servers",
-            "type": "webhook"
-        },
-        {
-            "change": 1,
-            "cooldown": 1800,
-            "id": "e36e6a43-2a7a-433c-918c-39fa45b75d12",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/e36e6a43-2a7a-433c-918c-39fa45b75d12/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale up by one server",
-            "type": "webhook"
-        },
-    ],
-    "policies_links": []
-}
 
-Create one or many new scaling policies.
++ Response 200 (application/json)
+    + Body
+        
+            {
+                "policies": [
+                    {
+                        "args": {
+                            "cron": "23 * * * *"
+                        },
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent at 11pm",
+                        "type": "schedule"
+                    },
+                    {
+                        "args": {
+                            "at": "2013-12-05T03:12:00Z"
+                        },
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "9f7c5801-6b25-4f5a-af07-4bb752e23d53",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/9f7c5801-6b25-4f5a-af07-4bb752e23d53/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent on the 5th",
+                        "type": "schedule"
+                    },
+                    {
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent",
+                        "type": "webhook"
+                    },
+                    {
+                        "cooldown": 1800,
+                        "desiredCapacity": 5,
+                        "id": "2f45092a-fde7-4461-a67a-3519e0366cd6",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/2f45092a-fde7-4461-a67a-3519e0366cd6/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "set group to 5 servers",
+                        "type": "webhook"
+                    },
+                    {
+                        "change": 1,
+                        "cooldown": 1800,
+                        "id": "e36e6a43-2a7a-433c-918c-39fa45b75d12",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/e36e6a43-2a7a-433c-918c-39fa45b75d12/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale up by one server",
+                        "type": "webhook"
+                    },
+                ],
+                "policies_links": []
+            }
+
+###  Create one or many new scaling policies [POST]
 Scaling policies must include a name, type, adjustment, and cooldown.
 The response header will point to the list policies endpoint.
 An array of scaling policies is provided in the request body in JSON format.
-POST /{tenantId}/groups/{groupId}/policies
-> Accepts: application/json
-[
-    {
-        "change": 1,
-        "cooldown": 1800,
-        "name": "scale up by one server",
-        "type": "webhook"
-    },
-    {
-        "changePercent": -5.5,
-        "cooldown": 1800,
-        "name": "scale down by 5.5 percent",
-        "type": "webhook"
-    },
-    {
-        "cooldown": 1800,
-        "desiredCapacity": 5,
-        "name": "set group to 5 servers",
-        "type": "webhook"
-    },
-    {
-        "args": {
-            "cron": "23 * * * *"
-        },
-        "changePercent": -5.5,
-        "cooldown": 1800,
-        "name": "scale down by 5.5 percent at 11pm",
-        "type": "schedule"
-    },
-    {
-        "args": {
-            "at": "2013-12-05T03:12:00Z"
-        },
-        "changePercent": -5.5,
-        "cooldown": 1800,
-        "name": "scale down by 5.5 percent on the 5th",
-        "type": "schedule"
-    }
-]
-< 201
-< Content-Type: application/json
-{
-    "policies": [
-        {
-            "args": {
-                "cron": "23 * * * *"
-            },
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
-            "links": [
+
++ Request (application/json)
+    + Body
+        
+            [
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent at 11pm",
-            "type": "schedule"
-        },
-        {
-            "args": {
-                "at": "2013-12-05T03:12:00Z"
-            },
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "9f7c5801-6b25-4f5a-af07-4bb752e23d53",
-            "links": [
+                    "change": 1,
+                    "cooldown": 1800,
+                    "name": "scale up by one server",
+                    "type": "webhook"
+                },
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/9f7c5801-6b25-4f5a-af07-4bb752e23d53/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent on the 5th",
-            "type": "schedule"
-        },
-        {
-            "changePercent": -5.5,
-            "cooldown": 1800,
-            "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
-            "links": [
+                    "changePercent": -5.5,
+                    "cooldown": 1800,
+                    "name": "scale down by 5.5 percent",
+                    "type": "webhook"
+                },
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
-                    "rel": "self"
-                }
-            ],
-            "name": "scale down by 5.5 percent",
-            "type": "webhook"
-        },
-        {
-            "cooldown": 1800,
-            "desiredCapacity": 5,
-            "id": "2f45092a-fde7-4461-a67a-3519e0366cd6",
-            "links": [
+                    "cooldown": 1800,
+                    "desiredCapacity": 5,
+                    "name": "set group to 5 servers",
+                    "type": "webhook"
+                },
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/2f45092a-fde7-4461-a67a-3519e0366cd6/",
-                    "rel": "self"
-                }
-            ],
-            "name": "set group to 5 servers",
-            "type": "webhook"
-        },
-        {
-            "change": 1,
-            "cooldown": 1800,
-            "id": "e36e6a43-2a7a-433c-918c-39fa45b75d12",
-            "links": [
+                    "args": {
+                        "cron": "23 * * * *"
+                    },
+                    "changePercent": -5.5,
+                    "cooldown": 1800,
+                    "name": "scale down by 5.5 percent at 11pm",
+                    "type": "schedule"
+                },
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/e36e6a43-2a7a-433c-918c-39fa45b75d12/",
-                    "rel": "self"
+                    "args": {
+                        "at": "2013-12-05T03:12:00Z"
+                    },
+                    "changePercent": -5.5,
+                    "cooldown": 1800,
+                    "name": "scale down by 5.5 percent on the 5th",
+                    "type": "schedule"
                 }
-            ],
-            "name": "scale up by one server",
-            "type": "webhook"
-        },
-    ],
-    "policies_links": []
-}
+            ]
+
++ Response 201 (application/json)
+    + Body 
+
+            {
+                "policies": [
+                    {
+                        "args": {
+                            "cron": "23 * * * *"
+                        },
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent at 11pm",
+                        "type": "schedule"
+                    },
+                    {
+                        "args": {
+                            "at": "2013-12-05T03:12:00Z"
+                        },
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "9f7c5801-6b25-4f5a-af07-4bb752e23d53",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/9f7c5801-6b25-4f5a-af07-4bb752e23d53/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent on the 5th",
+                        "type": "schedule"
+                    },
+                    {
+                        "changePercent": -5.5,
+                        "cooldown": 1800,
+                        "id": "eb0fe1bf-3428-4f34-afd9-a5ac36f60511",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale down by 5.5 percent",
+                        "type": "webhook"
+                    },
+                    {
+                        "cooldown": 1800,
+                        "desiredCapacity": 5,
+                        "id": "2f45092a-fde7-4461-a67a-3519e0366cd6",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/2f45092a-fde7-4461-a67a-3519e0366cd6/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "set group to 5 servers",
+                        "type": "webhook"
+                    },
+                    {
+                        "change": 1,
+                        "cooldown": 1800,
+                        "id": "e36e6a43-2a7a-433c-918c-39fa45b75d12",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/e36e6a43-2a7a-433c-918c-39fa45b75d12/",
+                                "rel": "self"
+                            }
+                        ],
+                        "name": "scale up by one server",
+                        "type": "webhook"
+                    },
+                ],
+                "policies_links": []
+            }
 
 
+## Policy Resource [/{tenantId}/groups/{groupId}/policies/{policyId}]
+
+### Get policy details [GET]
 Get a scaling policy which describes an id, name, type, adjustment, and
 cooldown, and links.  This data is returned in the body of the response in
 JSON format.
-GET /{tenantId}/groups/{groupId}/policies/{policyId}
-< 200
-< Content-Type: application/json
-{
-    "policy": {
-        "args": {
-            "cron": "23 * * * *"
-        },
-        "changePercent": -5.5,
-        "cooldown": 1800,
-        "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
-        "links": [
-            {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
-                "rel": "self"
-            }
-        ],
-        "name": "scale down by 5.5 percent at 11pm",
-        "type": "schedule"
-    }
-}
 
-Updates a scaling policy. Scaling policies must include a name, type,
++ Response 200 (application/json)
+    + Body
+        
+            {
+                "policy": {
+                    "args": {
+                        "cron": "23 * * * *"
+                    },
+                    "changePercent": -5.5,
+                    "cooldown": 1800,
+                    "id": "5f26e16c-5fa7-4d4f-8e78-257ea711389f",
+                    "links": [
+                        {
+                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/5f26e16c-5fa7-4d4f-8e78-257ea711389f/",
+                            "rel": "self"
+                        }
+                    ],
+                    "name": "scale down by 5.5 percent at 11pm",
+                    "type": "schedule"
+                }
+            }
+
+### Updates scaling policy [PUT]
+Scaling policies must include a name, type,
 adjustment, and cooldown.
 If successful, no response body will be returned.
-PUT /{tenantId}/groups/{groupId}/policies/{policyId}
-> Accepts: application/json
-{
-        "change": 1,
-        "cooldown": 1800,
-        "name": "scale up by one server",
-        "type": "webhook"
-}
-< 204
+
++ Request 
+    + Body
+       
+            {
+                "change": 1,
+                "cooldown": 1800,
+                "name": "scale up by one server",
+                "type": "webhook"
+            }
++ Response 204
 
 
-Delete a scaling policy. If successful, no response body will be returned.
-DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
-< 204
+### Delete scaling policy [DELETE] 
+If successful, no response body will be returned.
 
++ Response 204
 
-Execute a scaling policy. If successful, a response body will be returned.
-POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
-< 202
-< Content-Type: application/json
-{}
+## Execute Policy [/{tenantId}/groups/{groupId}/policies/{policyId}/execute]
 
+### Execute scaling policy [POST]
+If successful, a response body will be returned.
 
---
-Execute Resource
++ Response 202
+    + Body
+    
+            {}
+
+# Group Anonymous Capability URLs
+
+## Execute Resource [/execute/{capabilityVersion}/{capabilityHash}/]
 Autoscale REST Endpoints having to do with executing policies without
 authentication.
 
-(/execute/{capabilityVersion}/{capabilityHash}/)
---
+### Execute an anonymous capability URL [POST]
 
-Execute a webhook
-POST /execute/{capabilityVersion}/{capabilityHash}/
-< 202
-< Content-Type: application/json
-{}
++ Response 202 (application/json)
+    + Body
+      
+            {}
 
 
+# Group Webhooks
 
---
-Webhooks Resource
+## Webhooks Resource [/tenantId/groups/groupId/policy/policyId/webhooks]
 Autoscale REST endpoints having to do with creating/reading/updating/deleting
 the webhooks associated with a particular scaling group's particular scaling
 policy.
 
-(/tenantId/groups/groupId/policy/policyId/webhooks and
-/tenantId/groups/groupId/policy/policyId/webhooks/webhookId)
---
-
-
-Get a list of webhooks and their IDs.
+### Get webhooks [GET]
 This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
-< 200
-< Content-Type: application/json
-{
-    "webhooks": [
-        {
-            "id": "152054a3-e0ab-445b-941d-9f8e360c9eed",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/152054a3-e0ab-445b-941d-9f8e360c9eed/",
-                    "rel": "self"
-                },
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/0077882e9626d83ef30e1ca379c8654d86cd34df3cd49ac8da72174668315fe8/",
-                    "rel": "capability"
-                }
-            ],
-            "metadata": {
-                "notes": "PagerDuty will fire this webhook"
-            },
-            "name": "PagerDuty"
-        },
-        {
-            "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
-                    "rel": "self"
-                },
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
-                    "rel": "capability"
-                }
-            ],
-            "metadata": {},
-            "name": "Nagios"
-        }
-    ],
-    "webhooks_links": []
-}
+
++ Response 200
+    + Body
+       
+            {
+                "webhooks": [
+                    {
+                        "id": "152054a3-e0ab-445b-941d-9f8e360c9eed",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/152054a3-e0ab-445b-941d-9f8e360c9eed/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/0077882e9626d83ef30e1ca379c8654d86cd34df3cd49ac8da72174668315fe8/",
+                                "rel": "capability"
+                            }
+                        ],
+                        "metadata": {
+                            "notes": "PagerDuty will fire this webhook"
+                        },
+                        "name": "PagerDuty"
+                    },
+                    {
+                        "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
+                                "rel": "capability"
+                            }
+                        ],
+                        "metadata": {},
+                        "name": "Nagios"
+                    }
+                ],
+                "webhooks_links": []
+            }
 
 
-Create one or more new scaling policy webhooks. Webhooks must have a name.
-If successful, the created response body will contain the IDs and links to the
+### Create one or more scaling policy webhooks. [POST]
+Webhooks must have a name. If successful, the created response body will contain the IDs and links to the
 newly created webhooks.
 This data provided in the request body in JSON format.
-POST /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
-> Accepts: application/json
-[
-    {
-        "metadata": {
-            "notes": "PagerDuty will fire this webhook"
-        },
-        "name": "PagerDuty"
-    },
-    {
-        "name": "Nagios"
-    }
-]
-< 201
-< Content-Type: application/json
-{
-    "webhooks": [
-        {
-            "id": "152054a3-e0ab-445b-941d-9f8e360c9eed",
-            "links": [
+
++ Request (application/json)
+    + Body
+
+            [
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/152054a3-e0ab-445b-941d-9f8e360c9eed/",
-                    "rel": "self"
+                    "metadata": {
+                        "notes": "PagerDuty will fire this webhook"
+                    },
+                    "name": "PagerDuty"
                 },
                 {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/0077882e9626d83ef30e1ca379c8654d86cd34df3cd49ac8da72174668315fe8/",
-                    "rel": "capability"
+                    "name": "Nagios"
                 }
-            ],
-            "metadata": {
-                "notes": "PagerDuty will fire this webhook"
-            },
-            "name": "PagerDuty"
-        },
-        {
-            "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
-            "links": [
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
-                    "rel": "self"
-                },
-                {
-                    "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
-                    "rel": "capability"
-                }
-            ],
-            "metadata": {},
-            "name": "Nagios"
-        }
-    ],
-    "webhooks_links": []
-}
+            ]
 
++ Response 201 (application/json)
+    + Body
 
-
-Get information about a specific scaling policy webhook.
-This data is returned in the body of the response in JSON format.
-GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-< 200
-< Content-Type: application/json
-{
-    "webhook": {
-        "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
-        "links": [
             {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
-                "rel": "self"
-            },
-            {
-                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
-                "rel": "capability"
+                "webhooks": [
+                    {
+                        "id": "152054a3-e0ab-445b-941d-9f8e360c9eed",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/152054a3-e0ab-445b-941d-9f8e360c9eed/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/0077882e9626d83ef30e1ca379c8654d86cd34df3cd49ac8da72174668315fe8/",
+                                "rel": "capability"
+                            }
+                        ],
+                        "metadata": {
+                            "notes": "PagerDuty will fire this webhook"
+                        },
+                        "name": "PagerDuty"
+                    },
+                    {
+                        "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
+                        "links": [
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
+                                "rel": "self"
+                            },
+                            {
+                                "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
+                                "rel": "capability"
+                            }
+                        ],
+                        "metadata": {},
+                        "name": "Nagios"
+                    }
+                ],
+                "webhooks_links": []
             }
-        ],
-        "metadata": {},
-        "name": "Nagios"
-    }
-}
 
 
-Update an existing webhook.
+## Webhook Details [/{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}]
+
+
+### Get webhook details [GET]
+This data is returned in the body of the response in JSON format.
+
++ Response 200 (application/json)
+    + Body
+
+            {
+                "webhook": {
+                    "id": "23037efb-53a9-4ae5-bc33-e89a56b501b6",
+                    "links": [
+                        {
+                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/676873/groups/605e13f6-1452-4588-b5da-ac6bb468c5bf/policies/eb0fe1bf-3428-4f34-afd9-a5ac36f60511/webhooks/23037efb-53a9-4ae5-bc33-e89a56b501b6/",
+                            "rel": "self"
+                        },
+                        {
+                            "href": "https://dfw.autoscale.api.rackspacecloud.com/v1.0/execute/1/4f767340574433927a26dc747253dad643d5d13ec7b66b764dcbf719b32302b9/",
+                            "rel": "capability"
+                        }
+                    ],
+                    "metadata": {},
+                    "name": "Nagios"
+                }
+            }
+
+### Update webhook. [PUT]
 WebhookIds not recognized will be ignored with accompanying data.
 URLs will be ignored if submitted, but that will not invalidate the request.
 If successful, no response body will be returned.
-PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-> Accepts: application/json
-{
-    "name": "alice",
-    "metadata": {
-        "notes": "this is for Alice"
-    }
-}
-< 204
+
++ Request
+    + Body
+    
+            {
+                "name": "alice",
+                "metadata": {
+                    "notes": "this is for Alice"
+                }
+            }
++ Response 204
 
 
-Delete a scaling policy webhook.
+### Delete webhook. [DELETE]
 If successful, no response body will be returned.
-DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-< 204
+
++ Response 204
+
+
