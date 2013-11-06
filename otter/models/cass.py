@@ -9,7 +9,6 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from jsonschema import ValidationError
-
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -66,8 +65,9 @@ _cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
-_cql_insert_policy = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", data) '
-                      'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data)')
+_cql_insert_policy = (
+    'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
+    'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused)')
@@ -87,12 +87,6 @@ _cql_insert_cron_event = (
     'INSERT INTO {cf}(bucket, "tenantId", "groupId", "policyId", trigger, cron, version) '
     'VALUES (:{name}bucket, :{name}tenantId, :{name}groupId, :{name}policyId, '
     ':{name}trigger, :{name}cron, :{name}version);')
-_cql_update_version = (
-    'UPDATE {cf} SET version = :{name}version '
-    'WHERE "tenantId"=:{name}tenantId AND "groupId"=:{name}groupId AND "policyId"=:{name}policyId;')
-_cql_update_group_version = (
-    'UPDATE {cf} SET version = :{name}version '
-    'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND "policyId"=:{name}policyId;')
 _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version FROM {cf} '
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
@@ -256,6 +250,7 @@ def _build_policies(policies, policies_table, event_table, queries, data, bucket
 
             data[polname + 'data'] = serialize_json_data(policy, 1)
             data[polname + 'policyId'] = polId
+            data[polname + 'version'] = uuid.uuid1()
 
             if policy.get("type") == 'schedule':
                 _build_schedule_policy(policy, event_table, policies_table, queries,
@@ -273,8 +268,6 @@ def _build_schedule_policy(policy, event_table, policies_table, queries, data,
     Build schedule-type policy
     """
     data[polname + 'bucket'] = buckets.next()
-    version = uuid.uuid1()
-    data[polname + 'version'] = version
     if 'at' in policy["args"]:
         queries.append(_cql_insert_group_event.format(cf=event_table, name=polname))
         at_time = timestamp.from_timestamp(policy["args"]["at"])
@@ -285,8 +278,6 @@ def _build_schedule_policy(policy, event_table, policies_table, queries, data,
         cron = policy["args"]["cron"]
         data[polname + "trigger"] = next_cron_occurrence(cron)
         data[polname + 'cron'] = cron
-    # Add version to policies table
-    queries.append(_cql_update_group_version.format(cf=policies_table, name=polname))
 
 
 def _build_webhooks(bare_webhooks, webhooks_table, queries, cql_parameters):
@@ -682,7 +673,8 @@ class CassScalingGroup(object):
         self.log.bind(updated_policy=data, policy_id=policy_id).msg("Updating policy")
 
         queries = []
-        cqldata = {'tenantId': self.tenant_id, 'groupId': self.uuid, 'policyId': policy_id}
+        cqldata = {'tenantId': self.tenant_id, 'groupId': self.uuid, 'policyId': policy_id,
+                   'version': uuid.uuid1()}
 
         def _do_update_schedule(lastRev):
             if "type" in lastRev:
@@ -1084,10 +1076,7 @@ class CassScalingGroupCollection:
             queries.append(_cql_insert_cron_event.format(cf=self.event_table, name=polname))
             data[polname + 'version'] = uuid.uuid1()
             data[polname + 'bucket'] = self.buckets.next()
-            data.update({polname + key: event[key]
-                         for key in ('tenantId', 'groupId', 'policyId', 'trigger', 'cron')})
-            queries.append(_cql_update_version.format(cf=self.policies_table,
-                                                      name=polname))
+            data.update({polname + key: event[key] for key in event})
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
 

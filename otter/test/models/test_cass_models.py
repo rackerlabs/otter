@@ -1592,12 +1592,15 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         Validate CQL calls made to update the policy
         """
         expectedCql = (
-            'BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :data) APPLY BATCH;')
+            'BEGIN BATCH '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policyId, :data, :version) '
+            'APPLY BATCH;')
         expectedData = {"data": policy_json,
                         "groupId": '12345678g',
                         "policyId": '12345678',
-                        "tenantId": '11111'}
+                        "tenantId": '11111',
+                        "version": "timeuuid"}
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
@@ -1636,20 +1639,6 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValidationError)
         self.assertFalse(self.connection.execute.called)
 
-    def validate_schedule_update(self, insert_event_cql, insert_event_data_part):
-        """
-        validate cql calls made to update scaling_schedule table
-        """
-        delCql = 'DELETE FROM scaling_schedule WHERE "policyId" = :policyId;'
-        delData = {'policyId': '12345678'}
-        insert_event_data = {"groupId": '12345678g',
-                             "policyId": '12345678',
-                             "tenantId": '11111'}
-        insert_event_data.update(insert_event_data_part)
-        self.assertEqual(self.connection.execute.call_args_list[:2],
-                         [mock.call(delCql, delData, ConsistencyLevel.TWO),
-                          mock.call(insert_event_cql, insert_event_data, ConsistencyLevel.TWO)])
-
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({"type": "schedule",
                                             "args": {"at": "2013-07-30T19:03:12Z"}}))
@@ -1664,12 +1653,11 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.assertIsNone(self.successResultOf(d))
         expected_cql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", trigger, version) '
+            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'trigger, version) '
             'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :version) '
-            'UPDATE scaling_policies SET version = :version '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND "policyId"=:policyId; '
-            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :data) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policyId, :data, :version) '
             'APPLY BATCH;')
         expected_data = {
             "data": '{"_ver": 1, "args": {"at": "2015-09-20T10:00:12Z"}, '
@@ -1696,10 +1684,8 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :cron, :version) '
-            'UPDATE scaling_policies SET version = :version '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND "policyId"=:policyId; '
-            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policyId, :data) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policyId, :data, :version) '
             'APPLY BATCH;')
         expected_data = {
             "data": '{"_ver": 1, "args": {"cron": "2 0 * * *"}, '
@@ -1742,10 +1728,13 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         self.returns = [None]
         d = self.group.create_policies([{"b": "lah"}])
         result = self.successResultOf(d)
-        expectedCql = ('BEGIN BATCH INSERT INTO scaling_policies("tenantId", "groupId", "policyId", '
-                       'data) VALUES (:tenantId, :groupId, :policy0policyId, :policy0data) '
-                       'APPLY BATCH;')
+        expectedCql = (
+            'BEGIN BATCH '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
+            'APPLY BATCH;')
         expectedData = {"policy0data": '{"_ver": 1, "b": "lah"}',
+                        "policy0version": 'timeuuid',
                         "groupId": '12345678g',
                         "policy0policyId": '12345678',
                         "tenantId": '11111'}
@@ -1771,14 +1760,12 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         result = self.successResultOf(d)
         expectedCql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, version) '
             'VALUES (:policy0bucket, :tenantId, :groupId, :policy0policyId, '
             ':policy0trigger, :policy0version) '
-            'UPDATE scaling_policies SET version = :policy0version '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND "policyId"=:policy0policyId; '
             'APPLY BATCH;')
         expectedData = {
             "policy0data": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
@@ -1811,14 +1798,12 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         result = self.successResultOf(d)
         expectedCql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:policy0bucket, :tenantId, :groupId, :policy0policyId, '
             ':policy0trigger, :policy0cron, :policy0version) '
-            'UPDATE scaling_policies SET version = :policy0version '
-            'WHERE "tenantId"=:tenantId AND "groupId"=:groupId AND "policyId"=:policy0policyId; '
             'APPLY BATCH;')
         expectedData = {"groupId": '12345678g',
                         "tenantId": '11111',
@@ -1865,10 +1850,10 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         Tests that you can fetch and delete list of events
         """
-        self.returns = [[{'tenantId': '1d2', 'groupId': 'gr2',
-                          'policyId': 'ef', 'trigger': 100, 'cron': 'c1', 'version': 'uuid'},
-                         {'tenantId': '1d2', 'groupId': 'gr2',
-                          'policyId': 'ex', 'trigger': 122, 'cron': 'c2', 'version': 'uuid'}],
+        self.returns = [[{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                          'trigger': 100, 'cron': 'c1', 'version': 'uuid1'},
+                         {'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ex',
+                          'trigger': 122, 'cron': 'c2', 'version': 'uuid2'}],
                         None]
         events = self.returns[0]
 
@@ -1899,32 +1884,26 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         """
         self.returns = [None]
         events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
-                   'trigger': 100, 'cron': 'c1'},
+                   'trigger': 100, 'cron': 'c1', 'version': 'v1'},
                   {'tenantId': '1d3', 'groupId': 'gr3', 'policyId': 'ex',
-                   'trigger': 122, 'cron': 'c2'}]
+                   'trigger': 122, 'cron': 'c2', 'version': 'v2'}]
         cql = (
             'BEGIN BATCH '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:policy0bucket, :policy0tenantId, :policy0groupId, :policy0policyId, '
             ':policy0trigger, :policy0cron, :policy0version); '
-            'UPDATE scaling_policies SET version = :policy0version '
-            'WHERE "tenantId"=:policy0tenantId AND "groupId"=:policy0groupId AND '
-            '"policyId"=:policy0policyId; '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:policy1bucket, :policy1tenantId, :policy1groupId, :policy1policyId, '
             ':policy1trigger, :policy1cron, :policy1version); '
-            'UPDATE scaling_policies SET version = :policy1version '
-            'WHERE "tenantId"=:policy1tenantId AND "groupId"=:policy1groupId AND '
-            '"policyId"=:policy1policyId; '
             'APPLY BATCH;')
         data = {'policy0bucket': 2, 'policy0tenantId': '1d2', 'policy0groupId': 'gr2',
                 'policy0policyId': 'ef', 'policy0trigger': 100, 'policy0cron': 'c1',
-                'policy0version': 'timeuuid',
+                'policy0version': 'v1',
                 'policy1bucket': 3, 'policy1tenantId': '1d3', 'policy1groupId': 'gr3',
                 'policy1policyId': 'ex', 'policy1trigger': 122, 'policy1cron': 'c2',
-                'policy1version': 'timeuuid'}
+                'policy1version': 'v2'}
         self.collection.buckets = iter(range(2, 4))
 
         result = self.successResultOf(self.collection.add_cron_events(events))
@@ -1969,6 +1948,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.mock_key = patch(self, 'otter.models.cass.generate_key_str')
         patch(self, 'otter.models.cass.get_consistency_level',
               return_value=ConsistencyLevel.TWO)
+
+        self.uuid = patch(self, 'otter.models.cass.uuid')
+        self.uuid.uuid1.return_value = 'timeuuid'
 
         # 'serializing' something just wraps it with a _S
         self.mock_serial = patch(self, 'otter.models.cass.serialize_json_data',
@@ -2033,16 +2015,17 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
-            'policy0data': _S(policy)}
-        expectedCql = ('BEGIN BATCH '
-                       'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-                       'launch_config, active, pending, "policyTouched", '
-                       'paused, created_at) '
-                       'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                       ':pending, :policyTouched, :paused, :created_at) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-                       'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data) '
-                       'APPLY BATCH;')
+            'policy0data': _S(policy),
+            'policy0version': 'timeuuid'}
+        expectedCql = (
+            'BEGIN BATCH '
+            'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
+            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
+            ':pending, :policyTouched, :paused, :created_at) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
+            'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
         policy = group_examples.policy()[0]
         result = self.validate_create_return_value(self.mock_log, '123',
@@ -2082,19 +2065,21 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "paused": False,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
+            'policy0version': 'timeuuid',
             'policy1policyId': '3',
-            'policy1data': _S(policies[1])}
-        expectedCql = ('BEGIN BATCH '
-                       'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-                       'launch_config, active, pending, "policyTouched", '
-                       'paused, created_at) '
-                       'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                       ':pending, :policyTouched, :paused, :created_at) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-                       'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data) '
-                       'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data) '
-                       'VALUES (:tenantId, :groupId, :policy1policyId, :policy1data) '
-                       'APPLY BATCH;')
+            'policy1data': _S(policies[1]),
+            'policy1version': 'timeuuid'}
+        expectedCql = (
+            'BEGIN BATCH '
+            'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
+            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
+            ':pending, :policyTouched, :paused, :created_at) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policy1policyId, :policy1data, :policy1version) '
+            'APPLY BATCH;')
 
         counter = [0]
 
