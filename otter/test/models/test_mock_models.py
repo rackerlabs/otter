@@ -717,11 +717,11 @@ class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.tenant_id = 'goo1234'
         self.mock_log = mock.MagicMock()
 
-    def test_list_events(self):
+    def test_fetch_events(self):
         """
-        Test that the 'list all events' method works.
+        Test that the `fetch_and_delete` method works.
         """
-        deferred = self.collection.fetch_batch_of_events(1234, 100)
+        deferred = self.collection.fetch_and_delete(2, 1234, 100)
         self.assertEqual(self.successResultOf(deferred), [])
 
 

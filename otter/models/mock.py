@@ -216,7 +216,7 @@ class MockScalingGroup:
                     if (marker is None or k > marker)]
         return defer.succeed(policies[:limit])
 
-    def get_policy(self, policy_id):
+    def get_policy(self, policy_id, version=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.get_policy`
         """
@@ -434,13 +434,13 @@ class MockScalingGroupCollection:
         # a NoSuchScalingGroupError whenever its methods are called
         return result or MockScalingGroup(log, tenant, uuid, self, None)
 
-    def fetch_batch_of_events(self, now, size=100):
+    def fetch_and_delete(self, bucket, now, size=100):
         """
-        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_batch_of_events`
+        see :meth:`otter.models.interface.IScalingScheduleCollection.fetch_and_delete`
         """
         return defer.succeed([])
 
-    def update_delete_events(self, delete_policy_ids, update_policies):
+    def add_cron_events(self, events):
         """
         see :meth:`otter.models.interface.IScalingScheduleCollection.update_delete_events`
         """
