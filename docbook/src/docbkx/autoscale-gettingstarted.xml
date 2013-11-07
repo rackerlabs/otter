@@ -831,21 +831,13 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     you need to specify the time when the policy is
                     supposed to be invoked in CRON format, as shown in
                     the following example, which configures the policy
-                    to be invoked daily at
-                    midnight:<programlisting>
-{    
-   "args": {
-             "cron": "23 * * * *"
-          },</programlisting></para>
+                    to be invoked at 6 AM every
+                    day:<programlisting language="json"><xi:include href="./samples/Cronstylescheduler.json" parse="text"/></programlisting></para>
             <para>To set the time at which the policy will be invoked
-                    directly, without Cron, use  the "at" argument and
+                    directly, without Cron, use the "at" argument and
                     specify the time using the format that is shown in
-                    the following example
-                    <programlisting>    
- {
-    "args": {
-            "at": "2013-12-05T03:12:00Z"
-          },</programlisting></para>
+                    the following
+                    example:<programlisting language="json"><xi:include href="./samples/Atstylescheduler.json" parse="text"/></programlisting></para>
             </section>
             
             <section xml:id="Scale_by_percentage">
