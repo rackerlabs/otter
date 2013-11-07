@@ -126,7 +126,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.dirtied()
         keyspace.pause()
-        keyspace.reset(self.mktemp())
+        keyspace.reset()
         set_supervisor(None)
 
     def create_scaling_group(self):
@@ -344,7 +344,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.dirtied()
         keyspace.pause()
-        keyspace.reset(self.mktemp())
+        keyspace.reset()
 
     def assert_number_of_scaling_policies(self, number):
         """
