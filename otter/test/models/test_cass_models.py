@@ -1752,7 +1752,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         self.returns = [None]
         expected_at = '2012-10-20T03:23:45'
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
-               'args': {'at': '2012-10-20T03:23:45'}}
+               'args': {'at': expected_at}}
 
         d = self.group.create_policies([pol])
 
