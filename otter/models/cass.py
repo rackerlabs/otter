@@ -91,7 +91,7 @@ _cql_fetch_batch_of_events = (
     'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version FROM {cf} '
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
 _cql_delete_bucket_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
-                            'AND trigger = :{trigger} AND "policyId" = :{policy_id};')
+                            'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
 
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -253,7 +253,7 @@ def _build_policies(policies, policies_table, event_table, queries, data, bucket
             data[polname + 'version'] = uuid.uuid1()
 
             if policy.get("type") == 'schedule':
-                _build_schedule_policy(policy, event_table, policies_table, queries,
+                _build_schedule_policy(policy, event_table, queries,
                                        data, polname, buckets)
 
             outpolicies.append(policy.copy())
@@ -262,8 +262,7 @@ def _build_policies(policies, policies_table, event_table, queries, data, bucket
     return outpolicies
 
 
-def _build_schedule_policy(policy, event_table, policies_table, queries, data,
-                           polname, buckets):
+def _build_schedule_policy(policy, event_table, queries, data, polname, buckets):
     """
     Build schedule-type policy
     """
@@ -681,8 +680,8 @@ class CassScalingGroup(object):
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
                 if lastRev["type"] == 'schedule' and lastRev['args'] != data['args']:
-                    _build_schedule_policy(data, self.event_table, self.policies_table,
-                                           queries, cqldata, '', self.buckets)
+                    _build_schedule_policy(data, self.event_table, queries,
+                                           cqldata, '', self.buckets)
 
         def _do_update_policy(_):
             queries.append(_cql_insert_policy.format(cf=self.policies_table, name=""))
@@ -1050,14 +1049,12 @@ class CassScalingGroupCollection:
             data = {'bucket': bucket}
             queries = []
             for i, event in enumerate(events):
-                pol_num = 'policyid{}'.format(i)
-                trigger_num = 'trigger{}'.format(i)
+                event_name = 'event{}'.format(i)
                 queries.append(
                     _cql_delete_bucket_event.format(cf=self.event_table,
-                                                    policy_id=pol_num,
-                                                    trigger=trigger_num))
-                data[pol_num] = event['policyId']
-                data[trigger_num] = event['trigger']
+                                                    name=event_name))
+                data[event_name + 'policyId'] = event['policyId']
+                data[event_name + 'trigger'] = event['trigger']
             b = Batch(queries, data, get_consistency_level('delete', 'event'))
             return b.execute(self.connection).addCallback(lambda _: events)
 
@@ -1072,11 +1069,11 @@ class CassScalingGroupCollection:
         """
         queries, data = list(), dict()
         for i, event in enumerate(cron_events):
-            polname = 'policy{}'.format(i)
-            queries.append(_cql_insert_cron_event.format(cf=self.event_table, name=polname))
-            data[polname + 'version'] = uuid.uuid1()
-            data[polname + 'bucket'] = self.buckets.next()
-            data.update({polname + key: event[key] for key in event})
+            event_name = 'event{}'.format(i)
+            queries.append(_cql_insert_cron_event.format(cf=self.event_table,
+                                                         name=event_name))
+            data[event_name + 'bucket'] = self.buckets.next()
+            data.update({event_name + key: event[key] for key in event})
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
 

@@ -1864,12 +1864,12 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
             'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
         del_cql = ('BEGIN BATCH '
                    'DELETE FROM scaling_schedule WHERE bucket = :bucket '
-                   'AND trigger = :trigger0 AND "policyId" = :policyid0; '
+                   'AND trigger = :event0trigger AND "policyId" = :event0policyId; '
                    'DELETE FROM scaling_schedule WHERE bucket = :bucket '
-                   'AND trigger = :trigger1 AND "policyId" = :policyid1; '
+                   'AND trigger = :event1trigger AND "policyId" = :event1policyId; '
                    'APPLY BATCH;')
-        del_data = {'bucket': 2, 'trigger0': 100, 'policyid0': 'ef',
-                    'trigger1': 122, 'policyid1': 'ex'}
+        del_data = {'bucket': 2, 'event0trigger': 100, 'event0policyId': 'ef',
+                    'event1trigger': 122, 'event1policyId': 'ex'}
 
         result = self.validate_fetch_and_delete(2, 1234, 100)
 
@@ -1891,19 +1891,19 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
             'BEGIN BATCH '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
-            'VALUES (:policy0bucket, :policy0tenantId, :policy0groupId, :policy0policyId, '
-            ':policy0trigger, :policy0cron, :policy0version); '
+            'VALUES (:event0bucket, :event0tenantId, :event0groupId, :event0policyId, '
+            ':event0trigger, :event0cron, :event0version); '
             'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
-            'VALUES (:policy1bucket, :policy1tenantId, :policy1groupId, :policy1policyId, '
-            ':policy1trigger, :policy1cron, :policy1version); '
+            'VALUES (:event1bucket, :event1tenantId, :event1groupId, :event1policyId, '
+            ':event1trigger, :event1cron, :event1version); '
             'APPLY BATCH;')
-        data = {'policy0bucket': 2, 'policy0tenantId': '1d2', 'policy0groupId': 'gr2',
-                'policy0policyId': 'ef', 'policy0trigger': 100, 'policy0cron': 'c1',
-                'policy0version': 'v1',
-                'policy1bucket': 3, 'policy1tenantId': '1d3', 'policy1groupId': 'gr3',
-                'policy1policyId': 'ex', 'policy1trigger': 122, 'policy1cron': 'c2',
-                'policy1version': 'v2'}
+        data = {'event0bucket': 2, 'event0tenantId': '1d2', 'event0groupId': 'gr2',
+                'event0policyId': 'ef', 'event0trigger': 100, 'event0cron': 'c1',
+                'event0version': 'v1',
+                'event1bucket': 3, 'event1tenantId': '1d3', 'event1groupId': 'gr3',
+                'event1policyId': 'ex', 'event1trigger': 122, 'event1cron': 'c2',
+                'event1version': 'v2'}
         self.collection.buckets = iter(range(2, 4))
 
         result = self.successResultOf(self.collection.add_cron_events(events))
