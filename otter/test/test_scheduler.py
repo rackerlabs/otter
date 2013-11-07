@@ -137,6 +137,7 @@ class SchedulerServiceTests(SchedulerTests):
 
         # Ensure others are not called
         self.assertFalse(self.kz_partition.__iter__.called)
+        self.assertFalse(new_kz_partition.__iter__.called)
         self.assertFalse(self.check_events_in_bucket.called)
 
     def test_check_events_bad_state(self):
@@ -164,6 +165,7 @@ class SchedulerServiceTests(SchedulerTests):
 
         # Ensure others are not called
         self.assertFalse(self.kz_partition.__iter__.called)
+        self.assertFalse(new_kz_partition.__iter__.called)
         self.assertFalse(self.check_events_in_bucket.called)
 
     @mock.patch('otter.scheduler.datetime')
@@ -262,23 +264,6 @@ class CheckEventsInBucketTests(SchedulerTests):
         self.log.bind.return_value.err.assert_called_once_with(CheckFailure(ValueError))
         self.assertFalse(self.process_events.called)
 
-    def test_events_exact_limit(self):
-        """
-        When number of events fetched == limit
-        """
-        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
-                   'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
-        self.returns = [events, []]
-
-        d = check_events_in_bucket(self.log, self.mock_store, 1, 'now', 100)
-
-        self.successResultOf(d)
-        self.assertEqual(self.mock_store.fetch_and_delete.mock_calls,
-                         [mock.call(1, 'now', 100)] * 2)
-        self.assertEqual(self.process_events.mock_calls,
-                         [mock.call(events, self.mock_store, self.log.bind()),
-                          mock.call([], self.mock_store, self.log.bind())])
-
     def test_events_more_limit(self):
         """
         When events fetched > 100, they are processed in 2 batches
@@ -300,7 +285,8 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def test_events_batch_error(self):
         """
-        When error occurs after first batch of events are processed
+        When error occurs after first batch of events are processed, then it
+        logs errors and does not try to fetch again
         """
         events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
                    'trigger': 'now', 'cron': None, 'bucket': 1} for i in range(100)]
@@ -317,7 +303,7 @@ class CheckEventsInBucketTests(SchedulerTests):
 
     def test_events_batch_process(self):
         """
-        When events fetched > 100, they are processed in batches untill all
+        When events fetched > 100, they are processed in batches until all
         events are processed
         """
         events1 = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
@@ -405,6 +391,18 @@ class AddCronEventsTests(SchedulerTests):
         self.assertFalse(self.next_cron_occurrence.called)
         self.assertFalse(self.mock_store.add_cron_events.called)
 
+    def test_no_events_to_add(self):
+        """
+        When all events passed are to be deleted, then does nothing
+        """
+        events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
+                   'trigger': 'now', 'cron': '*', 'bucket': 1} for i in range(3)]
+        d = add_cron_events(self.mock_store, self.log, [], set(range(3)))
+        self.assertIsNone(d)
+        self.assertFalse(self.log.msg.called)
+        self.assertFalse(self.next_cron_occurrence.called)
+        self.assertFalse(self.mock_store.add_cron_events.called)
+
     def test_store_add_cron_called(self):
         """
         Updates cron events for non-deleted policies by calling store.add_cron_events
@@ -466,7 +464,7 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.log.bind.assert_called_with(**self.log_args)
         log = self.log.bind.return_value
-        log.msg.assert_called_once_with('Scheduler executing policy pol44')
+        log.msg.assert_called_once_with('Scheduler executing policy {policy_id}')
         self.maybe_exec_policy.assert_called_once_with(
             log, 'transaction-id', self.mock_group, self.mock_state,
             policy_id=self.event['policyId'], version=self.event['version'])
@@ -516,7 +514,7 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.bind.return_value.msg.assert_called_with(
-            'Scheduler cannot execute policy pol44',
+            'Scheduler cannot execute policy {policy_id}',
             reason=CheckFailure(CannotExecutePolicyError))
 
     def test_unknown_error(self):
@@ -532,4 +530,4 @@ class ExecuteEventTests(SchedulerTests):
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(len(del_pol_ids), 0)
         self.log.bind.return_value.err.assert_called_with(
-            CheckFailure(ValueError), 'Scheduler failed to execute policy pol44')
+            CheckFailure(ValueError), 'Scheduler failed to execute policy {policy_id}')

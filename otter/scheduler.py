@@ -96,7 +96,14 @@ class SchedulerService(TimerService):
 
 def check_events_in_bucket(log, store, bucket, now, batchsize):
     """
-    Check for events in the given bucket before `now`
+    Retrieves events in the given bucket that occur before or at now,
+    in batches of batchsize, for processing
+
+    :param log: A bound log for logging
+    :param store: `IScalingGroupCollection` provider
+    :param bucket: Bucket to check events in
+    :param now: Time before which events are checked
+    :param batchsize: Number of events to check at a time
 
     :return: a deferred that fires with None
     """
@@ -119,9 +126,13 @@ def check_events_in_bucket(log, store, bucket, now, batchsize):
 
 def process_events(events, store, log):
     """
-    Process events
+    Executes all the events and adds the next occurrence of each event to the buckets
 
-    :return: a deferred that fires with number of events processed
+    :param events: list of event dict to process
+    :param store: `IScalingGroupCollection` provider
+    :param log: A bound log for logging
+
+    :return: a `Deferred` that fires with number of events processed
     """
     if not events:
         return 0
@@ -148,7 +159,16 @@ def next_cron_occurrence(cron):
 
 def add_cron_events(store, log, events, deleted_policy_ids):
     """
-    Update events with cron entry with next trigger time
+    Update events with cron entry with next trigger time.
+
+    :param store: `IScalingGroupCollection` provider
+    :param log: A bound log for logging
+    :param events: list of event dict whose next event has to be added
+    :param deleted_policy_ids: set of policy ids that have been deleted. Events
+                               corresponding to these policy ids will not be added
+
+    :return: `Deferred` that fires will result of adding cron events or None if no
+             events have to be added
     """
     if not events:
         return
@@ -159,35 +179,36 @@ def add_cron_events(store, log, events, deleted_policy_ids):
             event['trigger'] = next_cron_occurrence(event['cron'])
             new_cron_events.append(event)
 
-    log.msg('Adding {new_cron_events} cron events', new_cron_events=len(new_cron_events))
-    return store.add_cron_events(new_cron_events)
+    if new_cron_events:
+        log.msg('Adding {new_cron_events} cron events', new_cron_events=len(new_cron_events))
+        return store.add_cron_events(new_cron_events)
 
 
 def execute_event(store, log, event, deleted_policy_ids):
     """
     Execute a single event
 
-    :param store: store
+    :param store: `IScalingGroupCollection` provider
     :param log: A bound log for logging
     :param event: event dict to execute
     :param deleted_policy_ids: Set of policy ids that are deleted. Policy id will be added
                                to this if its scaling group or policy has been deleted
-    :return: a deferred with the results of execution
+    :return: a deferred with None. Any error occurred during execution is logged
     """
     tenant_id, group_id, policy_id = event['tenantId'], event['groupId'], event['policyId']
     log = log.bind(tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
-    log.msg('Scheduler executing policy {}'.format(policy_id))
+    log.msg('Scheduler executing policy {policy_id}')
     group = store.get_scaling_group(log, tenant_id, group_id)
     d = group.modify_state(partial(maybe_execute_scaling_policy,
                                    log, generate_transaction_id(),
                                    policy_id=policy_id, version=event['version']))
     d.addErrback(ignore_and_log, CannotExecutePolicyError,
-                 log, 'Scheduler cannot execute policy {}'.format(policy_id))
+                 log, 'Scheduler cannot execute policy {policy_id}')
 
     def collect_deleted_policy(failure):
         failure.trap(NoSuchScalingGroupError, NoSuchPolicyError)
         deleted_policy_ids.add(policy_id)
 
     d.addErrback(collect_deleted_policy)
-    d.addErrback(log.err, 'Scheduler failed to execute policy {}'.format(policy_id))
+    d.addErrback(log.err, 'Scheduler failed to execute policy {policy_id}')
     return d
