@@ -60,7 +60,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/co
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-11-01</pubdate>
+        <pubdate/>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -1589,130 +1589,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
         some element of the configuration is invalid, scaling can fail
         even if the scaling policy is executed. </para>
     </section>
-    <section xml:id="Delete_Scaling_Group">
-      <title>Delete a Scaling Group</title>
-      <para>You can use the Auto Scale API to deactivate and delete
-        one or more scaling groups. Your options for deleting the
-        scaling group depend on whether your scaling group has active
-        entities or not.</para>
-      <para>
-        <note>
-          <para>You cannot delete a scaling group when it has active
-            entities associated with it.</para>
-        </note>
-      </para>
-      <para>When a group contains no servers, you can eliminate the
-        group by sending a <command>DELETE</command> request to its
-        group ID. </para>
-      <para>The following three options are possible for deleting a
-        scaling group:</para>
-      <para>
-        <orderedlist>
-          <listitem>
-            <para>If there are no active entities in your
-              configuration, use the <command>DELETE</command> request
-              to delete the scaling group.</para>
-          </listitem>
-          <listitem>
-            <para>If there are active entities in your configuration,
-              update your scaling group configuration by submitting a
-                <command>PUT</command> request and setting the
-                <parameter>minEntities</parameter> and
-                <parameter>maxEntities</parameter> parameters to 0.
-            </para>
-          </listitem>
-          <listitem>
-            <para>Force the deletion of your group by submitting a
-                <command>DELETE</command> request and setting the
-                <parameter>force</parameter> parameter to true.</para>
-          </listitem>
-        </orderedlist>
-      </para>
-      <example>
-        <title>Delete a Scaling Group with no Active Entities</title>
-        <para>To delete a scaling policy group that has no active
-          entities, submit a <command>DELETE</command> request with
-          the <parameter>tenantID</parameter> and
-            <parameter>groupID</parameter> parameters specified in the
-          request URL as shown in the following example: </para>
-        <programlisting language="json"><xi:include href="./samples/reqDeleteGroup.json" parse="text"/></programlisting>
-        <para>If the <command>DELETE</command> request is successful,
-          a 204 response code with no response body will be returned.
-          If the request fails, a 403 response code will be returned
-          with a message stating that your group still has active
-          entities as shown in the following example:</para>
-        <programlisting>
-"Group d5f5f3ad-faef-4c8f-99c4-0e931189c521 for tenant 829409 still has entities."
-                </programlisting>
-      </example>
-      <example>
-        <title>Delete a Scaling Group with Active
-          Entities<?sbr?><?sbr?></title>
-        <para>If you have submitted a <command>DELETE</command>
-          request and received a response saying that your group still
-          has active entities, go through the following steps:</para>
-        <para>
-          <orderedlist>
-            <listitem>
-              <para>Update the scaling group configuration by
-                submitting a <command>PUT</command> request that sets
-                the <parameter>minEntities</parameter> and
-                  <parameter>maxEntities</parameter> parameters to 0
-                as shown in the following example:</para>
-              <programlisting>
-PUT /{tenantId}/groups/{groupId}/config
-                </programlisting>
-              <programlisting language="json">
-<xi:include href="./samples/reqPutGroupConfig-size0.json" parse="text"/>
-</programlisting>
-            </listitem>
-            <listitem>
-              <para>Submit a <command>DELETE</command> request with
-                the <parameter>tenantId</parameter> and
-                  <parameter>groupId</parameter> parameters specified
-                in the request URL: </para>
-              <programlisting>
-DELETE /{tenantId}/groups/{groupId}
-            </programlisting>
-            </listitem>
-          </orderedlist>
-        </para>
-        <para>If the <command>DELETE</command> request is successful,
-          a 204 response code with an empty response body will be
-          returned.</para>
-      </example>
-      <example>
-        <title>Delete a Scaling Group using Force Delete</title>
-        <para>The Auto Scale API provides an option for users to force
-          delete a scaling group that has active servers. The Force
-          Delete option will remove all servers in the configuration
-          from the load balancer(s) and then delete the server. </para>
-        <para>
-          <warning>
-            <para>Using Force Delete will remove all servers that are
-              associated with the scaling group immediately. Users are
-              discouraged from using the Force Delete option and to
-              manually delete servers instead.</para>
-          </warning>
-        </para>
-        <para>To use the Force Delete option, submit a
-            <command>DELETE</command> request with the
-            <parameter>tenantId</parameter> and
-            <parameter>groupId</parameter> parameters specified in the
-          request URL, and set the <parameter>force</parameter>
-          parameter to <parameter>true</parameter>. </para>
-        <programlisting>
-DELETE /{tenantId}/groups/{groupId}?force=true
-            </programlisting>
-        <para>Upon successful submission of this request the
-            <parameter>minEntities</parameter> and
-            <parameter>maxEntities</parameter> parameters will
-          automatically be set to 0 and the deletion of the group will
-          begin. If the <command>DELETE</command> request is
-          successful, a 204 response code with an empty response body
-          will be returned.</para>
-      </example>
-    </section>
+    <section xml:id="Delete_Scaling_Group"/>
     <xi:include href="./chapters/rbac.xml"/>
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
