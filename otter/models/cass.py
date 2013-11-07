@@ -963,39 +963,38 @@ class CassScalingGroupCollection:
 
         d.addCallback(check_groups, max_groups)
 
-        log.msg("Creating scaling group")
+        def _create_group(_):
+            log.msg("Creating scaling group")
+            queries = [_cql_create_group.format(cf=self.group_table)]
 
-        queries = [_cql_create_group.format(cf=self.group_table)]
+            data = {
+                "tenantId": tenant_id,
+                "groupId": scaling_group_id,
+                "group_config": serialize_json_data(config, 1),
+                "launch_config": serialize_json_data(launch, 1),
+                "active": '{}',
+                "pending": '{}',
+                "created_at": datetime.utcnow(),
+                "policyTouched": '{}',
+                "paused": False
+            }
 
-        data = {
-            "tenantId": tenant_id,
-            "groupId": scaling_group_id,
-            "group_config": serialize_json_data(config, 1),
-            "launch_config": serialize_json_data(launch, 1),
-            "active": '{}',
-            "pending": '{}',
-            "created_at": datetime.utcnow(),
-            "policyTouched": '{}',
-            "paused": False
-        }
+            scaling_group_state = GroupState(
+                tenant_id,
+                scaling_group_id,
+                config['name'],
+                {},
+                {},
+                data['created_at'],
+                {},
+                data['paused']
+            )
+            outpolicies = _build_policies(policies, self.policies_table,
+                                          self.event_table, queries, data)
 
-        scaling_group_state = GroupState(
-            tenant_id,
-            scaling_group_id,
-            config['name'],
-            {},
-            {},
-            data['created_at'],
-            {},
-            data['paused']
-        )
-        outpolicies = _build_policies(policies, self.policies_table,
-                                      self.event_table, queries, data)
+            b = Batch(queries, data,
+                      consistency=get_consistency_level('create', 'group'))
 
-        b = Batch(queries, data,
-                  consistency=get_consistency_level('create', 'group'))
-
-        def execute_batch(_ignore):
             bd = b.execute(self.connection)
             bd.addCallback(lambda _: {
                 'groupConfiguration': config,
@@ -1007,7 +1006,7 @@ class CassScalingGroupCollection:
 
             return bd
 
-        return d.addCallback(execute_batch)
+        return d.addCallback(_create_group)
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """
