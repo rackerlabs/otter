@@ -55,8 +55,8 @@ format="SVG" scale="60"/>
     <title>&PRODNAME; Getting Started Guide</title>
     <titleabbrev>&PRODABBV; Intro</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
-      status.bar.text="Early Access" 
-      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
+status.bar.text="Early Access"
+canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
@@ -169,7 +169,7 @@ format="SVG" scale="60"/>
                     </listitem>
                     <listitem>
                         <para>Rackspace username and password
-                            specified during registration</para>
+                            specified during registration.</para>
                     </listitem>
                 </itemizedlist>
             </para>
@@ -203,8 +203,9 @@ format="SVG" scale="60"/>
                     xlink:href="http:// docs.autoscale.apiary.io/ "
                     >http:// docs.autoscale.apiary.io/ </link>. Also,
                 for a list of FAQs on Autoscale, read <link
-                    xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC "
-                    >this article</link>.</para>
+                    xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC"
+                    >the Auto Scale FAQ page on the Knowledge
+                    Center</link>.</para>
         </section>
     </chapter>
     <chapter xml:id="Core_Concepts">
@@ -231,7 +232,7 @@ format="SVG" scale="60"/>
                             Guide</link>.</para>
                 </listitem>
             </itemizedlist>You can set up a schedule for launching
-            Autoscale or define an event that is triggered by Cloud
+            Auto Scale or define an event that is triggered by Cloud
             Monitoring. You can also specify a minimum and maximum
             number of cloud servers, the amount of resources you want
             to increase or decrease and the thresholds in Cloud
@@ -271,12 +272,12 @@ format="SVG" scale="60"/>
                 <para>You can configure Auto Scale to be triggered
                     based on a user-defined schedule that is specified
                     in one or more policies.</para>
-                <para>This Configuration option is helpful if you know
+                <para>This configuration option is helpful if you know
                     that your Cloud Server deployment will need
                     additional resources during certain peak times.
                     For example, if you need additional server
                     resources during the weekend, you can define a
-                    policy that adds 50 server on Friday evening and
+                    policy that adds 50 servers on Friday evening and
                     then removes these servers again on Sunday evening
                     to return to a regular operational state.</para>
                 <para>The following diagram outlines how Scaling by
@@ -285,7 +286,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebySchedule.png"
+                                fileref="images/ScalebySchedule.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -302,7 +303,7 @@ format="SVG" scale="60"/>
                 <title>Monitoring-based configuration</title>
                 <para>You can configure Auto Scale to be triggered
                     based on a predefined alarm or threshold that has
-                    been previously set up in Cloud Montioring. </para>
+                    been previously set up in Cloud Monitoring. </para>
                 <para>Monitoring-based configuration works the
                     following way:</para>
                 <para>
@@ -335,13 +336,29 @@ format="SVG" scale="60"/>
             <section xml:id="webhooks-anonymous-webhooks">
                 <title>Webhooks, Anonymous Webhooks, and Capability
                     URLs</title>
-                <para>Auto Scale supports webhooks. Webhooks are also
-                    sometimes referred to as capability URLs. A
-                    webhook is an HTTP callback that is triggered by
+                <para>Auto Scale uses webhooks to initiate a scaling
+                    event. A webhook is an industry-standard protocol
+                    for sending events between systems. A webhook
+                    consists of HTTP callback that is triggered by
                     some user-defined event, such as an alarm that is
                     set through Cloud Monitoring. When that event
                     occurs the source site makes an HTTP request to
                     the URI configured for the webhook. </para>
+                <para>A webhook contains a POST call to a defined URL,
+                    potentially with a payload in the POST body. You
+                    can send webhooks with a simple call in whatever
+                    library is available for your environment. You can
+                    also manually send them via cURL.   </para>
+                <para>The following example shows how to send a
+                    webhook with cURL:</para>
+                <para>
+                    <programlisting>curl -v  http://example.com/webhook -X POST -d 'payload=payload'</programlisting>
+                </para>
+                <para>For more information about how webhooks are used
+                    in the Rackspace API, see </para>
+                <para><link
+                        xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook"
+                        >http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook</link>.</para>
                 <para>Auto Scale also support anonymous webhooks. In
                     regular webhooks, the
                         <code>{capability_version}/{capability_hash}</code>
@@ -350,11 +367,12 @@ format="SVG" scale="60"/>
                     the issuer—this is the reason why the webhook is
                     called "anonymous" because no authentication is
                     needed. </para>
-                <para> Capability URLs are URLs that themselves give
-                    authorization.  If you know the URL, you have
-                    access to it and it enables you to do something.
-                     Capability URLs are usually long, random, and
-                    cannot be guessed by a user.</para>
+                <para> Capability URLs are URLs that give
+                    authorization for a certain action or event. If
+                    you know the URL, you have access to it and it
+                    enables you to do something. Capability URLs are
+                    usually long, random, and cannot be guessed by a
+                    user.</para>
             </section>
             <section xml:id="cooldowns">
                 <title>Cooldowns</title>
@@ -463,7 +481,7 @@ format="SVG" scale="60"/>
         </section>
         <section xml:id="Launch_Configuration">
             <title>Launch Configuration</title>
-            <para> The launch configuration manages the process of
+            <para>The launch configuration manages the process of
                 creating new servers. It specifies what type of server
                 image will be started on launch, what flavor the new
                 server is, and which load balancer the new server
@@ -683,7 +701,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebyPercentage.png"
+                                fileref="images/ScalebyPercentage.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -708,7 +726,7 @@ format="SVG" scale="60"/>
                 <informalfigure>
                     <mediaobject>
                         <imageobject>
-                            <imagedata fileref="Images/Minandmax.png"
+                            <imagedata fileref="images/Minandmax.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -743,7 +761,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/DeletePolicy.png"
+                                fileref="images/DeletePolicy.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -795,7 +813,7 @@ format="SVG" scale="60"/>
         <section xml:id="Authenticate">
             <title>Authenticate</title>
             <para>As with all Rackspace APIs, before you can use the
-                Autoscale API you must authenticate with your
+                Auto Scale API you must authenticate with your
                 Rackspace credentials. </para>
             <itemizedlist>
                 <listitem>
@@ -834,6 +852,11 @@ format="SVG" scale="60"/>
                 you issue an authentication request to the Rackspace
                 Cloud Identity Service, which is an implementation of
                 the OpenStack Keystone Identity Service v2.0. </para>
+            <para>Auto Scale supports Role-based Access Control (RBAC)
+                for more information, read <link
+                    xlink:href="http://ord.admin.kc.rakr.net/knowledge_center/article/permissions-matrix-for-auto-scale"
+                    >this article</link> on the Knowledge
+                Center.</para>
             <important>
                 <para>Multiple Rackspace Cloud Identity Service
                     endpoints exist. You may use any endpoint,
@@ -879,7 +902,7 @@ format="SVG" scale="60"/>
             </table>
             <section xml:id="Authenticate_using_cURL">
                 <title>Authenticate using cURL</title>
-                <para>To authenticate against the Rackspace Autoscale
+                <para>To authenticate against the Rackspace Auto Scale
                     API, you issue a POST request to the appropriate
                     Rackspace Cloud Identity Service endpoint. In the
                     request body, supply one of the following sets of
@@ -933,7 +956,7 @@ format="SVG" scale="60"/>
                 </itemizedlist>
             </para>
             <para> With the Cloud Servers API, you can use a <link
-                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
+                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/images-d1e4427.html"
                     >List Images</link> request to retrieve a list of
                 options available for configuring your server. <example>
                     <title>Requesting a List of Cloud Server
