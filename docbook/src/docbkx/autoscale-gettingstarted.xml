@@ -334,8 +334,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 </para>
             </section>
             <section xml:id="webhooks-anonymous-webhooks">
-                <title>Webhooks, Anonymous Webhooks, and Capability
-                    URLs</title>
+                <title>Webhooks</title>
                 <para>Auto Scale uses webhooks to initiate a scaling
                     event. A webhook is an industry-standard protocol
                     for sending events between systems. A webhook
@@ -367,22 +366,19 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     the issuer—this is the reason why the webhook is
                     called "anonymous" because no authentication is
                     needed. </para>
-                <para> Capability URLs are URLs that give
-                    authorization for a certain action or event. If
-                    you know the URL, you have access to it and it
-                    enables you to do something. Capability URLs are
-                    usually long, random, and cannot be guessed by a
-                    user.</para>
             </section>
             <section xml:id="cooldowns">
                 <title>Cooldowns</title>
-                <para>Auto Scale supports a cooldown feature. By
-                    configuring cooldown periods between triggers, you
-                    can control how quickly Auto Scale scales up
-                    toward the scaling group's maximum size or down
-                    toward the scaling group's minimum size. A
-                    cooldown is a period during which no other scaling
-                    activity occurs. </para>
+                <para>Auto Scale supports a cooldown feature. A
+                    cooldown is a configured period of time that must
+                    pass between actions. By configuring group
+                    cooldowns, you control how often a group can have
+                    a policy applied, which can help servers scaling
+                    up to complete the scale up before another policy
+                    is executed. By configuring policy cooldowns, you
+                    control how often a policy can be executed, which
+                    can help provide quick scale-ups and gradual
+                    scale-downs.</para>
                 <para>Cooldowns work the following way:<itemizedlist>
                         <listitem>
                             <para>Cooldowns allow some time for the
@@ -437,10 +433,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <para>The scaling group configuration specifies the basic
                 elements of the Auto Scale configuration. It manages
                 how many servers can participate in the scaling group. </para>
-            <table rules="all" width="566">
+            <table rules="all">
                 <caption>GroupConfiguration Parameters</caption>
-                <col width="175pt"/>
-                <col width="69%"/>
+                <col width="20%"/>
+                <col width="60%"/>
                 <thead>
                     <tr>
                         <td>Parameter Name</td>
@@ -474,10 +470,12 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 </tbody>
             </table>
             <para>The number of entities that are specified in
-                minEntities and maxEntities overrides the amount of
-                resources that can be specified in a policy. See also
-                    <link linkend="Min_and_Max_Policies">Using the Min
-                    and Max Values with Policies</link>.</para>
+                    <parameter>minEntities</parameter> and
+                    <parameter>maxEntities</parameter> overrides the
+                amount of resources that can be specified in a policy.
+                See also <link linkend="Min_and_Max_Policies">Using
+                    the Min and Max Values with
+                Policies</link>.</para>
         </section>
         <section xml:id="Launch_Configuration">
             <title>Launch Configuration</title>
@@ -505,17 +503,56 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                                    configuration type.) </emphasis>
                                 </para>
                             </listitem>
+                            <listitem>
+                                <para><parameter>args</parameter></para>
+                                <para>Specifies the item to be
+                                   configured.  This parameter must be
+                                   one of the following two, or
+                                   both:</para>
+                                <para>
+                                   <table rules="all">
+                                   <caption>args Parameters</caption>
+                                   <col width="20%"/>
+                                   <col width="60%"/>
+                                   <thead>
+                                   <tr>
+                                   <td>Value</td>
+                                   <td>Description</td>
+                                   </tr>
+                                   </thead>
+                                   <tbody>
+                                   <tr>
+                                   <td><parameter>server</parameter></td>
+                                   <td>Specifies configuration
+                                   information for the Cloud server
+                                   image that will be created during
+                                   the scaling process.</td>
+                                   </tr>
+                                   <tr>
+                                   <td><parameter>loadbalancers</parameter></td>
+                                   <td>Specifies the configuration
+                                   information for the load
+                                   balancer(s) used in the cloud
+                                   server deployment.</td>
+                                   </tr>
+                                   </tbody>
+                                   </table>
+                                </para>
+                            </listitem>
                         </itemizedlist>
                     </listitem>
                     <listitem>
                         <para>
-                            <emphasis role="bold">Server</emphasis> -
-                            specifies details about the server</para>
+                            <emphasis role="bold"
+                            >Server</emphasis></para>
+                        <para>This argument specifies details about
+                            the server as described in the following
+                            table:</para>
                         <para>
-                            <table>
+                            <table rules="all">
                                 <caption>server Parameters</caption>
-                                <col width="175pt"/>
-                                <col width="69%"/>
+                                <col width="20%"/>
+                                <col width="60%"/>
                                 <thead>
                                    <tr>
                                    <td>Parameter Name</td>
@@ -525,7 +562,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                                 <tbody>
                                    <tr>
                                    <td><parameter>name</parameter></td>
-                                   <td>Name of the scaling group</td>
+                                   <td>Specifies the name of the
+                                   server</td>
                                    </tr>
                                    <tr>
                                    <td><parameter>flavorRef</parameter></td>
@@ -546,12 +584,13 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         <para>
                             <emphasis role="bold">Load
                                 Balancers</emphasis>- specifies
-                            details about the load balancer </para>
-                        <table>
+                            details about the load balancer as
+                            described in the following table:</para>
+                        <table rules="all">
                             <caption>loadBalancers
                                 Parameters</caption>
-                            <col width="175pt"/>
-                            <col width="69%"/>
+                            <col width="20%"/>
+                            <col width="60%"/>
                             <thead>
                                 <tr>
                                    <td>Parameter Name</td>
@@ -632,10 +671,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 scaling group and its behavior. You can specify
                 multiple policies to manage a scaling group. </para>
             <para>Scaling policies specify the following:</para>
-            <table>
+            <table rules="all">
                 <caption>scalingPolicies Parameters</caption>
-                <col width="175pt"/>
-                <col width="69%"/>
+                <col width="20%"/>
+                <col width="60%"/>
                 <thead>
                     <tr>
                         <td>Parameter Name</td>
@@ -660,7 +699,9 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <tr>
                         <td><parameter>type</parameter></td>
                         <td>Specifies how the policy will be executed
-                            (by webhook)</td>
+                            (by <parameter>webhook</parameter> or
+                            based on a
+                            <parameter>schedule</parameter>.</td>
                     </tr>
                 </tbody>
             </table>
@@ -668,14 +709,16 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 policy:</para>
             <itemizedlist spacing="compact">
                 <listitem>
-                    <para> Define a policy that triggers Auto Scale
+                    <para>Define a policy that triggers Auto Scale
                         activities <link
-                            linkend="Schedule_Based_Configuration"
-                            >based on a schedule</link>.</para>
+                            linkend="Schedule_based_Policy">based on a
+                            schedule</link>.</para>
                 </listitem>
                 <listitem>
                     <para>Define a policy that triggers Auto Scale
-                        activities based on a predefined event.</para>
+                        activities based on a predefined event, <link
+                            linkend="Webhook_triggered_policy">using a
+                            webhook</link>.</para>
                 </listitem>
                 <listitem>
                     <para>Define a policy that scales up or down by a
@@ -688,6 +731,123 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         percentage</link>.</para>
                 </listitem>
             </itemizedlist>
+            <section xml:id="Webhook_triggered_policy">
+                <title>Webhook-triggered policies</title>
+                <para>You can define a scaling policy that is invoked
+                    by a webhook when a predefined event occurs. To
+                    configure a webhook-based policy, you need to set
+                    the <parameter>type</parameter> parameter to
+                    "webhook" and then provide the following
+                    information: </para>
+                <para>
+                    <table rules="all">
+                        <caption>Parameters for Webhook-triggered
+                            Policies</caption>
+                        <col width="20%"/>
+                        <col width="60%"/>
+                        <thead>
+                            <tr>
+                                <td>Parameter Name</td>
+                                <td>Description</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><parameter>change</parameter></td>
+                                <td>Specifies the number of entities
+                                   to add or remove, for example "1"
+                                   implies that 1 server needs to be
+                                   added.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>changePercent</parameter></td>
+                                <td>Specifies the change value, in
+                                   incremental stages or per
+                                   cent.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>desiredCapacity</parameter></td>
+                                <td>Specifies final capacity that is
+                                   desired by the scale up event</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>args</parameter></td>
+                                <td>Specifiy any additional
+                                   information</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </para>
+            </section>
+            <section xml:id="Schedule_based_Policy">
+            <title>Schedule-based Policies</title>
+                <para>You can define a scaling policy that is invoked
+                    by a preset schedule. To configure a
+                    schedule-based policy, you need to set the
+                        <parameter>type</parameter> parameter to
+                    "schedule" and then provide the following
+                    information: </para>
+                <para>
+                    <table>
+                        <caption>Parameters for Webhook-triggered
+                            Policies</caption>
+                        <col width="205"/>
+                        <col width="60%"/>
+                        <thead>
+                            <tr>
+                                <td>Parameter Name</td>
+                                <td>Description</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><parameter>change</parameter></td>
+                                <td>Specifies the number of entities
+                                   to add or remove, for example "1"
+                                   implies that 1 server needs to be
+                                   added.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>changePercent</parameter></td>
+                                <td>Specifies the change value, in
+                                   incremental stages or per
+                                   cent.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>desiredCapacity</parameter></td>
+                                <td>Specifies final capacity that is
+                                   desired by the scale up event</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>args</parameter></td>
+                                <td>Provide information related to the
+                                   time when the policy is supposed to
+                                   be invoked.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </para>
+            <para>For example to use Cron, a time-based job scheduler,
+                    you need to specify the time when the policy is
+                    supposed to be invoked in CRON format, as shown in
+                    the following example, which configures the policy
+                    to be invoked daily at
+                    midnight:<programlisting>
+{    
+   "args": {
+             "cron": "23 * * * *"
+          },</programlisting></para>
+            <para>To set the time at which the policy will be invoked
+                    directly, without Cron, use  the "at" argument and
+                    specify the time using the format that is shown in
+                    the following example
+                    <programlisting>    
+ {
+    "args": {
+            "at": "2013-12-05T03:12:00Z"
+          },</programlisting></para>
+            </section>
+            
             <section xml:id="Scale_by_percentage">
                 <title>Scaling by Percentage</title>
                 <para>You can define a policy that scales your server
@@ -711,18 +871,28 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <title>Using the Min and Max Values with
                     Policies</title>
                 <para>When setting up the configuration for your
-                    scaling groups, you specified the minimum and
+                    scaling groups, you configure the minimum and
                     maximum amount of resources that are allowed in
                     your configuration. These values are specified in
-                    the minEntities and maxEntities parameters under
-                    GroupConfiguration, and are invoked whenever your
-                    group configuration is updated. If the amount of
-                    resources that is specified in a policy differs
-                    from the amount that is specified under
-                    GroupConfiguration, the preconfigured values take
-                    precedence. </para>
-                <para>The following diagram illustrates how this
-                    concept works.</para>
+                    the <parameter>minEntities</parameter> and
+                        <parameter>maxEntities</parameter> parameters
+                    under <emphasis role="bold"
+                        >GroupConfiguration</emphasis>, and are
+                    invoked whenever you update your group
+                    configuration. </para>
+                <para>
+                    <important>
+                        <para>If the amount of resources that is
+                            specified in a policy differs from the
+                            amount that is specified under <emphasis
+                                role="bold"
+                                >GroupConfiguration</emphasis>, the
+                            preconfigured values take precedence.
+                        </para>
+                    </important>
+                </para>
+                <para>The following diagram illustrates how the min
+                    and max values work in a scaling scenario.</para>
                 <informalfigure>
                     <mediaobject>
                         <imageobject>
@@ -898,6 +1068,12 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
                         </td>
                     </tr>
+                    <tr align="left">
+                        <td colspan="2">Hong Kong (HKG)</td>
+                        <td colspan="5">
+                            <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
                 </tbody>
             </table>
             <section xml:id="Authenticate_using_cURL">
@@ -952,6 +1128,23 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             Servers API by using a <link
                                 xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
                                 >Create Server</link> request. </para>
+                        <para>
+                            <note>
+                                <para>Auto Scale does not use the
+                                   <parameter>name</parameter>
+                                   parameter in the Create Server
+                                   request, as the server name is
+                                   automatically generate.</para>
+                                <para>The metadata parameter is
+                                   optional. The maximum size of the
+                                   metadata key and value is 255 bytes
+                                   each. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   >Server Metadata</link>
+                                   documentation.</para>
+                            </note>
+                        </para>
                     </listitem>
                 </itemizedlist>
             </para>
