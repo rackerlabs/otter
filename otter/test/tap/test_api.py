@@ -12,7 +12,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import Options, makeService, setup_scheduler
-from otter.test.utils import patch
+from otter.test.utils import patch, CheckFailure
 from otter.util.config import set_config_data
 
 
@@ -219,28 +219,6 @@ class APIMakeServiceTests(TestCase):
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
 
-    def test_mock_store_with_scheduler(self):
-        """
-        makeService does not setup a SchedulerService when Cassandra is
-        mocked, and a scheduler config exists.
-        """
-        mock_config = test_config.copy()
-        mock_config['mock'] = True
-        mock_config['scheduler'] = {'interval': 1, 'batchsize': 5}
-
-        makeService(mock_config)
-
-        for mocked in (self.RoundRobinCassandraCluster,
-                       self.LoggingCQLClient,
-                       self.CassScalingGroupCollection,
-                       self.SchedulerService,
-                       self.clientFromString):
-            mock_calls = getattr(mocked, 'mock_calls')
-            self.assertEqual(len(mock_calls), 0,
-                             "{0} called with {1}".format(mocked, mock_calls))
-
-        self.test_mock_store_with_scheduler.skip = 'Temporarily'
-
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
         """
@@ -257,7 +235,7 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
         """
-        KazooClient is started and calls `setup_scheduler`
+        TxKazooClient is started and calls `setup_scheduler`
         """
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts'}
@@ -271,6 +249,27 @@ class APIMakeServiceTests(TestCase):
         kz_client.start.assert_called_once_with()
         mock_setup_scheduler.assert_called_once_with(
             parent, self.CassScalingGroupCollection.return_value, kz_client)
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_failed(self, mock_txkz, mock_setup_scheduler):
+        """
+        `setup_scheduler` is not called if TxKazooClient is not able to start
+        Error is logged
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        kz_client = mock.Mock(spec=['start'])
+        kz_client.start.return_value = defer.fail(ValueError('e'))
+        mock_txkz.return_value = kz_client
+
+        parent = makeService(config)
+
+        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        kz_client.start.assert_called_once_with()
+        self.assertFalse(mock_setup_scheduler.called)
+        self.log.err.assert_called_once_with(CheckFailure(ValueError),
+                                             'Could not start TxKazooClient')
 
 
 class SchedulerSetupTests(TestCase):
@@ -286,7 +285,7 @@ class SchedulerSetupTests(TestCase):
         self.config = {
             'scheduler': {
                 'buckets': 10,
-                'partition_path': '/part_path',
+                'partition': {'path': '/part_path', 'time_boundary': 15},
                 'batchsize': 100,
                 'interval': 10
             }
@@ -304,11 +303,24 @@ class SchedulerSetupTests(TestCase):
 
     def test_success(self):
         """
-        All works
+        `SchedulerService` is configured with config values and set as parent
+        to passed `MultiService`
         """
         setup_scheduler(self.parent, self.store, self.kz_client)
         buckets = range(1, 11)
         self.store.set_scheduler_buckets.assert_called_once_with(buckets)
         self.scheduler_service.assert_called_once_with(
-            100, 10, self.store, self.kz_client, '/part_path', buckets)
+            100, 10, self.store, self.kz_client, '/part_path', 15, buckets)
         self.scheduler_service.return_value.setServiceParent.assert_called_once_with(self.parent)
+
+    def test_mock_store_with_scheduler(self):
+        """
+        SchedulerService is not created with mock store
+        """
+        self.config['mock'] = True
+        set_config_data(self.config)
+
+        setup_scheduler(self.parent, self.store, self.kz_client)
+
+        self.assertFalse(self.store.set_scheduler_buckets.called)
+        self.assertFalse(self.scheduler_service.called)

@@ -54,12 +54,13 @@ class SchedulerServiceTests(SchedulerTests):
                                            allocated=False)
         self.kz_client.SetPartitioner.return_value = self.kz_partition
         self.zk_partition_path = '/part_path'
+        self.time_boundary = 15
         self.buckets = range(1, 10)
 
         self.clock = Clock()
         self.scheduler_service = SchedulerService(
             100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
-            self.buckets, self.clock)
+            self.time_boundary, self.buckets, self.clock)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
@@ -71,7 +72,7 @@ class SchedulerServiceTests(SchedulerTests):
         """
         self.scheduler_service.startService()
         self.kz_client.SetPartitioner.assert_called_once_with(
-            self.zk_partition_path, set=set(self.buckets))
+            self.zk_partition_path, set=set(self.buckets), time_boundary=self.time_boundary)
         self.assertEqual(self.scheduler_service.kz_partition, self.kz_partition)
         self.timer_service.startService.assert_called_once_with(self.scheduler_service)
 
@@ -124,7 +125,7 @@ class SchedulerServiceTests(SchedulerTests):
 
         # after starting change SetPartitioner return value to check if
         # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.Mock()
+        new_kz_partition = mock.MagicMock()
         self.kz_client.SetPartitioner.return_value = new_kz_partition
 
         self.scheduler_service.check_events(100)
@@ -132,7 +133,8 @@ class SchedulerServiceTests(SchedulerTests):
 
         # Called once when starting and now again when partition failed
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets))] * 2)
+                         [mock.call(self.zk_partition_path, set=set(self.buckets),
+                                    time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
 
         # Ensure others are not called
@@ -150,7 +152,7 @@ class SchedulerServiceTests(SchedulerTests):
 
         # after starting change SetPartitioner return value to check if
         # new value is set in self.scheduler_service.kz_partition
-        new_kz_partition = mock.Mock()
+        new_kz_partition = mock.MagicMock()
         self.kz_client.SetPartitioner.return_value = new_kz_partition
 
         self.scheduler_service.check_events(100)
@@ -160,7 +162,8 @@ class SchedulerServiceTests(SchedulerTests):
 
         # Called once when starting and now again when got bad state
         self.assertEqual(self.kz_client.SetPartitioner.call_args_list,
-                         [mock.call(self.zk_partition_path, set=set(self.buckets))] * 2)
+                         [mock.call(self.zk_partition_path, set=set(self.buckets),
+                                    time_boundary=self.time_boundary)] * 2)
         self.assertEqual(self.scheduler_service.kz_partition, new_kz_partition)
 
         # Ensure others are not called
