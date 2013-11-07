@@ -235,8 +235,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.mock_log = mock.MagicMock()
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
-                                      self.connection, itertools.cycle(range(10)))
-        self.group.buckets = iter(range(2, 10))
+                                      self.connection, itertools.cycle(range(2, 10)))
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
