@@ -948,7 +948,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         scaling_group_id = generate_key_str('scalinggroup')
-        log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
+        log = log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
 
         # obey limits
         max_groups = config_value('limits.absolute.maxGroups')
