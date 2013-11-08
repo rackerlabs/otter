@@ -950,5 +950,44 @@ If successful, no response body will be returned.
 ### Get Limits [GET]
 Provides details about account usage limits.
 
-+ Response 501
++ Response 200 (application/json)
+    + Body
+            
+            {
+                "limits": {
+                    "absolute": {
+                        "maxGroups": 1000,
+                        "maxPoliciesPerGroup": 1000,
+                        "maxWebhooksPerPolicy": 1000
+                    },
+                    "rate": [
+                        {
+                            "limit": [
+                                {
+                                    "next-available": "2013-11-08T23:27:15.646Z",
+                                    "remaining": 999,
+                                    "unit": "MINUTE",
+                                    "value": 1000,
+                                    "verb": "ALL"
+                                }
+                            ],
+                            "regex": "/v1\\.0/([0-9]+)/.+",
+                            "uri": "/v1.0/tenantId/*"
+                        },
+                        {
+                            "limit": [
+                                {
+                                    "next-available": "2013-11-08T23:26:15.674Z",
+                                    "remaining": 10,
+                                    "unit": "SECOND",
+                                    "value": 10,
+                                    "verb": "ALL"
+                                }
+                            ],
+                            "regex": "/v1\\.0/execute/(.*)",
+                            "uri": "/v1.0/execute/*"
+                        }
+                    ]
+                }
+            }
 
