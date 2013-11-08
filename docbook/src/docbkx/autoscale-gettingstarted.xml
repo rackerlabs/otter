@@ -55,8 +55,8 @@ format="SVG" scale="60"/>
     <title>&PRODNAME; Getting Started Guide</title>
     <titleabbrev>&PRODABBV; Intro</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
-      status.bar.text="Early Access" 
-      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
+status.bar.text="Early Access"
+canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
@@ -169,7 +169,7 @@ format="SVG" scale="60"/>
                     </listitem>
                     <listitem>
                         <para>Rackspace username and password
-                            specified during registration</para>
+                            specified during registration.</para>
                     </listitem>
                 </itemizedlist>
             </para>
@@ -203,8 +203,9 @@ format="SVG" scale="60"/>
                     xlink:href="http:// docs.autoscale.apiary.io/ "
                     >http:// docs.autoscale.apiary.io/ </link>. Also,
                 for a list of FAQs on Autoscale, read <link
-                    xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC "
-                    >this article</link>.</para>
+                    xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC"
+                    >the Auto Scale FAQ page on the Knowledge
+                    Center</link>.</para>
         </section>
     </chapter>
     <chapter xml:id="Core_Concepts">
@@ -231,7 +232,7 @@ format="SVG" scale="60"/>
                             Guide</link>.</para>
                 </listitem>
             </itemizedlist>You can set up a schedule for launching
-            Autoscale or define an event that is triggered by Cloud
+            Auto Scale or define an event that is triggered by Cloud
             Monitoring. You can also specify a minimum and maximum
             number of cloud servers, the amount of resources you want
             to increase or decrease and the thresholds in Cloud
@@ -271,12 +272,12 @@ format="SVG" scale="60"/>
                 <para>You can configure Auto Scale to be triggered
                     based on a user-defined schedule that is specified
                     in one or more policies.</para>
-                <para>This Configuration option is helpful if you know
+                <para>This configuration option is helpful if you know
                     that your Cloud Server deployment will need
                     additional resources during certain peak times.
                     For example, if you need additional server
                     resources during the weekend, you can define a
-                    policy that adds 50 server on Friday evening and
+                    policy that adds 50 servers on Friday evening and
                     then removes these servers again on Sunday evening
                     to return to a regular operational state.</para>
                 <para>The following diagram outlines how Scaling by
@@ -285,7 +286,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebySchedule.png"
+                                fileref="images/ScalebySchedule.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -302,7 +303,7 @@ format="SVG" scale="60"/>
                 <title>Monitoring-based configuration</title>
                 <para>You can configure Auto Scale to be triggered
                     based on a predefined alarm or threshold that has
-                    been previously set up in Cloud Montioring. </para>
+                    been previously set up in Cloud Monitoring. </para>
                 <para>Monitoring-based configuration works the
                     following way:</para>
                 <para>
@@ -333,15 +334,30 @@ format="SVG" scale="60"/>
                 </para>
             </section>
             <section xml:id="webhooks-anonymous-webhooks">
-                <title>Webhooks, Anonymous Webhooks, and Capability
-                    URLs</title>
-                <para>Auto Scale supports webhooks. Webhooks are also
-                    sometimes referred to as capability URLs. A
-                    webhook is an HTTP callback that is triggered by
+                <title>Webhooks</title>
+                <para>Auto Scale uses webhooks to initiate a scaling
+                    event. A webhook is an industry-standard protocol
+                    for sending events between systems. A webhook
+                    consists of HTTP callback that is triggered by
                     some user-defined event, such as an alarm that is
                     set through Cloud Monitoring. When that event
                     occurs the source site makes an HTTP request to
                     the URI configured for the webhook. </para>
+                <para>A webhook contains a POST call to a defined URL,
+                    potentially with a payload in the POST body. You
+                    can send webhooks with a simple call in whatever
+                    library is available for your environment. You can
+                    also manually send them via cURL.   </para>
+                <para>The following example shows how to send a
+                    webhook with cURL:</para>
+                <para>
+                    <programlisting>curl -v  http://example.com/webhook -X POST -d 'payload=payload'</programlisting>
+                </para>
+                <para>For more information about how webhooks are used
+                    in the Rackspace API, see </para>
+                <para><link
+                        xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook"
+                        >http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook</link>.</para>
                 <para>Auto Scale also support anonymous webhooks. In
                     regular webhooks, the
                         <code>{capability_version}/{capability_hash}</code>
@@ -350,21 +366,19 @@ format="SVG" scale="60"/>
                     the issuer—this is the reason why the webhook is
                     called "anonymous" because no authentication is
                     needed. </para>
-                <para> Capability URLs are URLs that themselves give
-                    authorization.  If you know the URL, you have
-                    access to it and it enables you to do something.
-                     Capability URLs are usually long, random, and
-                    cannot be guessed by a user.</para>
             </section>
             <section xml:id="cooldowns">
                 <title>Cooldowns</title>
-                <para>Auto Scale supports a cooldown feature. By
-                    configuring cooldown periods between triggers, you
-                    can control how quickly Auto Scale scales up
-                    toward the scaling group's maximum size or down
-                    toward the scaling group's minimum size. A
-                    cooldown is a period during which no other scaling
-                    activity occurs. </para>
+                <para>Auto Scale supports a cooldown feature. A
+                    cooldown is a configured period of time that must
+                    pass between actions. By configuring group
+                    cooldowns, you control how often a group can have
+                    a policy applied, which can help servers scaling
+                    up to complete the scale up before another policy
+                    is executed. By configuring policy cooldowns, you
+                    control how often a policy can be executed, which
+                    can help provide quick scale-ups and gradual
+                    scale-downs.</para>
                 <para>Cooldowns work the following way:<itemizedlist>
                         <listitem>
                             <para>Cooldowns allow some time for the
@@ -419,10 +433,10 @@ format="SVG" scale="60"/>
             <para>The scaling group configuration specifies the basic
                 elements of the Auto Scale configuration. It manages
                 how many servers can participate in the scaling group. </para>
-            <table rules="all" width="566">
+            <table rules="all">
                 <caption>GroupConfiguration Parameters</caption>
-                <col width="175pt"/>
-                <col width="69%"/>
+                <col width="20%"/>
+                <col width="60%"/>
                 <thead>
                     <tr>
                         <td>Parameter Name</td>
@@ -456,14 +470,16 @@ format="SVG" scale="60"/>
                 </tbody>
             </table>
             <para>The number of entities that are specified in
-                minEntities and maxEntities overrides the amount of
-                resources that can be specified in a policy. See also
-                    <link linkend="Min_and_Max_Policies">Using the Min
-                    and Max Values with Policies</link>.</para>
+                    <parameter>minEntities</parameter> and
+                    <parameter>maxEntities</parameter> overrides the
+                amount of resources that can be specified in a policy.
+                See also <link linkend="Min_and_Max_Policies">Using
+                    the Min and Max Values with
+                Policies</link>.</para>
         </section>
         <section xml:id="Launch_Configuration">
             <title>Launch Configuration</title>
-            <para> The launch configuration manages the process of
+            <para>The launch configuration manages the process of
                 creating new servers. It specifies what type of server
                 image will be started on launch, what flavor the new
                 server is, and which load balancer the new server
@@ -487,17 +503,56 @@ format="SVG" scale="60"/>
                                    configuration type.) </emphasis>
                                 </para>
                             </listitem>
+                            <listitem>
+                                <para><parameter>args</parameter></para>
+                                <para>Specifies the item to be
+                                   configured.  This parameter must be
+                                   one of the following two, or
+                                   both:</para>
+                                <para>
+                                   <table rules="all">
+                                   <caption>args Parameters</caption>
+                                   <col width="20%"/>
+                                   <col width="60%"/>
+                                   <thead>
+                                   <tr>
+                                   <td>Value</td>
+                                   <td>Description</td>
+                                   </tr>
+                                   </thead>
+                                   <tbody>
+                                   <tr>
+                                   <td><parameter>server</parameter></td>
+                                   <td>Specifies configuration
+                                   information for the Cloud server
+                                   image that will be created during
+                                   the scaling process.</td>
+                                   </tr>
+                                   <tr>
+                                   <td><parameter>loadbalancers</parameter></td>
+                                   <td>Specifies the configuration
+                                   information for the load
+                                   balancer(s) used in the cloud
+                                   server deployment.</td>
+                                   </tr>
+                                   </tbody>
+                                   </table>
+                                </para>
+                            </listitem>
                         </itemizedlist>
                     </listitem>
                     <listitem>
                         <para>
-                            <emphasis role="bold">Server</emphasis> -
-                            specifies details about the server</para>
+                            <emphasis role="bold"
+                            >Server</emphasis></para>
+                        <para>This argument specifies details about
+                            the server as described in the following
+                            table:</para>
                         <para>
-                            <table>
+                            <table rules="all">
                                 <caption>server Parameters</caption>
-                                <col width="175pt"/>
-                                <col width="69%"/>
+                                <col width="20%"/>
+                                <col width="60%"/>
                                 <thead>
                                    <tr>
                                    <td>Parameter Name</td>
@@ -507,7 +562,8 @@ format="SVG" scale="60"/>
                                 <tbody>
                                    <tr>
                                    <td><parameter>name</parameter></td>
-                                   <td>Name of the scaling group</td>
+                                   <td>Specifies the name of the
+                                   server</td>
                                    </tr>
                                    <tr>
                                    <td><parameter>flavorRef</parameter></td>
@@ -528,12 +584,13 @@ format="SVG" scale="60"/>
                         <para>
                             <emphasis role="bold">Load
                                 Balancers</emphasis>- specifies
-                            details about the load balancer </para>
-                        <table>
+                            details about the load balancer as
+                            described in the following table:</para>
+                        <table rules="all">
                             <caption>loadBalancers
                                 Parameters</caption>
-                            <col width="175pt"/>
-                            <col width="69%"/>
+                            <col width="20%"/>
+                            <col width="60%"/>
                             <thead>
                                 <tr>
                                    <td>Parameter Name</td>
@@ -614,10 +671,10 @@ format="SVG" scale="60"/>
                 scaling group and its behavior. You can specify
                 multiple policies to manage a scaling group. </para>
             <para>Scaling policies specify the following:</para>
-            <table>
+            <table rules="all">
                 <caption>scalingPolicies Parameters</caption>
-                <col width="175pt"/>
-                <col width="69%"/>
+                <col width="20%"/>
+                <col width="60%"/>
                 <thead>
                     <tr>
                         <td>Parameter Name</td>
@@ -642,7 +699,9 @@ format="SVG" scale="60"/>
                     <tr>
                         <td><parameter>type</parameter></td>
                         <td>Specifies how the policy will be executed
-                            (by webhook)</td>
+                            (by <parameter>webhook</parameter> or
+                            based on a
+                            <parameter>schedule</parameter>.</td>
                     </tr>
                 </tbody>
             </table>
@@ -650,14 +709,16 @@ format="SVG" scale="60"/>
                 policy:</para>
             <itemizedlist spacing="compact">
                 <listitem>
-                    <para> Define a policy that triggers Auto Scale
+                    <para>Define a policy that triggers Auto Scale
                         activities <link
-                            linkend="Schedule_Based_Configuration"
-                            >based on a schedule</link>.</para>
+                            linkend="Schedule_based_Policy">based on a
+                            schedule</link>.</para>
                 </listitem>
                 <listitem>
                     <para>Define a policy that triggers Auto Scale
-                        activities based on a predefined event.</para>
+                        activities based on a predefined event, <link
+                            linkend="Webhook_triggered_policy">using a
+                            webhook</link>.</para>
                 </listitem>
                 <listitem>
                     <para>Define a policy that scales up or down by a
@@ -670,6 +731,115 @@ format="SVG" scale="60"/>
                         percentage</link>.</para>
                 </listitem>
             </itemizedlist>
+            <section xml:id="Webhook_triggered_policy">
+                <title>Webhook-triggered policies</title>
+                <para>You can define a scaling policy that is invoked
+                    by a webhook when a predefined event occurs. To
+                    configure a webhook-based policy, you need to set
+                    the <parameter>type</parameter> parameter to
+                    "webhook" and then provide the following
+                    information: </para>
+                <para>
+                    <table rules="all">
+                        <caption>Parameters for Webhook-triggered
+                            Policies</caption>
+                        <col width="20%"/>
+                        <col width="60%"/>
+                        <thead>
+                            <tr>
+                                <td>Parameter Name</td>
+                                <td>Description</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><parameter>change</parameter></td>
+                                <td>Specifies the number of entities
+                                   to add or remove, for example "1"
+                                   implies that 1 server needs to be
+                                   added.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>changePercent</parameter></td>
+                                <td>Specifies the change value, in
+                                   incremental stages or per
+                                   cent.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>desiredCapacity</parameter></td>
+                                <td>Specifies final capacity that is
+                                   desired by the scale up event</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>args</parameter></td>
+                                <td>Specifiy any additional
+                                   information</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </para>
+            </section>
+            <section xml:id="Schedule_based_Policy">
+            <title>Schedule-based Policies</title>
+                <para>You can define a scaling policy that is invoked
+                    by a preset schedule. To configure a
+                    schedule-based policy, you need to set the
+                        <parameter>type</parameter> parameter to
+                    "schedule" and then provide the following
+                    information: </para>
+                <para>
+                    <table>
+                        <caption>Parameters for Webhook-triggered
+                            Policies</caption>
+                        <col width="205"/>
+                        <col width="60%"/>
+                        <thead>
+                            <tr>
+                                <td>Parameter Name</td>
+                                <td>Description</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><parameter>change</parameter></td>
+                                <td>Specifies the number of entities
+                                   to add or remove, for example "1"
+                                   implies that 1 server needs to be
+                                   added.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>changePercent</parameter></td>
+                                <td>Specifies the change value, in
+                                   incremental stages or per
+                                   cent.</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>desiredCapacity</parameter></td>
+                                <td>Specifies final capacity that is
+                                   desired by the scale up event</td>
+                            </tr>
+                            <tr>
+                                <td><parameter>args</parameter></td>
+                                <td>Provide information related to the
+                                   time when the policy is supposed to
+                                   be invoked.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </para>
+            <para>For example to use Cron, a time-based job scheduler,
+                    you need to specify the time when the policy is
+                    supposed to be invoked in CRON format, as shown in
+                    the following example, which configures the policy
+                    to be invoked at 6 AM every
+                    day:<programlisting language="json"><xi:include href="./samples/Cronstylescheduler.json" parse="text"/></programlisting></para>
+            <para>To set the time at which the policy will be invoked
+                    directly, without Cron, use the "at" argument and
+                    specify the time using the format that is shown in
+                    the following
+                    example:<programlisting language="json"><xi:include href="./samples/Atstylescheduler.json" parse="text"/></programlisting></para>
+            </section>
+            
             <section xml:id="Scale_by_percentage">
                 <title>Scaling by Percentage</title>
                 <para>You can define a policy that scales your server
@@ -683,7 +853,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/ScalebyPercentage.png"
+                                fileref="images/ScalebyPercentage.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -693,22 +863,32 @@ format="SVG" scale="60"/>
                 <title>Using the Min and Max Values with
                     Policies</title>
                 <para>When setting up the configuration for your
-                    scaling groups, you specified the minimum and
+                    scaling groups, you configure the minimum and
                     maximum amount of resources that are allowed in
                     your configuration. These values are specified in
-                    the minEntities and maxEntities parameters under
-                    GroupConfiguration, and are invoked whenever your
-                    group configuration is updated. If the amount of
-                    resources that is specified in a policy differs
-                    from the amount that is specified under
-                    GroupConfiguration, the preconfigured values take
-                    precedence. </para>
-                <para>The following diagram illustrates how this
-                    concept works.</para>
+                    the <parameter>minEntities</parameter> and
+                        <parameter>maxEntities</parameter> parameters
+                    under <emphasis role="bold"
+                        >GroupConfiguration</emphasis>, and are
+                    invoked whenever you update your group
+                    configuration. </para>
+                <para>
+                    <important>
+                        <para>If the amount of resources that is
+                            specified in a policy differs from the
+                            amount that is specified under <emphasis
+                                role="bold"
+                                >GroupConfiguration</emphasis>, the
+                            preconfigured values take precedence.
+                        </para>
+                    </important>
+                </para>
+                <para>The following diagram illustrates how the min
+                    and max values work in a scaling scenario.</para>
                 <informalfigure>
                     <mediaobject>
                         <imageobject>
-                            <imagedata fileref="Images/Minandmax.png"
+                            <imagedata fileref="images/Minandmax.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -743,7 +923,7 @@ format="SVG" scale="60"/>
                     <mediaobject>
                         <imageobject>
                             <imagedata
-                                fileref="Images/DeletePolicy.png"
+                                fileref="images/DeletePolicy.png"
                                 contentwidth="6in"/>
                         </imageobject>
                     </mediaobject>
@@ -795,7 +975,7 @@ format="SVG" scale="60"/>
         <section xml:id="Authenticate">
             <title>Authenticate</title>
             <para>As with all Rackspace APIs, before you can use the
-                Autoscale API you must authenticate with your
+                Auto Scale API you must authenticate with your
                 Rackspace credentials. </para>
             <itemizedlist>
                 <listitem>
@@ -834,6 +1014,11 @@ format="SVG" scale="60"/>
                 you issue an authentication request to the Rackspace
                 Cloud Identity Service, which is an implementation of
                 the OpenStack Keystone Identity Service v2.0. </para>
+            <para>Auto Scale supports Role-based Access Control (RBAC)
+                for more information, read <link
+                    xlink:href="http://ord.admin.kc.rakr.net/knowledge_center/article/permissions-matrix-for-auto-scale"
+                    >this article</link> on the Knowledge
+                Center.</para>
             <important>
                 <para>Multiple Rackspace Cloud Identity Service
                     endpoints exist. You may use any endpoint,
@@ -875,11 +1060,17 @@ format="SVG" scale="60"/>
                             <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
                         </td>
                     </tr>
+                    <tr align="left">
+                        <td colspan="2">Hong Kong (HKG)</td>
+                        <td colspan="5">
+                            <code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                        </td>
+                    </tr>
                 </tbody>
             </table>
             <section xml:id="Authenticate_using_cURL">
                 <title>Authenticate using cURL</title>
-                <para>To authenticate against the Rackspace Autoscale
+                <para>To authenticate against the Rackspace Auto Scale
                     API, you issue a POST request to the appropriate
                     Rackspace Cloud Identity Service endpoint. In the
                     request body, supply one of the following sets of
@@ -929,11 +1120,28 @@ format="SVG" scale="60"/>
                             Servers API by using a <link
                                 xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
                                 >Create Server</link> request. </para>
+                        <para>
+                            <note>
+                                <para>Auto Scale does not use the
+                                   <parameter>name</parameter>
+                                   parameter in the Create Server
+                                   request, as the server name is
+                                   automatically generate.</para>
+                                <para>The metadata parameter is
+                                   optional. The maximum size of the
+                                   metadata key and value is 255 bytes
+                                   each. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   >Server Metadata</link>
+                                   documentation.</para>
+                            </note>
+                        </para>
                     </listitem>
                 </itemizedlist>
             </para>
             <para> With the Cloud Servers API, you can use a <link
-                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Images-d1e4427.html"
+                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/images-d1e4427.html"
                     >List Images</link> request to retrieve a list of
                 options available for configuring your server. <example>
                     <title>Requesting a List of Cloud Server

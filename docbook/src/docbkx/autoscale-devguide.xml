@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE book [
 <!-- Some useful entities borrowed from HTML -->
-<!ENTITY ndash  "&#x2013;">
-<!ENTITY mdash  "&#x2014;">
+<!ENTITY ndash "&#x2013;">
+<!ENTITY mdash "&#x2014;">
 <!ENTITY hellip "&#x2026;">
 
 <!-- Useful for describing APIs -->
-<!ENTITY GET    '<command xmlns="http://docbook.org/ns/docbook">GET</command>'>
-<!ENTITY PUT    '<command xmlns="http://docbook.org/ns/docbook">PUT</command>'>
-<!ENTITY POST   '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
+<!ENTITY GET '<command xmlns="http://docbook.org/ns/docbook">GET</command>'>
+<!ENTITY PUT '<command xmlns="http://docbook.org/ns/docbook">PUT</command>'>
+<!ENTITY POST '<command xmlns="http://docbook.org/ns/docbook">POST</command>'>
 <!ENTITY DELETE '<command xmlns="http://docbook.org/ns/docbook">DELETE</command>'>
 
 <!ENTITY PRODNAME "Rackspace Auto Scale"> <!-- in PDF: for line 1 on the cover page -->
 <!ENTITY PRODABBV "Rackspace Auto Scale"> <!-- in PDF: for page headers -->
-<!ENTITY PROD "Auto Scale">               <!-- in body -->
+<!ENTITY PROD "Auto Scale"> <!-- in body -->
 
 <!-- changing authentication endpoints; define entities for US & UK rather than maintaining in text -->
 <!ENTITY ENDPOINT-US "https://identity.api.rackspacecloud.com/v1.1/">
@@ -21,14 +21,14 @@
 <!ENTITY ENDPOINT-US-20 "https://identity.api.rackspacecloud.com/v2.0/">
 <!ENTITY ENDPOINT-UK-20 "https://lon.identity.api.rackspacecloud.com/v2.0/">
 
-<!ENTITY CHECK  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<!ENTITY CHECK '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
 <imageobject>
 <imagedata fileref="img/Check_mark_23x20_02.svg"
 format="SVG" scale="60"/>
 </imageobject>
 </inlinemediaobject>'>
 
-<!ENTITY ARROW  '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
+<!ENTITY ARROW '<inlinemediaobject xmlns="http://docbook.org/ns/docbook">
 <imageobject>
 <imagedata fileref="img/Arrow_east.svg"
 format="SVG" scale="60"/>
@@ -36,10 +36,10 @@ format="SVG" scale="60"/>
 </inlinemediaobject>'>
 
 <!-- Useful for specs -->
-<!ENTITY MAY    '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MAY</emphasis>'>
+<!ENTITY MAY '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MAY</emphasis>'>
 <!ENTITY SHOULD '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">SHOULD</emphasis>'>
-<!ENTITY MUST   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
-<!ENTITY MUST_NOT   '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
+<!ENTITY MUST '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST</emphasis>'>
+<!ENTITY MUST_NOT '<emphasis xmlns="http://docbook.org/ns/docbook" role="strong">MUST NOT</emphasis>'>
 ]>
 
 <book version="5.0"
@@ -52,15 +52,15 @@ format="SVG" scale="60"/>
          xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
-<titleabbrev>&PRODABBV; DevGuide</titleabbrev>    
+<titleabbrev>&PRODABBV; DevGuide</titleabbrev>
 <?rax title.font.size="35px" subtitle.font.size="20px"
-      status.bar.text="Early Access" 
-      canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
+status.bar.text="Early Access"
+canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-21</pubdate>
+        <pubdate>2013-11-01</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -101,7 +101,7 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision> 
+            </revision>
              <revision>
                 <date>2013-07-02</date>
                 <revdescription>
@@ -113,10 +113,10 @@ format="SVG" scale="60"/>
                         </listitem>
                     </itemizedlist>
                 </revdescription>
-            </revision>           
+            </revision>
         </revhistory>
       <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
-	<raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
+        <raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
@@ -136,7 +136,7 @@ format="SVG" scale="60"/>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
       Then you define policies, either schedule-based or monitoring-based. For monitoring-based policies,
       you define cloud monitoring alerts to watch the group's activity,
-      and you define scaling rules to change the scaling group's configuration in response to alerts. 
+      and you define scaling rules to change the scaling group's configuration in response to alerts.
       For schedule-based policies, you simply set a schedule.
       Because you can change a
       scaling group's configuration in response to changing
@@ -183,8 +183,8 @@ format="SVG" scale="60"/>
         </para>
         <?rax revhistory?>
     </section>
-    <!-- Resources section, suggesting other places to go for info, 
-         is external so it's handy for Getting Started to share -->    
+    <!-- Resources section, suggesting other places to go for info,
+is external so it's handy for Getting Started to share -->
             <xi:include href="chapters/resources.xml"/>
     <!-- -->
     <section xml:id="API_Contract_Changes-d1e363">
@@ -204,9 +204,8 @@ format="SVG" scale="60"/>
           <listitem>
             <para>For Rackspace Next Gen Cloud Servers, pricing is
               published at <link
-                xlink:href="http://www.rackspace.com/cloud/servers/#pricing"
-                >http://www.rackspace.com/cloud/servers/#pricing</link>.
-            </para>
+                xlink:href="http://www.rackspace.com/cloud/servers/pricing"
+                >http://www.rackspace.com/cloud/servers/pricing</link>. </para>
           </listitem>
           <listitem>
             <para>For Rackspace Cloud Load Balancers, pricing is
@@ -230,10 +229,10 @@ format="SVG" scale="60"/>
     <chapter xml:id="Concepts-dle001">
         <title>Concepts</title>
         <para> To use the &PROD; API effectively, you should
-            understand several key concepts: 
+            understand several key concepts:
         </para>
-      <!-- Glossary section, defining basic terms, 
-         is external so it's handy for Getting Started to share -->
+      <!-- Glossary section, defining basic terms,
+is external so it's handy for Getting Started to share -->
       <xi:include href="chapters/glossary.xml"/>
       <!-- -->
     </chapter>
@@ -255,44 +254,6 @@ format="SVG" scale="60"/>
           <code>X-Auth-Token</code> HTTP header. Customers obtain this
         token by first using the Rackspace Cloud Identity service and
         supplying a valid user name and API access key. </para>
-      <section xml:id="Geographic_Endpoints">
-        <title>Geographic Endpoints</title>
-        <para> The Rackspace Cloud Identity service serves as the
-          entry point to all Rackspace Cloud APIs and is itself a
-          RESTful web service. </para>
-        <para> You can use either of the following endpoints
-          to access the Identity Service, regardless
-          of US or UK identities: </para>
-        <itemizedlist spacing="compact">
-          <listitem>
-            <para><link xlink:href="&ENDPOINT-US-20;"
-              >&ENDPOINT-US-20;</link>
-            </para>
-          </listitem>
-          <listitem>
-            <para><link xlink:href="&ENDPOINT-UK-20;"
-              >&ENDPOINT-UK-20;</link></para>
-          </listitem>
-        </itemizedlist>
-        <para> Your account might be based in either the US or the UK.
-          This is not determined by your physical location but by the
-          location of the Rackspace retail site that was used to
-          create your account: </para>
-        <itemizedlist spacing="compact">
-          <listitem>
-            <para> If your account was created via <link
-              xlink:href="http://www.rackspacecloud.com"
-              >http://www.rackspacecloud.com</link>,
-              it is a US-based account. </para>
-          </listitem>
-          <listitem>
-            <para> If your account was created via <link
-                xlink:href="http://www.rackspace.co.uk"
-                >http://www.rackspace.co.uk</link>, it is a UK-based
-              account.  </para>
-          </listitem>
-        </itemizedlist>
-      </section>
       <section xml:id="Retrieving_Auth_Token">
         <title>Retrieving the Authentication Token</title>
         <para> The authenticate operation provides clients with an
@@ -304,7 +265,7 @@ format="SVG" scale="60"/>
           authenticate successfully, the response to your
           authentication request includes a catalog of the
           services to which you have subscribed rather than the sample
-          values shown. </para> 
+          values shown. </para>
         <table rules="all">
           <caption>Request for Authentication Token</caption>
           <tbody>
@@ -362,20 +323,20 @@ format="SVG" scale="60"/>
           
           <programlistingco>
             <areaspec>
-              <area xml:id="response.json.token"       units="linecolumn" coords="10 8"/>
-              <area xml:id="response.json.dfltregion"  units="linecolumn" coords="17 12"/>
-              <area xml:id="response.json.role"        units="linecolumn" coords="18 12"/>
-              <area xml:id="response.json.catalog"     units="linecolumn" coords="31 8"/>
-              <area xml:id="response.json.service-lb"         units="linecolumn" coords="49 16"/>
-              <area xml:id="response.json.service-compute"    units="linecolumn" coords="65 16"/>
-              <area xml:id="response.json.service-monitor"    units="linecolumn" coords="87 16"/>
-              <area xml:id="response.json.service-autoscale"  units="linecolumn" coords="97 16"/>
-              <area xml:id="response.json.tenant"      units="linecolumn" coords="121 24"/>
-              <area xml:id="response.json.url"         units="linecolumn" coords="122 24"/>
-              <area xml:id="response.json.region"      units="linecolumn" coords="124 24"/>
+              <area xml:id="response.json.token" units="linecolumn" coords="10 8"/>
+              <area xml:id="response.json.dfltregion" units="linecolumn" coords="17 12"/>
+              <area xml:id="response.json.role" units="linecolumn" coords="18 12"/>
+              <area xml:id="response.json.catalog" units="linecolumn" coords="31 8"/>
+              <area xml:id="response.json.service-lb" units="linecolumn" coords="49 16"/>
+              <area xml:id="response.json.service-compute" units="linecolumn" coords="65 16"/>
+              <area xml:id="response.json.service-monitor" units="linecolumn" coords="87 16"/>
+              <area xml:id="response.json.service-autoscale" units="linecolumn" coords="97 16"/>
+              <area xml:id="response.json.tenant" units="linecolumn" coords="121 24"/>
+              <area xml:id="response.json.url" units="linecolumn" coords="122 24"/>
+              <area xml:id="response.json.region" units="linecolumn" coords="124 24"/>
               <area xml:id="response.json.servicename" units="linecolumn" coords="133 16"/>
               <area xml:id="response.json.servicetype" units="linecolumn" coords="134 16"/>
-            </areaspec>	
+            </areaspec>        
             <programlisting language="json">
               <xi:include href="samples/resAuthenticate.json" parse="text"/>
             </programlisting>
@@ -390,10 +351,10 @@ format="SVG" scale="60"/>
         </note>
         <calloutlist>
           <callout arearefs="response.json.token">
-            <para> This token can be presented to a service as
-              evidence of authentication. Tokens are valid for a
-              finite duration; a token's default lifespan is 24 hours. </para>
-            <para> The token's <code>expires</code> attribute denotes
+            <para>This token can be presented to a service as evidence
+              of authentication. Tokens are valid for a finite
+              duration; a token's default lifespan is 24 hours. </para>
+            <para>The token's <code>expires</code> attribute denotes
               the time after which the token automatically becomes
               invalid. A token can be manually revoked before the time
               identified by the <code>expires</code> attribute.
@@ -401,11 +362,11 @@ format="SVG" scale="60"/>
               maximum possible lifespan but does not guarantee that it
               will reach that lifespan. Clients are encouraged to
               cache a token until it expires. </para>
-            <para>
-              Authentication tokens are typically valid for 24 hours. 
-              Applications should be designed to re-authenticate after 
-              receiving a <errorcode>401</errorcode> (Unauthorized) response from a service endpoint. 
-            </para>
+            <para>Authentication tokens are typically valid for 24
+              hours. Applications should be designed to
+              re-authenticate after receiving a
+                <errorcode>401</errorcode> (Unauthorized) response
+              from a service endpoint. </para>
             <note>
               <para>The token's expiration time is formatted
                 differently in the US and UK. These response examples
@@ -417,19 +378,19 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.dfltregion">
-            <para> Users can be assigned a default region. If multiple
+            <para>Users can be assigned a default region. If multiple
               endpoints are associated with a service in the user's
               catalog, the endpoint for the user's default region is
               selected if it is available. In this example, the user's
               default region is DFW, and several of the services in
               the user's catalog offer endpoints in that region and
-              the ORD region; whenever possible, the user's work is directed to the
-              DFW region. </para>
+              the ORD region; whenever possible, the user's work is
+              directed to the DFW region. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.role">
-            <para> Users can be assigned multiple roles, with each
-              role providing specific privileges. In this example,
+            <para>Users can be assigned multiple roles, with each role
+              providing specific privileges. In this example,
                 <code>jsmith</code> is the administrative user for the
               account and holds the fully-privileged
                 <code>identity:admin</code> role. Other users might
@@ -440,8 +401,8 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.catalog">
-            <para> The service catalog lists the services this user
-              can access. In this example, the user can access one
+            <para>The service catalog lists the services this user can
+              access. In this example, the user can access one
               database service, one load-balancing service, one
               compute service (Cloud Servers OpenStack), one object
               storage service (Cloud Files), one monitoring service
@@ -454,25 +415,29 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-lb">
-            <para> This service catalog entry describes a
+            <para>This service catalog entry describes a
               load-balancing service. To use &PRODNAME;, you must have
               access to a load-balancing service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-compute">
-            <para> This service catalog entry describes a compute service. To use &PRODNAME;, you must have access to a compute service. </para>
+            <para>This service catalog entry describes a compute
+              service. To use &PRODNAME;, you must have access to a
+              compute service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-monitor">
-            <para> This service catalog entry describes a monitoring service. To use &PRODNAME;, you must have access to a monitoring service. </para>
+            <para>This service catalog entry describes a monitoring
+              service. To use &PRODNAME;, you must have access to a
+              monitoring service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-autoscale">
-            <para> This service catalog entry describes &PRODNAME;. </para>
+            <para>This service catalog entry describes &PRODNAME;. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.tenant">
-            <para> Some services recognize the specification of a
+            <para>Some services recognize the specification of a
               tenant. If a service does recognize tenants, the format
               of the tenant specification is defined only by the
               service. For details about whether and how to specify a
@@ -481,7 +446,7 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.url">
-            <para> An endpoint can be assigned public and internal
+            <para>An endpoint can be assigned public and internal
               URLs. A public URL is accessible from anywhere. Access
               to a public URL usually incurs traffic charges. Internal
               URLs are accessible only to services within the same
@@ -489,21 +454,21 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.region">
-            <para> A service can expose endpoints in different
-              regions. Regional endpoints allow clients to provision
-              resources in a manner that provides high availability. </para>
-            <para> Some services are not region specific. These
+            <para>A service can expose endpoints in different regions.
+              Regional endpoints allow clients to provision resources
+              in a manner that provides high availability. </para>
+            <para>Some services are not region specific. These
               services supply a single, non-regional endpoint and do
               not provide access to internal URLs. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicename">
-            <para> The service name attribute identifies each unique
+            <para>The service name attribute identifies each unique
               service in the catalog. After a service is created, its
               name does not change. However, new services of the same
               service type can be added to the catalog with new names. </para>
             <important>
-              <para> If you are programmatically parsing an
+              <para>If you are programmatically parsing an
                 authentication response, use service type rather than
                 service name to determine whether a user has access to
                 a particular kind of service. Service type is stable
@@ -517,7 +482,7 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicetype">
-            <para> The service type attribute identifies services that
+            <para>The service type attribute identifies services that
               perform similar functions, regardless of service names.
               In this example, the service named cloudFiles is
               identified as <code>type="store"</code>, indicating that
@@ -532,11 +497,10 @@ format="SVG" scale="60"/>
             <para> </para>
           </callout>
         </calloutlist>
-      </section>  
+      </section>
     </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access Endpoints</title>
-      <para/>
       <para>&PRODNAME; is a regionalized service. The user of the
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
@@ -553,6 +517,13 @@ format="SVG" scale="60"/>
       <para>
         <table rules="all">
           <caption>Regionalized Service Endpoints</caption>
+          <col width="11%"/>
+          <col width="11%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
           <thead>
             <tr align="center">
               <td colspan="2">Region</td>
@@ -584,6 +555,11 @@ format="SVG" scale="60"/>
                 <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
+            <tr align="left">
+              <td colspan="2">Hong Kong (HKG)</td>
+              <td colspan="5"
+                  ><code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
+            </tr>
           </tbody>
         </table>
       </para>
@@ -593,7 +569,7 @@ format="SVG" scale="60"/>
         the <code>publicURL</code> field returned by the
         authentication response. For example, in <olink
           targetdoc="autoscale-devguide"
-          targetptr="auth-response-example-json">Example 2,
+          targetptr="auth-response-example-json">Example 2,
           “Authentication Response for US Endpoint: JSON”</olink> the
           <code>publicURL</code> field for <code>autoscale</code>
           ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
@@ -604,7 +580,7 @@ format="SVG" scale="60"/>
       <title>Contract Versions</title>
       <para> The &PROD; version defines the contract and build
         information for the API. </para>
-      <para> The contract version denotes the data model and behavior
+      <para>The contract version denotes the data model and behavior
         that the API supports. The requested contract version is
         included in all request URLs. Different contract versions of
         the API might be available at any given time and are not
@@ -652,7 +628,7 @@ format="SVG" scale="60"/>
             <td>No</td>
           </tr>
         </tbody>
-      </table> 
+      </table>
     </section>
     <?hard-pagebreak?>
     <section xml:id="Limits-d1e1208">
@@ -665,12 +641,12 @@ format="SVG" scale="60"/>
         reset after a certain amount of time passes. Absolute limits
         are fixed. </para>
       <section xml:id="Rate_Limits-d1e1222">
-        <!-- 
-        rate limits are managed by Repose rate limiting filter, 
-        config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
-        -->
+        <!--
+rate limits are managed by Repose rate limiting filter,
+config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbooks/repose/attributes/default.rb
+-->
         <title>Rate Limits</title>
-        <para> Rate limits are specified in terms of both a
+        <para>Rate limits are specified in terms of both a
           human-readable wildcard URI and a machine-processable
           regular expression. The regular expression boundary matcher
           '^' takes effect after the root URI path. For example, the
@@ -678,9 +654,8 @@ format="SVG" scale="60"/>
           the bolded portion of the following URI:
             https://ord.autoscale.api.rackspacecloud.com<emphasis
             role="bold">/v1.0/execute</emphasis>. </para>
-        <para>
-          For any user, all &PROD; operations are limited to 1,000 calls per minute.
-        </para>
+        <para>For any user, all &PROD; operations are limited to 1,000
+          calls per minute. </para>
         <para>In addition, the following table specifies the default rate limits
           for specific &PROD; API operations: </para>
         <table rules="all" width="556">
@@ -708,20 +683,20 @@ format="SVG" scale="60"/>
             </tr>
           </tbody>
         </table>
-        <para> Rate limits are applied in order relative to the verb,
+        <para>Rate limits are applied in order relative to the verb,
           going from least to most specific. For example, although the
           general threshold for operations to <code>/v1/0/*</code> is
           1,000 per minute, one cannot &POST; to
             <code>/v1.0/execute*</code> more than 1 time per second,
           which is 60 times per minute. </para>
-        <para> If you exceed the thresholds established for your
+        <para>If you exceed the thresholds established for your
           account, a <errorcode>413</errorcode> (Rate Control) HTTP
           response is returned with a <code>Retry-After</code> header
           to notify the client when it can attempt to try again. </para>
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <para>&PRODNAME; does not use absolute limits. It does use 
+        <para>&PRODNAME; does not use absolute limits. It does use
           <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
         <table rules="all">
           <caption>Absolute Limits</caption>
@@ -755,11 +730,11 @@ format="SVG" scale="60"/>
     </section>
     <section xml:id="datetimeformat">
       <title>Date and Time Format</title>
-      <para> The &PROD; service uses an ISO-8601 compliant date format
+      <para>The &PROD; service uses an ISO-8601 compliant date format
         for the display and consumption of date and time values. While
         the standard allows specification of time zones, &PROD; does
         not use time zones. All times are expressed as GMT. </para>
-      <para> The following tables show how the date and time format
+      <para>The following tables show how the date and time format
         works. The first table identifies the elements of the ISO-8601
         standard. The second table shows how a sample time appears
         when formatted for use by &PROD; in compliance with the
@@ -830,7 +805,7 @@ format="SVG" scale="60"/>
             <td>May 19th, 2013 at 8:07:08 AM, GMT</td>
           </tr>
         </tbody>
-      </table>   
+      </table>
     </section>
         <section xml:id="pagination">
       <title>Pagination</title>
@@ -967,7 +942,7 @@ format="SVG" scale="60"/>
       <para>The <parameter>limit</parameter> parameter in the example
         above is set to 100, which means no more than 100 items can be
         displayed on one page. For Auto Scale, this number must be
-        between 1 and 100, inclusive. So if you provide a query
+        between 1 and 100, inclusive. So if you provide a query
         argument of more than 100, it will default to 100, and if you
         set the limit to less than 1, it will default to 1. </para>
       <para>If you provide an invalid query argument for
@@ -986,7 +961,7 @@ format="SVG" scale="60"/>
             response body will only list 100, and provide a next link
             in the <parameter>rel</parameter> parameter as shown in
             the following example: </para>
-          <programlisting language="json">  {
+          <programlisting language="json"> {
        "policies": [
             ...
        ],
@@ -1013,7 +988,7 @@ format="SVG" scale="60"/>
             response body will only list 100, and provide a next link
             in the <parameter>rel</parameter> parameter as shown in
             the following example: </para>
-      <programlisting language="json">  {
+      <programlisting language="json"> {
        "webhooks": [
             ...
        ],
@@ -1030,15 +1005,164 @@ format="SVG" scale="60"/>
             is provided in the response body, all the webhooks
             displayed will have webhook Ids that are greater than
             "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
-          </example></para>
-    </section> 
+          </example></para> </section>
+          <section xml:id="server-flavors">
+            <title>Server Flavors</title>
+            <para>When configuring a Cloud Server image through the
+        Control Panel or the API, users can chose from a specific
+        server flavor. A flavor is an available hardware configuration
+        for a server. Each flavor has a unique combination of disk
+        space and memory capacity. The server flavor that is specified
+        in the Control Panel maps to a specific flavor id in the
+        Rackspace API. The following table outlines the mapping
+        between flavor Id and the available flavors in the Control
+        Panel. </para>
+            <table rules="all">
+                <caption>Rackspace Cloud Server Flavors</caption>
+              <col width="30%"/>
+              <col width="30%"/>
+              <col width="20%"/>
+              <col width="10%"/>
+              <col width="10%"/>
+        
+                <thead>
+                  <tr>
+                    <td align="center">Flavor ID</td>
+                    <td align="center">Name</td>
+                    <td align="center">Memory (MB)</td>
+                    <td align="center">Disk</td>
+                    <td align="center">VCPUs</td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>2</td>
+                    <td>512 MB Standard Instance</td>
+                    <td>512</td>
+                    <td>20</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>3</td>
+                    <td>1 GB Standard Instance</td>
+                    <td>1024</td>
+                    <td>40</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>4</td>
+                    <td>2 GB Standard Instance</td>
+                    <td>2048</td>
+                    <td>80</td>
+                    <td>2</td>
+                  </tr>
+                  <tr>
+                    <td>5</td>
+                    <td>4 GB Standard Instance</td>
+                    <td>4096</td>
+                    <td>160</td>
+                    <td>2</td>
+                  </tr>
+                  <tr>
+                    <td>6</td>
+                    <td>8 GB Standard Instance</td>
+                    <td>8192</td>
+                    <td>320</td>
+                    <td>4</td>
+                  </tr>
+                  <tr>
+                    <td>7</td>
+                    <td>15 GB Standard Instance </td>
+                    <td>15360</td>
+                    <td>620</td>
+                    <td>6</td>
+                  </tr>
+                  <tr>
+                    <td>8</td>
+                    <td>30 GB Standard Instance </td>
+                    <td>30720</td>
+                    <td>1200</td>
+                    <td>8</td>
+                  </tr>
+                  <tr>
+                    <td>performance1-1</td>
+                    <td>1 GB Performance</td>
+                    <td>1024</td>
+                    <td>20</td>
+                    <td>1</td>
+                  </tr>
+                  <tr>
+                    <td>performance1-2</td>
+                    <td>2 GB Performance</td>
+                    <td>2048</td>
+                    <td>40</td>
+                    <td>2</td>
+                  </tr>
+                  <tr>
+                    <td>performance1-4</td>
+                    <td>4 GB Performance</td>
+                    <td>4096</td>
+                    <td>40</td>
+                    <td>4</td>
+                  </tr>
+                  <tr>
+                    <td>performance1-8</td>
+                    <td>8 GB Performance</td>
+                    <td>8192</td>
+                    <td>40</td>
+                    <td>8</td>
+                  </tr>
+                  <tr>
+                    <td>performance2-120 </td>
+                    <td>120 GB Performance</td>
+                    <td>122880</td>
+                    <td>40</td>
+                    <td>32</td>
+                  </tr>
+                  <tr>
+                    <td>performance2-15 </td>
+                    <td>15 GB Performance</td>
+                    <td>15360</td>
+                    <td>40</td>
+                    <td>4</td>
+                  </tr>
+                  <tr>
+                    <td>performance2-30 </td>
+                    <td>30 GB Performance</td>
+                    <td>30720</td>
+                    <td>40</td>
+                    <td>8</td>
+                  </tr>
+                  <tr>
+                    <td>performance2-60 </td>
+                    <td>60 GB Performance</td>
+                    <td>61440</td>
+                    <td>40</td>
+                    <td>16</td>
+                  </tr>
+                  <tr>
+                    <td>performance2-90 </td>
+                    <td>90 GB Performance</td>
+                    <td>92160</td>
+                    <td>40</td>
+                    <td>24</td>
+                  </tr>
+                </tbody>
+              </table>
+          </section>
       <section xml:id="audit-log">
         <title>Audit Log</title>
-      <para>Because of the deferred nature of Autoscale, most errors
+      <para>Because of the deferred nature of Auto Scale, most errors
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
         the events that have occurred within a user's scaling group. </para>
-        </section> 
+      <para>The following example shows an audit log for the
+        successful creation of a scaling group.</para>
+        <programlisting language="json"><xi:include href="./samples/auditlogcreatescalinggroup.py" parse="text"/>
+</programlisting>
+        <para>The following example shows an audit log for the
+        successful creation of a webhook.</para>
+        </section>
       <section xml:id="faults-dle101">
         <title>Faults</title>
       <para>If any &PRODNAME; request results in an error, the service
@@ -1064,7 +1188,7 @@ format="SVG" scale="60"/>
         image that does not exist causes a fault, as does trying to
         attach a load balancer to a scaling group that does not exist. </para>
       <para>An example of an error message follows. </para>
-      <!-- improve this example to show something that an Autoscale user would really see -->
+      <!-- improve this example to show something that an Auto scale user would really see -->
       <example>
         <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
@@ -1210,13 +1334,18 @@ Content-Type: application/json
     </section>
     <section xml:id="Create_Scaling_Policies">
       <title>Create Scaling Policies</title>
-      <para>You can use the Autoscale API to create and manage the
+      <para>You can use the Auto Scale API to create and manage the
         scaling policies for your scaling group. Create a scaling
         policy by submitting a <command>POST</command> request that
         contains the <parameter>tenantID</parameter> that you obtained
-        during the Authenticationstep and the
+        during the Authentication<olink
+          targetdoc="autoscale-getting-started"
+          targetptr="Authenticate">“Authenticate”</olink> step and the
           <parameter>groupID</parameter> that you obtained durring the
-        Create and Manage a Scaling Group step. </para>
+        Create and Manage a Scaling Grou<olink
+          targetdoc="autoscale-getting-started"
+          targetptr="Create_Group">“Create and Manage a Scaling
+          Group”</olink>p step. </para>
       <para> You can specify multiple policies to manage your scaling
         group.</para>
       <para>
@@ -1446,7 +1575,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
             <parameter>policyId</parameter> parameters specified in
           the request URL.</para>
         <programlisting>
- POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute 
+ POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                 </programlisting>
       </example>
       <para> The <command>POST</command> request causes the <link

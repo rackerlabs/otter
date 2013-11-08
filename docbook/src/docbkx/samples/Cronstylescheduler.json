@@ -1,0 +1,11 @@
+[
+	{
+	"cooldown": 600,
+	 "args": 
+		{"cron": "0 6 * * *"
+		},
+	 "type": "schedule",
+	 "name": "testscheduler_736835",
+	 "desiredCapacity": 2
+	}
+]
