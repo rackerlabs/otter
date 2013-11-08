@@ -60,7 +60,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/co
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
         <!-- enter the publication date of this document; in revhistory, explain what changed -->
-        <pubdate>2013-08-21</pubdate>
+        <pubdate>2013-11-01</pubdate>
         <copyright>
             <year>2013</year>
             <holder>Rackspace US, Inc.</holder>
@@ -351,10 +351,10 @@ is external so it's handy for Getting Started to share -->
         </note>
         <calloutlist>
           <callout arearefs="response.json.token">
-            <para> This token can be presented to a service as
-              evidence of authentication. Tokens are valid for a
-              finite duration; a token's default lifespan is 24 hours. </para>
-            <para> The token's <code>expires</code> attribute denotes
+            <para>This token can be presented to a service as evidence
+              of authentication. Tokens are valid for a finite
+              duration; a token's default lifespan is 24 hours. </para>
+            <para>The token's <code>expires</code> attribute denotes
               the time after which the token automatically becomes
               invalid. A token can be manually revoked before the time
               identified by the <code>expires</code> attribute.
@@ -362,11 +362,11 @@ is external so it's handy for Getting Started to share -->
               maximum possible lifespan but does not guarantee that it
               will reach that lifespan. Clients are encouraged to
               cache a token until it expires. </para>
-            <para>
-              Authentication tokens are typically valid for 24 hours.
-              Applications should be designed to re-authenticate after
-              receiving a <errorcode>401</errorcode> (Unauthorized) response from a service endpoint.
-            </para>
+            <para>Authentication tokens are typically valid for 24
+              hours. Applications should be designed to
+              re-authenticate after receiving a
+                <errorcode>401</errorcode> (Unauthorized) response
+              from a service endpoint. </para>
             <note>
               <para>The token's expiration time is formatted
                 differently in the US and UK. These response examples
@@ -378,19 +378,19 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.dfltregion">
-            <para> Users can be assigned a default region. If multiple
+            <para>Users can be assigned a default region. If multiple
               endpoints are associated with a service in the user's
               catalog, the endpoint for the user's default region is
               selected if it is available. In this example, the user's
               default region is DFW, and several of the services in
               the user's catalog offer endpoints in that region and
-              the ORD region; whenever possible, the user's work is directed to the
-              DFW region. </para>
+              the ORD region; whenever possible, the user's work is
+              directed to the DFW region. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.role">
-            <para> Users can be assigned multiple roles, with each
-              role providing specific privileges. In this example,
+            <para>Users can be assigned multiple roles, with each role
+              providing specific privileges. In this example,
                 <code>jsmith</code> is the administrative user for the
               account and holds the fully-privileged
                 <code>identity:admin</code> role. Other users might
@@ -401,8 +401,8 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.catalog">
-            <para> The service catalog lists the services this user
-              can access. In this example, the user can access one
+            <para>The service catalog lists the services this user can
+              access. In this example, the user can access one
               database service, one load-balancing service, one
               compute service (Cloud Servers OpenStack), one object
               storage service (Cloud Files), one monitoring service
@@ -415,25 +415,29 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-lb">
-            <para> This service catalog entry describes a
+            <para>This service catalog entry describes a
               load-balancing service. To use &PRODNAME;, you must have
               access to a load-balancing service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-compute">
-            <para> This service catalog entry describes a compute service. To use &PRODNAME;, you must have access to a compute service. </para>
+            <para>This service catalog entry describes a compute
+              service. To use &PRODNAME;, you must have access to a
+              compute service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-monitor">
-            <para> This service catalog entry describes a monitoring service. To use &PRODNAME;, you must have access to a monitoring service. </para>
+            <para>This service catalog entry describes a monitoring
+              service. To use &PRODNAME;, you must have access to a
+              monitoring service. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.service-autoscale">
-            <para> This service catalog entry describes &PRODNAME;. </para>
+            <para>This service catalog entry describes &PRODNAME;. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.tenant">
-            <para> Some services recognize the specification of a
+            <para>Some services recognize the specification of a
               tenant. If a service does recognize tenants, the format
               of the tenant specification is defined only by the
               service. For details about whether and how to specify a
@@ -442,7 +446,7 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.url">
-            <para> An endpoint can be assigned public and internal
+            <para>An endpoint can be assigned public and internal
               URLs. A public URL is accessible from anywhere. Access
               to a public URL usually incurs traffic charges. Internal
               URLs are accessible only to services within the same
@@ -450,21 +454,21 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.region">
-            <para> A service can expose endpoints in different
-              regions. Regional endpoints allow clients to provision
-              resources in a manner that provides high availability. </para>
-            <para> Some services are not region specific. These
+            <para>A service can expose endpoints in different regions.
+              Regional endpoints allow clients to provision resources
+              in a manner that provides high availability. </para>
+            <para>Some services are not region specific. These
               services supply a single, non-regional endpoint and do
               not provide access to internal URLs. </para>
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicename">
-            <para> The service name attribute identifies each unique
+            <para>The service name attribute identifies each unique
               service in the catalog. After a service is created, its
               name does not change. However, new services of the same
               service type can be added to the catalog with new names. </para>
             <important>
-              <para> If you are programmatically parsing an
+              <para>If you are programmatically parsing an
                 authentication response, use service type rather than
                 service name to determine whether a user has access to
                 a particular kind of service. Service type is stable
@@ -478,7 +482,7 @@ is external so it's handy for Getting Started to share -->
             <para> </para>
           </callout>
           <callout arearefs="response.json.servicetype">
-            <para> The service type attribute identifies services that
+            <para>The service type attribute identifies services that
               perform similar functions, regardless of service names.
               In this example, the service named cloudFiles is
               identified as <code>type="store"</code>, indicating that
@@ -497,7 +501,6 @@ is external so it's handy for Getting Started to share -->
     </section>
     <section xml:id="serviceEndpoints">
       <title>Service Access Endpoints</title>
-      <para/>
       <para>&PRODNAME; is a regionalized service. The user of the
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
@@ -514,6 +517,13 @@ is external so it's handy for Getting Started to share -->
       <para>
         <table rules="all">
           <caption>Regionalized Service Endpoints</caption>
+          <col width="11%"/>
+          <col width="11%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
+          <col width="16%"/>
           <thead>
             <tr align="center">
               <td colspan="2">Region</td>
@@ -544,6 +554,11 @@ is external so it's handy for Getting Started to share -->
               <td colspan="5">
                 <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
+            </tr>
+            <tr align="left">
+              <td colspan="2">Hong Kong (HKG)</td>
+              <td colspan="5"
+                  ><code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
             </tr>
           </tbody>
         </table>
@@ -998,29 +1013,24 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         server flavor. A flavor is an available hardware configuration
         for a server. Each flavor has a unique combination of disk
         space and memory capacity. The server flavor that is specified
-        in the Control Panel, maps to a specific flavor id in the
+        in the Control Panel maps to a specific flavor id in the
         Rackspace API. The following table outlines the mapping
         between flavor Id and the available flavors in the Control
-        Panel.</para>
-              <table frame="void">
-                <caption>Flavors</caption>
-                <col width="16%"/>
-                <col width="27%"/>
-                <col width="8%"/>
-                <col width="6%"/>
-                <col width="9%"/>
-                <col width="6%"/>
-                <col width="8%"/>
-                <col width="12%"/>
-                <col width="9%"/>
+        Panel. </para>
+            <table rules="all">
+                <caption>Rackspace Cloud Server Flavors</caption>
+              <col width="30%"/>
+              <col width="30%"/>
+              <col width="20%"/>
+              <col width="10%"/>
+              <col width="10%"/>
+        
                 <thead>
                   <tr>
                     <td align="center">Flavor ID</td>
                     <td align="center">Name</td>
-                    <td align="center">Memory_MB</td>
+                    <td align="center">Memory (MB)</td>
                     <td align="center">Disk</td>
-                    <td align="center">Ephemeral</td>
-                    <td align="center">Swap</td>
                     <td align="center">VCPUs</td>
                   </tr>
                 </thead>
@@ -1030,8 +1040,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>512 MB Standard Instance</td>
                     <td>512</td>
                     <td>20</td>
-                    <td>0</td>
-                    <td>512</td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1039,8 +1047,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>1 GB Standard Instance</td>
                     <td>1024</td>
                     <td>40</td>
-                    <td>0</td>
-                    <td>1024</td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1048,8 +1054,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>2 GB Standard Instance</td>
                     <td>2048</td>
                     <td>80</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1057,8 +1061,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>4 GB Standard Instance</td>
                     <td>4096</td>
                     <td>160</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1066,8 +1068,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>8 GB Standard Instance</td>
                     <td>8192</td>
                     <td>320</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1075,8 +1075,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>15 GB Standard Instance </td>
                     <td>15360</td>
                     <td>620</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>6</td>
                   </tr>
                   <tr>
@@ -1084,8 +1082,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>30 GB Standard Instance </td>
                     <td>30720</td>
                     <td>1200</td>
-                    <td>0</td>
-                    <td>2048</td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1093,8 +1089,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>1 GB Performance</td>
                     <td>1024</td>
                     <td>20</td>
-                    <td>0</td>
-                    <td></td>
                     <td>1</td>
                   </tr>
                   <tr>
@@ -1102,8 +1096,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>2 GB Performance</td>
                     <td>2048</td>
                     <td>40</td>
-                    <td>20</td>
-                    <td></td>
                     <td>2</td>
                   </tr>
                   <tr>
@@ -1111,8 +1103,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>4 GB Performance</td>
                     <td>4096</td>
                     <td>40</td>
-                    <td>40</td>
-                    <td></td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1120,8 +1110,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>8 GB Performance</td>
                     <td>8192</td>
                     <td>40</td>
-                    <td>80</td>
-                    <td></td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1129,8 +1117,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>120 GB Performance</td>
                     <td>122880</td>
                     <td>40</td>
-                    <td>1200</td>
-                    <td></td>
                     <td>32</td>
                   </tr>
                   <tr>
@@ -1138,8 +1124,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>15 GB Performance</td>
                     <td>15360</td>
                     <td>40</td>
-                    <td>150</td>
-                    <td></td>
                     <td>4</td>
                   </tr>
                   <tr>
@@ -1147,8 +1131,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>30 GB Performance</td>
                     <td>30720</td>
                     <td>40</td>
-                    <td>300</td>
-                    <td></td>
                     <td>8</td>
                   </tr>
                   <tr>
@@ -1156,8 +1138,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>60 GB Performance</td>
                     <td>61440</td>
                     <td>40</td>
-                    <td>600</td>
-                    <td></td>
                     <td>16</td>
                   </tr>
                   <tr>
@@ -1165,8 +1145,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                     <td>90 GB Performance</td>
                     <td>92160</td>
                     <td>40</td>
-                    <td>900</td>
-                    <td></td>
                     <td>24</td>
                   </tr>
                 </tbody>
@@ -1174,11 +1152,16 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           </section>
       <section xml:id="audit-log">
         <title>Audit Log</title>
-      <para>Because of the deferred nature of Autoscale, most errors
+      <para>Because of the deferred nature of Auto Scale, most errors
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
         the events that have occurred within a user's scaling group. </para>
-      <para/>
+      <para>The following example shows an audit log for the
+        successful creation of a scaling group.</para>
+        <programlisting language="json"><xi:include href="./samples/auditlogcreatescalinggroup.py" parse="text"/>
+</programlisting>
+        <para>The following example shows an audit log for the
+        successful creation of a webhook.</para>
         </section>
       <section xml:id="faults-dle101">
         <title>Faults</title>
@@ -1205,7 +1188,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         image that does not exist causes a fault, as does trying to
         attach a load balancer to a scaling group that does not exist. </para>
       <para>An example of an error message follows. </para>
-      <!-- improve this example to show something that an Autoscale user would really see -->
+      <!-- improve this example to show something that an Auto scale user would really see -->
       <example>
         <title>Error Message: Bad Request</title>
         <programlisting>HTTP/1.1 400 Bad Request
@@ -1351,7 +1334,7 @@ Content-Type: application/json
     </section>
     <section xml:id="Create_Scaling_Policies">
       <title>Create Scaling Policies</title>
-      <para>You can use the Autoscale API to create and manage the
+      <para>You can use the Auto Scale API to create and manage the
         scaling policies for your scaling group. Create a scaling
         policy by submitting a <command>POST</command> request that
         contains the <parameter>tenantID</parameter> that you obtained
