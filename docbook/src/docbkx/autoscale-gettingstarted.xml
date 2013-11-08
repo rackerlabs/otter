@@ -203,6 +203,25 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
     </chapter>
     <chapter xml:id="Core_Concepts">
         <title>Core Concepts</title>
+        <para>
+            <itemizedlist>
+                <listitem>
+                    <para><link
+                            linkend="Authenticated_Webhooks_and_Anonymous_Webhooks"
+                            >Authenticated Webhooks, Anonymous
+                            Webhooks, and Capability
+                        URLs</link></para>
+                </listitem>
+                <listitem>
+                    <para><link linkend="Cooldowns"
+                        >Cooldowns</link></para>
+                </listitem>
+                <listitem>
+                    <para><link linkend="Auto_Scale_Process">Auto
+                            Scale Process</link></para>
+                </listitem>
+            </itemizedlist>
+        </para>
         <para>Rackspace &PROD; is an API-based tool that automatically
             scales resources in response to an increase or decrease in
             overall workload based on user-defined thresholds. </para>
@@ -220,11 +239,185 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             </itemizedlist>You can set up a schedule for launching
             Auto Scale or define an event that triggers a webhook. You
             can also specify a minimum and maximum number of cloud
-            servers, as well as the amount of resources you want to
-            increase or decrease.</para>
-        <section xml:id="Basic_Workflow">
-            <title>Auto Scale Process</title>
-            <para> There are two ways to configure Auto Scale:</para>
+            servers for your scaling group, the amount of resources
+            you want to increase or decrease, and policies based on
+            percentage or real numbers.</para>
+        <para>
+            <note>
+                <para> &PROD; does not configure any information
+                    within a server. You must configure your services
+                    to function properly when each server is started.
+                    We recommend automating your servers' startup
+                    processes with <link
+                        xlink:href="http://www.opscode.com/chef/"
+                        >Chef</link> or a similar tool.</para>
+            </note>
+        </para>
+        <section xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks">
+            <title>Authenticated Webhooks, Anonymous Webhooks, and
+                Capability URLs</title>
+            <para>Auto Scale uses webhooks to initiate scaling events.
+                A webhook is an industry-standard protocol for sending
+                events between systems; for Auto Scale, they are used
+                to execute policies. A webhook consists of an HTTP
+                callback that is triggered by some user-defined event,
+                such as an alarm that is set through Cloud Monitoring
+                or another monitoring service. When that event occurs,
+                the source site makes an HTTP request to the URI
+                configured for the webhook. </para>
+            <para>A webhook contains a POST call to a defined URL,
+                potentially with a payload in the POST body. You can
+                send webhooks with a simple call in the library that
+                you are using. You can also send them manually via
+                cURL:</para>
+            <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
+            <para>Auto Scale also supports anonymous webhooks. In
+                regular webhooks, the {webhook_version}/{webhook_hash}
+                is specified by URL. In anonymous webhooks, the URL is
+                replaced with a hash that is known only to the issuer—
+                because no authentication is needed, the webhook is
+                considered "anonymous."</para>
+            <para>Auto Scale can also use capability URLs. Capability
+                URLs are URLs that give authorization for a certain
+                action or event. If you know the URL, you have access
+                to it and you can use the URL to trigger a specific
+                event. For Auto Scale, capability URLs assume the same
+                role as anonymous webhooks.  Capability URLs are
+                usually long, and random, and cannot be guessed by a
+                user.</para>
+            <para>To execute a capability URL, locate the URL in your
+                webhook, and then submit a POST request against it, as
+                shown in the following example:</para>
+            <programlisting language="json"><xi:include href="./samples/ReqExecuteCapabilityURL.json" parse="text"/></programlisting>
+        <para>Executing a capability URL will always return a 202,
+                    <parameter>Accepted</parameter>, response code,
+                even if the request fails because of an invalid
+                configuration. This is done to prevent information
+                leakage. </para>
+            <para>
+                <note>
+                    <para>To execute anonymous webhooks and capability
+                        URLs, no authentication is needed.</para>
+                </note>
+            </para>
+        </section>
+        <section xml:id="Scaling_groups"><title>Scaling Groups</title><para> The scaling group is at the heart of an Auto Scale deployment.
+                The scaling group specifies the basic elements of the
+                Auto Scale configuration. It manages how many servers
+                can participate in the scaling group. It also
+                specifies information related to load balancers if
+                your configuration uses a load balancer. </para>
+            <para>When you create a scaling group, you specify the
+                details for the following two configurations:</para>
+                <itemizedlist>
+                    <listitem>
+                        <para>Group Configuration </para>
+                    </listitem>
+                    <listitem>
+                        <para>Launch Configuration</para></listitem>
+                </itemizedlist>
+
+            <para>The following table provides a description of both
+                configuration types.</para>
+            <para>
+                <table>
+                    <caption>Scaling Group Configurations</caption>
+                    <col width="20%"/>
+                    <col width="60%"/>
+                    <thead>
+                        <tr>
+                            <td>Configuration</td>
+                            <td>Description</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Group Configuration</td>
+                            <td>Outlines the basic elements of the
+                                Auto Scale configuration. The group
+                                configuration manages how many servers
+                                can participate in the scaling group.
+                                It sets a minimum and maximum limit
+                                for the number of entities that can be
+                                used in the scaling process. It also
+                                specifies information related to load
+                                balancers.</td>
+                        </tr>
+                        <tr>
+                            <td>Launch Configuration</td>
+                            <td>Creates a blueprint for how new
+                                servers will be created. The launch
+                                configuration specifies what type of
+                                server image will be started on
+                                launch, what flavor the new server is,
+                                and which load balancer the new server
+                                connects to. </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </para></section>
+        <section xml:id="Scaling_policies"><title>Scaling Policies</title>
+            <para>Auto Scale uses policies to define the scaling
+                activity that will take place, as well as when and how
+                that scaling activity will take place. Scaling
+                policies specify how to modify the scaling group and
+                its behavior. You can specify multiple policies to
+                manage a scaling group. </para>
+            <para>You can create two kinds of Auto Scale
+                policies:</para>
+            <itemizedlist spacing="compact">
+                <listitem>
+                    <para>Policies that trigger Auto Scale activities
+                        through a webhook.</para>
+                </listitem>
+                <listitem>
+                    <para>Policies that trigger Auto Scale activities
+                        based on a schedule.</para>
+                </listitem>
+            </itemizedlist></section>
+            <section xml:id="Cooldowns">
+                <title>Cooldowns</title>
+                <para>Auto Scale supports a cooldown feature. A
+                    cooldown is a configured period of time that must
+                    pass between actions. Cooldowns only apply to
+                    webhook-based configurations. By configuring group
+                    cooldowns, you control how often a group can have
+                    a policy applied, which can help servers scaling
+                    up to complete the scale up before another policy
+                    is executed. By configuring policy cooldowns, you
+                    control how often a policy can be executed, which
+                    can help provide quick scale-ups and gradual
+                    scale-downs. </para>
+                <para>Cooldowns work the following way:<itemizedlist>
+                        <listitem>
+                            <para>Group cooldowns control how often a
+                                group can be modified by denying all
+                                policy executions until the cooldown
+                                expires—even if conditions exist that
+                                would trigger one.</para>
+                        </listitem>
+                        <listitem>
+                            <para>Policy cooldowns control how often a
+                                single, specific, policy can be
+                                executed. For example, a policy
+                                cooldown can require at least six
+                                hours until any successive scale down
+                                policies are reactivated. This allows
+                                you to "scale up fast, scale down
+                                slow."</para>
+                        </listitem>
+                    </itemizedlist></para>
+                <para>
+                    <note>
+                        <para>Cooldown configuration is irrelevant for
+                            schedule-based configurations and the
+                            Group Cooldown and Policy Cooldown can
+                            both be set to 0 (null). </para>
+                    </note>
+                </para>
+            </section>
+        <section xml:id="Auto_Scale_Process">
+            <title><?sbr?>Auto Scale Process</title>
             <para>
                 <itemizedlist>
                     <listitem>
@@ -240,17 +433,6 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             Configuration</link></para>
                     </listitem>
                 </itemizedlist>
-            </para>
-            <para>
-                <note>
-                    <para> &PROD; does not configure any information
-                        within a server. You must configure your
-                        services to function properly when each server
-                        is started. We recommend automating your
-                        servers' startup processes with <link
-                            xlink:href="http://www.opscode.com/chef/"
-                            >Chef</link> or a similar tool.</para>
-                </note>
             </para>
             <section xml:id="Schedule_Based_Configuration">
                 <title>Schedule-based Configuration</title>
@@ -314,80 +496,42 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             </section>
             <section xml:id="webhook_based_configuration">
                 <title>Webhook-based Configuration</title>
-                <para>Auto Scale uses webhooks to initiate a scaling
-                    event. A webhook is an industry-standard protocol
-                    for sending events between systems. A webhook
-                    consists of an HTTP callback that is triggered by
-                    some user-defined event. When that event occurs
-                    the source site makes an HTTP request to the URI
-                    configured for the webhook. </para>
-                <para>A webhook contains a POST call to a defined URL,
-                    potentially with a payload in the POST body. You
-                    can send webhooks with a simple call using
-                    whatever library is available for your
-                    environment. You can also manually send them via
-                    cURL.   </para>
-                <para>The following example shows how to send a
-                    webhook with cURL:</para>
+                <para>You can configure Auto Scale to be triggered
+                    through a webhook, based on a predefined alarm or
+                    threshold that has been previously set up in a
+                    monitoring service. Monitoring-based configuration
+                    works the following way:</para>
                 <para>
-                    <programlisting>curl -v  http://example.com/webhook -X POST -d 'payload=payload'</programlisting>
+                    <itemizedlist>
+                        <listitem>
+                            <para>
+                             In your monitoring service, you
+                                   configure alarms that are triggered
+                                   when a high utilization of
+                                   resources occurs</para> </listitem>
+                        <listitem>
+                                <para>In Auto Scale, you configure a
+                                   scaling group, scaling policies,
+                                   and a webhook to be triggered when
+                                   your monitoring service sets off an
+                                   alarm for high utilization of
+                                   resources. </para></listitem>
+                        <listitem> <para>The webhook launches the
+                                   Rackspace Auto Scale service, which
+                                   looks up the policy that has been
+                                   defined in accordance with the
+                                   webhook. This policy determines the
+                                   amount of cloud servers that need
+                                   to be added or removed. </para>
+                            </listitem>
+                    </itemizedlist>
                 </para>
-                <para>For more information about how webhooks are used
-                    in the Rackspace API, see </para>
-                <para><link
-                        xlink:href="http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook"
-                        >http://docs.rackspace.com/cm/api/v1.0/cm-devguide/content/service-notification-types-crud.html#service-notification-types-webhook</link>.</para>
-                <para>Auto Scale also support anonymous webhooks. In
-                    regular webhooks, the
-                        <code>{capability_version}/{capability_hash}</code>
-                    is specified by URL. In anonymous webhooks, the
-                    URL is replaced with a hash that is known only to
-                    the issuer—this is the reason why the webhook is
-                    called "anonymous" because no authentication is
-                    needed. </para>
-            </section>
-            <section xml:id="cooldowns">
-                <title>Cooldowns</title>
-                <para>Auto Scale supports a cooldown feature. A
-                    cooldown is a configured period of time that must
-                    pass between actions. By configuring group
-                    cooldowns, you control how often a group can have
-                    a policy applied, which can help servers scaling
-                    up to complete the scale up before another policy
-                    is executed. By configuring policy cooldowns, you
-                    control how often a policy can be executed, which
-                    can help provide quick scale-ups and gradual
-                    scale-downs.</para>
-                <para>When a group of servers are being automatically
-                    managed by Auto Scale, you may need to set limits
-                    as to how the group changes over time. Cooldowns
-                    allow you to control the rate of change of a
-                    group. A cooldown is a configured period of time
-                    that must pass between actions. Group cooldowns
-                    control how often a group can be modified by
-                    denying all policy executions until the cooldown
-                    expires. Policy cooldowns control how often a
-                    single specific policy can be executed. For
-                    example, a policy cooldown can require at least
-                    six hours until any successive scale down policies
-                    are reactivated. </para>
-                <para>Cooldowns work the following way:<itemizedlist>
-                        <listitem>
-                            <para>Cooldowns allow some time for the
-                                initial scaling response to take
-                                effect, potentially resolving the
-                                situation that triggered the policy.
-                                When a scaling policy is triggered,
-                                cooldown periods begin for both the
-                                scaling policy and the group. </para>
-                        </listitem>
-                        <listitem>
-                            <para>While the cooldown is active, any
-                                additional requests to the group or to
-                                the specific policy are ignored.
-                            </para>
-                        </listitem>
-                    </itemizedlist></para>
+                <note>
+                    <para>Servers added through a webhook triggered by
+                        an external monitoring service will not be
+                        automatically monitored by the external
+                        monitoring service. </para>
+                </note>
             </section>
         </section>
     </chapter>
@@ -419,7 +563,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 It also specifies information related to load
                 balancers.</para>
             <para>The following table specifies the parameters for the
-                GroupConfiguration entity:</para>
+                    <parameter>GroupConfiguration</parameter>
+                entity:</para>
             <table rules="all">
                 <caption>GroupConfiguration Parameters</caption>
                 <col width="20%"/>
@@ -561,13 +706,19 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                                    <tr>
                                    <td><parameter>name</parameter></td>
                                    <td>Specifies the name of the
-                                   server</td>
+                                server.</td>
                                    </tr>
                                    <tr>
                                    <td><parameter>flavorRef</parameter></td>
-                                   <td>Specifies the maximum amount of
-                                   identities that are allowed in this
-                                   group</td>
+                                   <td>Specifies the flavor Id for the
+                                server.  A flavor is a resource
+                                configuration for a server. For more
+                                information on available flavors, see
+                                the Server Flavors<olink
+                                   targetdoc="autoscale-devguide"
+                                   targetptr="server-flavors">“Server
+                                   Flavors”</olink> section in the
+                                Auto Scale Developer's Guide.</td>
                                    </tr>
                                    <tr>
                                    <td><parameter>imageRef</parameter></td>
@@ -575,16 +726,55 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                                    Server image to start.</td>
                                    </tr>
                                     <tr>
+                                        <td><parameter>OS-DCF:diskConfig</parameter></td>
+                                        <td>Specifies the disk
+                                configuration value. Valid values are
+                                "AUTO" or "manual." For more
+                                information, see the <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute"
+                                   >Disk Configuration
+                                   Extension</link> documentation for
+                                Rackspace Cloud Servers.</td>
+                                    </tr>
+                                        <tr>    
                                         <td><parameter>metadata</parameter></td>
-                                        <td/>
+                                        <td>This parameter is
+                                optional. The maximum size of the
+                                metadata key and value is 255 bytes
+                                each. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   >Server Metadata</link>
+                                documentation for Rackspace Cloud
+                                Servers.</td>
                                     </tr>
                                     <tr>
                                         <td><parameter>networks</parameter></td>
-                                        <td/>
+                                        <td>Specifies the networks to
+                                which you want to attach the server.
+                                This attribute enables you to attach
+                                to an isolated network for your tenant
+                                ID, the public Internet network, and
+                                the private ServiceNet network.
+                                <?sbr?>If you do not specify any
+                                networks, your server is attached to
+                                the public Internet and private
+                                ServiceNet networks. The UUID for the
+                                private ServiceNet is
+                                11111111-1111-1111-1111-111111111111.
+                                The UUID for the public Internet is
+                                00000000-0000-0000-0000-000000000000. </td>
                                     </tr>
                                     <tr>
                                         <td><parameter>personality</parameter></td>
-                                        <td/>
+                                        <td>Specifies the file path
+                                and/or the content that you want to
+                                inject into a server image. For more
+                                information, see the <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Personality-d1e2543.html"
+                                   >Server Personality</link>
+                                documentation for Rackspace Cloud
+                                Servers.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -652,8 +842,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         </listitem>
                     </itemizedlist>
                 </para>
-                <para> To learn more about configuring cloud load
-                    balancers through an API, read the following: <itemizedlist>
+                <para> To learn more about configuring Cloud Load
+                    Balancers through an API, read the following: <itemizedlist>
                         <listitem>
                             <para>
                                 <link
@@ -687,6 +877,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                                 >Schedule-based Policies</link></para>
                     </listitem>
                     <listitem>
+                        <para><link linkend="Scale_by_percentage"
+                                >Scaling by Percentage</link></para>
+                    </listitem>
+                    <listitem>
                         <para><link linkend="Min_and_Max_Policies"
                                 >Using the Min and Max Values with
                                 Policies</link></para>
@@ -700,7 +894,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <para>Scaling group policies specify how to modify the
                 scaling group and its behavior. You can specify
                 multiple policies to manage a scaling group. </para>
-            <para>Scaling policies specify the following:</para>
+            <para>To define a scaling policy, you need to set the
+                following parameters for the
+                    <parameter>scalingPolicies</parameter>
+                group:</para>
             <table rules="all">
                 <caption>scalingPolicies Parameters</caption>
                 <col width="20%"/>
@@ -714,7 +911,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <tbody>
                     <tr>
                         <td><parameter>name</parameter></td>
-                        <td>Name of the scaling policy</td>
+                        <td>Specifies the name of the scaling
+                            policy</td>
                     </tr>
                     <tr>
                         <td><parameter>changePercent</parameter></td>
@@ -735,7 +933,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     </tr>
                 </tbody>
             </table>
-            <para>You have several options for defining an Auto Scale
+            <para>You have two options for defining an Auto Scale
                 policy:</para>
             <itemizedlist spacing="compact">
                 <listitem>
@@ -750,9 +948,9 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <section xml:id="Webhook_triggered_policy">
                 <title>Webhook-triggered policies</title>
                 <para>You can define a scaling policy that is invoked
-                    by a webhook when a predefined event occurs. To
-                    configure a webhook-based policy, you need to set
-                    the <parameter>type</parameter> parameter to
+                    by a webhook when a predefined event occurs. </para>
+                <para>To configure a webhook-based policy, you need to
+                    set the <parameter>type</parameter> parameter to
                     "webhook" and then provide the following
                     information: </para>
                 <para>
@@ -777,23 +975,31 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             </tr>
                             <tr>
                                 <td><parameter>changePercent</parameter></td>
-                                <td>Specifies the change value, in
-                                   incremental stages or per
+                                <td>Specifies the change value in per
                                    cent.</td>
                             </tr>
                             <tr>
                                 <td><parameter>desiredCapacity</parameter></td>
-                                <td>Specifies final capacity that is
-                                   desired by the scale up event</td>
-                            </tr>
-                            <tr>
-                                <td><parameter>args</parameter></td>
-                                <td>Specifiy any additional
-                                   information</td>
+                                <td>Specifies the final capacity that
+                                   is desired by the scale up event.
+                                   Note that this value is always
+                                   rounded up.</td>
                             </tr>
                         </tbody>
-                    </table>
-                </para>
+                    </table>  The webhook object takes no args, but
+                    enables the use of the
+                        <parameter>policyId</parameter>.</para>
+                <para>
+                    <note>
+                        <para>The <parameter>change</parameter>,
+                                <parameter>changePercent</parameter>,
+                            and <parameter>desiredCapacity</parameter>
+                            parameters are all mutually exclusive. You
+                            can only set one of them per
+                            policy.</para>
+                    </note> For more information, see <link
+                        linkend="webhook_based_configuration"
+                        >Webhook-based Configuration</link>.</para>
             </section>
             <section xml:id="Schedule_based_Policy">
             <title>Schedule-based Policies</title>
@@ -953,11 +1159,14 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         <para>
             <itemizedlist>
                 <listitem>
-                    <para>Authenticate</para>
+                    <para><link linkend="Authenticate"
+                            >Authenticate</link></para>
                 </listitem>
-                <listitem> <para>Save an Image</para></listitem>
-                <listitem><para>Create an Manage a Scaling Group</para></listitem>
-                <listitem>  <para>Delete a Scaling Group</para></listitem>  
+                <listitem> <para><link linkend="Save_Image">Save an Image</link></para></listitem>
+                <listitem><para><link linkend="Create_Group">Create an Manage a Scaling
+                            Group</link></para></listitem>
+                <listitem>  <para><link linkend="Delete_Scaling_Group">Delete a Scaling
+                            Group</link></para></listitem>  
             </itemizedlist>
         </para>
         <para>You can create a autoscaling group by following the
@@ -1413,8 +1622,29 @@ DELETE /{tenantId}/groups/{groupId}?force=true
     </chapter>
     <chapter xml:id="Next_Steps">
         <title>Next Steps</title>
-        <section xml:id="Next_Steps_For_Autoscale">
-        <title>Next Steps<?sbr?></title>
-            <para></para>
-    </section></chapter>
+            <para>Now that you have created your scaling group, you
+                are ready to take the next steps:</para>
+            <para>
+                <itemizedlist>
+                    <listitem>
+                        <para>Update your scaling group configuration
+                        using the Auto Scale API. For more
+                        information, see Working with the Auto Scale
+                            API<olink targetdoc="autoscale-devguide"
+                            targetptr="Working_with_Auto_Scale_API"
+                            >Working with the Auto Scale API</olink>
+                        in the Auto Scale Developer's Guide.</para>
+                    </listitem>
+                    <listitem>
+                        <para>Learn more about configuring scaling
+                        policy and webhooks, as well as executing a
+                        scaling policy by </para>
+                    </listitem>
+                    <listitem>
+                        <para>Configure your Auto Scale deployment
+                            using the Control Panel.</para>
+                    </listitem>
+                </itemizedlist>
+            </para>
+</chapter>
 </book>

@@ -1149,6 +1149,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                   </tr>
                 </tbody>
               </table>
+            <para>
+        <note>
+          <para>Auto Scale only supports Next Generation servers. No
+            First Generation servers are supported.</para>
+        </note>
+      </para>
           </section>
       <section xml:id="audit-log">
         <title>Audit Log</title>
@@ -1208,7 +1214,6 @@ Content-Type: application/json
       <para>Error information for each API operation is included with
         the description of that operation in <xref linkend="API_Operations"
         />.</para>
-      <para/>
       </section>
       </chapter>
   <chapter xml:id="Working_with_Auto_Scale_API">
@@ -1275,7 +1280,7 @@ Content-Type: application/json
         <title>Edit the Launch Configuration for your Scaling
           Group</title>
         <para>To edit the launch configuration for a scaling group,
-          inlucding how to create a server, from what image, which
+          including how to create a server, from what image, which
           load balancers to join it to, and what networks to add it
           to, and other metadata, submit a <command>PUT</command>
           request with the <parameter>tenantId</parameter> and

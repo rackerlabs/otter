@@ -1,0 +1,3 @@
+curl --include \
+   --request POST \
+   "https://ord.autoscale.api.rackspacecloud.com/v1.0/execute/1/be624bfb20f07baddc278cd978c1ddca56bdb29a1c7b70bbeb229fe0b862c134" -v
