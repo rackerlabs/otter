@@ -29,7 +29,7 @@ class ScalingPolicyNegative(AutoscaleFixture):
         by default
         """
         list_policy_resp = self.autoscale_client.list_policies(self.group.id)
-        list_policy = list_policy_resp.entity
+        list_policy = (list_policy_resp.entity).policies
         self.assertEquals(list_policy_resp.status_code, 200,
                           msg='List scaling policies for group {0} failed with '
                           '{0}'.format(self.group.id, list_policy_resp.status_code))

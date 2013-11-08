@@ -414,7 +414,6 @@ class AutoscaleFixture(BaseTestFixture):
     def get_total_num_policies(self, group_id):
         """
         Returns the total number of policies on the given scaling group.
-        Note: This will work only after the test policy pagination branch is merged
         """
         list_policies = self.autoscale_client.list_policies(group_id).entity
         policies_num = len(list_policies.policies)
