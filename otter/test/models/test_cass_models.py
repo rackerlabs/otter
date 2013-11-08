@@ -21,7 +21,7 @@ from otter.models.cass import (
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, OverLimitError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -2117,7 +2117,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-        self.failureResultOf(d, OverLimitError)
+        self.failureResultOf(d, ScalingGroupOverLimitError)
 
     def test_list_states(self):
         """

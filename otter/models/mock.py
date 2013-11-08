@@ -13,7 +13,7 @@ from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError, IScalingScheduleCollection,
-    IAdmin, OverLimitError)
+    IAdmin, ScalingGroupOverLimitError)
 from otter.util.hashkey import generate_capability
 from otter.util.config import config_value
 
@@ -416,7 +416,7 @@ class MockScalingGroupCollection:
         if len(self.data[tenant]) >= max_groups:
             msg = 'client has reached maxGroups limit'
             log.bind(tenant_id=tenant, scaling_group_id=uuid).msg(msg)
-            return defer.fail(OverLimitError(tenant, max_groups))
+            return defer.fail(ScalingGroupOverLimitError(tenant, max_groups))
 
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid, self,

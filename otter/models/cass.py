@@ -12,7 +12,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
-    IScalingScheduleCollection, IAdmin, OverLimitError)
+    IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -959,7 +959,7 @@ class CassScalingGroupCollection:
         def check_groups(cur_groups, max_groups):
             if cur_groups[0]['count'] >= max_groups:
                 log.msg('client has reached maxGroups limit')
-                raise OverLimitError(tenant_id, max_groups)
+                raise ScalingGroupOverLimitError(tenant_id, max_groups)
 
         d.addCallback(check_groups, max_groups)
 

@@ -13,7 +13,7 @@ from otter.models.mock import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError,
-    OverLimitError)
+    ScalingGroupOverLimitError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -825,7 +825,7 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         set_config_data({'limits': {'absolute': {'maxGroups': 0}}})
 
         d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
-        self.failureResultOf(d, OverLimitError)
+        self.failureResultOf(d, ScalingGroupOverLimitError)
 
     def test_list_scaling_group_limits_number_of_groups(self):
         """
