@@ -1589,7 +1589,6 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
         some element of the configuration is invalid, scaling can fail
         even if the scaling policy is executed. </para>
     </section>
-    <section xml:id="Delete_Scaling_Group"/>
     <xi:include href="./chapters/rbac.xml"/>
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
