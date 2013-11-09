@@ -288,7 +288,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <para>To execute a capability URL, locate the URL in your
                 webhook, and then submit a POST request against it, as
                 shown in the following example:</para>
-            <programlisting language="json"><xi:include href="./samples/ReqExecuteCapabilityURL.json" parse="text"/></programlisting>
+            <programlisting language="json"><xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/></programlisting>
         <para>Executing a capability URL will always return a 202,
                     <parameter>Accepted</parameter>, response code,
                 even if the request fails because of an invalid
