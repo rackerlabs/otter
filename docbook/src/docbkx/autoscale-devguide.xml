@@ -124,28 +124,29 @@ format="SVG" scale="60"/>
     </info>
 <chapter xml:id="Overview">
     <title>Overview</title>
-    <para> The &PRODNAME; service responds to events by changing
-      capacity to meet current needs. </para>
+    <para> The &PRODNAME; is a web service that automatically scales
+        resources in response to an increase or decrease in overall
+        workload based on user-defined policies. You can set up a
+        schedule for launching &PROD; or define an event that is
+        triggered by Cloud Monitoring. You can also specify a minimum
+        and maximum number of cloud servers, the amount of resources
+        that you want to increase or decrease, and the thresholds in
+        Cloud Monitoring that trigger the scaling activities. </para>
   <para>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
-      Then you define cloud monitoring alerts to watch the group's activity, 
+      Then you define policies, either schedule-based or monitoring-based. For monitoring-based policies,
+      you define cloud monitoring alerts to watch the group's activity,
       and you define scaling rules to change the scaling group's configuration in response to alerts. 
+      For schedule-based policies, you simply set a schedule.
       Because you can change a
       scaling group's configuration in response to changing
       workloads, you can begin with a minimal cloud
       configuration and grow only when the cost of that growth is
       justified. </para>
-    <para> &PROD; is a web service that automatically scales
-      resources in response to an increase or decrease in overall
-      workload based on user-defined thresholds. You can set up a
-      schedule for launching &PROD; or define an event that is
-      triggered by Cloud Monitoring. You can also specify a minimum
-      and maximum number of cloud servers, the amount of resources
-      that you want to increase or decrease, and the thresholds in
-      Cloud Monitoring that trigger the scaling activities. &PROD; 
+    <para> &PROD;
       requires the following services to work together: <itemizedlist>
         <listitem>
-          <para> Cloud Monitoring </para>
+          <para> Cloud Monitoring (for monitoring-based policies) </para>
         </listitem>
         <listitem>
           <para> Cloud Servers </para>
@@ -1083,8 +1084,507 @@ Content-Type: application/json
       <para>Error information for each API operation is included with
         the description of that operation in <xref linkend="API_Operations"
         />.</para>
-    </section> 
-        <xi:include href="./chapters/rbac.xml"/>
+      <para/>
+      </section>
+      </chapter>
+  <chapter xml:id="Working_with_Auto_Scale_API">
+    <title>Working with the Auto Scale API</title>
+    <section xml:id="Manage_Launch_Configuration">
+      <title>Manage the Launch Configuration for your Scaling
+        Group</title>
+      <para>You can use the Auto Scale API to view and update the
+        launch configuration for your scaling group.</para>
+      <example>
+        <title>Get the Current Configuration for your Scaling
+          Group</title>
+        <para>To obtain the configuration for a scaling group, which
+          includes the minimum number of entities, the maximum number
+          of entities, global cooldown, and other metadata, submit a
+            <command>GET</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
+        <para>If the <command>GET</command> request is successful, the
+          data is returned in the body of the response in JSON format
+          as shown in the following example:</para>
+        <programlisting language="json"><xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Edit the Current Configuration for your Scaling
+          Group</title>
+        <para>To edit the configuration for a scaling group, which
+          includes the minimum number of entities, the maximum number
+          of entities, global cooldown, and other metadata, submit a
+            <command>PUT</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
+        <programlisting language="json"><xi:include href="./samples/reqPutGroupConfig.json" parse="text"/>
+</programlisting>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned </para>
+      </example>
+      <example>
+        <title>Get the Launch Configuration for your Scaling
+          Group</title>
+        <para>To obtain the launch configuration for a scaling group,
+          which includes the details of how to create a server, from
+          what image, which load balancers to join it to, what
+          networks to add it to, and other metadata, submit a
+            <command>GET</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting> GET /{tenantId}/groups/{groupId}/launch</programlisting>
+        <para>If the <command>GET</command> request is successfull,
+          the data will be returned in the body of the response in
+          JSON format as shown in the following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Edit the Launch Configuration for your Scaling
+          Group</title>
+        <para>To edit the launch configuration for a scaling group,
+          inlucding how to create a server, from what image, which
+          load balancers to join it to, and what networks to add it
+          to, and other metadata, submit a <command>PUT</command>
+          request with the <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter>parameters specified in the
+          request URL. In the request body, specify the details about
+          the server type, server image, load balancers, network, and
+          any other information you want to edit, as shown in the
+          following example. </para>
+        <programlisting> PUT /{tenantId}/groups/{groupId}/launch </programlisting>
+        <programlisting language="json"><xi:include href="./samples/reqPutLaunchConfig.json" parse="text"/>
+</programlisting>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned.</para>
+      </example>
+      <example>
+        <title>Pause Execution of all Policies for a Scaling
+          Group<?sbr?></title>
+        <para>
+          <note>
+            <para>The Pause feature has not been implemented in the
+              Auto Scale API yet but will be implemented in a future
+              release.</para>
+          </note>
+        </para>
+        <para>To pause all execution of scaling policies for a scaling
+          group, submit a <command>POST</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting> POST /{tenantId}/groups/{groupId}/pause</programlisting>
+        <para>If the <command>POST</command> request is successful, a
+          204 response code is returned with an empty response
+          body.</para>
+      </example>
+      <example>
+        <title>Resume Execution of all Policies for a Scaling
+          Group</title>
+        <para>
+          <note>
+            <para>The Resume feature has not been implemented in the
+              Auto Scale API yet but will be implemented in a future
+              release.</para>
+          </note>
+        </para>
+        <para>To resume execution of all scaling policies for a
+          scaling group, submit a <command>POST</command> request with
+          the <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting> POST /{tenantId}/groups/{groupId}/resume</programlisting>
+        <para>If the <command>POST</command> request is successful, a
+          204 response code is returned with an empty response
+          body.</para>
+      </example>
+    </section>
+    <section xml:id="Create_Scaling_Policies">
+      <title>Create Scaling Policies</title>
+      <para>You can use the Autoscale API to create and manage the
+        scaling policies for your scaling group. Create a scaling
+        policy by submitting a <command>POST</command> request that
+        contains the <parameter>tenantID</parameter> that you obtained
+        during the Authenticationstep and the
+          <parameter>groupID</parameter> that you obtained durring the
+        Create and Manage a Scaling Group step. </para>
+      <para> You can specify multiple policies to manage your scaling
+        group.</para>
+      <para>
+        <note>
+          <para> Executing a scaling policy always returns a <code>202
+              Accepted</code> status. This status indicates that the
+            scaling policy was executed but does not indicate whether
+            the execution successfully caused the scaling group to
+            scale. If some element of the configuration is invalid,
+            scaling can fail even if the scaling policy is executed.
+          </para>
+        </note>
+      </para>
+      <example>
+        <title>Creating a Scaling Policy</title>
+        <para>To create a scaling policy, submit a POST request with
+          the <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL. The following example shows how to create a
+          policy that scales the group up by one server with a
+          cooldown phase of 150 seconds and a scaling policy that
+          scales the group down by 5.5 percent with a cooldown phase
+          of 6 seconds.</para>
+        <programlisting>
+POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
+                </programlisting>
+        <programlisting language="json">
+<xi:include href="./samples/reqCreatePolicies.json" parse="text"/>
+</programlisting>
+        <para>If the <command>POST</command> request is successful, an
+          array of scaling policies is provided in the request body in
+          JSON format, as shown in the following example.</para>
+        <programlisting language="json">
+<xi:include href="./samples/resCreatePolicies.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Obtaining a List of Scaling Policies</title>
+        <para>To obtain a list of scaling policies for a scaling
+          group, submit a <command>GET</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL.</para>
+        <programlisting>
+GET /{tenantId}/groups/{groupId}/policies
+                </programlisting>
+        <para>If the <command>GET</command> request is successful, the
+          response data will be returned in JSON format as shown in
+          the following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resGetPolicies.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Getting an Individual Scaling Policy</title>
+        <para>To obtain information about an individual scaling
+          policy, including policy id, name, type, adjustment, and
+          cooldown, submit a <command>GET</command> request with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter> and
+            <parameter>policyId</parameter> parameters specified in
+          the request URL. </para>
+        <programlisting>
+GET /{tenantId}/groups/{groupId}/policies/{policyId}
+                </programlisting>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in the response body in JSON format as
+          shown in the following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resGetPolicy.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Updating a Scaling Policy</title>
+        <para>To update a scaling policy, submit a
+            <command>PUT</command> request, with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter> and
+            <parameter>policyId</parameter> parameters specified in
+          the request URL. In the request body provide a name for the
+          policy, a change value, and a value for the cooldown and a
+          method for triggering the policy, for example a webhook. In
+          the following example, the configuration is scaled up by 1
+          server with a cooldown phase of 1800 seconds. </para>
+        <programlisting>
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}
+</programlisting>
+        <programlisting language="json">
+<xi:include href="./samples/reqPutPolicy.json" parse="text"/>
+</programlisting>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned. </para>
+      </example>
+      <example>
+        <title>Deleting a Scaling Policy</title>
+        <para>To delete a scaling policy, submit a
+            <command>DELETE</command> request with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter> and
+            <parameter>policyId</parameter> parameters specified in
+          the request URL. </para>
+        <programlisting>
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
+                </programlisting>
+        <para>If the <command>DELETE</command> request is successful,
+          a 204 response code with an empty response body will be
+          returned. </para>
+      </example>
+    </section>
+    <section xml:id="Create_and_Manage_Webhooks">
+      <title>Create and Manage Webhooks</title>
+      <para>After creating your policy, you need to specify a webhook
+        to tie your scaling policy to events. Webhooks are URLs that
+        can activate the policy without authentication. When a webhook
+        is set, a pre-configured event, such as an alarm set through
+        Cloud Monitoring, causes an HTTP POST callback request to be
+        sent to a configured URI. </para>
+      <example>
+        <title>Creating a Scaling Webhook: Request</title>
+        <para>To create a webhook, submit a <command>POST</command>
+          request with the <parameter>tenantID</parameter>,
+            <parameter>groupID</parameter>, and
+            <parameter>policyID</parameter> specified in the request
+          URL. In the request body, specify the name of the webhook,
+          as well as any metadata for the webhook. The following
+          example shows how to create a webhook for a scaling
+          policy.</para>
+        <programlisting>
+POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
+                </programlisting>
+        <programlisting language="json">
+<xi:include href="./samples/reqCreateWebhook.json" parse="text"/>
+</programlisting>
+        <para>If the <command>POST</command> request is successful,
+          the data will be returned in JSON format as shown in the
+          following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resCreateWebhook.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Get a List of all Scaling Webhooks and their
+          Ids</title>
+        <para>To obtain a list of all scaling webhooks and their
+          corresponding ids, submit a <command>GET</command> request
+          with the <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter> and
+            <parameter>policyId</parameter> parameters specified in
+          the request URL.</para>
+        <programlisting>
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
+                </programlisting>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in the response body in JSON format as
+          shown in the following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resGetWebhooks.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Update a Scaling Webhook</title>
+        <para>To modify a scaling webhook, submit a
+            <command>PUT</command> request with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter>,
+            <parameter>policyId</parameter> and
+            <parameter>webhookId</parameter> parameters specified in
+          the request URL. In the request body, specify a name and
+          metadata for the webhook as shown in the following
+          example.</para>
+        <programlisting>
+PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
+                </programlisting>
+        <programlisting language="json"><xi:include href="./samples/reqPutWebhook.json" parse="text"/></programlisting>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned.</para>
+      </example>
+      <example>
+        <title>Get Information about a Specific Webhook</title>
+        <para>To obtain details about a specific webhook, submit a
+            <command>GET</command> request with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter>,
+            <parameter>policyId</parameter> and
+            <parameter>webhookId</parameter> parameters specified in
+          the request URL.</para>
+        <programlisting>
+GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
+                </programlisting>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in JSON format as shown in the
+          following example:</para>
+        <programlisting language="json">
+<xi:include href="./samples/resGetWebhook.json" parse="text"/>
+</programlisting>
+      </example>
+      <example>
+        <title>Delete a Scaling Webhook</title>
+        <para>To delete a scaling policy webhook, submit a
+            <command>DELETE</command> request with the
+            <parameter>tenantID</parameter>,
+            <parameter>groupID</parameter>,
+            <parameter>policyID</parameter>, and the
+            <parameter>webhookID</parameter> parameters specified in
+          the request URL.</para>
+        <programlisting>
+DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
+                </programlisting>
+        <para>If the <command>DELETE</command> request is successful,
+          a 204 response code with an empty response body will be
+          returned. </para>
+      </example>
+    </section>
+    <section xml:id="Execute_Scaling_Policy">
+      <title>Execute a Scaling Policy</title>
+      <para> After you define a scaling policy, you can activate that
+        policy by issuing a <command>POST</command> request against
+        its URL. </para>
+      <example>
+        <title>Activating a Scaling Policy</title>
+        <para>To activate a scaling policy, submit a
+            <command>POST</command> request with the
+            <parameter>tenantId</parameter>,
+            <parameter>groupId</parameter> and
+            <parameter>policyId</parameter> parameters specified in
+          the request URL.</para>
+        <programlisting>
+ POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute 
+                </programlisting>
+      </example>
+      <para> The <command>POST</command> request causes the <link
+          linkend="Create_Scaling_Policies">scaling policy</link> to
+        execute, which causes the scaling group to transform if it is
+        able to do so. </para>
+      <para> Execution of a scaling policy always returns a <code>202
+          Accepted</code> status. This status indicates that the
+        scaling policy was executed but does not indicate whether the
+        execution successfully caused the scaling group to scale. If
+        some element of the configuration is invalid, scaling can fail
+        even if the scaling policy is executed. </para>
+    </section>
+    <section xml:id="Delete_Scaling_Group">
+      <title>Delete a Scaling Group</title>
+      <para>You can use the Auto Scale API to deactivate and delete
+        one or more scaling groups. Your options for deleting the
+        scaling group depend on whether your scaling group has active
+        entities or not.</para>
+      <para>
+        <note>
+          <para>You cannot delete a scaling group when it has active
+            entities associated with it.</para>
+        </note>
+      </para>
+      <para>When a group contains no servers, you can eliminate the
+        group by sending a <command>DELETE</command> request to its
+        group ID. </para>
+      <para>The following three options are possible for deleting a
+        scaling group:</para>
+      <para>
+        <orderedlist>
+          <listitem>
+            <para>If there are no active entities in your
+              configuration, use the <command>DELETE</command> request
+              to delete the scaling group.</para>
+          </listitem>
+          <listitem>
+            <para>If there are active entities in your configuration,
+              update your scaling group configuration by submitting a
+                <command>PUT</command> request and setting the
+                <parameter>minEntities</parameter> and
+                <parameter>maxEntities</parameter> parameters to 0.
+            </para>
+          </listitem>
+          <listitem>
+            <para>Force the deletion of your group by submitting a
+                <command>DELETE</command> request and setting the
+                <parameter>force</parameter> parameter to true.</para>
+          </listitem>
+        </orderedlist>
+      </para>
+      <example>
+        <title>Delete a Scaling Group with no Active Entities</title>
+        <para>To delete a scaling policy group that has no active
+          entities, submit a <command>DELETE</command> request with
+          the <parameter>tenantID</parameter> and
+            <parameter>groupID</parameter> parameters specified in the
+          request URL as shown in the following example: </para>
+        <programlisting language="json"><xi:include href="./samples/reqDeleteGroup.json" parse="text"/></programlisting>
+        <para>If the <command>DELETE</command> request is successful,
+          a 204 response code with no response body will be returned.
+          If the request fails, a 403 response code will be returned
+          with a message stating that your group still has active
+          entities as shown in the following example:</para>
+        <programlisting>
+"Group d5f5f3ad-faef-4c8f-99c4-0e931189c521 for tenant 829409 still has entities."
+                </programlisting>
+      </example>
+      <example>
+        <title>Delete a Scaling Group with Active
+          Entities<?sbr?><?sbr?></title>
+        <para>If you have submitted a <command>DELETE</command>
+          request and received a response saying that your group still
+          has active entities, go through the following steps:</para>
+        <para>
+          <orderedlist>
+            <listitem>
+              <para>Update the scaling group configuration by
+                submitting a <command>PUT</command> request that sets
+                the <parameter>minEntities</parameter> and
+                  <parameter>maxEntities</parameter> parameters to 0
+                as shown in the following example:</para>
+              <programlisting>
+PUT /{tenantId}/groups/{groupId}/config
+                </programlisting>
+              <programlisting language="json">
+<xi:include href="./samples/reqPutGroupConfig-size0.json" parse="text"/>
+</programlisting>
+            </listitem>
+            <listitem>
+              <para>Submit a <command>DELETE</command> request with
+                the <parameter>tenantId</parameter> and
+                  <parameter>groupId</parameter> parameters specified
+                in the request URL: </para>
+              <programlisting>
+DELETE /{tenantId}/groups/{groupId}
+            </programlisting>
+            </listitem>
+          </orderedlist>
+        </para>
+        <para>If the <command>DELETE</command> request is successful,
+          a 204 response code with an empty response body will be
+          returned.</para>
+      </example>
+      <example>
+        <title>Delete a Scaling Group using Force Delete</title>
+        <para>The Auto Scale API provides an option for users to force
+          delete a scaling group that has active servers. The Force
+          Delete option will remove all servers in the configuration
+          from the load balancer(s) and then delete the server. </para>
+        <para>
+          <warning>
+            <para>Using Force Delete will remove all servers that are
+              associated with the scaling group immediately. Users are
+              discouraged from using the Force Delete option and to
+              manually delete servers instead.</para>
+          </warning>
+        </para>
+        <para>To use the Force Delete option, submit a
+            <command>DELETE</command> request with the
+            <parameter>tenantId</parameter> and
+            <parameter>groupId</parameter> parameters specified in the
+          request URL, and set the <parameter>force</parameter>
+          parameter to <parameter>true</parameter>. </para>
+        <programlisting>
+DELETE /{tenantId}/groups/{groupId}?force=true
+            </programlisting>
+        <para>Upon successful submission of this request the
+            <parameter>minEntities</parameter> and
+            <parameter>maxEntities</parameter> parameters will
+          automatically be set to 0 and the deletion of the group will
+          begin. If the <command>DELETE</command> request is
+          successful, a 204 response code with an empty response body
+          will be returned.</para>
+      </example>
+    </section>
+    <xi:include href="./chapters/rbac.xml"/>
   </chapter>
     <xi:include href="./chapters/apiref.xml"/>
 </book>

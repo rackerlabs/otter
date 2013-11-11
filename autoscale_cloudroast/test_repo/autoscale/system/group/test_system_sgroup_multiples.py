@@ -5,12 +5,24 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import time
 
+import unittest
+
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
 
     """
     System tests to verify multiple groups on an account
     """
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize autoscale configs, behaviors and client
+        """
+        super(ScalingGroupMultiplesTest, cls).setUpClass()
+        cls.limits_response = cls.autoscale_client.view_limits().entity
+        cls.max_policies = cls.limits_response.absolute.maxPoliciesPerGroup
+        cls.max_webhooks = cls.limits_response.absolute.maxWebhooksPerPolicy
 
     def setUp(self):
         """
@@ -95,70 +107,81 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
     def test_system_max_scaling_groups_on_one_account(self):
         """
         The maximum scaling groups an account cannot be more than 1000.
+        Trying to create groups beyond max results in 422.
         """
-        current_group_count = len((self.autoscale_client.list_scaling_groups().entity).groups)
-        max_groups = self.max_groups - current_group_count
-        for group in (range(max_groups)):
+        current_group_count = self.get_total_num_groups()
+        max_groups = self.limits_response.absolute.maxGroups - current_group_count
+        for _ in range(max_groups):
             create_group_reponse = self.autoscale_behaviors.create_scaling_group_min()
+            self.assertEquals(create_group_reponse.status_code, 201, msg='Create group'
+                              'returned response {0}'.format(create_group_reponse.status_code))
             self.resources.add(create_group_reponse.entity, self.empty_scaling_group)
-        self.assertEquals(len((self.autoscale_client.list_scaling_groups().entity).groups),
-                          self.max_groups)
+        self.assertEquals(self.get_total_num_groups(), self.max_groups, msg='{0} groups'
+                          'exist'.format(self.get_total_num_groups()))
         create_group_beyond_max = self.autoscale_behaviors.create_scaling_group_min()
-        self.assertEquals(create_group_beyond_max.status_code, 429,
-                          msg='created more than 1000 groups on the tenant')
+        self.assertEquals(create_group_beyond_max.status_code, 422,
+                          msg='{0} groups exist on the tenant'.format(self.get_total_num_groups()))
 
+    @unittest.skip('Not yet implemented')
     @tags(type='one-time')
     def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
-        Verify the maximum scaling policies are allowed on a scaling group.
-        Trying to create policies beyond max results in 429
+        Verify maximum scaling policies are allowed on a scaling group.
+        Trying to create policies beyond max results in 422
         """
-        for policy in (range(self.max_policies)):
-            self.autoscale_behaviors.create_policy_min(
-                self.first_scaling_group.id)
-        self.assertEquals(len(self.autoscale_client.list_policies(
-            self.first_scaling_group.id).entity), self.max_policies)
+        for policy in range(self.max_policies):
+            self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
+        self.assertEquals(self.get_total_num_policies(self.first_scaling_group.id),
+                          self.max_policies)
         policy_beyond_max = self.autoscale_behaviors.create_policy_min(
             self.first_scaling_group.id)
-        self.assertEquals(policy_beyond_max['status_code'], 429,
-                          msg='Created more than max policies on the group')
+        self.assertEquals(policy_beyond_max['status_code'], 422,
+                          msg='Created {0} policies on the '
+                          'group'.format(self.get_total_num_policies(
+                                         self.first_scaling_group.id)))
 
+    @unittest.skip('Not yet implemented')
     @tags(type='one-time')
     def test_system_max_scheduler_policies_on_a_scaling_group(self):
         """
-        Verify the maximum scaling policies are allowed on a scaling group.
-        Trying to create policies beyond max results in 429.
+        Verify maximum scaling policies are allowed on a scaling group.
+        Trying to create policies beyond max results in 422.
         """
-        for policy in (range(self.max_policies)):
+        for _ in range(self.max_policies):
             self.autoscale_behaviors.create_schedule_policy_given(
                 self.first_scaling_group.id,
                 sp_change_percent=100)
-        self.assertEquals(len(self.autoscale_client.list_policies(
-            self.first_scaling_group.id).entity), self.max_policies,
-            msg='Policies on the group {0} is under/over max allowed'.format(
-                self.first_scaling_group.id))
+        self.assertEquals(self.get_total_num_policies(self.first_scaling_group.id),
+                          self.max_policies,
+                          msg='Policies on the group {0} is under/over max '
+                          'allowed'.format(self.first_scaling_group.id))
         policy_beyond_max = self.autoscale_behaviors.create_schedule_policy_given(
             self.first_scaling_group.id,
             sp_change_percent=100)
-        self.assertEquals(policy_beyond_max['status_code'], 429,
-                          msg='Created more than max policies on the group')
+        self.assertEquals(policy_beyond_max['status_code'], 422,
+                          msg='Created {0} policies on the '
+                          'group'.format(self.get_total_num_policies(
+                                         self.first_scaling_group.id)))
 
+    @unittest.skip('Not yet implemented')
     @tags(type='one-time')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
         Verify the maximum scaling policies are allowed on a scaling policy.
-        Trying to create webhooks beyond max results in 429
+        Trying to create webhooks beyond max results in 422
         """
         policy = self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
         for webhook in (range(self.max_webhooks)):
             self.autoscale_client.create_webhook(self.first_scaling_group.id,
                                                  policy['id'], 'wb_{0}'.format(webhook))
-        self.assertEquals(len(self.autoscale_client.list_webhooks(
-            self.first_scaling_group.id, policy['id']).entity), self.max_webhooks,
-            msg='Webhooks on the group {0} is under/over max allowed for policy {1}'.format(
-                self.first_scaling_group.id, policy['id']))
+        self.assertEquals(self.get_total_num_webhooks(self.first_scaling_group.id, policy['id']),
+                          self.max_webhooks,
+                          msg='Webhooks on the group {0} is under/over max allowed for policy '
+                          '{1}'.format(self.first_scaling_group.id, policy['id']))
         webhook_beyond_max = self.autoscale_client.create_webhook(self.first_scaling_group.id,
                                                                   policy['id'],
                                                                   'wb_{0}'.format(webhook))
-        self.assertEquals(webhook_beyond_max.status_code, 429,
-                          msg='Created more than max webhooks on the policy')
+        self.assertEquals(webhook_beyond_max.status_code, 422,
+                          msg='Created {0} webhooks on the '
+                          'policy'.format(self.get_total_num_webhooks(self.first_scaling_group.id,
+                                          policy['id'])))
