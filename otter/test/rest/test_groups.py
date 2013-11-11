@@ -679,10 +679,13 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         """
         Deleting a group with force sets min/max to zero and deletes it.
         """
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+
         self.mock_group.view_config.return_value = defer.succeed(
             {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
+        self.mock_controller.obey_config_change.return_value = defer.succeed(None)
 
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
@@ -690,15 +693,19 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.update_config.assert_called_once_with(
             {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
+        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_case_insensitive(self):
         """
         The 'true' specified in force is case insensitive.
         """
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+
         self.mock_group.view_config.return_value = defer.succeed({'name': 'group1'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
+        self.mock_controller.obey_config_change.return_value = defer.succeed(None)
 
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
@@ -706,6 +713,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.update_config.assert_called_once_with(
             {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
+        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_garbage_arg(self):

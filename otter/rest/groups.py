@@ -489,15 +489,13 @@ class OtterGroup(object):
                 return group.update_config(_config)
             d.addCallback(update_config)
 
-            def view_state(_):
-                return group.view_state()
-            d.addCallback(view_state)
-
-            def obey_config(group_state):
+            def modify_state(_):
                 _config = config[0]
-                return controller.obey_config_change(
-                    self.log, transaction_id(request), _config, group, group_state)
-            d.addCallback(obey_config)
+                d = group.modify_state(
+                    partial(controller.obey_config_change, self.log,
+                            transaction_id(request), _config))
+                return d
+            d.addCallback(modify_state)
 
             return d.addCallback(lambda _: group.delete_group())
         else:
