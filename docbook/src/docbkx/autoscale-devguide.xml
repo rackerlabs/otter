@@ -124,14 +124,34 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/co
     </info>
 <chapter xml:id="Overview">
     <title>Overview</title>
-    <para> The &PRODNAME; is a web service that automatically scales
-        resources in response to an increase or decrease in overall
-        workload based on user-defined policies. You can set up a
-        schedule for launching &PROD; or define an event that is
-        triggered by Cloud Monitoring. You can also specify a minimum
-        and maximum number of cloud servers, the amount of resources
-        that you want to increase or decrease, and the thresholds in
-        Cloud Monitoring that trigger the scaling activities. </para>
+    <para>
+      <itemizedlist>
+        <listitem>
+          <para><link linkend="Intended_Audience-d1e166">Intended
+              Audience</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Doc_Change_History">Document Change
+              History</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Resources-000">Additional
+              Resources</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Pricing_SLA-d1e1362">Pricing and
+              Service Level</link></para>
+        </listitem>
+      </itemizedlist>
+    </para>
+    <para>The &PRODNAME; is a web service that automatically scales
+      resources in response to an increase or decrease in overall
+      workload based on user-defined policies. You can set up a
+      schedule for launching &PROD; or define an event that is
+      triggered by Cloud Monitoring. You can also specify a minimum
+      and maximum number of cloud servers, the amount of resources
+      that you want to increase or decrease, and the thresholds in
+      Cloud Monitoring that trigger the scaling activities. </para>
   <para>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
       Then you define policies, either schedule-based or monitoring-based. For monitoring-based policies,
@@ -226,11 +246,11 @@ is external so it's handy for Getting Started to share -->
         <para>For the Early Access period, there is no Service Level Agreement (SLA) for &PRODNAME;. </para>
     </section>
     </chapter>
-    <chapter xml:id="Concepts-dle001">
-        <title>Concepts</title>
-        <para> To use the &PROD; API effectively, you should
-            understand several key concepts:
-        </para>
+    <chapter xml:id="Glossary">
+      <title>Glossary</title>
+      <para> To use the &PROD; API effectively, you should
+        understand several key concepts:
+      </para>
       <!-- Glossary section, defining basic terms,
 is external so it's handy for Getting Started to share -->
       <xi:include href="chapters/glossary.xml"/>
@@ -238,6 +258,46 @@ is external so it's handy for Getting Started to share -->
     </chapter>
       <chapter xml:id="Gen_API_Info-de01">
     <title>General API Information</title>
+    <para>
+      <itemizedlist>
+        <listitem>
+          <para><link linkend="Authentication-d1e01"
+              >Authentication</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="serviceEndpoints">Service Access
+              Endpoints</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="contractVersion">Contract
+              Versions</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Request_Response_Types-d1e903">Request
+              and Response Types</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Limits-d1e1208">Limits</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="datetimeformat">Date and Time
+              Format</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="pagination">Pagination</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="server-flavors">Server
+            Flavors</link></para>
+        </listitem>
+        <listitem linkend="audit-log">
+          <para><link linkend="audit-log">Audit Logs</link></para>
+        </listitem>
+        <listitem linkend="faults-dle101">
+          <para><link linkend="faults-dle101">Faults</link></para>
+        </listitem>
+      </itemizedlist>
+    </para>
     <para>The &PROD; API is implemented using a RESTful web service
       interface. Like other products in the Rackspace Cloud suite,
       &PROD; shares a common token-based authentication system that
@@ -249,7 +309,9 @@ is external so it's handy for Getting Started to share -->
     </note>
     <section xml:id="Authentication-d1e647">
       <title>Authentication</title>
-        <para> Every REST request for &PROD; requires the inclusion of
+      <para><link linkend="Retrieving_Auth_Token">Retrieving the
+          Authentication Token</link></para>
+        <para>Every REST request for &PROD; requires the inclusion of
         a specific authorization token, supplied by the
           <code>X-Auth-Token</code> HTTP header. Customers obtain this
         token by first using the Rackspace Cloud Identity service and
@@ -806,6 +868,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           </tr>
         </tbody>
       </table>
+      <para>
+        <note>
+          <para>In Auto Scale, the time specified always refers to the
+            "GMT" time zone.</para>
+        </note>
+      </para>
     </section>
         <section xml:id="pagination">
       <title>Pagination</title>
@@ -1157,7 +1225,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       </para>
           </section>
       <section xml:id="audit-log">
-        <title>Audit Log</title>
+        <title>Audit Logs</title>
       <para>Because of the deferred nature of Auto Scale, most errors
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
@@ -1212,6 +1280,27 @@ Content-Type: application/json
       </chapter>
   <chapter xml:id="Working_with_Auto_Scale_API">
     <title>Working with the Auto Scale API</title>
+    <para>
+      <itemizedlist>
+        <listitem>
+          <para><link linkend="Manage_Launch_Configuration">Manage the
+              Launch Configuration for your Scaling
+            Group</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Create_Scaling_Policies">Create Scaling
+              Policies</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Create_and_Manage_Webhooks">Create and
+              Manage Webhooks</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Execute_Scaling_Policy">Execute a
+              Scaling Policy</link></para>
+        </listitem>
+      </itemizedlist>
+    </para>
     <section xml:id="Manage_Launch_Configuration">
       <title>Manage the Launch Configuration for your Scaling
         Group</title>
