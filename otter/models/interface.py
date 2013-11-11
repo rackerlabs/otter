@@ -199,14 +199,17 @@ class ScalingGroupOverLimitError(Exception):
 
 class WebhooksOverLimitError(Exception):
     """
-    Error to be raised when client requests new webhook but
-    is already at maxWebhooksPerPolicy
+    Error to be raised when client requests some number of new webhooks that
+    would put them over maxWebhooksPerPolicy
     """
-    def __init__(self, tenant_id, group_id, policy_id, max_webhooks):
+    def __init__(self, tenant_id, group_id, policy_id, max_webhooks,
+                 curr_webhooks, new_webhooks):
         super(WebhooksOverLimitError, self).__init__(
-            ("Allowed limit of {n} webhooks reached by tenant {t} "
-             "for scaling group {s}, policy {p}").format(
-             t=tenant_id, s=group_id, p=policy_id, n=max_webhooks))
+            ("Currently there are {c} webhooks for tenant {t}, scaling group "
+             "{g}, policy {p}.  Creating {n} new webhooks would exceed the "
+             "webhook limit of {m} per policy.").format(
+             t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
+             c=curr_webhooks, n=new_webhooks))
 
 
 class IScalingGroup(Interface):

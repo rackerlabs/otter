@@ -306,10 +306,12 @@ class MockScalingGroup:
 
         if policy_id in self.policies:
             max_webhooks = config_value('limits.absolute.maxWebhooksPerPolicy')
-            if len(data) + len(self.webhooks.get(policy_id, [])) > max_webhooks:
+            curr_webhooks = len(self.webhooks.get(policy_id, []))
+            if len(data) + curr_webhooks > max_webhooks:
                 return defer.fail(
                     WebhooksOverLimitError(self.tenant_id, self.uuid,
-                                           policy_id, max_webhooks))
+                                           policy_id, max_webhooks,
+                                           curr_webhooks, len(data)))
 
             created = []
             for webhook_input in data:
