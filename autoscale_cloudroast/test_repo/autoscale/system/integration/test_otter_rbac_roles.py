@@ -3,7 +3,7 @@ System Integration tests for otter's rbac roles
 """
 import unittest
 
-from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
+from test_repo.autoscale.fixtures import ScalingGroupPolicyFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.identity.v2_0.tokens_api.behaviors import \
     TokenAPI_Behaviors as OSTokenAPI_Behaviors
@@ -14,7 +14,7 @@ from autoscale.client import AutoscalingAPIClient
 
 
 @unittest.skip('Not yet implemented')
-class OtterRbacTests(ScalingGroupWebhookFixture):
+class OtterRbacTests(ScalingGroupPolicyFixture):
 
     """
     System tests to verify the rbac roles for otter.
@@ -159,7 +159,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
     def _verify_otter_observer_role(self, user_client, expected_response_code=200):
         """
         verify all the GET calls on a group and policy. Uses the group, policy and webhook
-        created as part of the ScalingGroupWebhookFixture imported.
+        created as part of the ScalingGroupPolicyFixture imported.
         """
         list_groups_response = user_client.list_scaling_groups()
         self.assertEquals(
