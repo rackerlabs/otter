@@ -1162,12 +1162,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
         the events that have occurred within a user's scaling group. </para>
-      <para>The following example shows an audit log for the
-        successful creation of a scaling group.</para>
-        <programlisting language="json"><xi:include href="./samples/auditlogcreatescalinggroup.py" parse="text"/>
-</programlisting>
-        <para>The following example shows an audit log for the
-        successful creation of a webhook.</para>
         </section>
       <section xml:id="faults-dle101">
         <title>Faults</title>
