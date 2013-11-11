@@ -207,9 +207,9 @@ class WebhooksOverLimitError(Exception):
         super(WebhooksOverLimitError, self).__init__(
             ("Currently there are {c} webhooks for tenant {t}, scaling group "
              "{g}, policy {p}.  Creating {n} new webhooks would exceed the "
-             "webhook limit of {m} per policy.").format(
-             t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
-             c=curr_webhooks, n=new_webhooks))
+             "webhook limit of {m} per policy.")
+            .format(t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
+                    c=curr_webhooks, n=new_webhooks))
 
 
 class IScalingGroup(Interface):
