@@ -21,7 +21,8 @@ from otter.models.cass import (
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
+    WebhooksOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -206,6 +207,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Create a mock group
         """
         self.connection = mock.MagicMock(spec=['execute'])
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 1000}}})
+        self.addCleanup(set_config_data, {})
 
         self.returns = [None]
 
@@ -1158,7 +1161,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return mock_ids.pop(0)
 
         self.mock_key.side_effect = _return_uuid
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         result = self.validate_create_webhooks_return_value(
             '23456789',
             [{'name': 'a name'}, {'name': 'new name', 'metadata': {"k": "v"}}])
@@ -1191,7 +1194,7 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
             return mock_ids.pop(0)
 
         self.mock_key.side_effect = _return_uuid
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
 
         self.validate_create_webhooks_return_value(
             '23456789',
@@ -1243,6 +1246,27 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.returns = [[], None]
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
         self.failureResultOf(d, NoSuchPolicyError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_webhooks_already_beyond_limits(self, _):
+        """
+        Can't add a webhook if already at limit
+        """
+        self.returns = [[{'count': 1000}], None]
+        d = self.group.create_webhooks('23456789', [{}])
+        self.failureResultOf(d, WebhooksOverLimitError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_many_webhooks_beyond_limits(self, _):
+        """
+        Can't add any of the webhooks if adding all would bring it above the
+        limit
+        """
+        self.returns = [[{'count': 990}], None]
+        d = self.group.create_webhooks('23456789', [{} for i in range(20)])
+        self.failureResultOf(d, WebhooksOverLimitError)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))

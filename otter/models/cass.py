@@ -12,7 +12,8 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
-    IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError)
+    IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
+    WebhooksOverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -114,7 +115,9 @@ _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} W
                            '"webhookKey" = :webhookKey;')
 
 _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId;')
-
+_cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
+                         '"tenantId" = :tenantId AND "groupId" = :groupId AND '
+                         '"policyId" = :policyId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
@@ -750,12 +753,36 @@ class CassScalingGroup(object):
         """
         self.log.bind(policy_id=policy_id, webhook=data).msg("Creating webhooks")
 
+        main_params = {"tenantId": self.tenant_id,
+                       "groupId": self.uuid,
+                       "policyId": policy_id}
+
+        d = self.get_policy(policy_id)  # check that policy exists first
+
+        def _check_limit(curr_webhooks):
+            max_webhooks = config_value('limits.absolute.maxWebhooksPerPolicy')
+            curr_webhooks = curr_webhooks[0]['count']
+            if curr_webhooks + len(data) > max_webhooks:
+                raise WebhooksOverLimitError(
+                    curr_webhooks=curr_webhooks,
+                    max_webhooks=max_webhooks,
+                    new_webhooks=len(data),
+                    tenant_id=self.tenant_id,
+                    group_id=self.uuid,
+                    policy_id=policy_id)
+
+        def _do_limits_check(lastRev):
+            d = self.connection.execute(
+                    _cql_count_for_policy.format(cf=self.webhooks_table),
+                    main_params,
+                    get_consistency_level('create', 'webhook'))
+            return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
+
+        d.addCallback(_do_limits_check)
+
         def _do_create(lastRev):
             queries = []
-            cql_params = {"tenantId": self.tenant_id,
-                          "groupId": self.uuid,
-                          "policyId": policy_id}
-
+            cql_params = main_params.copy()
             output = _build_webhooks(data, self.webhooks_table, queries,
                                      cql_params)
 
@@ -764,7 +791,6 @@ class CassScalingGroup(object):
             d = b.execute(self.connection)
             return d.addCallback(lambda _: output)
 
-        d = self.get_policy(policy_id)  # check that policy exists first
         d.addCallback(_do_create)
         return d
 
