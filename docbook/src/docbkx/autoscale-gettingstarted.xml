@@ -375,14 +375,15 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 action or event. If you know the URL, you have access
                 to it and you can use the URL to trigger a specific
                 event. For Auto Scale, capability URLs assume the same
-                role as anonymous webhooks. Capability URLs are
-                usually long, and random, and cannot be guessed by a
-                user.</para>
+                role as anonymous webhooks. Both capability URLs and
+                anonymous webhooks are usually long, and random, and
+                cannot be guessed by a user.</para>
             <para>To execute a capability URL, locate the URL in your
                 webhook, and then submit a POST request against it, as
                 shown in the following example:</para>
             <programlisting language="json"><xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/></programlisting>
-            <para>Executing a capability URL will always return a 202,
+            <para>Executing a capability URL or an anonymous webhook
+                will always return a 202,
                     <parameter>Accepted</parameter>, response code,
                 even if the request fails because of an invalid
                 configuration. This is done to prevent information
@@ -651,6 +652,19 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 See also <link linkend="Min_and_Max_Policies">Using
                     the Min and Max Values with
                 Policies</link>.</para>
+            <para>You can specify custom metadata for your group
+                configuration using the optional
+                    <parameter>metadata</parameter> parameter.</para>
+            <para>
+                <note>
+                    <para>Group metadata is stored within the Auto
+                        Scale API and can be queried. You can use the
+                            <parameter>metadata</parameter> parameter
+                        for customer automation, but it does not
+                        change any functionality in Auto Scale. There
+                        currently is no limitation on depth.</para>
+                </note>
+            </para>
             <para>The following example shows a possible scaling group
                 configuration:</para>
             <programlisting language="json"><xi:include href="./samples/GroupConfiguration.json" parse="text"/></programlisting>
