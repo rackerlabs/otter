@@ -222,7 +222,6 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             lc_flavor_ref=self.lc_flavor_ref,
             lc_name='test-grp-srv',
             lc_load_balancers=lc_load_balancers)
-        group = create_scaling_group_response.entity
         self.assertEquals(
             create_scaling_group_response.status_code, response_codes['create'],
             msg='Create group returned response code {0}'.format(
@@ -338,7 +337,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             '{1}'.format(self.group.id, delete_policy_response.status_code))
 
         # delete group
-        self.resources.add(group.id, self.empty_scaling_group(self.group))
+        self.resources.add(self.group.id, self.empty_scaling_group(self.group))
         delete_group_response = user_client.delete_scaling_group(self.group.id)
         self.assertEquals(
             delete_group_response.status_code, response_codes['upd-del'],
