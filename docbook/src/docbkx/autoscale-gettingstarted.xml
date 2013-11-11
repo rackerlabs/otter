@@ -168,9 +168,6 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <para>After going throught the examples in this guide, you will be able to complete the following tasks:</para>
             <itemizedlist>
                 <listitem>
-                    <para>Create a Cloud Server Image</para>
-                </listitem>
-                <listitem>
                     <para>Create a Scaling Group and a Launch
                         Configuration</para>
                 </listitem>
@@ -189,7 +186,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         <section xml:id="Resources"
             xmlns:xlink="http://www.w3.org/1999/xlink">
             <title>Before You Get Started</title>
-            <para>To go throught the steps that are described in this
+            <para>To go through the steps that are described in this
                 guide, you need to have the following:</para>
             <para>
                 <itemizedlist>
@@ -206,8 +203,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     </listitem>
                 </itemizedlist>
             </para>
-            <para>To use Rackspace Auto Scale, you need to be able to
-                complete the following tasks:</para>
+            <para>To use Rackspace Auto Scale, you need to complete
+                the following tasks:</para>
             <itemizedlist>
                 <listitem>
                     <para> Create servers by using Cloud Servers. For
@@ -231,15 +228,15 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         <para>
             <itemizedlist>
                 <listitem>
+                    <para><link linkend="Scaling_groups">Scaling
+                            Groups</link></para>
+                </listitem>
+                <listitem>
                     <para><link
                             linkend="Authenticated_Webhooks_and_Anonymous_Webhooks"
                             >Authenticated Webhooks, Anonymous
                             Webhooks, and Capability
                         URLs</link></para>
-                </listitem>
-                <listitem>
-                    <para><link linkend="Scaling_groups">Scaling
-                            Groups</link></para>
                 </listitem>
                 <listitem>
                     <para><link linkend="Scaling_Policies">Scaling
@@ -250,7 +247,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         >Cooldowns</link></para>
                 </listitem>
                 <listitem>
-                    <para><link linkend="Auto_Scale_Process">Auto
+                    <para><link linkend="How_Auto_Scale_Works">Auto
                             Scale Process</link></para>
                 </listitem>
             </itemizedlist>
@@ -260,7 +257,11 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             overall workload based on user-defined thresholds. </para>
         <para>&PROD; functions by linking these services: <itemizedlist>
                 <listitem>
-                    <para> &PROD; API </para>
+                    <para> &PROD; API. For more information, see the
+                            <olink targetdoc="autoscale-devguide"
+                            targetptr="autoscale-devguide">Rackspace
+                            Auto Scale DevGuide</olink>Auto Scale
+                        Developer's Guide.</para>
                 </listitem>
                 <listitem>
                     <para> Load-balanced Cloud Servers. For more
@@ -286,55 +287,6 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         >Chef</link> or a similar tool.</para>
             </note>
         </para>
-        <section
-            xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks">
-            <title>Authenticated Webhooks, Anonymous Webhooks, and
-                Capability URLs</title>
-            <para>Auto Scale uses webhooks to initiate scaling events.
-                A webhook is an industry-standard protocol for sending
-                events between systems; for Auto Scale, they are used
-                to execute policies. A webhook consists of an HTTP
-                callback that is triggered by some user-defined event,
-                such as an alarm that is set through Cloud Monitoring
-                or another monitoring service. When that event occurs,
-                the source site makes an HTTP request to the URI
-                configured for the webhook. </para>
-            <para>A webhook contains a POST call to a defined URL,
-                potentially with a payload in the POST body. You can
-                send webhooks with a simple call in the library that
-                you are using. You can also send them manually via
-                cURL:</para>
-            <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
-            <para>Auto Scale also supports anonymous webhooks. In
-                regular webhooks, the {webhook_version}/{webhook_hash}
-                is specified by URL. In anonymous webhooks, the URL is
-                replaced with a hash that is known only to the issuer—
-                because no authentication is needed, the webhook is
-                considered "anonymous."</para>
-            <para>Auto Scale can also use capability URLs. Capability
-                URLs are URLs that give authorization for a certain
-                action or event. If you know the URL, you have access
-                to it and you can use the URL to trigger a specific
-                event. For Auto Scale, capability URLs assume the same
-                role as anonymous webhooks. Capability URLs are
-                usually long, and random, and cannot be guessed by a
-                user.</para>
-            <para>To execute a capability URL, locate the URL in your
-                webhook, and then submit a POST request against it, as
-                shown in the following example:</para>
-            <programlisting language="json"><xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/></programlisting>
-            <para>Executing a capability URL will always return a 202,
-                    <parameter>Accepted</parameter>, response code,
-                even if the request fails because of an invalid
-                configuration. This is done to prevent information
-                leakage. </para>
-            <para>
-                <note>
-                    <para>To execute anonymous webhooks and capability
-                        URLs, no authentication is needed.</para>
-                </note>
-            </para>
-        </section>
         <section xml:id="Scaling_groups">
             <title>Scaling Groups</title>
             <para> The scaling group is at the heart of an Auto Scale
@@ -391,6 +343,55 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         </tr>
                     </tbody>
                 </table>
+            </para>
+        </section>
+        <section
+            xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks">
+            <title>Authenticated Webhooks, Anonymous Webhooks, and
+                Capability URLs</title>
+            <para>Auto Scale uses webhooks to initiate scaling events.
+                A webhook is an industry-standard protocol for sending
+                events between systems; for Auto Scale, they are used
+                to execute policies. A webhook consists of an HTTP
+                callback that is triggered by some user-defined event,
+                such as an alarm that is set through Cloud Monitoring
+                or another monitoring service. When that event occurs,
+                the source site makes an HTTP request to the URI
+                configured for the webhook. </para>
+            <para>A webhook contains a POST call to a defined URL,
+                potentially with a payload in the POST body. You can
+                send webhooks with a simple call in the library that
+                you are using. You can also send them manually via
+                cURL:</para>
+            <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
+            <para>Auto Scale also supports anonymous webhooks. In
+                regular webhooks, the {webhook_version}/{webhook_hash}
+                is specified by URL. In anonymous webhooks, the URL is
+                replaced with a hash that is known only to the issuer—
+                because no authentication is needed, the webhook is
+                considered "anonymous."</para>
+            <para>Auto Scale can also use capability URLs. Capability
+                URLs are URLs that give authorization for a certain
+                action or event. If you know the URL, you have access
+                to it and you can use the URL to trigger a specific
+                event. For Auto Scale, capability URLs assume the same
+                role as anonymous webhooks. Capability URLs are
+                usually long, and random, and cannot be guessed by a
+                user.</para>
+            <para>To execute a capability URL, locate the URL in your
+                webhook, and then submit a POST request against it, as
+                shown in the following example:</para>
+            <programlisting language="json"><xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/></programlisting>
+            <para>Executing a capability URL will always return a 202,
+                    <parameter>Accepted</parameter>, response code,
+                even if the request fails because of an invalid
+                configuration. This is done to prevent information
+                leakage. </para>
+            <para>
+                <note>
+                    <para>To execute anonymous webhooks and capability
+                        URLs, no authentication is needed.</para>
+                </note>
             </para>
         </section>
         <section xml:id="Scaling_policies">
@@ -453,8 +454,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 </note>
             </para>
         </section>
-        <section xml:id="Auto_Scale_Process">
-            <title><?sbr?>Auto Scale Process</title>
+        <section xml:id="How_Auto_Scale_Works">
+            <title><?sbr?>How Auto Scale Works</title>
             <para>
                 <itemizedlist>
                     <listitem>
@@ -576,26 +577,28 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
     </chapter>
     <chapter xml:id="Autoscale_Components">
         <title>Autoscale Key Configurations</title>
-        <itemizedlist spacing="compact">
-            <listitem>
-                <para>
-                    <link linkend="Group_Configuration">Scaling Group
-                        Configuration</link>
-                </para>
-            </listitem>
-            <listitem>
-                <para>
-                    <link linkend="Launch_Configuration">Launch
-                        Configuration </link></para>
-            </listitem>
-            <listitem>
-                <para>
-                    <link linkend="Scaling_Policies">Scaling Policies
-                    </link></para>
-            </listitem>
-        </itemizedlist>
+        
         <section xml:id="Group_Configuration">
             <title>Scaling Group Configuration</title>
+            <para>
+                <itemizedlist>
+                    <listitem>
+                        <para><link
+                                linkend="Schedule_Based_Configuration"
+                                >Scaling Group
+                            Configuration</link></para>
+                    </listitem>
+                    <listitem>
+                        <para><link
+                                linkend="webhook_based_configuration"
+                                >Launch Configuration</link></para>
+                    </listitem>
+                    <listitem>
+                        <para><link linkend="Scaling_Policies">Scaling
+                                Group Policies</link></para>
+                    </listitem>
+                </itemizedlist>
+            </para>
             <para>The scaling group configuration specifies the basic
                 elements of the Auto Scale configuration. It manages
                 how many servers can participate in the scaling group.
@@ -1200,7 +1203,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             Image</link></para>
                 </listitem>
                 <listitem>
-                    <para><link linkend="Create_Group">Create an
+                    <para><link linkend="Create_Group">Create and
                             Manage a Scaling Group</link></para>
                 </listitem>
                 <listitem>
