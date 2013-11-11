@@ -12,7 +12,7 @@ from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
-    IScalingScheduleCollection, IAdmin)
+    IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -948,47 +948,65 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         scaling_group_id = generate_key_str('scalinggroup')
+        log = log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id)
 
-        log.bind(tenant_id=tenant_id, scaling_group_id=scaling_group_id).msg("Creating scaling group")
+        # obey limits
+        max_groups = config_value('limits.absolute.maxGroups')
+        d = self.connection.execute(_cql_count_for_tenant.format(
+            cf="scaling_group"), {'tenantId': tenant_id},
+            get_consistency_level('list', 'group'))
 
-        queries = [_cql_create_group.format(cf=self.group_table)]
+        def check_groups(cur_groups, max_groups):
+            if cur_groups[0]['count'] >= max_groups:
+                log.msg('client has reached maxGroups limit')
+                raise ScalingGroupOverLimitError(tenant_id, max_groups)
 
-        data = {
-            "tenantId": tenant_id,
-            "groupId": scaling_group_id,
-            "group_config": serialize_json_data(config, 1),
-            "launch_config": serialize_json_data(launch, 1),
-            "active": '{}',
-            "pending": '{}',
-            "created_at": datetime.utcnow(),
-            "policyTouched": '{}',
-            "paused": False
-        }
+        d.addCallback(check_groups, max_groups)
 
-        scaling_group_state = GroupState(
-            tenant_id,
-            scaling_group_id,
-            config['name'],
-            {},
-            {},
-            data['created_at'],
-            {},
-            data['paused']
-        )
-        outpolicies = _build_policies(policies, self.policies_table,
-                                      self.event_table, queries, data)
+        def _create_group(_):
+            log.msg("Creating scaling group")
+            queries = [_cql_create_group.format(cf=self.group_table)]
 
-        b = Batch(queries, data,
-                  consistency=get_consistency_level('create', 'group'))
-        d = b.execute(self.connection)
-        d.addCallback(lambda _: {
-            'groupConfiguration': config,
-            'launchConfiguration': launch,
-            'scalingPolicies': outpolicies,
-            'id': scaling_group_id,
-            'state': scaling_group_state
-        })
-        return d
+            data = {
+                "tenantId": tenant_id,
+                "groupId": scaling_group_id,
+                "group_config": serialize_json_data(config, 1),
+                "launch_config": serialize_json_data(launch, 1),
+                "active": '{}',
+                "pending": '{}',
+                "created_at": datetime.utcnow(),
+                "policyTouched": '{}',
+                "paused": False
+            }
+
+            scaling_group_state = GroupState(
+                tenant_id,
+                scaling_group_id,
+                config['name'],
+                {},
+                {},
+                data['created_at'],
+                {},
+                data['paused']
+            )
+            outpolicies = _build_policies(policies, self.policies_table,
+                                          self.event_table, queries, data)
+
+            b = Batch(queries, data,
+                      consistency=get_consistency_level('create', 'group'))
+
+            bd = b.execute(self.connection)
+            bd.addCallback(lambda _: {
+                'groupConfiguration': config,
+                'launchConfiguration': launch,
+                'scalingPolicies': outpolicies,
+                'id': scaling_group_id,
+                'state': scaling_group_state
+            })
+
+            return bd
+
+        return d.addCallback(_create_group)
 
     def list_scaling_group_states(self, log, tenant_id, limit=100, marker=None):
         """

@@ -21,7 +21,7 @@ from otter.models.cass import (
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -32,6 +32,7 @@ from otter.test.models.test_interface import (
 from otter.test.utils import patch, matches
 from testtools.matchers import IsInstance
 from otter.util.timestamp import from_timestamp
+from otter.util.config import set_config_data
 
 from otter.scheduler import next_cron_occurrence
 
@@ -1902,8 +1903,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def setUp(self):
         """ Setup the mocks """
         self.connection = mock.MagicMock(spec=['execute'])
+        set_config_data({'limits': {'absolute': {'maxGroups': 1000}}})
+        self.addCleanup(set_config_data, {})
 
-        self.returns = [None]
+        self.returns = [[{"count": 0}], None]
 
         def _responses(*args):
             result = _de_identify(self.returns.pop(0))
@@ -1972,9 +1975,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(data.pop('created_at'), datetime))
         self.assertEqual(expectedData, data)
 
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        mock.ANY,
-                                                        ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   mock.ANY,
+                                                   ConsistencyLevel.TWO)
 
     def test_create_with_policy(self):
         """
@@ -2020,9 +2023,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
         self.assertEqual(called_data, expectedData)
 
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        mock.ANY,
-                                                        ConsistencyLevel.TWO)
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   mock.ANY,
+                                                   ConsistencyLevel.TWO)
 
     def test_create_with_policy_multiple(self):
         """
@@ -2079,9 +2082,42 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.assertTrue(isinstance(called_data.pop('created_at'), datetime))
         self.assertEqual(called_data, expectedData)
 
-        self.connection.execute.assert_called_once_with(expectedCql,
-                                                        mock.ANY,
+        self.connection.execute.assert_called_with(expectedCql,
+                                                   mock.ANY,
+                                                   ConsistencyLevel.TWO)
+
+    def test_max_groups_underlimit(self):
+        """
+        test scaling group creation when below maxGroups limit
+        """
+        self.returns = [[{'count': 1}], None]
+
+        expectedData = {'tenantId': '1234'}
+        expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
+
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.assertTrue(isinstance(self.successResultOf(d), dict))
+
+        self.assertEqual(len(self.connection.execute.mock_calls), 2)
+        self.assertEqual(self.connection.execute.mock_calls[0],
+                         mock.call(expectedCQL, expectedData, ConsistencyLevel.TWO))
+
+    def test_max_groups_overlimit(self):
+        """
+        test scaling group creation when at maxGroups limit
+        """
+        set_config_data({'limits': {'absolute': {'maxGroups': 1}}})
+        self.returns = [[{'count': 1}]]
+
+        expectedData = {'tenantId': '1234'}
+        expectedCQL = 'SELECT COUNT(*) FROM scaling_group WHERE "tenantId" = :tenantId;'
+
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.connection.execute.assert_called_once_with(expectedCQL,
+                                                        expectedData,
                                                         ConsistencyLevel.TWO)
+
+        self.failureResultOf(d, ScalingGroupOverLimitError)
 
     def test_list_states(self):
         """
