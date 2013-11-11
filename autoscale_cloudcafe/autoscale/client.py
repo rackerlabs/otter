@@ -3,7 +3,8 @@ Client objects for all the autoscale api calls
 """
 from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
-                                                          ScalingGroup, Groups)
+                                                          ScalingGroup, Groups,
+                                                          Policies)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -196,23 +197,27 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def delete_scaling_group(self, group_id, requestslib_kwargs=None):
+    def delete_scaling_group(self, group_id, force=None, requestslib_kwargs=None):
         """
         :summary: Deletes the scaling group when empty. Rejects when group
                   has entities.
         :param group_id: The id of an existing scaling group.
         :type group_id: String
+        :param force: If force is set to 'true', a group is deleted even if servers exist.
+        :type force: String
         :return: Response Object containing response code 204
                  on success and empty body
         :rtype: Response Object
 
             DELETE
             '/{tenantId}/groups/{groupId}'
+            '/{tenantId}/groups/{groupId}?force=true'
         """
 
         self.group_id = group_id
+        params = {'force': force}
         url = '%s/groups/%s/' % (self.url, self.group_id)
-        return self.request('DELETE', url,
+        return self.request('DELETE', url, params=params,
                             requestslib_kwargs=requestslib_kwargs)
 
     def list_status_entities_sgroups(self, group_id, requestslib_kwargs=None):
@@ -382,7 +387,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def list_policies(self, group_id, requestslib_kwargs=None):
+    def list_policies(self, group_id, marker=None, limit=None,
+                      requestslib_kwargs=None, url=None):
         """
         :summary: List the scaling group's policy configurations
         :param group_id: The id of an existing scaling group.
@@ -394,10 +400,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
         """
-        url = '%s/groups/%s/policies/' % (self.url, group_id)
-        return self.request('GET', url,
+        params = {'marker': marker, 'limit': limit}
+        url = url or '%s/groups/%s/policies/' % (self.url, group_id)
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Policy)
+                            response_entity_type=Policies)
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,

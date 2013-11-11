@@ -292,7 +292,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_group_create_maxEntites_lt_minEntities_invalid_400(self):
         """
@@ -323,7 +323,7 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         }
         resp_body = self.assert_status_code(400, self.endpoint, 'POST', json.dumps(invalid))
         resp = json.loads(resp_body)
-        self.assertEqual(resp['type'], 'InvalidMinEntities', resp['message'])
+        self.assertEqual(resp['error']['type'], 'InvalidMinEntities', resp['error']['message'])
 
     @mock.patch('otter.util.http.get_url_root', return_value="")
     def _test_successful_create(self, request_body, mock_url):
@@ -593,7 +593,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.mock_group.view_manifest.assert_called_once_with()
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     @mock.patch('otter.rest.groups.get_policies_links', return_value='pol links')
@@ -735,7 +735,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.mock_group.delete_group.assert_called_once_with()
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     def test_group_delete_403(self):
@@ -751,7 +751,7 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         self.mock_group.delete_group.assert_called_once_with()
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'GroupNotEmptyError')
+        self.assertEqual(resp['error']['type'], 'GroupNotEmptyError')
         self.flushLoggedErrors(GroupNotEmptyError)
 
 
@@ -782,7 +782,7 @@ class GroupStateTestCase(RestAPITestMixin, TestCase):
         self.mock_group.view_state.assert_called_once_with()
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchScalingGroupError')
+        self.assertEqual(resp['error']['type'], 'NoSuchScalingGroupError')
         self.flushLoggedErrors(NoSuchScalingGroupError)
 
     @mock.patch('otter.rest.groups.format_state_dict')

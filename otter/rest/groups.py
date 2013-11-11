@@ -12,6 +12,7 @@ from otter.supervisor import get_supervisor
 
 from otter.json_schema.rest_schemas import create_group_request
 from otter.json_schema.group_schemas import MAX_ENTITIES
+from otter.log import log
 from otter.rest.configs import OtterConfig, OtterLaunch
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    with_transaction_id, paginatable,
@@ -56,12 +57,14 @@ class OtterGroups(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id):
+    def __init__(self, store, tenant_id):
+        self.log = log.bind(system='otter.rest.groups',
+                            tenant_id=tenant_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @paginatable
@@ -142,6 +145,7 @@ class OtterGroups(object):
     # attached.  If we are going to create the scaling policies here too, we should
     # probably also return their ids and links, just like the manifest.
     @app.route('/', methods=['POST'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(create_group_request)
@@ -351,14 +355,12 @@ class OtterGroups(object):
         return deferred
 
     @app.route('/<string:group_id>/', branch=True)
-    @with_transaction_id()
-    def group(self, request, log, group_id):
+    def group(self, request, group_id):
         """
         Routes requiring a specific group_id are delegated to
         OtterGroup.
         """
-        return OtterGroup(self.store, log,
-                          self.tenant_id, group_id).app.resource()
+        return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
 
 
 class OtterGroup(object):
@@ -367,13 +369,16 @@ class OtterGroup(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id):
+        self.log = log.bind(system='otter.rest.group',
+                            tenant_id=tenant_id,
+                            group_id=group_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def view_manifest_config_for_scaling_group(self, request):
@@ -452,6 +457,7 @@ class OtterGroup(object):
     # Feature: Force delete, which stops scaling, deletes all servers for you, then
     #       deletes the scaling group.
     @app.route('/', methods=['DELETE'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     def delete_scaling_group(self, request):
@@ -498,6 +504,7 @@ class OtterGroup(object):
             return group.delete_group()
 
     @app.route('/state/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def get_scaling_group_state(self, request):
@@ -531,6 +538,7 @@ class OtterGroup(object):
         return deferred
 
     @app.route('/pause/', methods=['POST'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     def pause_scaling_group(self, request):
@@ -543,6 +551,7 @@ class OtterGroup(object):
         return controller.pause_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/resume/', methods=['POST'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     def resume_scaling_group(self, request):
@@ -555,25 +564,24 @@ class OtterGroup(object):
         return controller.resume_scaling_group(self.log, transaction_id(request), group)
 
     @app.route('/config/')
-    @with_transaction_id()
-    def config(self, request, log):
+    def config(self, request):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/launch/')
     @with_transaction_id()
-    def launch(self, request, log):
+    def launch(self, request):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/policies/', branch=True)
     @with_transaction_id()
-    def policies(self, request, log):
+    def policies(self, request):
         """
         policies routes handled by OtterPolicies
         """
-        return OtterPolicies(self.store, log, self.tenant_id, self.group_id).app.resource()
+        return OtterPolicies(self.store, self.tenant_id, self.group_id).app.resource()

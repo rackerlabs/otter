@@ -29,6 +29,16 @@ from otter.test.utils import patch
 
 from otter.util.config import set_config_data
 
+limits = {
+    'url_root': 'http://127.0.0.1',
+    'limits': {
+        'pagination': 100,
+        'absolute': {
+            'maxGroups': 1000
+        }
+    }
+}
+
 
 def _strip_base_url(url):
     return urlsplit(url)[2]
@@ -64,8 +74,7 @@ class MockStoreRestScalingGroupTestCase(TestCase):
         """
         store = MockScalingGroupCollection()
         self.root = Otter(store).app.resource()
-        set_config_data({'url_root': 'http://127.0.0.1',
-                         'limits': {'pagination': 5}})
+        set_config_data(limits)
         self.addCleanup(set_config_data, {})
 
         self.config = config()[1]
@@ -227,6 +236,9 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         """
         Replace the store every time with a clean one.
         """
+        set_config_data(limits)
+        self.addCleanup(set_config_data, {})
+
         store = MockScalingGroupCollection()
         self.mock_log = mock.MagicMock()
         manifest = self.successResultOf(
@@ -245,9 +257,6 @@ class MockStoreRestScalingPolicyTestCase(TestCase):
         self.addCleanup(controller_patcher.stop)
 
         self.root = Otter(store).app.resource()
-
-        set_config_data({'url_root': 'http://127.0.0.1'})
-        self.addCleanup(set_config_data, {})
 
     def assert_number_of_scaling_policies(self, number):
         """
@@ -418,6 +427,9 @@ class MockStoreRestWebhooksTestCase(TestCase):
         """
         Replace the store every time with a clean one.
         """
+        set_config_data(limits)
+        self.addCleanup(set_config_data, {})
+
         self.mock_log = mock.MagicMock()
         store = MockScalingGroupCollection()
         manifest = self.successResultOf(
@@ -448,9 +460,6 @@ class MockStoreRestWebhooksTestCase(TestCase):
         self.mock_controller.maybe_execute_scaling_policy.side_effect = _mock_maybe_execute
 
         self.root = Otter(store).app.resource()
-
-        set_config_data({'url_root': 'http://127.0.0.1'})
-        self.addCleanup(set_config_data, {})
 
     def assert_number_of_webhooks(self, number):
         """

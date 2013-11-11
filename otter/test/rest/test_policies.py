@@ -19,6 +19,8 @@ from otter.models.interface import NoSuchPolicyError
 from otter.rest.decorators import InvalidJsonError
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.rest.bobby import set_bobby
+from otter.bobby import BobbyClient
 
 
 class AllPoliciesTestCase(RestAPITestMixin, TestCase):
@@ -136,7 +138,78 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_policy_create_bobby_without_bobby(self, mock_url):
+        """
+        Tries to create a Bobby policy without Bobby being active
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    def test_policy_create_bad_args(self, mock_url):
+        """
+        Verifies that a schedule with the paramaters for cloud_monitoring still
+        fails
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "schedule",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
 
     def test_policy_create(self):
         """
@@ -156,6 +229,139 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         validate(resp, rest_schemas.create_policies_response)
 
         expected_policy = policy_examples()[0]
+        expected_policy['id'] = '5'
+        expected_policy['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5/'
+            }
+        ]
+        self.assertEqual(resp, {"policies": [expected_policy]})
+
+
+class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
+    """
+    Tests for ``/{tenantId}/groups/{group_id}/policies`` endpoints (create, list)
+    """
+    endpoint = "/v1.0/11111/groups/1/policies/"
+    invalid_methods = ("PUT", "DELETE")
+
+    def setUp(self):
+        """
+        Set up mock Bobby client
+        """
+        set_bobby(BobbyClient("http://127.0.0.1:9876/"))
+
+        super(AllBobbyPoliciesTestCase, self).setUp()
+
+    def tearDown(self):
+        """
+        Revert mock Bobby client
+        """
+        set_bobby(None)
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby_null(self, create_policy, mock_url):
+        """
+        Tries to create a regular policy with bobby active
+        """
+
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **policy_examples()[0])])
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps(policy_examples()[:1]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies/')
+
+        self.assertFalse(create_policy.called)
+
+        self.mock_group.create_policies.assert_called_once_with(
+            policy_examples()[:1])
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_policies_response)
+
+        expected_policy = policy_examples()[0]
+        expected_policy['id'] = '5'
+        expected_policy['links'] = [
+            {
+                'rel': 'self',
+                'href': '/v1.0/11111/groups/1/policies/5/'
+            }
+        ]
+        self.assertEqual(resp, {"policies": [expected_policy]})
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby_bad_args(self, create_policy, mock_url):
+        """
+        Tries to create a policy with bobby on and invalid args
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring",
+            "args": {
+                "at": "2015-05-20T00:00:00Z"
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        self.assert_status_code(400, None, 'POST', '["tacos"]')
+
+    @mock.patch('otter.util.http.get_url_root', return_value="")
+    @mock.patch('otter.bobby.BobbyClient.create_policy', return_value=defer.succeed(''))
+    def test_policy_create_bobby(self, create_policy, mock_url):
+        """
+        Tries to create a Bobby policy
+        """
+
+        bobby_policy = {
+            "name": "Bobby policy for MaaS",
+            "cooldown": 3,
+            "change": 10,
+            "type": "cloud_monitoring",
+            "args": {
+                "check": {
+                    "label": "Website check 1",
+                    "type": "remote.http",
+                    "details": {
+                        "url": "http://www.foo.com",
+                        "method": "GET"
+                    },
+                    "monitoring_zones_poll": [
+                        "mzA"
+                    ],
+                    "timeout": 30,
+                    "period": 100,
+                    "target_alias": "default"
+                },
+                "alarm_criteria": {"criteria": ("if (metric[\"duration\"] >= 2) { return new "
+                                                "AlarmStatus(OK); } return new AlarmStatus(CRITICAL);")}
+            }
+        }
+        self.mock_group.create_policies.return_value = defer.succeed([
+            dict(id="5", **bobby_policy.copy())])
+
+        response_body = self.assert_status_code(
+            201, None, 'POST', json.dumps([bobby_policy]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies/')
+
+        self.mock_group.create_policies.assert_called_once_with(
+            [bobby_policy])
+
+        create_policy.assert_called_once_with("11111", "1", "5", bobby_policy["args"]["check"],
+                                              bobby_policy["args"]["alarm_criteria"]["criteria"])
+
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_policies_response)
+
+        expected_policy = bobby_policy
         expected_policy['id'] = '5'
         expected_policy['links'] = [
             {
@@ -218,7 +424,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         response_body = self.assert_status_code(404, method="GET")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_policy_success(self):
@@ -250,7 +456,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.update_policy.assert_called_once_with(
             self.policy_id, policy_examples()[0])
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_update_policy_unknown_error_is_500(self):
@@ -286,7 +492,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.flushLoggedErrors(ValidationError)
 
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'ValidationError')
+        self.assertEqual(resp['error']['type'], 'ValidationError')
 
     def test_delete_policy_success(self):
         """
@@ -314,7 +520,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
 
         self.mock_group.delete_policy.assert_called_once_with(
             self.policy_id)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_execute_policy_success(self):
@@ -348,7 +554,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'NoSuchPolicyError')
+        self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
     def test_execute_policy_failure_403(self):
@@ -364,9 +570,9 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
                                                 endpoint=self.endpoint + 'execute/',
                                                 method="POST")
         resp = json.loads(response_body)
-        self.assertEqual(resp['type'], 'CannotExecutePolicyError')
+        self.assertEqual(resp['error']['type'], 'CannotExecutePolicyError')
         self.assertEqual(
-            resp['message'],
+            resp['error']['message'],
             'Cannot execute scaling policy 2 for group 1 for tenant 11111: meh')
         self.flushLoggedErrors(CannotExecutePolicyError)
 

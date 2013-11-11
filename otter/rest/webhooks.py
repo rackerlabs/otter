@@ -9,6 +9,7 @@ policy.
 from functools import partial
 import json
 
+from otter.log import log
 from otter.json_schema import group_schemas
 from otter.json_schema import rest_schemas
 from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
@@ -51,14 +52,18 @@ class OtterWebhooks(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id, policy_id):
+    def __init__(self, store, tenant_id, group_id, policy_id):
+        self.log = log.bind(system='otter.rest.webhooks',
+                            tenant_id=tenant_id,
+                            group_id=group_id,
+                            policy_id=policy_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     @paginatable
@@ -129,6 +134,7 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/', methods=['POST'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
     @validate_body(rest_schemas.create_webhooks_request)
@@ -214,12 +220,11 @@ class OtterWebhooks(object):
         return deferred
 
     @app.route('/<string:webhook_id>/', branch=True)
-    @with_transaction_id()
-    def webhook(self, request, log, webhook_id):
+    def webhook(self, request, webhook_id):
         """
         Delegate routes for specific webhooks to OtterWebhook.
         """
-        return OtterWebhook(self.store, log, self.tenant_id,
+        return OtterWebhook(self.store, self.tenant_id,
                             self.group_id, self.policy_id,
                             webhook_id).app.resource()
 
@@ -230,16 +235,20 @@ class OtterWebhook(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, tenant_id, group_id, policy_id,
-                 webhook_id):
+    def __init__(self, store, tenant_id, group_id, policy_id, webhook_id):
+        self.log = log.bind(system='otter.rest.webhook',
+                            tenant_id=tenant_id,
+                            group_id=group_id,
+                            policy_id=policy_id,
+                            webhook_id=webhook_id)
         self.store = store
-        self.log = log
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.policy_id = policy_id
         self.webhook_id = webhook_id
 
     @app.route('/', methods=['GET'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
     def get_webhook(self, request):
@@ -280,6 +289,7 @@ class OtterWebhook(object):
         return deferred
 
     @app.route('/', methods=['PUT'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     @validate_body(group_schemas.update_webhook)
@@ -304,6 +314,7 @@ class OtterWebhook(object):
         return deferred
 
     @app.route('/', methods=['DELETE'])
+    @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
     def delete_webhook(self, request):
@@ -322,13 +333,16 @@ class OtterExecute(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, log, capability_version, capability_hash):
+    def __init__(self, store, capability_version, capability_hash):
+        self.log = log.bind(system='otter.rest.execute',
+                            capability_version=capability_version,
+                            capability_hash=capability_hash)
         self.store = store
-        self.log = log
         self.capability_version = capability_version
         self.capability_hash = capability_hash
 
     @app.route('/', methods=['POST'])
+    @with_transaction_id()
     @fails_with({})  # This will allow us to surface internal server error only.
     @succeeds_with(202)
     def execute_webhook(self, request):
