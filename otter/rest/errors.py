@@ -34,5 +34,5 @@ exception_codes = {
     InvalidQueryArgument: 400,
     NotImplementedError: 501,
     ScalingGroupOverLimitError: 422,
-    WebhooksOverLimitError, 422
+    WebhooksOverLimitError: 422
 }

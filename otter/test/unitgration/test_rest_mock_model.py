@@ -34,7 +34,8 @@ limits = {
     'limits': {
         'pagination': 100,
         'absolute': {
-            'maxGroups': 1000
+            'maxGroups': 1000,
+            'maxWebhooksPerPolicy': 1000
         }
     }
 }
