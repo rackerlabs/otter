@@ -263,7 +263,7 @@ class APIMakeServiceTests(TestCase):
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
-        parent = makeService(config)
+        makeService(config)
 
         mock_txkz.assert_called_once_with(hosts='zk_hosts')
         kz_client.start.assert_called_once_with()
