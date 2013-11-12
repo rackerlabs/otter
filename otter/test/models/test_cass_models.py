@@ -1722,9 +1722,15 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
     Tests for `CassScalingGroup.create_policies`
     """
 
-    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
-                return_value=defer.succeed({}))
-    def test_add_scaling_policy(self, view_config):
+    def setUp(self):
+        """
+        Mock view_config
+        """
+        super(ScalingGroupAddPoliciesTests, self).setUp()
+        self.view_config = patch(self, 'otter.models.cass.CassScalingGroup.view_config',
+                                 return_value=defer.succeed({}))
+
+    def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy, and what is returned is a
         list of the scaling policies with their ids
@@ -1747,9 +1753,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
         self.assertEqual(result, [{'b': 'lah', 'id': self.mock_key.return_value}])
 
-    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
-                return_value=defer.succeed({}))
-    def test_add_scaling_policy_at(self, view_config):
+    def test_add_scaling_policy_at(self):
         """
         Test that you can add a scaling policy with 'at' schedule and what is
         returned is a list of the scaling policies with their ids
@@ -1786,9 +1790,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         pol['id'] = self.mock_key.return_value
         self.assertEqual(result, [pol])
 
-    @mock.patch('otter.models.cass.CassScalingGroup.view_config',
-                return_value=defer.succeed({}))
-    def test_add_scaling_policy_cron(self, view_config):
+    def test_add_scaling_policy_cron(self):
         """
         Test that you can add a scaling policy with 'cron' schedule and what is
         returned is a list of the scaling policies with their ids
