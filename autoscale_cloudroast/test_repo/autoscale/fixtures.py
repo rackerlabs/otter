@@ -428,7 +428,7 @@ class AutoscaleFixture(BaseTestFixture):
         Returns the total number of webhooks on a given policy.
         Note: This will work only after the test webhook pagination branch is merged
         """
-        list_webhooks = self.autoscale_client.list_webhooks().entity
+        list_webhooks = self.autoscale_client.list_webhooks(group_id, policy_id).entity
         webhooks_num = len(list_webhooks.webhooks)
         while (hasattr(list_webhooks.webhooks_links, 'next')):
             list_webhooks = self.autoscale_client.list_webhooks(
