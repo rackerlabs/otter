@@ -15,7 +15,7 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
-from kazoo.txkazoo import TxKazooClient
+from txkazoo import TxKazooClient
 
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
