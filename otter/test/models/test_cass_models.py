@@ -1586,6 +1586,13 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
     Tests for `ScalingGroup.update_policy`
     """
 
+    def setUp(self):
+        """
+        Mock `get_policy`
+        """
+        super(CassScalingGroupUpdatePolicyTests, self).setUp()
+        self.get_policy = patch(self, 'otter.models.cass.CassScalingGroup.get_policy')
+
     def validate_policy_update(self, policy_json):
         """
         Validate CQL calls made to update the policy
@@ -1603,50 +1610,49 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_with(
             expectedCql, expectedData, ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({"type": "helvetica"}))
-    def test_update_scaling_policy(self, mock_get_policy):
+    def test_update_scaling_policy(self):
         """
         Test that you can update a scaling policy, and if successful it returns
         None
         """
         self.returns = [None]
+        self.get_policy.return_value = defer.succeed({"type": "helvetica"})
         d = self.group.update_policy('12345678', {"b": "lah", "type": "helvetica"})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "helvetica"}')
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({"type": "schedule", "args": {"ott": "er"}}))
-    def test_update_scaling_policy_schedule_no_change(self, mock_get_policy):
+    def test_update_scaling_policy_schedule_no_change(self):
         """
         Schedule policy update with no change in args does not update the scaling_schedule table.
         It only updates the scaling_policies table
         """
         self.returns = [None]
-        d = self.group.update_policy('12345678', {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
+        self.get_policy.return_value = defer.succeed({"type": "schedule",
+                                                      "args": {"ott": "er"}})
+        d = self.group.update_policy(
+            '12345678',
+            {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
         self.assertIsNone(self.successResultOf(d))  # update returns None
         self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}')
         self.assertEqual(self.connection.execute.call_count, 1)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({"type": "helvetica"}))
-    def test_update_scaling_policy_type_change(self, mock_get_policy):
+    def test_update_scaling_policy_type_change(self):
         """
         Policy type cannot be changed while updating it
         """
+        self.get_policy.return_value = defer.succeed({"type": "helvetica"})
         d = self.group.update_policy('12345678', {"b": "lah", "type": "comicsans"})
         self.failureResultOf(d, ValidationError)
         self.assertFalse(self.connection.execute.called)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({"type": "schedule",
-                                            "args": {"at": "2013-07-30T19:03:12Z"}}))
-    def test_update_scaling_policy_at_schedule_change(self, mock_get_policy):
+    def test_update_scaling_policy_at_schedule_change(self):
         """
         Updating at-style schedule policy updates respective entry in
         scaling_schedule table also
         """
         self.returns = [None]
+        self.get_policy.return_value = defer.succeed({"type": "schedule",
+                                                      "args": {"at": "2013-07-30T19:03:12Z"}})
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"at": "2015-09-20T10:00:12Z"}})
         self.assertIsNone(self.successResultOf(d))
@@ -1667,14 +1673,14 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.succeed({"type": "schedule", "args": {"cron": "1 * * * *"}}))
-    def test_update_scaling_policy_cron_schedule_change(self, mock_get_policy):
+    def test_update_scaling_policy_cron_schedule_change(self):
         """
         Updating cron-style schedule policy updates respective entry in
         scaling_schedule table also
         """
         self.returns = [None]
+        self.get_policy.return_value = defer.succeed({"type": "schedule",
+                                                      "args": {"cron": "1 * * * *"}})
         d = self.group.update_policy('12345678', {"type": "schedule",
                                                   "args": {"cron": "2 0 * * *"}})
         self.assertIsNone(self.successResultOf(d))
@@ -1695,12 +1701,11 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
-                return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
-    def test_update_scaling_policy_bad(self, mock_get_policy):
+    def test_update_scaling_policy_bad(self):
         """
         Tests that if you try to update a scaling policy that doesn't exist, the right thing happens
         """
+        self.get_policy.return_value = defer.fail(NoSuchPolicyError('t', 'g', 'p'))
         d = self.group.update_policy('12345678', {"b": "lah"})
         self.failureResultOf(d, NoSuchPolicyError)
         self.assertFalse(self.connection.execute.called)
