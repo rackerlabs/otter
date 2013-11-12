@@ -665,42 +665,70 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
         """
         Deleting an existing group succeeds with a 204.
         """
+        self.mock_group.update_config.return_value = defer.succeed(None)
         self.mock_group.delete_group.return_value = defer.succeed(None)
 
         response_body = self.assert_status_code(204, method="DELETE")
         self.assertEqual(response_body, "")
         self.mock_store.get_scaling_group.assert_called_once_with(
             mock.ANY, '11111', 'one')
+        self.assertEqual(0, self.mock_group.update_config.call_count)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force(self):
         """
         Deleting a group with force sets min/max to zero and deletes it.
         """
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+
+        self.mock_group.view_config.return_value = defer.succeed(
+            {'name': 'group1', 'minEntities': '10', 'maxEntities': '1000'})
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
+        self.mock_controller.obey_config_change.return_value = defer.succeed(None)
 
         self.assert_status_code(
             204, endpoint="{0}?force=true".format(self.endpoint),
             method="DELETE")
 
         self.mock_group.update_config.assert_called_once_with(
-            {'maxEntities': 0, 'minEntities': 0})
+            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
+        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
+        self.mock_group.delete_group.assert_called_once_with()
+
+    def test_group_delete_force_case_insensitive(self):
+        """
+        The 'true' specified in force is case insensitive.
+        """
+        self.mock_controller = patch(self, 'otter.rest.groups.controller')
+
+        self.mock_group.view_config.return_value = defer.succeed({'name': 'group1'})
+        self.mock_group.delete_group.return_value = defer.succeed(None)
+        self.mock_group.update_config.return_value = defer.succeed(None)
+        self.mock_controller.obey_config_change.return_value = defer.succeed(None)
+
+        self.assert_status_code(
+            204, endpoint="{0}?force=true".format(self.endpoint),
+            method="DELETE")
+
+        self.mock_group.update_config.assert_called_once_with(
+            {'maxEntities': 0, 'minEntities': 0, 'name': 'group1'})
+        self.assertEqual(1, self.mock_controller.obey_config_change.call_count)
         self.mock_group.delete_group.assert_called_once_with()
 
     def test_group_delete_force_garbage_arg(self):
         """
-        Deleting a group with force sets min/max to zero and deletes it.
+        Providing an force argument other than 'true' causes an error.
         """
         self.mock_group.delete_group.return_value = defer.succeed(None)
         self.mock_group.update_config.return_value = defer.succeed(None)
 
         self.assert_status_code(
-            204, endpoint="{0}?force=blah".format(self.endpoint),
+            400, endpoint="{0}?force=blah".format(self.endpoint),
             method="DELETE")
 
         self.assertEqual(0, self.mock_group.update_config.call_count)
-        self.mock_group.delete_group.assert_called_once_with()
+        self.assertEqual(0, self.mock_group.delete_group.call_count)
 
     def test_group_delete_404(self):
         """

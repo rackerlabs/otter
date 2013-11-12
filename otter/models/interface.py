@@ -186,6 +186,17 @@ class GroupNotEmptyError(Exception):
             .format(t=tenant_id, g=group_id))
 
 
+class ScalingGroupOverLimitError(Exception):
+    """
+    Error to be raised when client requests new scaling group but
+    is already at MaxGroups
+    """
+    def __init__(self, tenant_id, max_groups):
+        super(ScalingGroupOverLimitError, self).__init__(
+            "Allowed limit of {n} scaling groups reached by tenant {t}"
+            .format(t=tenant_id, n=max_groups))
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record

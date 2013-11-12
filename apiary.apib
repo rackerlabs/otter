@@ -204,6 +204,13 @@ format containing id and links is returned.
               }
             }
 
+## History [/{tenantId}/group/{groupId}/history]
+
+### Get History [GET]
+Returns the most recent events for the Auto Scale group.
+
++ Response 501
+
 ## Specific Groups [/{tenantId}/groups/{groupId}]
 
 ### List Group Information [GET]
@@ -759,7 +766,7 @@ If successful, a response body will be returned.
     
             {}
 
-# Group Anonymous Capability URLs
+# Group Anonymous Policy Execution URLs
 
 ## Execute Resource [/execute/{capabilityVersion}/{capabilityHash}/]
 Autoscale REST Endpoints having to do with executing policies without
@@ -825,7 +832,7 @@ This data is returned in the body of the response in JSON format.
             }
 
 
-### Create one or more scaling policy webhooks. [POST]
+### Create one or more scaling policy webhooks  [POST]
 Webhooks must have a name. If successful, the created response body will contain the IDs and links to the
 newly created webhooks.
 This data provided in the request body in JSON format.
@@ -914,7 +921,7 @@ This data is returned in the body of the response in JSON format.
                 }
             }
 
-### Update webhook. [PUT]
+### Update webhook [PUT]
 WebhookIds not recognized will be ignored with accompanying data.
 URLs will be ignored if submitted, but that will not invalidate the request.
 If successful, no response body will be returned.
@@ -931,9 +938,56 @@ If successful, no response body will be returned.
 + Response 204
 
 
-### Delete webhook. [DELETE]
+### Delete webhook [DELETE]
 If successful, no response body will be returned.
 
 + Response 204
 
+# Group Limits
+
+## User Autoscale Limits [/{tenantId}/limits]
+
+### Get Limits [GET]
+Provides details about account usage limits.
+
++ Response 200 (application/json)
+    + Body
+            
+            {
+                "limits": {
+                    "absolute": {
+                        "maxGroups": 1000,
+                        "maxPoliciesPerGroup": 1000,
+                        "maxWebhooksPerPolicy": 1000
+                    },
+                    "rate": [
+                        {
+                            "limit": [
+                                {
+                                    "next-available": "2013-11-08T23:27:15.646Z",
+                                    "remaining": 999,
+                                    "unit": "MINUTE",
+                                    "value": 1000,
+                                    "verb": "ALL"
+                                }
+                            ],
+                            "regex": "/v1\\.0/([0-9]+)/.+",
+                            "uri": "/v1.0/tenantId/*"
+                        },
+                        {
+                            "limit": [
+                                {
+                                    "next-available": "2013-11-08T23:26:15.674Z",
+                                    "remaining": 10,
+                                    "unit": "SECOND",
+                                    "value": 10,
+                                    "verb": "ALL"
+                                }
+                            ],
+                            "regex": "/v1\\.0/execute/(.*)",
+                            "uri": "/v1.0/execute/*"
+                        }
+                    ]
+                }
+            }
 

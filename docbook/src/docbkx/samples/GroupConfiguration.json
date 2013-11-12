@@ -1,0 +1,9 @@
+ "groupConfiguration": {
+    "maxEntities": 10,
+    "cooldown": 360,
+    "name": "test_scaling_group",
+    "minEntities": 0,
+    "metadata": {
+      "gc_meta_key_2": "gc_meta_value_2",
+      "gc_meta_key_1": "gc_meta_value_1"
+    }
