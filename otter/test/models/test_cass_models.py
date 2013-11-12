@@ -1753,7 +1753,9 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
 
         self.assertEqual(result, [{'b': 'lah', 'id': self.mock_key.return_value}])
 
-    def test_add_scaling_policy_at(self):
+    @mock.patch('otter.models.cass.serialize_json_data',
+                side_effect=lambda *args: _S(args[0]))
+    def test_add_scaling_policy_at(self, mock_serial):
         """
         Test that you can add a scaling policy with 'at' schedule and what is
         returned is a list of the scaling policies with their ids
@@ -1776,8 +1778,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
             ':policy0trigger, :policy0version) '
             'APPLY BATCH;')
         expectedData = {
-            "policy0data": ('{"name": "scale up by 10", "args": {"at": "2012-10-20T03:23:45"}, '
-                            '"cooldown": 5, "_ver": 1, "type": "schedule", "change": 10}'),
+            "policy0data": _S(pol),
             "groupId": '12345678g',
             "policy0policyId": '12345678',
             "policy0trigger": from_timestamp(expected_at),
