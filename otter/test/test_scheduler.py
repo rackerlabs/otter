@@ -400,7 +400,8 @@ class AddCronEventsTests(SchedulerTests):
         """
         events = [{'tenantId': '1234', 'groupId': 'scal44', 'policyId': 'pol4{}'.format(i),
                    'trigger': 'now', 'cron': '*', 'bucket': 1} for i in range(3)]
-        d = add_cron_events(self.mock_store, self.log, [], set(range(3)))
+        d = add_cron_events(self.mock_store, self.log, events,
+                            set(['pol4{}'.format(i) for i in range(3)]))
         self.assertIsNone(d)
         self.assertFalse(self.log.msg.called)
         self.assertFalse(self.next_cron_occurrence.called)
