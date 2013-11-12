@@ -13,8 +13,9 @@ from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError, IScalingScheduleCollection,
-    IAdmin)
+    IAdmin, ScalingGroupOverLimitError)
 from otter.util.hashkey import generate_capability
+from otter.util.config import config_value
 
 
 def generate_entity_links(tenant_id, entity_ids,
@@ -410,6 +411,13 @@ class MockScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.create_scaling_group`
         """
         uuid = str(uuid4())
+        max_groups = config_value('limits.absolute.maxGroups')
+
+        if len(self.data[tenant]) >= max_groups:
+            msg = 'client has reached maxGroups limit'
+            log.bind(tenant_id=tenant, scaling_group_id=uuid).msg(msg)
+            return defer.fail(ScalingGroupOverLimitError(tenant, max_groups))
+
         self.data[tenant][uuid] = MockScalingGroup(
             log, tenant, uuid, self,
             {'config': config, 'launch': launch, 'policies': policies})
