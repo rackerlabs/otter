@@ -11,7 +11,7 @@ x-response-id: 12870084-b00c-4295-957e-f134979233ea
        "type": "launch_server",
         "args": {
             "server": {
-                "flavorRef": 3,
+                "flavorRef": performance1-4,
                 "name": "webhead",
                 "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
                 "OS-DCF:diskConfig": "AUTO",

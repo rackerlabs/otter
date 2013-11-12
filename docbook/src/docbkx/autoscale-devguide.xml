@@ -247,7 +247,7 @@ is external so it's handy for Getting Started to share -->
     </section>
     </chapter>
     <chapter xml:id="Glossary">
-      <title>Glossary</title>
+      <title>Auto Scale Core Concepts</title>
       <para> To use the &PROD; API effectively, you should
         understand several key concepts:
       </para>
