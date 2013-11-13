@@ -170,36 +170,36 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
         self.assertEquals(
             get_group_response.status_code, expected_response_code,
             msg='Get group returned response code {0} on group '
-            '{1}'.format(self.group.id, get_group_response.status_code))
+            '{1}'.format(get_group_response.status_code, self.group.id))
         get_group_state_response = user_client.list_status_entities_sgroups(
             self.group.id)
         self.assertEquals(
             get_group_state_response.status_code, expected_response_code,
             msg='Get group state returned response code {0} on group '
-            '{1}'.format(self.group.id, get_group_state_response.status_code))
+            '{1}'.format(get_group_state_response.status_code, self.group.id))
         get_group_config_response = user_client.view_scaling_group_config(
             self.group.id)
         self.assertEquals(
             get_group_config_response.status_code, expected_response_code,
             msg='Get group config returned response code {0} on group '
-            '{1}'.format(self.group.id, get_group_config_response.status_code))
+            '{1}'.format(get_group_config_response.status_code, self.group.id))
         get_launch_config_response = user_client.view_launch_config(
             self.group.id)
         self.assertEquals(
             get_launch_config_response.status_code, expected_response_code,
             msg='Get launch config returned response code {0} on group '
-            '{1}'.format(self.group.id, get_launch_config_response.status_code))
+            '{1}'.format(get_launch_config_response.status_code, self.group.id))
         list_policies_response = user_client.list_policies(self.group.id)
         self.assertEquals(
             list_policies_response.status_code, expected_response_code,
             msg='List policies returned response code {0} for the group'
-            ' {1}'.format(self.group.id, list_policies_response.status_code))
+            ' {1}'.format(list_policies_response.status_code, self.group.id))
         get_policy_response = user_client.get_policy_details(
             self.group.id, self.policy['id'])
         self.assertEquals(
             get_policy_response.status_code, expected_response_code,
             msg='Get group returned response code {0} on group '
-            '{1}'.format(self.group.id, get_policy_response.status_code))
+            '{1}'.format(get_policy_response.status_code, self.group.id))
 
     def _verify_otter_admin_roles_other_than_GET_calls(self, user_client,
                                                        expected_response_code=None,

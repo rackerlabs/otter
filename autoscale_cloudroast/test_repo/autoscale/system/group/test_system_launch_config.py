@@ -125,7 +125,7 @@ class LaunchConfigTest(AutoscaleFixture):
             set(active_list_after_up) - set(first_server)))
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name,
-            server_after_down)
+            - scale_down_change)
 
     @tags(speed='quick')
     def test_system_server_details_name_and_metadata(self):
@@ -269,9 +269,7 @@ class LaunchConfigTest(AutoscaleFixture):
         self._verify_server_list_for_launch_config(
             servers_list_on_upd_group, self.upd_server_name, self.upd_image_ref,
             self.upd_flavor_ref)
-        self.assert_servers_deleted_successfully(
-            group.launchConfiguration.server.name,
-            group.groupConfiguration.minEntities)
+        self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
 
     @tags(speed='slow')
     def test_system_scale_down_oldest_on_active_servers(self):
