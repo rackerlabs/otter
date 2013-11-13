@@ -775,7 +775,7 @@ class CassScalingGroup(object):
             d = self.connection.execute(
                 _cql_count_for_policy.format(cf=self.webhooks_table),
                 main_params,
-                get_consistency_level('create', 'webhook'))
+                get_consistency_level('count', 'webhook'))
             return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
 
         d.addCallback(_do_limits_check)
