@@ -439,7 +439,7 @@ class CassScalingGroup(object):
         self.policies_table = "scaling_policies"
         self.state_table = "group_state"
         self.webhooks_table = "policy_webhooks"
-        self.event_table = "scaling_schedule"
+        self.event_table = "scaling_schedule_v2"
 
     def view_manifest(self):
         """
@@ -938,7 +938,7 @@ class CassScalingGroupCollection:
         self.policies_table = "scaling_policies"
         self.webhooks_table = "policy_webhooks"
         self.state_table = "group_state"
-        self.event_table = "scaling_schedule"
+        self.event_table = "scaling_schedule_v2"
         self.buckets = None
 
     def set_scheduler_buckets(self, buckets):

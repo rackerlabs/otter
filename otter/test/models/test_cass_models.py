@@ -1624,7 +1624,7 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
 
     def test_update_scaling_policy_schedule_no_change(self):
         """
-        Schedule policy update with no change in args does not update the scaling_schedule table.
+        Schedule policy update with no change in args does not update the scaling_schedule_v2 table.
         It only updates the scaling_policies table
         """
         self.returns = [None]
@@ -1649,7 +1649,7 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
     def test_update_scaling_policy_at_schedule_change(self):
         """
         Updating at-style schedule policy updates respective entry in
-        scaling_schedule table also
+        scaling_schedule_v2 table also
         """
         self.returns = [None]
         self.get_policy.return_value = defer.succeed({"type": "schedule",
@@ -1659,7 +1659,7 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.assertIsNone(self.successResultOf(d))
         expected_cql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, version) '
             'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
@@ -1677,7 +1677,7 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
     def test_update_scaling_policy_cron_schedule_change(self):
         """
         Updating cron-style schedule policy updates respective entry in
-        scaling_schedule table also
+        scaling_schedule_v2 table also
         """
         self.returns = [None]
         self.get_policy.return_value = defer.succeed({"type": "schedule",
@@ -1687,7 +1687,7 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
         self.assertIsNone(self.successResultOf(d))
         expected_cql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :cron, :version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
@@ -1773,7 +1773,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
             'BEGIN BATCH '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, version) '
             'VALUES (:policy0bucket, :tenantId, :groupId, :policy0policyId, '
             ':policy0trigger, :policy0version) '
@@ -1808,7 +1808,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
             'BEGIN BATCH '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:policy0bucket, :tenantId, :groupId, :policy0policyId, '
             ':policy0trigger, :policy0cron, :policy0version) '
@@ -1868,12 +1868,12 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         fetch_data = {'bucket': 2, 'now': 1234, 'size': 100}
         fetch_cql = (
             'SELECT "tenantId", "groupId", "policyId", "trigger", cron, version '
-            'FROM scaling_schedule '
+            'FROM scaling_schedule_v2 '
             'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
         del_cql = ('BEGIN BATCH '
-                   'DELETE FROM scaling_schedule WHERE bucket = :bucket '
+                   'DELETE FROM scaling_schedule_v2 WHERE bucket = :bucket '
                    'AND trigger = :event0trigger AND "policyId" = :event0policyId; '
-                   'DELETE FROM scaling_schedule WHERE bucket = :bucket '
+                   'DELETE FROM scaling_schedule_v2 WHERE bucket = :bucket '
                    'AND trigger = :event1trigger AND "policyId" = :event1policyId; '
                    'APPLY BATCH;')
         del_data = {'bucket': 2, 'event0trigger': 100, 'event0policyId': 'ef',
@@ -1897,11 +1897,11 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
                    'trigger': 122, 'cron': 'c2', 'version': 'v2'}]
         cql = (
             'BEGIN BATCH '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:event0bucket, :event0tenantId, :event0groupId, :event0policyId, '
             ':event0trigger, :event0cron, :event0version); '
-            'INSERT INTO scaling_schedule(bucket, "tenantId", "groupId", "policyId", '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
             'trigger, cron, version) '
             'VALUES (:event1bucket, :event1tenantId, :event1groupId, :event1policyId, '
             ':event1trigger, :event1cron, :event1version); '

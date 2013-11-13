@@ -1,10 +1,6 @@
 USE @@KEYSPACE@@;
 
--- Desired underlying structure is for the row key to be
--- the account ID and the column key to be the group ID
--- plus the policy ID.
---
--- This is used as a trigger for the next
+-- Stores events to be scheduled in future
 --
 -- In CQL3, the primary key is split such that the first part
 -- ends up in the row key, the rest of the key ends up
@@ -17,7 +13,7 @@ USE @@KEYSPACE@@;
 -- and mainframe computers, before Codd's relational model
 -- will probably get the giggles looking at this.
 
-CREATE TABLE scaling_schedule (
+CREATE TABLE scaling_schedule_v2 (
     bucket int,
     "tenantId" ascii,
     "groupId" ascii,
