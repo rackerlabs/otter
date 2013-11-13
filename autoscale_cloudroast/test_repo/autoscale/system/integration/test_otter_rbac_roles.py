@@ -1,7 +1,7 @@
 """
 System Integration tests for otter's rbac roles
 """
-from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 from cloudcafe.identity.v2_0.tokens_api.behaviors import \
     TokenAPI_Behaviors as OSTokenAPI_Behaviors
@@ -11,19 +11,25 @@ from cloudcafe.auth.config import UserConfig
 from autoscale.client import AutoscalingAPIClient
 
 
-class OtterRbacTests(ScalingGroupWebhookFixture):
-
+class OtterRbacTests(AutoscaleFixture):
     """
     System tests to verify the rbac roles for otter.
     """
-    @classmethod
-    def setUpClass(cls):
+    user_config = UserConfig()
+    password = user_config.password
+
+    def setUp(self):
         """
-        Gets password from the config file. All users were created to have the same password.
+        Create a group with a policy and a webhook
         """
-        super(OtterRbacTests, cls).setUpClass()
-        user_config = UserConfig()
-        cls.password = user_config.password
+        super(OtterRbacTests, self).setUp()
+        create_group = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=0)
+        self.group = create_group.entity
+        self.policy_webhook = self.autoscale_behaviors.create_policy_webhook(self.group.id,
+                                                                             {'change': 1,
+                                                                              'cooldown': 0})
+        self.resources.add(self.group, self.empty_scaling_group)
 
     @tags(type='rbac', speed='quick')
     def test_nova_lbaas_admin_autoscale_observer(self):
@@ -156,7 +162,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
     def _verify_otter_observer_role(self, user_client, expected_response_code=200):
         """
         verify all the GET calls on a group and policy. Uses the group, policy and webhook
-        created as part of the ScalingGroupWebhookFixture imported.
+        created as part of the setUp.
         """
         list_groups_response = user_client.list_scaling_groups()
         self.assertEquals(
@@ -192,7 +198,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             msg='List policies returned response code {0} for the group'
             ' {1}'.format(list_policies_response.status_code, self.group.id))
         get_policy_response = user_client.get_policy_details(
-            self.group.id, self.policy['id'])
+            self.group.id, self.policy_webhook['policy_id'])
         self.assertEquals(
             get_policy_response.status_code, expected_response_code,
             msg='Get group returned response code {0} on group '
@@ -261,7 +267,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # update_policy
         update_policy_response = user_client.update_policy(group_id=self.group.id,
-                                                           policy_id=self.policy['id'],
+                                                           policy_id=self.policy_webhook['policy_id'],
                                                            name='upd_name',
                                                            cooldown=0,
                                                            change=1,
@@ -272,7 +278,8 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             '{1}'.format(update_policy_response.status_code, self.group.id))
 
         # execute_policy
-        execute_policy_response = user_client.execute_policy(self.group.id, self.policy['id'])
+        execute_policy_response = user_client.execute_policy(self.group.id,
+                                                             self.policy_webhook['policy_id'])
         self.assertEquals(
             execute_policy_response.status_code, response_codes['execute'],
             msg='Execute policy returned response code {0} on group '
@@ -280,7 +287,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # create_webhook
         create_webhook_response = user_client.create_webhook(self.group.id,
-                                                             self.policy['id'],
+                                                             self.policy_webhook['policy_id'],
                                                              'test-wb')
         self.assertEquals(
             create_webhook_response.status_code, response_codes['create'],
@@ -288,7 +295,8 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             '{1}'.format(create_webhook_response.status_code, self.group.id))
 
         # list webhooks
-        list_webhook_response = user_client.list_webhooks(self.group.id, self.policy['id'])
+        list_webhook_response = user_client.list_webhooks(self.group.id,
+                                                          self.policy_webhook['policy_id'])
         self.assertEquals(
             list_webhook_response.status_code, response_codes['get'],
             msg='List webhooks returned response code {0} on group '
@@ -296,8 +304,8 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # get webhook
         get_webhook_response = user_client.get_webhook(self.group.id,
-                                                       self.policy['id'],
-                                                       self.webhook['id'])
+                                                       self.policy_webhook['policy_id'],
+                                                       self.policy_webhook['webhook_id'])
         self.assertEquals(
             get_webhook_response.status_code, response_codes['get'],
             msg='List webhooks returned response code {0} on group '
@@ -305,8 +313,8 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # update webhook
         update_webhook_response = user_client.update_webhook(self.group.id,
-                                                             self.policy['id'],
-                                                             self.webhook['id'],
+                                                             self.policy_webhook['policy_id'],
+                                                             self.policy_webhook['webhook_id'],
                                                              name='upd-wb',
                                                              metadata={})
         self.assertEquals(
@@ -315,7 +323,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
             '{1}'.format(update_webhook_response.status_code, self.group.id))
 
         # execute webhook
-        execute_webhook_response = user_client.execute_webhook(self.webhook['links'].capability)
+        execute_webhook_response = user_client.execute_webhook(self.policy_webhook['webhook_url'])
         self.assertEquals(
             execute_webhook_response.status_code, 202,
             msg='Execute webhook returned response code {0} on group '
@@ -323,8 +331,8 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # delete webhook
         delete_webhook_response = user_client.delete_webhook(self.group.id,
-                                                             self.policy['id'],
-                                                             self.webhook['id'])
+                                                             self.policy_webhook['policy_id'],
+                                                             self.policy_webhook['webhook_id'])
         self.assertEquals(
             delete_webhook_response.status_code, response_codes['upd-del'],
             msg='Delete webhook returned response code {0} on group '
@@ -332,7 +340,7 @@ class OtterRbacTests(ScalingGroupWebhookFixture):
 
         # delete policy
         delete_policy_response = user_client.delete_scaling_policy(self.group.id,
-                                                                   self.policy['id'])
+                                                                   self.policy_webhook['policy_id'])
         self.assertEquals(
             delete_policy_response.status_code, response_codes['upd-del'],
             msg='Delete policy returned response code {0} on group '
