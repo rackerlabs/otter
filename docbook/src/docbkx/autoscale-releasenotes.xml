@@ -59,17 +59,51 @@
       <raxm:priority>30</raxm:priority>
     </raxm:metadata>
   </info>
-  <preface xmlns="http://docbook.org/ns/docbook"
-    xmlns:xi="http://www.w3.org/2001/XInclude"
-    xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
-    xml:id="preface">
-    <title>Preface</title>
-    <para>Ipsum lorem</para>
-    <para>This document describes new features, changes, known issues,
-      supported images, and a summary of differences between first
-      generation and next generation Cloud Servers APIs. </para>
-    <para>We welcome feedback, comments, and bug reports at <link
-        xlink:href="mailto:support@rackspacecloud.com"
-        >support@rackspacecloud.com</link>. </para>
-  </preface>
+<chapter xml:id="doc_change_history">
+    	<title>Document Change History</title>
+    	<para>This version of the Release Notes replaces and obsoletes all
+    		previous versions. The most recent changes are described
+    		in the table below:</para>
+    	<?rax revhistory?>
+    </chapter>
+	<chapter xml:id="v1">
+		<title>v1.0, November 20, 2013</title>
+		<para>This is the initial release of Cloud Auto Scale.</para>
+		<itemizedlist>
+			<title>New Features</title>
+			<listitem>
+				<para>Activate Sydney for Cloud Load Balancers PTR management.</para>
+			</listitem>
+		</itemizedlist>
+		<itemizedlist>
+			<title>Bug Fixes</title>
+			<listitem>
+				<para>Fixed incorrect error response when updating multiple records that include an SRV record.</para>
+			</listitem>
+		</itemizedlist>
+		<itemizedlist>
+			<title>Resources</title>
+			<listitem>
+				<para><link
+					xlink:href="http://docs.rackspace.com/api/"
+					>DNS Developer Guide</link></para>
+			</listitem>
+			<listitem>
+				<para><link
+					xlink:href="http://feedback.rackspacecloud.com/forums/71021-product-feedback"
+					>Product Feedback Forum</link></para>
+			</listitem>
+			<listitem>
+				<para><link
+					xlink:href="http://www.rackspace.com/cloud/blog/2011/07/11/using-rackspace-dnsaas-with-curl-part-1/"
+					>Cloud DNS Tutorial</link></para>
+			</listitem>
+			<listitem>
+				<para><link
+					xlink:href="http://developer.rackspace.com/"
+					>Use Cloud
+					DNS with an SDK</link></para>
+			</listitem>
+		</itemizedlist>
+	</chapter>
 </book>
