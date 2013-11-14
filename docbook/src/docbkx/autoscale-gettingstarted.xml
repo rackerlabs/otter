@@ -151,7 +151,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
 -->
         <section xml:id="What_You_Will_Learn">
             <title>What You Will Learn in this Guide</title>
-            <para> After reading the Auto Scale Getting Started Guide you will know about the following:</para>
+            <para> After reading the Auto Scale Getting Started Guide
+                you will know about the following:</para>
             <itemizedlist>
                 <listitem>
                     <para>Prerequisites for Using Auto Scale</para>
@@ -165,7 +166,8 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <para>How Auto Scale Works</para>
                 </listitem>
             </itemizedlist>
-            <para>After going throught the examples in this guide, you will be able to complete the following tasks:</para>
+            <para>After going throught the examples in this guide, you
+                will be able to complete the following tasks:</para>
             <itemizedlist>
                 <listitem>
                     <para>Create a Scaling Group and a Launch
@@ -219,112 +221,109 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                             xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html"
                             >Rackspace Cloud Load Balancers Developers
                             Guide</link>. </para>
-                    <para/>
                 </listitem>
             </itemizedlist>
         </section>
-            <section xml:id="serviceEndpoints">
-                <title>Service Access Endpoints</title>
-                <para>&PRODNAME; is a regionalized service. The user
-                    of the service is therefore responsible for
-                    appropriate replication, caching, and overall
-                    maintenance of &PRODNAME; data across regional
-                    boundaries to other &PROD; servers.</para>
-                <important>
-                    <para> For the Early Access period, you can use
-                        &PROD; endpoints in ORD and DFW. Endpoints in
-                        LON and SYD will be available soon. </para>
-                </important>
-                <para>The following table lists the service access
-                    endpoints for &PROD;.</para>
-                <?rax-fo keep-with-next?>
-                <para>
-                    <table rules="all">
-                        <caption>Regionalized Service
-                            Endpoints</caption>
-                        <col width="11%"/>
-                        <col width="11%"/>
-                        <col width="16%"/>
-                        <col width="16%"/>
-                        <col width="16%"/>
-                        <col width="16%"/>
-                        <col width="16%"/>
-                        <thead>
-                            <tr align="center">
-                                <td colspan="2">Region</td>
-                                <td colspan="5">Endpoint</td>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr align="left">
-                                <td colspan="2">Chicago (ORD)</td>
-                                <td colspan="5"
+        <section xml:id="serviceEndpoints">
+            <title>Service Access Endpoints</title>
+            <para>&PRODNAME; is a regionalized service. The user of
+                the service is therefore responsible for appropriate
+                replication, caching, and overall maintenance of
+                &PRODNAME; data across regional boundaries to other
+                &PROD; servers.</para>
+            <important>
+                <para> For the Early Access period, you can use &PROD;
+                    endpoints in ORD and DFW. Endpoints in LON and SYD
+                    will be available soon. </para>
+            </important>
+            <para>The following table lists the service access
+                endpoints for &PROD;.</para>
+            <?rax-fo keep-with-next?>
+            <para>
+                <table rules="all">
+                    <caption>Regionalized Service Endpoints</caption>
+                    <col width="11%"/>
+                    <col width="11%"/>
+                    <col width="16%"/>
+                    <col width="16%"/>
+                    <col width="16%"/>
+                    <col width="16%"/>
+                    <col width="16%"/>
+                    <thead>
+                        <tr align="center">
+                            <td colspan="2">Region</td>
+                            <td colspan="5">Endpoint</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr align="left">
+                            <td colspan="2">Chicago (ORD)</td>
+                            <td colspan="5"
                                    ><code>https://ord.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                                </td>
-                            </tr>
-                            <tr align="left">
-                                <td colspan="2">Dallas/Ft. Worth
-                                   (DFW)</td>
-                                <td colspan="5"
+                            </td>
+                        </tr>
+                        <tr align="left">
+                            <td colspan="2">Dallas/Ft. Worth
+                                (DFW)</td>
+                            <td colspan="5"
                                    ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                                </td>
-                            </tr>
-                            <tr align="left">
-                                <td colspan="2">London (LON)</td>
-                                <td colspan="5">
-                                   <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                                </td>
-                            </tr>
-                            <tr align="left">
-                                <td colspan="2">Sydney (SYD)</td>
-                                <td colspan="5">
-                                   <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                                </td>
-                            </tr>
-                            <tr align="left">
-                                <td colspan="2">Hong Kong (HKG)</td>
-                                <td colspan="5"
+                            </td>
+                        </tr>
+                        <tr align="left">
+                            <td colspan="2">London (LON)</td>
+                            <td colspan="5">
+                                <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                            </td>
+                        </tr>
+                        <tr align="left">
+                            <td colspan="2">Sydney (SYD)</td>
+                            <td colspan="5">
+                                <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+                            </td>
+                        </tr>
+                        <tr align="left">
+                            <td colspan="2">Hong Kong (HKG)</td>
+                            <td colspan="5"
                                    ><code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </para>
-                <para>Replace the Tenant ID,
-                        <parameter>1234</parameter>, with your actual
-                    Tenant ID.</para>
-                <para>You will find your account number after the
-                    final '/' in the <code>publicURL</code> field
-                    returned by the authentication response. For
-                    example, in <olink targetdoc="autoscale-devguide"
-                        targetptr="auth-response-example-json">Example
-                        2, “Authentication Response for US Endpoint:
-                        JSON”</olink> the <code>publicURL</code> field
-                    for <code>autoscale</code>
-                        ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
-                        role="bold">1100111</emphasis>") shows that
-                    the account number is 1100111. </para>
-            </section>
-            <section xml:id="contractVersion">
-                <title>Contract Versions</title>
-                <para> The &PROD; version defines the contract and
-                    build information for the API. </para>
-                <para>The contract version denotes the data model and
-                    behavior that the API supports. The requested
-                    contract version is included in all request URLs.
-                    Different contract versions of the API might be
-                    available at any given time and are not guaranteed
-                    to be compatible with one another. </para>
-                <example>
-                    <title>Sample Request URL for Contract Version
-                        1.0</title>
-                    <programlisting>https://ord.autoscale.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
-                </example>
-                <note>
-                    <para>This document pertains to contract version
-                        1.0.</para>
-                </note>
-            </section>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </para>
+            <para>Replace the Tenant ID, <parameter>1234</parameter>,
+                with your actual Tenant ID.</para>
+            <para>You will find your account number after the final
+                '/' in the <code>publicURL</code> field returned by
+                the authentication response. For example, in <olink
+                    targetdoc="autoscale-devguide"
+                    targetptr="auth-response-example-json">Example 2,
+                    “Authentication Response for US Endpoint:
+                    JSON”</olink> the <code>publicURL</code> field for
+                    <code>autoscale</code>
+                    ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
+                    role="bold">1100111</emphasis>") shows that the
+                account number is 1100111. </para>
+        </section>
+        <section xml:id="contractVersion">
+            <title>Contract Versions</title>
+            <para> The &PROD; version defines the contract and build
+                information for the API. </para>
+            <para>The contract version denotes the data model and
+                behavior that the API supports. The requested contract
+                version is included in all request URLs. Different
+                contract versions of the API might be available at any
+                given time and are not guaranteed to be compatible
+                with one another. </para>
+            <example>
+                <title>Sample Request URL for Contract Version
+                    1.0</title>
+                <programlisting>https://ord.autoscale.api.rackspacecloud.com/<emphasis role="strong">v1.0</emphasis>/1234</programlisting>
+            </example>
+            <note>
+                <para>This document pertains to contract version
+                    1.0.</para>
+            </note>
+        </section>
     </chapter>
     <chapter xml:id="Core_Concepts">
         <title>Core Concepts</title>
@@ -450,8 +449,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         </section>
         <section
             xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks">
-            <title>Authenticated Webhooks, Anonymous Webhooks, and
-                Capability URLs</title>
+            <title>Webhooks, and Capability URLs</title>
             <para>Auto Scale uses webhooks to initiate scaling events.
                 A webhook is an industry-standard protocol for sending
                 events between systems; for Auto Scale, they are used
@@ -467,7 +465,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 you are using. You can also send them manually via
                 cURL:</para>
             <programlisting>curl -v https://example.com/webhook -X POST -d "payload=payload"</programlisting>
-            <para>Auto Scale also supports anonymous webhooks. In
+            <para>Auto Scale only supports anonymous webhooks. In
                 regular webhooks, the {webhook_version}/{webhook_hash}
                 is specified by URL. In anonymous webhooks, the URL is
                 replaced with a hash that is known only to the issuer—
@@ -494,7 +492,9 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             <para>
                 <note>
                     <para>To execute anonymous webhooks and capability
-                        URLs, no authentication is needed.</para>
+                        URLs, no authentication is needed. You can use
+                        a capability URL to trigger multiple
+                        webhooks.</para>
                 </note>
             </para>
         </section>
@@ -641,7 +641,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <para>You can configure Auto Scale to be triggered
                     through a webhook, based on a predefined alarm or
                     threshold that has been previously set up in a
-                    monitoring service. Monitoring-based configuration
+                    monitoring service. Webhook-based configuration
                     works the following way:</para>
                 <para>
                     <itemizedlist>
@@ -681,7 +681,6 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
     </chapter>
     <chapter xml:id="Autoscale_Components">
         <title>Autoscale Key Configurations</title>
-        
         <section xml:id="Group_Configuration">
             <title>Scaling Group Configuration</title>
             <para>
@@ -1818,6 +1817,14 @@ DELETE /{tenantId}/groups/{groupId}?force=true
                             xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC "
                             >the Auto Scale FAQ page on the Knowledge
                             Center</link>.</para>
+                </listitem>
+                <listitem>
+                    <para>To learn more about the key concepts in Auto
+                        Scale, read the <olink
+                            targetdoc="autoscale-devguide"
+                            targetptr="Glossary">Auto Scale Core
+                            Concepts</olink> in the Auto Scale
+                        Developer's Guide.</para>
                 </listitem>
             </itemizedlist>
         </para>
