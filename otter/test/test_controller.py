@@ -39,7 +39,6 @@ class CannotExecutePolicyErrorTest(TestCase):
             'Cannot execute scaling policy p for group g for tenant t: reason')
 
 
-
 class CalculateDeltaTestCase(TestCase):
     """
     Tests for :func:`otter.controller.calculate_delta`
