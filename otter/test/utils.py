@@ -6,7 +6,6 @@ import mock
 import os
 import treq
 
-from silverberg.lock import BasicLock
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from zope.interface import directlyProvides
@@ -159,13 +158,14 @@ class LockMixin(object):
         :param acquire_result: A value to be returned by acquire.
         :param release_result: A value to be returned by release.
 
-        :return: A mock BasicLock instance.
+        :return: A mock Lock instance.
         """
-        lock = mock.create_autospec(BasicLock)
+        lock = mock.Mock(spec=['acquire', 'release', '_acquire'])
 
         def _acquire(*args, **kwargs):
             return defer.succeed(acquire_result)
         lock.acquire.side_effect = _acquire
+        lock._acquire = lock.acquire
 
         def _release():
             return defer.succeed(release_result)

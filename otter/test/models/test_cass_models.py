@@ -37,7 +37,6 @@ from otter.util.config import set_config_data
 
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
-from silverberg.lock import BusyLockError
 
 
 def _de_identify(json_obj):
@@ -234,9 +233,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.launch_config = _de_identify(group_examples.launch_server_config()[0])
         self.policies = []
         self.mock_log = mock.MagicMock()
+
+        self.kz_lock = mock.Mock()
+        self.lock = self.mock_lock()
+        self.kz_lock.Lock.return_value = self.lock
+
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
-                                      self.connection, itertools.cycle(range(2, 10)))
+                                      self.connection, itertools.cycle(range(2, 10)),
+                                      self.kz_lock)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -255,10 +260,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.mock_next_cron_occurrence = patch(
             self, 'otter.models.cass.next_cron_occurrence', return_value='next_time')
-
-        self.lock = self.mock_lock()
-        self.basic_lock_mock = patch(self, 'otter.models.cass.BasicLock',
-                                     return_value=self.lock)
 
 
 class CassScalingGroupTests(CassScalingGroupTestCase):
@@ -397,24 +398,19 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
-                                                     self.group.uuid, max_retry=5,
-                                                     retry_wait=mock.ANY, log=mock.ANY)
-        args, kwargs = self.basic_lock_mock.call_args_list[0]
-        self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
+        self.kz_lock.Lock.assert_called_once_with('/locks', self.group.uuid)
 
-        self.lock.acquire.assert_called_once_with()
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
     def test_modify_state_lock_not_acquired(self, mock_serial):
         """
-        ``modify_state`` writes the state the modifier returns to the database
+        ``modify_state`` raises error if lock is not acquired and does not
+        do anything else
         """
-        def acquire():
-            return defer.fail(BusyLockError('', ''))
-        self.lock.acquire.side_effect = acquire
+        self.lock.acquire.side_effect = lambda timeout: defer.fail(ValueError('a'))
 
         def modifier(group, state):
             raise
@@ -422,37 +418,15 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
-        result = self.failureResultOf(d)
-        self.assertTrue(result.check(BusyLockError))
+        self.failureResultOf(d, ValueError)
 
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.lock.acquire.assert_called_once_with()
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.assertEqual(self.lock.release.call_count, 0)
-
-    def test_modify_state_lock_with_different_retry(self):
-        """
-        `modify_state` gets lock by retrying with different wait intervals each time
-        """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
-
-        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
-        self.returns = [None, None]
-
-        self.group.modify_state(modifier)
-        args, kwargs = self.basic_lock_mock.call_args_list[-1]
-        first_retry_wait = kwargs['retry_wait']
-        self.assertTrue(3 <= first_retry_wait <= 5)
-
-        self.group.modify_state(modifier)
-        args, kwargs = self.basic_lock_mock.call_args_list[-1]
-        second_retry_wait = kwargs['retry_wait']
-        self.assertTrue(3 <= second_retry_wait <= 5)
-        self.assertNotEqual(first_retry_wait, second_retry_wait)
 
     def test_modify_state_lock_log_category_locking(self):
         """
-        `modify_state` locks with log with category as locking
+        `modify_state` locking logs with category='locking'
         """
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
@@ -465,9 +439,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         log.bind.assert_called_once_with(system='CassScalingGroup.modify_state')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.basic_lock_mock.assert_called_once_with(
-            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=mock.ANY,
-            log=log.bind().bind())
+        self.assertEqual(log.bind().bind().msg.call_count, 2)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -1494,7 +1466,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.lock.acquire.assert_called_once_with()
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -1528,7 +1500,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.lock.acquire.assert_called_once_with()
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -1536,33 +1508,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         If the lock is not acquired, do not delete the group.
         """
-        def acquire():
-            return defer.fail(BusyLockError('', ''))
-        self.lock.acquire.side_effect = acquire
+        self.lock.acquire.side_effect = lambda timeout: defer.fail(ValueError('a'))
 
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False))
 
         d = self.group.delete_group()
-        result = self.failureResultOf(d)
-        self.assertTrue(result.check(BusyLockError))
+        self.failureResultOf(d, ValueError)
 
-        self.assertEqual(self.connection.execute.call_count, 0)
-        self.lock.acquire.assert_called_once_with()
-
-    @mock.patch('otter.models.cass.random.uniform')
-    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_lock_with_random_retry(self, mock_view_state, mock_rand_uniform):
-        """
-        The lock is created with random retry wait
-        """
-        mock_rand_uniform.return_value = 3.56
-
-        self.group.delete_group()
-
-        mock_rand_uniform.assert_called_once_with(3, 5)
-        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks', self.group.uuid,
-                                                     max_retry=5, retry_wait=3.56, log=mock.ANY)
+        self.assertFalse(self.connection.execute.called)
+        self.lock._acquire.assert_called_once_with(timeout=120)
 
     @mock.patch('otter.models.cass.random.uniform')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -1577,9 +1532,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         log.bind.assert_called_once_with(system='CassScalingGroup.delete_group')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.basic_lock_mock.assert_called_once_with(
-            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=3.56,
-            log=log.bind().bind())
+        self.assertEqual(log.bind().bind().msg.call_count, 2)
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):

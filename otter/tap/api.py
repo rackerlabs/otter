@@ -150,6 +150,7 @@ def makeService(config):
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'))
         d = kz_client.start()
         d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
+        d.addCallback(lambda _: setattr(store, 'kz_client', kz_client))
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return s
