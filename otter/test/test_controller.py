@@ -20,7 +20,7 @@ from otter.util.timestamp import MIN
 from otter.test.utils import CheckFailure, iMock, matches, patch, mock_log
 
 
-class CannotExecutePolicyErrorTestCase(TestCase):
+class CannotExecutePolicyErrorTest(TestCase):
     """
     Tests for :class:`otter.controller.CannotExecutePolicyError`
     """

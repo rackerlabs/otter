@@ -19,6 +19,68 @@ from otter.worker.validate_config import (
     InvalidFileContentSize)
 
 
+class InvalidLaunchConfigErrorsTests(TestCase):
+    """
+    Tests fof subclasses of InvalidLaunchConfig
+    """
+    def test_UnknownImage(self):
+        """
+        UnknownImage stores relevant info in the details attribute
+        """
+        e = UnknownImage('image')
+        self.assertEqual(e.details, {'image_ref': 'image'})
+        self.assertEqual(str(e),
+                         'Invalid imageRef "image" in launchConfiguration')
+
+    def test_InactiveImage(self):
+        """
+        InactiveImage stores relevant info in the details attribute
+        """
+        e = InactiveImage('image')
+        self.assertEqual(e.details, {'image_ref': 'image'})
+        self.assertEqual(str(e),
+                         'Inactive imageRef "image" in launchConfiguration')
+
+    def test_UnknownFlavor(self):
+        """
+        UnknownFlavor stores relevant info in the details attribute
+        """
+        e = UnknownFlavor('flavor')
+        self.assertEqual(e.details, {'flavor_ref': 'flavor'})
+        self.assertEqual(str(e),
+                         'Invalid flavorRef "flavor" in launchConfiguration')
+
+    def test_InvalidBase64Encoding(self):
+        """
+        InvalidBase64Encoding stores relevant info in the details attribute
+        """
+        e = InvalidBase64Encoding('path')
+        self.assertEqual(e.details, {'personality_path': 'path'})
+        self.assertEqual(str(e),
+                         'Invalid base64 encoding for contents of path "path"')
+
+    def test_InvalidMaxPersonality(self):
+        """
+        InvalidMaxPersonality stores relevant info in the details attribute
+        """
+        e = InvalidMaxPersonality(8, 9)
+        self.assertEqual(e.details, {'num_personality_files': 9,
+                                     'max_personality_files': 8})
+        self.assertEqual(
+            str(e),
+            'Number of files "9" in personality exceeds maximum limit "8"')
+
+    def test_InvalidFileContentSize(self):
+        """
+        InvalidFileContentSize stores relevant info in the details attribute
+        """
+        e = InvalidFileContentSize('path', 100)
+        self.assertEqual(e.details, {'personality_path': 'path',
+                                     'max_personality_size': 100})
+        self.assertEqual(
+            str(e), 'File "path" content\'s size exceeds maximum size "100"')
+
+
 class ValidateLaunchServerConfigTests(TestCase):
     """
     Tests for `validate_launch_server_config`
