@@ -174,3 +174,46 @@ class DeferredPool(object):
         self._waiting.append(d)
         self._if_empty_notify()
         return d
+
+
+def log_with_time(result, reactor, log, start, msg, time_kwarg=None):
+    """
+    Log `msg` with time taken
+
+    :param result: result of deferred callback
+    :param reactor: `IReactorTime` provider
+    :param log: A bound logger
+    :param start: start seconds
+    :param msg: Message to display with time taken
+    :param time_kwarg: kwarg used to call msg with time taken
+    """
+    time_taken = reactor.seconds() - start
+    msg = '{msg} in {t} seconds'.format(msg=msg, t=time_taken)
+    if time_kwarg:
+        log.msg(msg, **{time_kwarg: time_taken})
+    else:
+        log.msg(msg)
+    return result
+
+
+def with_lock(reactor, lock, log, func, *args, **kwargs):
+    """
+    Context manager for any lock object that contains acquire() and release() methods
+    """
+
+    d = defer.maybeDeferred(lock.acquire)
+    d.addCallback(log_with_time, reactor, log, reactor.seconds(),
+                  'Lock acquisition', 'acqure_time')
+
+    def release_lock(result):
+        d = defer.maybeDeferred(lock.release)
+        d.addCallback(
+            log_with_time, reactor, log, reactor.seconds(), 'Lock release', 'release_time')
+        return d.addCallback(lambda _: result)
+
+    def lock_acquired(_):
+        d = defer.maybeDeferred(func, *args, **kwargs).addBoth(release_lock)
+        return d
+
+    d.addCallback(lock_acquired)
+    return d
