@@ -52,7 +52,7 @@ format="SVG" scale="60"/>
     xmlns:raxm="http://docs.rackspace.com/api/metadata"
     xlink:href="http:// docs.autoscale.apiary.io/ ">
     <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
-    <title>&PRODNAME; Getting Started Guide</title>
+    <title>&PRODNAME;API Getting Started Guide</title>
     <titleabbrev>&PRODABBV; Intro</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
 status.bar.text="Early Access"
@@ -471,14 +471,27 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 replaced with a hash that is known only to the issuer—
                 because no authentication is needed, the webhook is
                 considered "anonymous."</para>
-            <para>Auto Scale can also use capability URLs. Capability
-                URLs are URLs that give authorization for a certain
-                action or event. If you know the URL, you have access
-                to it and you can use the URL to trigger a specific
-                event. For Auto Scale, capability URLs assume the same
-                role as anonymous webhooks. Both capability URLs and
-                anonymous webhooks are usually long, and random, and
-                cannot be guessed by a user.</para>
+            <para>Auto Scale uses Capability URLs in conjunction with
+                webhooks. Capability URLs are URLs that give
+                authorization for a certain action or event. If you
+                know the URL, you have access to it and you can use
+                the URL to trigger a specific event. Capability URLs
+                are usually long, and random, and cannot be guessed by
+                a user.</para>
+            <para>When a webhook is created, Auto Scale creates values
+                for the <parameter>capabilityVersion</parameter> and
+                    <parameter>capabilityHash</parameter> parameters.
+                These values are created per webhook, not per policy.
+                When you create a webhook, you associate it with a
+                policy. The response to the webhook creation request
+                includes a single capability URL that is also, by
+                inheritance, associated with the policy. </para>
+            <para>The Auto Scale webhook architecture allows Auto
+                Scale to be integrated with other systems, for
+                example, monitoring systems. So, now you have this URL
+                that will execute a specific policy and you can fire
+                off that URL based on events happening outside of Auto
+                Scale.</para>
             <para>To execute a capability URL, locate the URL in your
                 webhook, and then submit a POST request against it, as
                 shown in the following example:</para>
