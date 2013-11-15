@@ -140,73 +140,101 @@ class GroupState(object):
                 'desired_capacity': len(self.active) + len(self.pending)}
 
 
-class UnrecognizedCapabilityError(Exception):
+class DetailedException(Exception):
+    """
+    A superclass for Otter errors that takes a format string, puts relevant
+    in a dictionary, and uses the format string formatted with the info
+    to Exception as a msg.
+
+    This way the relevant information is kept as structured data and is
+    accessible in a common way, rather than as random attributes on the
+    Exception.
+
+    Note that this expects all the information to be passed as keyword
+    arguments.
+
+    :ivar dict details: All the keyword arguments passed in the constructor
+        to this exception
+    """
+    def __init__(self, format_str, **kwargs):
+        super(DetailedException, self).__init__(format_str.format(**kwargs))
+        self.details = kwargs
+
+
+class UnrecognizedCapabilityError(DetailedException):
     """
     Error to be raised when a capability hash is not recognized, or does not
     exist, or has been deleted.
     """
     def __init__(self, capability_hash, capability_version):
         super(UnrecognizedCapabilityError, self).__init__(
-            "Unrecognized (version {version}) capability hash {hash}".format(
-                hash=capability_hash, version=capability_version))
+            ("Unrecognized (version {capability_version}) "
+             "capability hash {capability_hash}"),
+            capability_hash=capability_hash,
+            capability_version=capability_version)
 
 
-class NoSuchScalingGroupError(Exception):
+class NoSuchScalingGroupError(DetailedException):
     """
     Error to be raised when attempting operations on a scaling group that
     does not exist.
     """
     def __init__(self, tenant_id, group_id):
         super(NoSuchScalingGroupError, self).__init__(
-            "No such scaling group {g} for tenant {t}".format(
-                t=tenant_id, g=group_id))
+            "No such scaling group {scaling_group_id} for tenant {tenant_id}",
+            tenant_id=tenant_id, scaling_group_id=group_id)
 
 
-class NoSuchPolicyError(Exception):
+class NoSuchPolicyError(DetailedException):
     """
     Error to be raised when attempting operations on an policy that does not
     exist.
     """
     def __init__(self, tenant_id, group_id, policy_id):
         super(NoSuchPolicyError, self).__init__(
-            "No such scaling policy {p} for group {g} for tenant {t}"
-            .format(t=tenant_id, g=group_id, p=policy_id))
+            ("No such scaling policy {policy_id} for group "
+             "{scaling_group_id} for tenant {tenant_id}"),
+            tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id)
 
 
-class NoSuchWebhookError(Exception):
+class NoSuchWebhookError(DetailedException):
     """
     Error to be raised when attempting operations on an webhook that does not
     exist.
     """
     def __init__(self, tenant_id, group_id, policy_id, webhook_id):
         super(NoSuchWebhookError, self).__init__(
-            "No such webhook {w} for policy {p} in group {g} for tenant {t}"
-            .format(t=tenant_id, g=group_id, p=policy_id, w=webhook_id))
+            ("No such webhook {webhook_id} for policy {policy_id} "
+             "in group {scaling_group_id} for tenant {tenant_id}"),
+            tenant_id=tenant_id, scaling_group_id=group_id,
+            policy_id=policy_id, webhook_id=webhook_id)
 
 
-class GroupNotEmptyError(Exception):
+class GroupNotEmptyError(DetailedException):
     """
     Error to be raised when attempting to delete group that still has entities
     in it
     """
     def __init__(self, tenant_id, group_id):
         super(GroupNotEmptyError, self).__init__(
-            "Group {g} for tenant {t} still has entities."
-            .format(t=tenant_id, g=group_id))
+            ("Group {scaling_group_id} for tenant {tenant_id} still has "
+             "entities, so cannot be deleted."),
+            tenant_id=tenant_id, scaling_group_id=group_id)
 
 
-class ScalingGroupOverLimitError(Exception):
+class ScalingGroupOverLimitError(DetailedException):
     """
     Error to be raised when client requests new scaling group but
     is already at MaxGroups
     """
     def __init__(self, tenant_id, max_groups):
         super(ScalingGroupOverLimitError, self).__init__(
-            "Allowed limit of {n} scaling groups reached by tenant {t}"
-            .format(t=tenant_id, n=max_groups))
+            ("Allowed limit of {max_groups} scaling groups reached by tenant "
+             "{tenant_id}"),
+            tenant_id=tenant_id, max_groups=max_groups)
 
 
-class WebhooksOverLimitError(Exception):
+class WebhooksOverLimitError(DetailedException):
     """
     Error to be raised when client requests some number of new webhooks that
     would put them over maxWebhooksPerPolicy
@@ -214,11 +242,13 @@ class WebhooksOverLimitError(Exception):
     def __init__(self, tenant_id, group_id, policy_id, max_webhooks,
                  curr_webhooks, new_webhooks):
         super(WebhooksOverLimitError, self).__init__(
-            ("Currently there are {c} webhooks for tenant {t}, scaling group "
-             "{g}, policy {p}.  Creating {n} new webhooks would exceed the "
-             "webhook limit of {m} per policy.")
-            .format(t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
-                    c=curr_webhooks, n=new_webhooks))
+            ("Currently there are {current_webhooks} webhooks for tenant "
+             "{tenant_id}, scaling group {scaling_group_id}, policy "
+             "{policy_id}.  Creating {new_webhooks} new webhooks would exceed "
+             "the webhook limit of {max_webhooks} per policy."),
+            tenant_id=tenant_id, scaling_group_id=group_id, policy_id=policy_id,
+            max_webhooks=max_webhooks, current_webhooks=curr_webhooks,
+            new_webhooks=new_webhooks)
 
 
 class IScalingGroup(Interface):
