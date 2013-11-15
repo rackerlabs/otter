@@ -146,56 +146,56 @@
 		     name="port"
 		     required="true"
 		     type="integer"
-		     path="$.launchConfiguration.type.item.args.loadBalancers.[*].port">
+		     path="$.launchConfiguration.args.loadBalancers.[*].port">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">The port number of the service (on the new servers) to load balance on for this particular load balancer.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="loadBalancerId"
 		     required="true"
 		     type="integer"
-		     path="$.launchConfiguration.type.item.args.loadBalancers.[*].loadBalancerId">
+		     path="$.launchConfiguration.args.loadBalancers.[*].loadBalancerId">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">The ID of the load balancer to which new servers will be added.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="server"
 		     required="true"
 		     type="object"
-		     path="$.launchConfiguration.type.item.args.server">
+		     path="$.launchConfiguration.args.server">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">Attributes to provide to nova create server: http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html.Whatever attributes are passed here will apply to all new servers (including the name attribute).</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="flavorRef"
 		     required="true"
 		     type="string"
-		     path="$.launchConfiguration.type.item.args.server.flavorRef">
+		     path="$.launchConfiguration.args.server.flavorRef">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="imageRef"
 		     required="true"
 		     type="string"
-		     path="$.launchConfiguration.type.item.args.server.imageRef">
+		     path="$.launchConfiguration.args.server.imageRef">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="personality"
 		     required="false"
 		     type="array"
-		     path="$.launchConfiguration.type.item.args.server.personality">
+		     path="$.launchConfiguration.args.server.personality">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="path"
 		     required="true"
 		     type="string"
-		     path="$.launchConfiguration.type.item.args.server.personality.[*].path">
+		     path="$.launchConfiguration.args.server.personality.[*].path">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="contents"
 		     required="true"
 		     type="string"
-		     path="$.launchConfiguration.type.item.args.server.personality.[*].contents">
+		     path="$.launchConfiguration.args.server.personality.[*].contents">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
 	      <param style="plain"
