@@ -29,21 +29,23 @@ import json
 from twisted.internet import defer
 
 from otter.log import audit
-from otter.models.interface import NoSuchScalingGroupError
+from otter.models.interface import NoSuchScalingGroupError, DetailedException
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
 
 
-class CannotExecutePolicyError(Exception):
+class CannotExecutePolicyError(DetailedException):
     """
     Exception to be raised when the policy cannot be executed
     """
-    def __init__(self, tenant_id, group_id, policy_id, why):
+    def __init__(self, tenant_id, group_id, policy_id, why, **kwargs):
         super(CannotExecutePolicyError, self).__init__(
-            "Cannot execute scaling policy {p} for group {g} for tenant {t}: {w}"
-            .format(t=tenant_id, g=group_id, p=policy_id, w=why))
+            ("Cannot execute scaling policy {policy_id} for group "
+             "{scaling_group_id} for tenant {tenant_id}: " + why),
+            tenant_id=tenant_id, scaling_group_id=group_id,
+            policy_id=policy_id, **kwargs)
 
 
 def pause_scaling_group(log, transaction_id, scaling_group):
