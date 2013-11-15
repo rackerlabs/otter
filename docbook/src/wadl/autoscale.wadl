@@ -127,69 +127,7 @@
         </wadl:doc>
         <request>
             <representation mediaType="application/json">
-	      <param style="plain"
-		     name="name"
-		     required="true"
-		     type="string"
-		     path="$.scalingPolicies.[*].name">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">A name for this scaling policy. This name does have to be unique for all scaling policies.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="args"
-		     required="false"
-		     type="object"
-		     path="$.scalingPolicies.[*].args">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cron"
-		     required="false"
-		     type="string"
-		     path="$.scalingPolicies.[*].args.cron">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">The recurrence pattern as a cron entry. This describes at what timesin the future will the scaling policy get executed. For example, if this is'1 0 * * *' then the policy will get executed at one minute past midnight(00:01) of every day of the month, of every day of the week.Kindly check http://en.wikipedia.org/wiki/Cron</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="at"
-		     required="false"
-		     type="string"
-		     path="$.scalingPolicies.[*].args.at">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">The time at which this policy will be executed. This property is mutuallyexclusive w.r.t 'cron'. Either 'cron' or 'at' can be given. Not both.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="changePercent"
-		     required="false"
-		     type="number"
-		     path="$.scalingPolicies.[*].changePercent">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">A non-zero percent change to make in the number of servers in the scaling group.  If positive, the number of servers will increase by the given percentage.  If negative, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer away than zero. This means that if -X% of the current number of servers turns out to be -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. And if X% of current number of servers turn out to be 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="cooldown"
-		     required="true"
-		     type="number"
-		     path="$.scalingPolicies.[*].cooldown">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">Cooldown period (given in seconds) before this particular scaling policy can be executed again.  This cooldown period does not affect the global scaling group cooldown.  Min is 0 seconds, max is 86400 seconds (24 hrs * 60 min * 60 sec). A value between 0 and 86400. </wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="type"
-		     required="true"
-		     type="enum"
-		     path="$.scalingPolicies.[*].type">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. Valid values: webhook, schedule.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="change"
-		     required="false"
-		     type="integer"
-		     path="$.scalingPolicies.[*].change">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">A non-zero integer change to make in the number of servers in the scaling group.  If positive, the number of servers will increase.  If negative, the number of servers will decrease.</wadl:doc>
-	      </param>
-	      <param style="plain"
-		     name="desiredCapacity"
-		     required="false"
-		     type="integer"
-		     path="$.scalingPolicies.[*].desiredCapacity">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">The desired capacity of the group - i.e. how many servers there should be (an absolute number, rather than a delta from the current number of servers). For example, if this is 10 and then executing policy with this will bring the number of servers to 10. The minimum allowed value is 0. </wadl:doc>
-	      </param>
+
 	      <param style="plain"
 		     name="launchConfiguration"
 		     required="true"
@@ -316,6 +254,84 @@
 		     path="$.groupConfiguration.metadata">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
 	      </param>
+	      <param style="plain"
+		     name="scalingPolicies"
+		     required="true"
+		     type="array"
+		     path="$.scalingPolicies">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">WRITEME</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="array"
+		     required="true"
+		     type="array"
+		     path="$.scalingPolicies.[*]">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">WRITEME</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="name"
+		     required="true"
+		     type="string"
+		     path="$.scalingPolicies.[*].name">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">A name for this scaling policy. This name does have to be unique for all scaling policies.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="args"
+		     required="false"
+		     type="object"
+		     path="$.scalingPolicies.[*].args">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. </wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="cron"
+		     required="false"
+		     type="string"
+		     path="$.scalingPolicies.[*].args.cron">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">The recurrence pattern as a cron entry. This describes at what timesin the future will the scaling policy get executed. For example, if this is'1 0 * * *' then the policy will get executed at one minute past midnight(00:01) of every day of the month, of every day of the week.Kindly check http://en.wikipedia.org/wiki/Cron</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="at"
+		     required="false"
+		     type="string"
+		     path="$.scalingPolicies.[*].args.at">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">The time at which this policy will be executed. This property is mutuallyexclusive w.r.t 'cron'. Either 'cron' or 'at' can be given. Not both.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="changePercent"
+		     required="false"
+		     type="number"
+		     path="$.scalingPolicies.[*].changePercent">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">A non-zero percent change to make in the number of servers in the scaling group.  If positive, the number of servers will increase by the given percentage.  If negative, the number of servers will decrease by the given percentage. The absolute change in the number of servers will be rounded to the nearest integer away than zero. This means that if -X% of the current number of servers turns out to be -0.5 or -0.25 or -0.75 servers, the actual number of servers that will be shut down is 1. And if X% of current number of servers turn out to be 1.2 or 1.5 or 1.7 servers, the actual number of servers that will be launched is 2</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="cooldown"
+		     required="true"
+		     type="number"
+		     path="$.scalingPolicies.[*].cooldown">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">Cooldown period (given in seconds) before this particular scaling policy can be executed again.  This cooldown period does not affect the global scaling group cooldown.  Min is 0 seconds, max is 86400 seconds (24 hrs * 60 min * 60 sec). A value between 0 and 86400. </wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="type"
+		     required="true"
+		     type="enum"
+		     path="$.scalingPolicies.[*].type">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">DESCRIBEME. Valid values: webhook, schedule.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="change"
+		     required="false"
+		     type="integer"
+		     path="$.scalingPolicies.[*].change">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">A non-zero integer change to make in the number of servers in the scaling group.  If positive, the number of servers will increase.  If negative, the number of servers will decrease.</wadl:doc>
+	      </param>
+	      <param style="plain"
+		     name="desiredCapacity"
+		     required="false"
+		     type="integer"
+		     path="$.scalingPolicies.[*].desiredCapacity">
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">The desired capacity of the group - i.e. how many servers there should be (an absolute number, rather than a delta from the current number of servers). For example, if this is 10 and then executing policy with this will bring the number of servers to 10. The minimum allowed value is 0. </wadl:doc>
+	      </param>
+
                 <wadl:doc xml:lang="en">
                     <xsdxt:code href="../docbkx/samples/reqCreateGroup.json"/>
                 </wadl:doc>
