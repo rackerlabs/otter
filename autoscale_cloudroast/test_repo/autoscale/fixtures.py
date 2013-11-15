@@ -328,6 +328,35 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
+    def wait_for_expected_group_state_on_scaledown(self, group_id, servers_after_scaledown,
+                                                   servers_before_scaledown):
+        """
+        :summary: verify the group state went from server count of servers_before_scaledown to
+                  servers_after_scaledown.
+        :param group_id: Group id
+        :param servers_after_scaledown: Number of servers expected before a scale down
+        :param servers_after_scaledown: Number of servers expected after a scale down
+        :param interval_time: Time to wait during polling group state
+        :param timeout: Time to wait before exiting this function
+        """
+        group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
+        if group_state.desiredCapacity == servers_before_scaledown:
+            end_time = time.time() + 120
+            while time.time() < end_time:
+                group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
+                if group_state.desiredCapacity == servers_after_scaledown:
+                    return
+                time.sleep(self.interval_time)
+            else:
+                self.fail(
+                    "wait_for_active_list_in_group_state ran for 120 seconds for group {1} and did not "
+                    "observe the active server list achieving the expected servers count: {2}.".format(
+                        group_id, servers_after_scaledown))
+        elif group_state.desiredCapacity == servers_after_scaledown:
+            return
+        else:
+            self.fail("The group state is not as expected even before scale down")
+
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
             desired_capacity=None, server_name=None):
