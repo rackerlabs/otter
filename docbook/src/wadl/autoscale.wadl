@@ -787,7 +787,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
 	      <param style="plain"
 		     name="array"
 		     required="true"
-		     type="string"
+		     type="array"
 		     path="$.[*]">
 		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies an array of scaling policies.</wadl:doc>
 	      </param>
@@ -844,14 +844,14 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
                     name="change"
                     required="false"
                     type="integer"
-                    path="$.scalingPolicies.[*].change">
+                    path="$.[*].change">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the change to make in the number of servers in the scaling group. This parameter must be an integer. If the value is a positive integer, the number of servers will increase. If the value is a negative integer, the number of servers will decrease.</wadl:doc>
                 </param>
                 <param style="plain"
                     name="desiredCapacity"
                     required="false"
                     type="integer"
-                    path="$.scalingPolicies.[*].desiredCapacity">
+                    path="$.[*].desiredCapacity">
                     <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the desired server capacity of the scaling the group, i.e. how many servers there should be in the scaling group. This value must be an absolute number. For example, if this parameter is set to 10, executing this policy will bring the number of servers to 10. The minimum allowed value of this parameter is 0. </wadl:doc>
                 </param>
 
@@ -913,7 +913,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
                     required="true"
                     type="string"
                     path="$.scalingPolicies.[*].name">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the scaling policy. This name dmust be unique for each scaling policy.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies a name for the scaling policy. This name must be unique for each scaling policy.</wadl:doc>
                 </param>
                 <param style="plain"
                     name="args"
