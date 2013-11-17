@@ -203,7 +203,7 @@ def with_lock(reactor, lock, log, func, *args, **kwargs):
 
     d = defer.maybeDeferred(lock.acquire)
     d.addCallback(log_with_time, reactor, log, reactor.seconds(),
-                  'Lock acquisition', 'acqure_time')
+                  'Lock acquisition', 'acquire_time')
 
     def release_lock(result):
         d = defer.maybeDeferred(lock.release)
@@ -216,4 +216,6 @@ def with_lock(reactor, lock, log, func, *args, **kwargs):
         return d
 
     d.addCallback(lock_acquired)
+    d.addErrback(log_with_time, reactor, log, reactor.seconds(),
+                 'Lock acquisition failed')
     return d
