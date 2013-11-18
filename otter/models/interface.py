@@ -197,6 +197,21 @@ class ScalingGroupOverLimitError(Exception):
             .format(t=tenant_id, n=max_groups))
 
 
+class WebhooksOverLimitError(Exception):
+    """
+    Error to be raised when client requests some number of new webhooks that
+    would put them over maxWebhooksPerPolicy
+    """
+    def __init__(self, tenant_id, group_id, policy_id, max_webhooks,
+                 curr_webhooks, new_webhooks):
+        super(WebhooksOverLimitError, self).__init__(
+            ("Currently there are {c} webhooks for tenant {t}, scaling group "
+             "{g}, policy {p}.  Creating {n} new webhooks would exceed the "
+             "webhook limit of {m} per policy.")
+            .format(t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
+                    c=curr_webhooks, n=new_webhooks))
+
+
 class IScalingGroup(Interface):
     """
     Scaling group record
@@ -437,6 +452,8 @@ class IScalingGroup(Interface):
             ``list``
 
         :raises: :class:`NoSuchPolicyError` if the policy id does not exist
+        :raises: :class:`WebhooksOverLimitError` if creating all the specified
+            webhooks would put the user over their limit of webhooks per policy
         """
 
     def get_webhook(policy_id, webhook_id):

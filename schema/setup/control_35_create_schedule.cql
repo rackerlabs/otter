@@ -1,10 +1,6 @@
 USE @@KEYSPACE@@;
 
--- Desired underlying structure is for the row key to be
--- the account ID and the column key to be the group ID
--- plus the policy ID.
---
--- This is used as a trigger for the next
+-- Stores events to be scheduled in future
 --
 -- In CQL3, the primary key is split such that the first part
 -- ends up in the row key, the rest of the key ends up
@@ -24,6 +20,23 @@ CREATE TABLE scaling_schedule (
     trigger timestamp,
     cron ascii,
     PRIMARY KEY("policyId", "trigger")
+) WITH compaction = {
+    'class' : 'SizeTieredCompactionStrategy',
+    'min_threshold' : '2'
+} AND gc_grace_seconds = 3600;
+
+
+-- New table to store scheduled events.
+
+CREATE TABLE scaling_schedule_v2 (
+    bucket int,
+    "tenantId" ascii,
+    "groupId" ascii,
+    "policyId" ascii,
+    trigger timestamp,
+    cron ascii,
+    version timeuuid,
+    PRIMARY KEY(bucket, trigger, "policyId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',
     'min_threshold' : '2'
