@@ -29,16 +29,3 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         body = self.assert_status_code(200)
         result = json.loads(body)
         self.assertEqual(result, data)
-
-    def test_history_xml(self):
-        """
-        the history api endpoint can return xml when requested
-        """
-        headers = {"Accept": ["application/xml"]}
-
-        result = self.successResultOf(
-            request(self.root, "GET", self.endpoint, headers=headers))
-
-        self.assertEqual(result.response.headers.getRawHeaders('Content-Type'),
-                         ['application/xml'])
-        self.assertEqual(result.response.code, 200)

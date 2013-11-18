@@ -4,7 +4,6 @@ rest endpoints that return the audit log
 /v1.0/tenant_id/history
 """
 import json
-from lxml import etree
 
 from otter.log import log
 from otter.rest.otterapp import OtterApp
@@ -34,13 +33,4 @@ class OtterHistory(object):
         returns a list of logged autoscale events
         """
         data = {}
-        accept = request.getHeader("accept")
-
-        if accept and 'xml' in accept:
-            url = "http://docs.openstack.org/common/api/v1.0"
-
-            xml = etree.Element("history", xmlns=url)
-
-            request.setHeader("Content-Type", "application/xml")
-            return etree.tostring(xml, encoding="UTF-8", xml_declaration=True)
         return json.dumps(data)
