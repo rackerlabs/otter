@@ -121,7 +121,90 @@ def PEP3101FormattingWrapper(observer):
     return PEP3101FormattingObserver
 
 
-IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure", "why"])
+IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure",
+                     "why", "audit_log"])
+
+AUDIT_LOG_FIELDS = {
+    "audit_log": bool,
+    "_message": basestring,
+    "request_ip": basestring,
+    "user_id": basestring,
+    "tenant_id": basestring,
+    "scaling_group_id": basestring,
+    "policy_id": basestring,
+    "webhook_id": basestring,
+    "data": dict,
+    "trasaction_id": basestring,
+    "event_type": basestring,
+    "is_error": bool,
+    "desired_capacity": int,
+    "pending_capacity": int,
+    "current_capacity": int,
+    "previous_desired_capacity": int,
+    "fault": dict,
+    "parent_id": basestring,
+    "as_user_id": basestring,
+    "convergence_delta": int,
+    "server_id": basestring,
+}
+
+def audit_log_formatter(eventDict, timestamp):
+    audit_log_params = {
+        "version": "1.0",
+        "timestamp": timestamp,
+        "level": eventDict.get("level", 6),
+        "is_error": False
+    }
+
+    for key, value in eventDict.iteritems():
+        if key in AUDIT_LOG_FIELDS and isinstance(value, AUDIT_LOG_FIELDS[key]):
+                audit_log_params[key] = value
+
+    if "_message" not in audit_log_params:
+        audit_log_params["_message"] = " ".join([
+            str(m) for m in eventDict["message"]])
+
+    if eventDict.get("isError", False):
+        audit_log_params['level'] = 3
+        audit_log_params["is_error"] = True
+
+        # create the fault dictionary, if it doesn't exist, without clobbering
+        # any existing details
+        fault = {'details': {}}
+        fault.update(audit_log_params.get('fault', {}))
+        audit_log_params['fault'] = fault
+
+        if 'failure' in eventDict:
+            # Do not clobber any details already in there
+            fault['details'].update(getattr(eventDict['failure'].value,
+                                            'details', {}))
+
+            if 'message' not in fault:
+                fault['message'] = eventDict['failure'].value.__name__
+
+        audit_log_params["_message"] = 'Failed: {0}.'.format(
+            audit_log_params["_message"])
+
+        if 'why' in eventDict and eventDict['why']:
+            audit_log_params["_message"] = '{0} {1}'.format(
+                audit_log_params["_message"], eventDict['why'])
+
+            if 'message' not in fault:
+                fault['message'] = eventDict['why']
+
+        # strip out any repeated info in the details dict
+        delete = []
+        for key, value in fault['details'].iteritems():
+            if key in AUDIT_LOG_FIELDS:
+                if (key not in audit_log_params and
+                    isinstance(value, AUDIT_LOG_FIELDS[key])):
+                    audit_log_params[key] = value
+                delete.append(key)
+
+        for key in delete:
+            del fault['details'][key]
+
+    return audit_log_params
 
 
 def ObserverWrapper(observer, hostname, seconds=None):
