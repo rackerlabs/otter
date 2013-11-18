@@ -149,6 +149,15 @@ AUDIT_LOG_FIELDS = {
 }
 
 def audit_log_formatter(eventDict, timestamp):
+    """
+    Format an eventDict into another dictionary that conforms to the audit log
+    format.
+
+    :param dict eventDict: an eventDict as would be passed into an observer
+    :param timestamp: a timestamp to use in the timestamp field
+
+    :returns: an audit-log formatted dictionary
+    """
     audit_log_params = {
         "version": "1.0",
         "timestamp": timestamp,
@@ -265,6 +274,11 @@ def ObserverWrapper(observer, hostname, seconds=None):
         for key, value in eventDict.iteritems():
             if key not in IGNORE_FIELDS:
                 log_params["%s" % (key, )] = value
+
+        # emit an audit log entry also, if it's an audit log
+        if 'audit_log' in eventDict:
+            log_params['audit_log_event_source'] = True
+            observer(audit_log_formatter(eventDict, log_params['timestamp']))
 
         observer(log_params)
 

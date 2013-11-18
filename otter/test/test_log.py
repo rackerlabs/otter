@@ -415,6 +415,20 @@ class ObserverWrapperTests(TestCase):
         self.observer.assert_called_once_with(
             matches(ContainsDict({'line': Equals(10)})))
 
+    def test_generates_new_audit_log(self):
+        """
+        The observer generates two logs for an audit-loggable eventDict -
+        the audit log dictionary and a regular log
+        """
+        self.wrapper({'message': 'meh', 'audit_log': True})
+        self.observer.has_calls([
+            mock.call(matches(ContainsDict({'_message': Equals('meh'),
+                                            'audit_log': Equals(True)}))),
+            mock.call(matches(ContainsDict({
+                'short_message': Equals('meh'),
+                'audit_log_event_source': Equals(True)})))
+        ])
+
 
 class AuditLogFormatterTests(TestCase):
     """
