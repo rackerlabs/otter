@@ -148,6 +148,7 @@ AUDIT_LOG_FIELDS = {
     "server_id": basestring,
 }
 
+
 def audit_log_formatter(eventDict, timestamp):
     """
     Format an eventDict into another dictionary that conforms to the audit log
@@ -206,7 +207,7 @@ def audit_log_formatter(eventDict, timestamp):
         for key, value in fault['details'].iteritems():
             if key in AUDIT_LOG_FIELDS:
                 if (key not in audit_log_params and
-                    isinstance(value, AUDIT_LOG_FIELDS[key])):
+                        isinstance(value, AUDIT_LOG_FIELDS[key])):
                     audit_log_params[key] = value
                 delete.append(key)
 
