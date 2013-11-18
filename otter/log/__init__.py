@@ -8,6 +8,7 @@ from twisted.python.log import msg, err
 
 log = BoundLog(msg, err).bind(system='otter')
 
+
 def audit(log):
     """
     Single method to ensure that the log object is an audit log (by binding
@@ -21,5 +22,3 @@ def audit(log):
 
 
 __all__ = ['observer_factory', 'observer_factory_debug', 'log']
-
-
