@@ -13,7 +13,8 @@
         "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
     },
     "zookeeper": {
-        "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183"
+        "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
+        "threads": 100
     },
     "scheduler": {
         "interval": 10,

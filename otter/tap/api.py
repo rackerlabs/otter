@@ -147,7 +147,9 @@ def makeService(config):
 
     # Setup Kazoo client
     if config_value('zookeeper'):
-        kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'))
+        threads = config_value('zookeeper.threads') or 10
+        kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
+                                  threads=threads)
         d = kz_client.start()
         d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
         d.addCallback(lambda _: setattr(store, 'kz_client', kz_client))

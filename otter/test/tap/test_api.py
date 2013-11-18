@@ -238,14 +238,14 @@ class APIMakeServiceTests(TestCase):
         TxKazooClient is started and calls `setup_scheduler`
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         kz_client = mock.Mock(spec=['start'])
         kz_client.start.return_value = defer.succeed(None)
         mock_txkz.return_value = kz_client
 
         parent = makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
         mock_setup_scheduler.assert_called_once_with(
             parent, self.CassScalingGroupCollection.return_value, kz_client)
@@ -258,14 +258,14 @@ class APIMakeServiceTests(TestCase):
         Error is logged
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         kz_client = mock.Mock(spec=['start'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
         makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
