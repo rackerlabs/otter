@@ -466,8 +466,7 @@ class AuditLogFormatterTests(TestCase):
 
     def test_error_formats_why_message(self):
         """
-        The why message is formatted into the fault dict and _message if it's
-        an error.
+        The why message is formatted into the _message if it's an error.
         """
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
@@ -478,7 +477,23 @@ class AuditLogFormatterTests(TestCase):
                 'timestamp': 0,
                 'level': 3,
                 'is_error': True,
-                'fault': {'details': {}, 'message': 'is the sky blue'}
+                'fault': {'details': {}}
+            })
+
+    def test_error_formats_Exception_message(self):
+        """
+        The error message is formatted into the fault dict if it's an error.
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'failure': Failure(ValueError('boo'))}, 0),
+            {
+                'version': '1.0',
+                '_message': 'Failed: meh.',
+                'timestamp': 0,
+                'level': 3,
+                'is_error': True,
+                'fault': {'details': {}, 'message': 'boo'}
             })
 
     def test_error_keeps_fault_dictionary(self):

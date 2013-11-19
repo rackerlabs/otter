@@ -190,7 +190,7 @@ def audit_log_formatter(eventDict, timestamp):
                                             'details', {}))
 
             if 'message' not in fault:
-                fault['message'] = eventDict['failure'].value.__name__
+                fault['message'] = eventDict['failure'].value.message
 
         audit_log_params["_message"] = 'Failed: {0}.'.format(
             audit_log_params["_message"])
@@ -198,9 +198,6 @@ def audit_log_formatter(eventDict, timestamp):
         if 'why' in eventDict and eventDict['why']:
             audit_log_params["_message"] = '{0} {1}'.format(
                 audit_log_params["_message"], eventDict['why'])
-
-            if 'message' not in fault:
-                fault['message'] = eventDict['why']
 
         # strip out any repeated info in the details dict
         delete = []
