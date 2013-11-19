@@ -15,6 +15,8 @@ from twisted.application.service import MultiService
 
 from twisted.web.server import Site
 
+from txkazoo import TxKazooClient
+
 from otter.rest.admin import OtterAdmin
 from otter.rest.application import Otter
 from otter.rest.bobby import set_bobby
@@ -143,11 +145,29 @@ def makeService(config):
     admin_service = service(str(config_value('admin')), admin_site)
     admin_service.setServiceParent(s)
 
-    # Setup scheduler service
-    if config_value('scheduler') and not config_value('mock'):
-        scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
-                                             int(config_value('scheduler.interval')),
-                                             cassandra_cluster, store)
-        scheduler_service.setServiceParent(s)
+    # Setup Kazoo client
+    if config_value('zookeeper'):
+        kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'))
+        d = kz_client.start()
+        d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
+        d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return s
+
+
+def setup_scheduler(parent, store, kz_client):
+    """
+    Setup scheduler service
+    """
+    # Setup scheduler service
+    if not config_value('scheduler') or config_value('mock'):
+        return
+    buckets = range(1, int(config_value('scheduler.buckets')) + 1)
+    store.set_scheduler_buckets(buckets)
+    partition_path = config_value('scheduler.partition.path') or '/scheduler_partition'
+    time_boundary = config_value('scheduler.partition.time_boundary') or 15
+    scheduler_service = SchedulerService(int(config_value('scheduler.batchsize')),
+                                         int(config_value('scheduler.interval')),
+                                         store, kz_client, partition_path, time_boundary,
+                                         buckets)
+    scheduler_service.setServiceParent(parent)

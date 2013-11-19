@@ -383,12 +383,15 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def get_policy(policy_id):
+    def get_policy(policy_id, version=None):
         """
         Gets the specified policy on this particular scaling group.
 
         :param policy_id: the uuid of the policy
         :type policy_id: ``str``
+
+        :param version: version of policy to check as Type-1 UUID
+        :type version: ``UUID``
 
         :return: a policy, as specified by
             :data:`otter.json_schema.group_schemas.policy`
@@ -525,9 +528,12 @@ class IScalingScheduleCollection(Interface):
     A list of scaling events in the future
     """
 
-    def fetch_batch_of_events(now, size=100):
+    def fetch_and_delete(bucket, now, size=100):
         """
-        Fetch a batch of scheduled events.
+        Fetch and delete and batch of scheduled events in a bucket
+
+        :param bucket: bucket whose events to be fetched
+        :type param: ``int``
 
         :param now: the current time
         :type now: ``datetime``
@@ -535,18 +541,15 @@ class IScalingScheduleCollection(Interface):
         :param size: the size of the request
         :type size: ``int``
 
-        :return: list of dict representing a row
+        :return: Deferred that fires with list of dict representing a row
         """
 
-    def update_delete_events(delete_policy_ids, update_policies):
+    def add_cron_events(cron_events):
         """
-        Update trigger times and Delete scheduled event of given policy Ids
+        Add cron events equally distributed among the buckets
 
-        :param delete_policy_ids: list of policy IDs to delete
-        :type policy_ids: ``list``
-
-        :param update_policies: list of `dict` returned in `fetch_batch_of_events`
-        :type policy_ids: ``list``
+        :param cron_events: list of events (dict) to be added
+        :type cron_events: ``list``
 
         :return: None
         """
