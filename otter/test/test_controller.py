@@ -672,7 +672,8 @@ class ObeyConfigChangeTestCase(TestCase):
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True)
+            active_capacity=3, audit_log=True, policy_id=None,
+            webhook_id=None)
 
     def test_audit_log_events_logged_on_negative_delta(self):
         """
@@ -687,7 +688,8 @@ class ObeyConfigChangeTestCase(TestCase):
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True)
+            active_capacity=3, audit_log=True, policy_id=None,
+            webhook_id=None)
 
 
 class FindPendingJobsToCancelTests(TestCase):
@@ -1125,7 +1127,8 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id='pol1')
+            active_capacity=3, audit_log=True, policy_id=None,
+            webhook_id=None)
 
     def test_audit_log_events_logged_on_negative_delta(self):
         """
@@ -1141,7 +1144,8 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True, policy_id='pol1')
+            active_capacity=3, audit_log=True, policy_id=None,
+            webhook_id=None)
 
 
 class ExecuteLaunchConfigTestCase(TestCase):

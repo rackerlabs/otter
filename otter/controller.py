@@ -88,6 +88,9 @@ def _do_convergence_audit_log(_, log, delta, state):
     msg += " servers to satisfy desired capacity"
 
     audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
+                  # setting policy_id/webhook_id to None is a hack to prevent
+                  # them from making it into the audit log
+                  policy_id=None, webhook_id=None,
                   **state.get_capacity())
     return state
 
