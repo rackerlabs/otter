@@ -175,6 +175,21 @@ class GroupStateTestCase(TestCase):
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
 
+    def test_get_capacity(self):
+        """
+        Getting capacity returns a dictionary with the desired capacity,
+        active capacity, and pending capacity
+        """
+        state = GroupState('tid', 'gid', 'name',
+                           {str(i): {} for i in range(5)},
+                           {str(i): {} for i in range(6)},
+                           'date', {}, True, now='0')
+        self.assertEqual(state.get_capacity(), {
+            'desired_capacity': 11,
+            'pending_capacity': 6,
+            'active_capacity': 5
+        })
+
 
 class IScalingGroupProviderMixin(object):
     """
