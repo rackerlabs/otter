@@ -441,9 +441,9 @@ class AuditLogFormatterTests(TestCase):
         self.assertEquals(
             audit_log_formatter({'message': ('Hello',), 'what': 'the'}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Hello',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 6,
                 'is_error': False
             })
@@ -456,9 +456,9 @@ class AuditLogFormatterTests(TestCase):
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes'}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh.',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'fault': {'details': {}}
@@ -472,9 +472,9 @@ class AuditLogFormatterTests(TestCase):
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'why': 'is the sky blue'}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh. is the sky blue',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'fault': {'details': {}}
@@ -488,9 +488,9 @@ class AuditLogFormatterTests(TestCase):
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'failure': Failure(ValueError('boo'))}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh.',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'fault': {'details': {}, 'message': 'boo'}
@@ -505,9 +505,9 @@ class AuditLogFormatterTests(TestCase):
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
                                  'failure': Failure(ValueError('boo'))}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh.',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'fault': {
@@ -528,9 +528,9 @@ class AuditLogFormatterTests(TestCase):
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
                                  'failure': Failure(exc)}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh.',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'fault': {
@@ -555,9 +555,9 @@ class AuditLogFormatterTests(TestCase):
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
                                  'failure': Failure(exc)}, 0),
             {
-                'version': '1.0',
+                '@version': 1,
                 '_message': 'Failed: meh.',
-                'timestamp': 0,
+                '@timestamp': 0,
                 'level': 3,
                 'is_error': True,
                 'scaling_group_id': '5',

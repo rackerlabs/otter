@@ -160,8 +160,8 @@ def audit_log_formatter(eventDict, timestamp):
     :returns: an audit-log formatted dictionary
     """
     audit_log_params = {
-        "version": "1.0",
-        "timestamp": timestamp,
+        "@version": 1,
+        "@timestamp": timestamp,
         "level": eventDict.get("level", 6),
         "is_error": False
     }
