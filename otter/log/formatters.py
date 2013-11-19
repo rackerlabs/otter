@@ -162,7 +162,6 @@ def audit_log_formatter(eventDict, timestamp):
     audit_log_params = {
         "@version": 1,
         "@timestamp": timestamp,
-        "level": eventDict.get("level", 6),
         "is_error": False
     }
 
@@ -175,7 +174,6 @@ def audit_log_formatter(eventDict, timestamp):
             str(m) for m in eventDict["message"]])
 
     if eventDict.get("isError", False):
-        audit_log_params['level'] = 3
         audit_log_params["is_error"] = True
 
         # create the fault dictionary, if it doesn't exist, without clobbering

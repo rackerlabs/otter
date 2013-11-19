@@ -444,7 +444,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Hello',
                 '@timestamp': 0,
-                'level': 6,
                 'is_error': False
             })
 
@@ -459,7 +458,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'fault': {'details': {}}
             })
@@ -475,7 +473,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh. is the sky blue',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'fault': {'details': {}}
             })
@@ -491,7 +488,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'fault': {'details': {}, 'message': 'boo'}
             })
@@ -508,7 +504,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'fault': {
                     'message': '1',
@@ -531,7 +526,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'fault': {
                     'message': '1',
@@ -558,7 +552,6 @@ class AuditLogFormatterTests(TestCase):
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
-                'level': 3,
                 'is_error': True,
                 'scaling_group_id': '5',
                 'tenant_id': '5',
