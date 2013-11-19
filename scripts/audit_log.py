@@ -17,6 +17,7 @@ examples = [
                 "groupConfiguration": {
                     "name": "new name", "cooldown": 5, "minEntities": 2
                 },
+                'id': "10000000-0000-0000-0000-00000000001",
                 "launchConfiguration": {
                     "type": "launch_server",
                     "args": {
@@ -27,14 +28,40 @@ examples = [
                         }
                     }
                 },
+                "links": [
+                    {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                              '/000001/groups/"10000000-0000-0000-0000-00000000001/'),
+                     'rel': 'self'}
+                ],
                 "scalingPolicies": [
                     {
                         "name": "scale up by 10",
                         "change": 10,
                         "cooldown": 5,
-                        "type": "webhook"
+                        "type": "webhook",
+                        "id": "11100000-0000-0000-0000-00000000001",
+                        "links": [
+                            {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                                      '/000001/groups/"10000000-0000-0000-0000-00000000001'
+                                      '/policies/11100000-0000-0000-0000-00000000001'),
+                             'rel': 'self'}
+                        ]
                     }
-                ]
+                ],
+                "scalingPolicies_links": [
+                    {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                              '/000001/groups/"10000000-0000-0000-0000-00000000001'
+                              '/policies/'),
+                     'rel': 'self'}
+                ],
+                'state': {
+                    'active': [],
+                    'activeCapacity': 0,
+                    'desiredCapacity': 0,
+                    'pendingCapacity': 0,
+                    'paused': False,
+                    'name': 'new name'
+                }
             },
             "transaction_id": "00000000-0000-0000-0000-00000000001",
             "event_type": "request.group.create.ok",
@@ -94,24 +121,51 @@ examples = [
                 "groupConfiguration": {
                     "name": "new name", "cooldown": 5, "minEntities": 2
                 },
+                'id': "10000000-0000-0000-0000-00000000001",
                 "launchConfiguration": {
                     "type": "launch_server",
                     "args": {
                         "server": {
                             "flavorRef": 2,
                             "name": "web",
-                            "imageRef": "image"
+                            "imageRef": "52415800-8b69-11e0-9b19-734f6f007777"
                         }
                     }
                 },
+                "links": [
+                    {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                              '/000001/groups/"10000000-0000-0000-0000-00000000001/'),
+                     'rel': 'self'}
+                ],
                 "scalingPolicies": [
                     {
                         "name": "scale up by 10",
                         "change": 10,
                         "cooldown": 5,
-                        "type": "webhook"
+                        "type": "webhook",
+                        "id": "11100000-0000-0000-0000-00000000001",
+                        "links": [
+                            {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                                      '/000001/groups/"10000000-0000-0000-0000-00000000001'
+                                      '/policies/11100000-0000-0000-0000-00000000001'),
+                             'rel': 'self'}
+                        ]
                     }
-                ]
+                ],
+                "scalingPolicies_links": [
+                    {'href': ('https://dfw.autoscale.api.rackspacecloud.com/v1.0'
+                              '/000001/groups/"10000000-0000-0000-0000-00000000001'
+                              '/policies/'),
+                     'rel': 'self'}
+                ],
+                'state': {
+                    'active': [],
+                    'activeCapacity': 0,
+                    'desiredCapacity': 0,
+                    'pendingCapacity': 0,
+                    'paused': False,
+                    'name': 'new name'
+                }
             },
             "transaction_id": "00000000-0000-0000-0000-00000000001",
             "event_type": "request.group.create.failure.invalid_launch_config",
@@ -328,8 +382,10 @@ examples = [
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "data": {
-                "name": "new name", "cooldown": 5, "minEntities": 2,
-                "maxEntities": 5, "metadata": {}
+                "groupConfiguration": {
+                    "name": "new name", "cooldown": 5, "minEntities": 2,
+                    "maxEntities": 5, "metadata": {}
+                }
             },
             "transaction_id": "00000000-0000-0000-0000-00000000001",
             "event_type": "request.group.config.update.ok",
