@@ -77,6 +77,7 @@ def _do_convergence_audit_log(_, log, delta, state):
     Logs a convergence event to the audit log
     """
     audit_log = audit(log)
+
     if delta < 0:
         msg = "Deleting {0}".format(-delta)
         event_type = "convergence.scale_down"
@@ -89,7 +90,6 @@ def _do_convergence_audit_log(_, log, delta, state):
     audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
                   **state.get_capacity())
     return state
-
 
 
 def obey_config_change(log, transaction_id, config, scaling_group, state):
@@ -202,10 +202,7 @@ def maybe_execute_scaling_policy(
                 d = exec_scale_down(execute_bound_log, transaction_id, state,
                                     scaling_group, -delta)
 
-            d.addCallback(_do_convergence_audit_log,
-                          # rebind because we don't want anything else bound
-                          # (policy ID, etc)
-                          log.bind(scaling_group_id=scaling_group.uuid),
+            d.addCallback(_do_convergence_audit_log, bound_log,
                           delta, state)
             return d.addCallback(mark_executed)
 

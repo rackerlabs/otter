@@ -986,9 +986,8 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
         self.assertEqual(result, self.mock_state)
 
         # log should have been updated
-        self.assertEqual(
-            self.mock_log.bind.mock_calls[0],
-            mock.call(scaling_group_id=self.group.uuid, policy_id='pol1'))
+        self.mock_log.bind.assert_called_once_with(
+            scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -1021,9 +1020,8 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
         self.assertEqual(failure.value, expected)
 
         # log should have been updated
-        self.assertEqual(
-            self.mock_log.bind.mock_calls[0],
-            mock.call(scaling_group_id=self.group.uuid, policy_id='pol1'))
+        self.mock_log.bind.assert_called_once_with(
+            scaling_group_id=self.group.uuid, policy_id='pol1')
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -1127,7 +1125,7 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             'Starting {convergence_delta} new servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
             convergence_delta=5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True)
+            active_capacity=3, audit_log=True, policy_id='pol1')
 
     def test_audit_log_events_logged_on_negative_delta(self):
         """
@@ -1143,7 +1141,7 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
             'Deleting 5 servers to satisfy desired capacity',
             scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
             convergence_delta=-5, desired_capacity=5, pending_capacity=2,
-            active_capacity=3, audit_log=True)
+            active_capacity=3, audit_log=True, policy_id='pol1')
 
 
 class ExecuteLaunchConfigTestCase(TestCase):
