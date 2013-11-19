@@ -1795,7 +1795,7 @@ DELETE /{tenantId}/groups/{groupId}?force=true
                 </listitem>
                 <listitem>
                     <para>For a list of FAQs on Auto Scale, read <link
-                            xlink:href="https://one.rackspace.com/display/Stretch/Auto+Scale+FAQ+Doc+for+KC "
+                            xlink:href="hhttp://www.rackspace.com/knowledge_center/article/rackspace-autoscale-faq"
                             >the Auto Scale FAQ page on the Knowledge
                             Center</link>.</para>
                 </listitem>

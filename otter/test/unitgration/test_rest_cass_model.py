@@ -31,6 +31,16 @@ from otter.test.rest.request import path_only, request, RequestTestMixin
 from otter.test.utils import LockMixin, patch
 from otter.util.config import set_config_data
 
+limits = {
+    'url_root': 'http://127.0.0.1',
+    'limits': {
+        'pagination': 100,
+        'absolute': {
+            'maxGroups': 1000
+        }
+    }
+}
+
 
 def _policy():
     return [
@@ -92,8 +102,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.resume()
         self.root = Otter(store).app.resource()
-        set_config_data({'url_root': 'http://127.0.0.1',
-                         'limits': {'pagination': 5}})
+        set_config_data(limits)
         self.addCleanup(set_config_data, {})
 
         self.config = config()[0]
@@ -126,7 +135,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.dirtied()
         keyspace.pause()
-        keyspace.reset(self.mktemp())
+        keyspace.reset()
         set_supervisor(None)
 
     def create_scaling_group(self):
@@ -311,7 +320,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         keyspace.resume()
         self.root = Otter(store).app.resource()
 
-        set_config_data({'url_root': 'http://127.0.0.1'})
+        set_config_data(limits)
         self.addCleanup(set_config_data, {})
 
         self._config = config()[0]
@@ -344,7 +353,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.dirtied()
         keyspace.pause()
-        keyspace.reset(self.mktemp())
+        keyspace.reset()
 
     def assert_number_of_scaling_policies(self, number):
         """

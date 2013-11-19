@@ -3,7 +3,8 @@ Client objects for all the autoscale api calls
 """
 from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
-                                                          ScalingGroup, Groups)
+                                                          ScalingGroup, Groups,
+                                                          Policies)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -386,7 +387,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             request_entity=policy,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def list_policies(self, group_id, requestslib_kwargs=None):
+    def list_policies(self, group_id, marker=None, limit=None,
+                      requestslib_kwargs=None, url=None):
         """
         :summary: List the scaling group's policy configurations
         :param group_id: The id of an existing scaling group.
@@ -398,10 +400,11 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         '/<string:tenantId>/groups/<string:groupId>/policy'
         """
-        url = '%s/groups/%s/policies/' % (self.url, group_id)
-        return self.request('GET', url,
+        params = {'marker': marker, 'limit': limit}
+        url = url or '%s/groups/%s/policies/' % (self.url, group_id)
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Policy)
+                            response_entity_type=Policies)
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,

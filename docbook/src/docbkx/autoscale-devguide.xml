@@ -55,7 +55,7 @@ format="SVG" scale="60"/>
 <titleabbrev>&PRODABBV; DevGuide</titleabbrev>
 <?rax title.font.size="35px" subtitle.font.size="20px"
 status.bar.text="Early Access"
-canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-devguide/content"?>
+canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>

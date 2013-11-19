@@ -303,3 +303,83 @@ class AutoscaleConfig(ConfigSectionInterface):
         Test tenant without autoscale endpoint in its service catalog
         """
         return self.get('non_autoscale_tenant')
+
+    @property
+    def autoscale_na_la_aa(self):
+        """
+        Test username with admin access for next gen, load balancers and
+        autoscale
+        """
+        return self.get('autoscale_na_la_aa')
+
+    @property
+    def autoscale_na_lo_aa(self):
+        """
+        Test username with admin access for next gen and autoscale &
+        observer role for load balancer.
+        """
+        return self.get('autoscale_na_lo_aa')
+
+    @property
+    def autoscale_no_lo_aa(self):
+        """
+        Test username with observer access for next gen and load balancer &
+        admin role for autoscale.
+        """
+        return self.get('autoscale_no_lo_aa')
+
+    @property
+    def autoscale_no_lo_ao(self):
+        """
+        Test username with observer access for next gen, load balancer &
+        autoscale.
+        """
+        return self.get('autoscale_no_lo_ao')
+
+    @property
+    def autoscale_na_la_ao(self):
+        """
+        Test username with admin access for next gen, load balancer &
+        observer role for autoscale.
+        """
+        return self.get('autoscale_na_la_ao')
+
+    @property
+    def autoscale_nc_lc_aa(self):
+        """
+        Test username with creator access for next gen, load balancer &
+        admin role for autoscale.
+        """
+        return self.get('autoscale_nc_lc_aa')
+
+    @property
+    def autoscale_nc_lc_ao(self):
+        """
+        Test username with creator access for next gen, load balancer &
+        observer role for autoscale.
+        """
+        return self.get('autoscale_nc_lc_ao')
+
+    @property
+    def autoscale_na_la_ano(self):
+        """
+        Test username with admin access for next gen, load balancer &
+        no access for autoscale.
+        """
+        return self.get('autoscale_na_la_ano')
+
+    @property
+    def autoscale_nno_lno_ao(self):
+        """
+        Test username with admin access for next gen, load balancer &
+        no access for autoscale.
+        """
+        return self.get('autoscale_nno_lno_ao')
+
+    @property
+    def autoscale_nno_lno_aa(self):
+        """
+        Test username with admin access for next gen, load balancer &
+        no access for autoscale.
+        """
+        return self.get('autoscale_nno_lno_aa')

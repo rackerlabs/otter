@@ -396,19 +396,18 @@ class IScalingScheduleCollectionProviderMixin(object):
         """
         verifyObject(IScalingScheduleCollection, self.collection)
 
-    def validate_fetch_batch_of_events(self, *args, **kwargs):
+    def validate_fetch_and_delete(self, *args, **kwargs):
         """
-        Calls ``fetch_batch_of_events()`` and validates that it returns a
+        Calls ``fetch_and_delete()`` and validates that it returns a
         list of dict
 
-        :return: the return value of ``fetch_batch_of_events()``
+        :return: the return value of ``fetch_and_delete()``
         """
         result = self.successResultOf(
-            self.collection.fetch_batch_of_events(*args, **kwargs))
+            self.collection.fetch_and_delete(*args, **kwargs))
 
-        self.assertEqual(type(result), list)
+        self.assertTrue(isinstance(result, list))
         for elem in result:
-            self.assertEqual(type(elem), dict)
-            self.assertEqual(len(elem), 5)
+            self.assertTrue(isinstance(elem, dict))
 
         return result

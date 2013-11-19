@@ -49,8 +49,7 @@ class ScalingGroup(AutoMarshallingModel):
         if hasattr(scaling_group, 'state'):
             scaling_group.state = Group._dict_to_obj(scaling_group.state)
         if hasattr(scaling_group, 'launchConfiguration'):
-            scaling_group.launchConfiguration = scaling_group.launchConfiguration[
-                'args']
+            scaling_group.launchConfiguration = scaling_group.launchConfiguration['args']
             scaling_group.launchConfiguration = Config._dict_to_obj(
                 scaling_group.launchConfiguration)
         if hasattr(scaling_group, 'scalingPolicies'):
@@ -195,7 +194,7 @@ class Config(AutoMarshallingModel):
 class Policy(AutoMarshallingModel):
 
     """
-    works for the autoscaling policies
+    works for the autoscaling policies, but does not include a "policies_links" attribute.
     """
 
     def __init__(self, **kwargs):
@@ -240,6 +239,42 @@ class Policy(AutoMarshallingModel):
                 newkey = re.split('}', each)[1]
                 setattr(policy, newkey, policy_dict[each])
         return policy
+
+
+class Policies(AutoMarshallingModel):
+    """
+    A marshalling object that works for paginated scaling group policies
+    """
+
+    def __init__(self, **kwargs):
+        super(Policies, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Return an object with attributes corresponding to the json serialized
+        string for paged policy listings
+        """
+
+        json_dict = json.loads(serialized_str)
+        # use the Policies dict_to_object classmethod to create the object
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, policies_dict):
+        """
+        Helper method to transform a dictionary into a Policies instance
+        """
+
+        policies = Policies(**policies_dict)
+        if hasattr(policies, 'policies_links'):
+            policies.policies_links = Links._dict_to_obj(policies.policies_links)
+        if hasattr(policies, 'policies'):
+            policies.policies = [
+                Policy._dict_to_obj(p) for p in policies.policies]
+        return policies
 
 
 class Webhook(AutoMarshallingModel):
