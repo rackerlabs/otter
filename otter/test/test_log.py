@@ -331,7 +331,7 @@ class ObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with({
             'source_host': 'localhost',
-            '@version': '1',
+            '@version': 1,
             'short_message': 'Hello',
             'message': 'Hello',
             'type': '',

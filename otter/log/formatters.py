@@ -165,7 +165,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
             full_message = " ".join([str(m) for m in eventDict["message"]])
 
         log_params = {
-            "@version": "1",
+            "@version": 1,
             "source_host": hostname,
             "short_message": short_message,
             "message": full_message,
