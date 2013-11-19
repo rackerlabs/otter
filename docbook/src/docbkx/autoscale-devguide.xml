@@ -52,9 +52,8 @@ format="SVG" scale="60"/>
          xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
-<titleabbrev>&PRODABBV; DevGuide</titleabbrev>
+<titleabbrev>&PRODABBV; Developer Guide</titleabbrev>
 <?rax title.font.size="35px" subtitle.font.size="20px"
-status.bar.text="Early Access"
 canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
@@ -71,6 +70,16 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
             </annotation>
         </legalnotice>
         <revhistory>
+          <revision>
+            <date>2013-11-19</date>
+            <revdescription>
+              <itemizedlist spacing="compact">
+                <listitem>
+                  <para>Updating content for UA</para>
+                </listitem>
+              </itemizedlist>
+            </revdescription>
+          </revision>
           <revision>
             <date>2013-08-21</date>
             <revdescription>
@@ -1337,7 +1346,8 @@ Content-Type: application/json
         <para>To obtain the configuration for a scaling group, which
           includes the minimum number of entities, the maximum number
           of entities, global cooldown, and other metadata, submit a
-          GET request with the <parameter>tenantId</parameter> and
+            <command>GET</command> request with the
+            <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
         <example><title>Get Configuration for your Scaling Group Request</title><programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting></example>
@@ -1353,14 +1363,16 @@ Content-Type: application/json
         <para>To edit the configuration for a scaling group, which
           includes the minimum number of entities, the maximum number
           of entities, global cooldown, and other metadata, submit a
-          PUT request with the <parameter>tenantId</parameter> and
+            <command>PUT</command> request with the
+            <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
         <example><title>Edit the Configuration for a Scaling Group Request</title><programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
         <programlisting language="json"><xi:include href="./samples/reqPutGroupConfig.json" parse="text"/>
 </programlisting></example>
-        <para>If the PUT request is successful, a 204 response code
-          with an empty response body will be returned </para>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned </para>
       </section>
       <section xml:id="Get_Launch_Configuration_for_Scaling_Group">
         <title>Get the Launch Configuration for your Scaling
@@ -1374,9 +1386,9 @@ Content-Type: application/json
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
         <example><title>Get the Launch Configuration for a Scaling Group Request</title><programlisting> GET /{tenantId}/groups/{groupId}/launch</programlisting></example>
-        <para>If the GET request is successfull, the data will be
-          returned in the body of the response in JSON format as shown
-          in the following example:</para>
+        <para>If the <command>GET</command> request is successfull,
+          the data will be returned in the body of the response in
+          JSON format as shown in the following example:</para>
         <example><title>Response to a Successful Get the Launch Configuration for a Scaling Group</title><programlisting language="json">
 <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
 </programlisting></example>
@@ -1387,8 +1399,8 @@ Content-Type: application/json
         <para>To edit the launch configuration for a scaling group,
           including how to create a server, from what image, which
           load balancers to join it to, and what networks to add it
-          to, and other metadata, submit a PUT request with the
-            <parameter>tenantId</parameter> and
+          to, and other metadata, submit a <command>PUT</command>
+          request with the <parameter>tenantId</parameter> and
             <parameter>groupId</parameter>parameters specified in the
           request URL. In the request body, specify the details about
           the server type, server image, load balancers, network, and
@@ -1415,7 +1427,7 @@ Content-Type: application/json
           </note>
         </para>
         <para>To pause all execution of scaling policies for a scaling
-          group, submit a POST request with the
+          group, submit a <command>POST</command> request with the
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
@@ -1439,8 +1451,8 @@ Content-Type: application/json
           </note>
         </para>
         <para>To resume execution of all scaling policies for a
-          scaling group, submit a POST request with the
-            <parameter>tenantId</parameter> and
+          scaling group, submit a <command>POST</command> request with
+          the <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
         <example>
@@ -1458,15 +1470,13 @@ Content-Type: application/json
         scaling policies for your scaling group. Create a scaling
         policy by submitting a <command>POST</command> request that
         contains the <parameter>tenantID</parameter> that you obtained
-        during the Authentication<olink
-          targetdoc="autoscale-getting-started"
+        during the <olink targetdoc="autoscale-getting-started"
           targetptr="Authenticate">“Authenticate”</olink> step and the
-          <parameter>groupID</parameter> that you obtained durring the
-        Create and Manage a Scaling Grou<olink
-          targetdoc="autoscale-getting-started"
+          <parameter>groupID</parameter> that you obtained during the
+          <olink targetdoc="autoscale-getting-started"
           targetptr="Create_Group">“Create and Manage a Scaling
-          Group”</olink>p step. </para>
-      <para> You can specify multiple policies to manage your scaling
+          Group”</olink> step. </para>
+      <para>You can specify multiple policies to manage your scaling
         group.</para>
       <para>
         <note>
@@ -1505,8 +1515,9 @@ Content-Type: application/json
       </para>
       <section xml:id="Create_a_Scaling_Policy">
         <title>Create a Scaling Policy</title>
-        <para>To create a scaling policy, submit a POST request with
-          the <parameter>tenantId</parameter> and
+        <para>To create a scaling policy, submit a
+            <command>POST</command> request with the
+            <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL. The following example shows how to create a
           policy that scales the group up by one server with a
@@ -1519,9 +1530,9 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
         <programlisting language="json">
 <xi:include href="./samples/reqCreatePolicies.json" parse="text"/>
 </programlisting>
-        <para>If the POST request is successful, an array of scaling
-          policies is provided in the request body in JSON format, as
-          shown in the following example.</para>
+        <para>If the <command>POST</command> request is successful, an
+          array of scaling policies is provided in the request body in
+          JSON format, as shown in the following example.</para>
         <example><title>Response to Successful Create a Scaling Policy Request</title><programlisting language="json">
 <xi:include href="./samples/resCreatePolicies.json" parse="text"/>
 </programlisting></example>
@@ -1529,16 +1540,16 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
       <section xml:id="Obtain_List_of_Scaling_Policies">
         <title>Obtain a List of Scaling Policies</title>
         <para>To obtain a list of scaling policies for a scaling
-          group, submit a GET request with the
+          group, submit a <command>GET</command> request with the
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
        <example><title>Obtain a List of Scaling Policies Request</title> <programlisting>
 GET /{tenantId}/groups/{groupId}/policies
                 </programlisting></example>
-        <para>If the GET request is successful, the response data will
-          be returned in JSON format as shown in the following
-          example:</para>
+        <para>If the <command>GET</command> request is successful, the
+          response data will be returned in JSON format as shown in
+          the following example:</para>
         <example><title>Response to Successful Obtain a List of Scaling Policies Request</title><programlisting language="json">
 <xi:include href="./samples/resGetPolicies.json" parse="text"/>
 </programlisting></example>
@@ -1547,7 +1558,7 @@ GET /{tenantId}/groups/{groupId}/policies
         <title>Get an Individual Scaling Policy</title>
         <para>To obtain information about an individual scaling
           policy, including policy id, name, type, adjustment, and
-          cooldown, submit a GET request with the
+          cooldown, submit a <command>GET</command> request with the
             <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
@@ -1555,23 +1566,24 @@ GET /{tenantId}/groups/{groupId}/policies
         <example><title>Get an Individual Scaling Policy Request</title><programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}
                 </programlisting></example>
-        <para>If the GET request is successful, the data will be
-          returned in the response body in JSON format as shown in the
-          following example:</para>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in the response body in JSON format as
+          shown in the following example:</para>
         <example><title>Response to a Successful Get an Individual Scaling Policy Request</title><programlisting language="json">
 <xi:include href="./samples/resGetPolicy.json" parse="text"/>
 </programlisting></example>
       </section>
       <section xml:id="Updating_Scaling_Policy">
         <title>Update a Scaling Policy</title>
-        <para>To update a scaling policy, submit a PUT request, with
-          the <parameter>tenantId</parameter>,
+        <para>To update a scaling policy, submit a
+            <command>PUT</command> request, with the
+            <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL. In the request body provide a name for the
           policy, a change value, and a value for the cooldown and a
           method for triggering the policy, for example a webhook. In
-          the following example, the configuration is scaled up by 1
+          the following example, the configuration is scaled up by one
           server with a cooldown phase of 1800 seconds. </para>
        <example><title>Update a Scaling Policy Request</title> <programlisting>
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
@@ -1579,13 +1591,15 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}
         <programlisting language="json">
 <xi:include href="./samples/reqPutPolicy.json" parse="text"/>
 </programlisting></example>
-        <para>If the PUT request is successful, a 204 response code
-          with an empty response body will be returned. </para>
+        <para>If the <command>PUT</command> request is successful, a
+          204 response code with an empty response body will be
+          returned. </para>
       </section>
       <section xml:id="Deleting_Scaling_Policy">
         <title>Delete a Scaling Policy</title>
-        <para>To delete a scaling policy, submit a DELETE request with
-          the <parameter>tenantId</parameter>,
+        <para>To delete a scaling policy, submit a
+            <command>DELETE</command> request with the
+            <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL. </para>
@@ -1631,8 +1645,8 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
       </para>
       <section xml:id="Create_scaling_webhook">
         <title>Create a Webhook</title>
-        <para>To create a webhook, submit a POST request with the
-            <parameter>tenantID</parameter>,
+        <para>To create a webhook, submit a <command>POST</command>
+          request with the <parameter>tenantID</parameter>,
             <parameter>groupID</parameter>, and
             <parameter>policyID</parameter> specified in the request
           URL. In the request body, specify the name of the webhook,
@@ -1645,9 +1659,9 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
         <programlisting language="json">
 <xi:include href="./samples/reqCreateWebhook.json" parse="text"/>
 </programlisting></example>
-        <para>If the POST request is successful, the data will be
-          returned in JSON format as shown in the following
-          example:</para>
+        <para>If the <command>POST</command> request is successful,
+          the data will be returned in JSON format as shown in the
+          following example:</para>
         <example><title>Response to a Successful Create a Webhook Request</title><programlisting language="json">
 <xi:include href="./samples/resCreateWebhook.json" parse="text"/>
 </programlisting></example>
@@ -1655,25 +1669,26 @@ POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/p
       <section xml:id="Get_List_of_Scaling_Webhooks">
         <title>Get a List of all Webhooks and their Ids</title>
         <para>To obtain a list of all scaling webhooks and their
-          corresponding ids, submit a GET request with the
-            <parameter>tenantId</parameter>,
+          corresponding ids, submit a <command>GET</command> request
+          with the <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL.</para>
         <example><title>Get a List of Scaling Webhooks and their Ids Request</title><programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
                 </programlisting></example>
-        <para>If the GET request is successful, the data will be
-          returned in the response body in JSON format as shown in the
-          following example:</para>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in the response body in JSON format as
+          shown in the following example:</para>
        <example><title>Response to a Successful Get a List of Scaling Webhooks Request</title><programlisting language="json">
 <xi:include href="./samples/resGetWebhooks.json" parse="text"/>
 </programlisting></example> 
       </section>
       <section xml:id="Update_Scaling_Webhook">
         <title>Update a Webhook</title>
-        <para>To modify a scaling webhook, submit a PUT request with
-          the <parameter>tenantId</parameter>,
+        <para>To modify a scaling webhook, submit a
+            <command>PUT</command> request with the
+            <parameter>tenantId</parameter>,
             <parameter>groupId</parameter>,
             <parameter>policyId</parameter> and
             <parameter>webhookId</parameter> parameters specified in
@@ -1690,8 +1705,9 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
       </section>
       <section xml:id="Get_Info_About_Webhook">
         <title>Get Information about a Specific Webhook</title>
-        <para>To obtain details about a specific webhook, submit a GET
-          request with the <parameter>tenantId</parameter>,
+        <para>To obtain details about a specific webhook, submit a
+            <command>GET</command>request with the
+            <parameter>tenantId</parameter>,
             <parameter>groupId</parameter>,
             <parameter>policyId</parameter> and
             <parameter>webhookId</parameter> parameters specified in
@@ -1699,16 +1715,16 @@ PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
        <example><title>Get Information about a Webhook Request</title> <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </programlisting></example>
-        <para>If the GET request is successful, the data will be
-          returned in JSON format as shown in the following
-          example:</para>
+        <para>If the <command>GET</command> request is successful, the
+          data will be returned in JSON format as shown in the
+          following example:</para>
         <example><title>Example of Successful Response to Get Info about a Webhook Request</title><programlisting language="json">
 <xi:include href="./samples/resGetWebhook.json" parse="text"/>
 </programlisting></example>
       </section>
       <section xml:id="Delete_Scaling_Webhook">
         <title>Delete a Webhook</title>
-        <para>To delete a scaling policy webhook, submit a DELETE
+        <para>To delete a webhook, submit a <command>DELETE</command>
           request with the <parameter>tenantID</parameter>,
             <parameter>groupID</parameter>,
             <parameter>policyID</parameter>, and the
@@ -1724,9 +1740,10 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
     <section xml:id="Execute_Scaling_Policy">
       <title>Execute a Scaling Policy</title>
       <para> After you define a scaling policy, you can activate that
-        policy by issuing a POST request against its URL. </para>
-      <para>To activate a scaling policy, submit a POST request with
-        the <parameter>tenantId</parameter>,
+        policy by issuing a <command>POST</command> request against
+        its URL. </para>
+      <para>To activate a scaling policy, submit a <command>POST
+        </command>request with the <parameter>tenantId</parameter>,
           <parameter>groupId</parameter> and
           <parameter>policyId</parameter> parameters specified in the
         request URL.</para>
@@ -1736,7 +1753,7 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
  POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                 </programlisting>
       </example>
-      <para> The POST request causes the <link
+      <para> The<command> POST</command> request causes the <link
           linkend="Create_Scaling_Policies">scaling policy</link> to
         execute, which causes the scaling group to transform if it is
         able to do so. </para>
