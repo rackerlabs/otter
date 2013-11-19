@@ -673,9 +673,13 @@ from twisted.internet.task import react
 
 def iter_events():
     """
-    Returns those json events as a single iterator of strings
+    Returns those json events as a single iterator of strings, with @version
+    added and timestamp converted to logstash @timestmap
     """
-    return (json.dumps(event) for _, events in examples for event in events)
+    for blob in (event for _, events in examples for event in events):
+        blob['@timestamp'] = blob.pop('timestamp')
+        blob['@version'] = 1
+        yield json.dumps(blob)
 
 
 def index(event):

@@ -36,7 +36,10 @@
             }
         }
       },
-      "timestamp": {
+      "@version": {
+        "type": "long"
+      },
+      "@timestamp": {
         "type": "date",
         "format": "dateOptionalTime"
       },
