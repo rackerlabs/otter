@@ -125,8 +125,7 @@ class CassStoreRestScalingGroupTestCase(TestCase, RequestTestMixin, LockMixin):
 
         self.mock_controller.obey_config_change.side_effect = _mock_obey_config_change
 
-        self.lock = self.mock_lock()
-        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
+        store.kz_client = mock.Mock(Lock=self.mock_lock())
 
     def tearDown(self):
         """
@@ -327,9 +326,6 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         self._launch = launch_server_config()[0]
 
         self.mock_controller = patch(self, 'otter.rest.policies.controller')
-
-        self.lock = self.mock_lock()
-        patch(self, 'otter.models.cass.BasicLock', return_value=self.lock)
 
         def _set_group_id(manifest):
             self.group_id = manifest['state'].group_id

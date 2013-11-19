@@ -113,6 +113,7 @@ class APIMakeServiceTests(TestCase):
         self.addCleanup(Otter_patcher.stop)
 
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
+        self.store = self.CassScalingGroupCollection.return_value
 
     def test_service_site_on_port(self):
         """
@@ -200,7 +201,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.CassScalingGroupCollection.return_value)
+        self.Otter.assert_called_once_with(self.store)
 
     def test_mock_store(self):
         """
@@ -235,20 +236,31 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
         """
-        TxKazooClient is started and calls `setup_scheduler`
+        TxKazooClient is started and calls `setup_scheduler`. Its instance
+        is also set in store.kz_client after start has finished
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+
         kz_client = mock.Mock(spec=['start'])
-        kz_client.start.return_value = defer.succeed(None)
+        start_d = defer.Deferred()
+        kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
+        self.store.kz_client = None
 
         parent = makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
-        mock_setup_scheduler.assert_called_once_with(
-            parent, self.CassScalingGroupCollection.return_value, kz_client)
+
+        # setup_scheduler and store.kz_client is not called yet
+        self.assertFalse(mock_setup_scheduler.called)
+        self.assertIsNone(self.store.kz_client)
+
+        # they are called after start completes
+        start_d.callback(None)
+        mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
+        self.assertEqual(self.store.kz_client, kz_client)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
@@ -258,14 +270,14 @@ class APIMakeServiceTests(TestCase):
         Error is logged
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         kz_client = mock.Mock(spec=['start'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
         makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
