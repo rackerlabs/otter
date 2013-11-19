@@ -14,11 +14,9 @@ from testtools.matchers import Contains, ContainsDict, Equals
 from otter.log import audit
 from otter.log.bound import BoundLog
 
-from otter.log.formatters import ObserverWrapper
-from otter.log.formatters import JSONObserverWrapper
-from otter.log.formatters import PEP3101FormattingWrapper
-from otter.log.formatters import StreamObserverWrapper
-from otter.log.formatters import SystemFilterWrapper
+from otter.log.formatters import (
+    ObserverWrapper, JSONObserverWrapper, PEP3101FormattingWrapper,
+    StreamObserverWrapper, SystemFilterWrapper, audit_log_formatter)
 
 from otter.test.utils import SameJSON, matches
 
@@ -416,3 +414,149 @@ class ObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'line': Equals(10)})))
+
+    def test_generates_new_audit_log(self):
+        """
+        The observer generates two logs for an audit-loggable eventDict -
+        the audit log dictionary and a regular log
+        """
+        self.wrapper({'message': 'meh', 'audit_log': True})
+        self.observer.has_calls([
+            mock.call(matches(ContainsDict({'_message': Equals('meh'),
+                                            'audit_log': Equals(True)}))),
+            mock.call(matches(ContainsDict({
+                'short_message': Equals('meh'),
+                'audit_log_event_source': Equals(True)})))
+        ])
+
+
+class AuditLogFormatterTests(TestCase):
+    """
+    Tests the audit log formatter
+    """
+    def test_filters_out_extraneous_fields(self):
+        """
+        audit log formatter filters extraneous fields out of the event dict
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('Hello',), 'what': 'the'}, 0),
+            {
+                '@version': 1,
+                '_message': 'Hello',
+                '@timestamp': 0,
+                'is_error': False
+            })
+
+    def test_always_includes_fault_dict_even_if_no_failure(self):
+        """
+        Even if it doesn't include a failure, if it's an error message a
+        fault dictionary will be specified.  is_error will also be True.
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes'}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh.',
+                '@timestamp': 0,
+                'is_error': True,
+                'fault': {'details': {}}
+            })
+
+    def test_error_formats_why_message(self):
+        """
+        The why message is formatted into the _message if it's an error.
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'why': 'is the sky blue'}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh. is the sky blue',
+                '@timestamp': 0,
+                'is_error': True,
+                'fault': {'details': {}}
+            })
+
+    def test_error_formats_Exception_message(self):
+        """
+        The error message is formatted into the fault dict if it's an error.
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'failure': Failure(ValueError('boo'))}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh.',
+                '@timestamp': 0,
+                'is_error': True,
+                'fault': {'details': {}, 'message': 'boo'}
+            })
+
+    def test_error_keeps_fault_dictionary(self):
+        """
+        The fault dictionary, if included, is not clobbered by the failure
+        """
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'failure': Failure(ValueError('boo'))}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh.',
+                '@timestamp': 0,
+                'is_error': True,
+                'fault': {
+                    'message': '1',
+                    'details': {'x': 'y'}
+                }
+            })
+
+    def test_error_updates_fault_details(self):
+        """
+        The details dictionary, if included, does not get clobbered by the
+        errors's details
+        """
+        exc = ValueError('boo')
+        exc.details = {'1': 2, '3': 5}
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'failure': Failure(exc)}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh.',
+                '@timestamp': 0,
+                'is_error': True,
+                'fault': {
+                    'message': '1',
+                    'details': {'x': 'y', '1': 2, '3': 5}
+                }
+            })
+
+    def test_error_pulls_some_fault_details_keys_into_main_log(self):
+        """
+        If audit log parameters are in the details dictionary, they are removed.
+
+        If they are valid values, they are pulled out and put in the main audit
+        log, but without clobbering existing values in the main audit log.
+        """
+        exc = ValueError('boo')
+        exc.details = {'1': 2, 'scaling_group_id': '5', 'tenant_id': '1',
+                       'fault': {}, 'policy_id': False}
+        self.assertEquals(
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes',
+                                 'tenant_id': '5',
+                                 'fault': {'details': {'x': 'y'}, 'message': '1'},
+                                 'failure': Failure(exc)}, 0),
+            {
+                '@version': 1,
+                '_message': 'Failed: meh.',
+                '@timestamp': 0,
+                'is_error': True,
+                'scaling_group_id': '5',
+                'tenant_id': '5',
+                'fault': {
+                    'message': '1',
+                    'details': {'x': 'y', '1': 2}
+                }
+            })
