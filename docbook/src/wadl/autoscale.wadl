@@ -750,11 +750,6 @@ IMPORTANT: This operation has not been implemented in the Auto Scale API yet and
                     </xsdxt:sample>
                 </doc>
                 <doc xml:lang="en">
-                    <xsdxt:sample title="Create Policy (Percentage Change on Alarm) Request: JSON" >
-                        <xsdxt:code href="../docbkx/samples/reqCreatePolicy-changePercentAlarm.json"/>
-                    </xsdxt:sample>
-                </doc>
-                <doc xml:lang="en">
                     <xsdxt:sample title="Create Policies Request: JSON" >
                         <xsdxt:code href="../docbkx/samples/reqCreatePolicies.json"/>
                     </xsdxt:sample>
