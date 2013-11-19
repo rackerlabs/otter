@@ -1570,13 +1570,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.assertFalse(self.connection.execute.called)
         self.lock._acquire.assert_called_once_with(timeout=120)
 
-    @mock.patch('otter.models.cass.random.uniform')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_lock_with_log_category_locking(self, mock_view_state, mock_rand_uniform):
+    def test_delete_lock_with_log_category_locking(self, mock_view_state):
         """
         The lock is created with log with category as locking
         """
-        mock_rand_uniform.return_value = 3.56
         log = self.group.log = mock.Mock()
 
         self.group.delete_group()
