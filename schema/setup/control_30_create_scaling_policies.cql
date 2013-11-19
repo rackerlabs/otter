@@ -20,6 +20,7 @@ CREATE TABLE scaling_policies (
     "groupId" ascii,
     "policyId" ascii,
     data ascii,
+    version timeuuid,
     PRIMARY KEY("tenantId", "groupId", "policyId")
 ) WITH compaction = {
     'class' : 'SizeTieredCompactionStrategy',

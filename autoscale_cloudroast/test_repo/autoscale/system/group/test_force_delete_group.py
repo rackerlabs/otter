@@ -1,13 +1,10 @@
 """
 System tests for force delete scaling group
 """
-import unittest
-
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 
 
-@unittest.skip('PR-432')
 class ForceDeleteGroupTest(AutoscaleFixture):
 
     """

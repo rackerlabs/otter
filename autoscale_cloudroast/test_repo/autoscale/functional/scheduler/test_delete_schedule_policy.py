@@ -72,4 +72,4 @@ class DeleteSchedulerPolicy(ScalingGroupFixture):
         Lists the policies in a group and returns the policy id list
         """
         list_policies_resp = self.autoscale_client.list_policies(group_id)
-        return [each_policy.id for each_policy in list_policies_resp.entity]
+        return [each_policy.id for each_policy in (list_policies_resp.entity).policies]

@@ -11,6 +11,7 @@ from twisted.trial.unittest import TestCase
 
 from testtools.matchers import Contains, ContainsDict, Equals
 
+from otter.log import audit
 from otter.log.bound import BoundLog
 
 from otter.log.formatters import ObserverWrapper
@@ -54,6 +55,36 @@ class BoundLogTests(TestCase):
         log.err(exc)
 
         self.err.assert_called_once_with(exc, system='hello')
+
+
+class AuditLoggerTests(TestCase):
+    """
+    Test the method that binds the audit log
+    """
+    def setUp(self):
+        """
+        Set up the mocks and a new BoundLog.
+        """
+        self.msg = mock.Mock()
+        self.err = mock.Mock()
+        self.log = BoundLog(self.msg, self.err)
+
+    def test_audit_msg(self):
+        """
+        audit_log keyword is bound when msg is called
+        """
+        auditlog = audit(self.log)
+        auditlog.msg('hey')
+        self.msg.assert_called_once_with('hey', audit_log=True)
+
+    def test_audit_err(self):
+        """
+        audit_log keyword is bound when err is called
+        """
+        exc = ValueError('boo')
+        auditlog = audit(self.log)
+        auditlog.err(exc)
+        self.err.assert_called_once_with(exc, audit_log=True)
 
 
 class JSONObserverWrapperTests(TestCase):

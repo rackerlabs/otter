@@ -114,7 +114,7 @@ def maybe_execute_scaling_policy(
         transaction_id,
         scaling_group,
         state,
-        policy_id):
+        policy_id, version=None):
     """
     Checks whether and how much a scaling policy can be executed.
 
@@ -124,6 +124,7 @@ def maybe_execute_scaling_policy(
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
     :param policy_id: the policy id to execute
+    :param version: the policy version to check before executing
 
     :return: a ``Deferred`` that fires with the updated
         :class:`otter.models.interface.GroupState` if successful
@@ -139,7 +140,7 @@ def maybe_execute_scaling_policy(
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
-    deferred = scaling_group.get_policy(policy_id)
+    deferred = scaling_group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
         deferred = defer.gatherResults([

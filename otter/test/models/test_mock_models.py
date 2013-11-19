@@ -5,13 +5,15 @@ import mock
 
 from twisted.trial.unittest import TestCase
 
+from otter.util.config import set_config_data
 from otter.json_schema import group_examples
 from otter.models.mock import (
     generate_entity_links, MockScalingGroup, MockScalingGroupCollection,
     MockAdmin)
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
-    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError)
+    NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError,
+    ScalingGroupOverLimitError, WebhooksOverLimitError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -77,6 +79,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10}}})
+        self.addCleanup(set_config_data, {})
+
         self.tenant_id = '11111'
         self.group_id = '1'
         self.mock_log = mock.MagicMock()
@@ -518,6 +523,27 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         deferred = self.group.create_webhooks("otter-stacking", [{}])
         self.failureResultOf(deferred, NoSuchPolicyError)
 
+    def test_create_one_webhook_when_at_limit_fails(self):
+        """
+        Creating webhooks on a policy that already has the max number of
+        webhooks fails with a :class:`WebhooksOverLimitError`
+        """
+        self.group.policies = {'pol_id': {}}
+        self.group.webhooks['pol_id'] = {str(i): {} for i in range(10)}
+        deferred = self.group.create_webhooks("pol_id", [{}])
+        self.failureResultOf(deferred, WebhooksOverLimitError)
+
+    def test_create_too_many_webhooks_over_limit(self):
+        """
+        Creating enough webhooks on a policy to put it over the max number of
+        webhooks fails with a :class:`WebhooksOverLimitError`
+        """
+        self.group.policies = {'pol_id': {}}
+        self.group.webhooks['pol_id'] = {'1': {}}
+        deferred = self.group.create_webhooks("pol_id",
+                                              [{str(i): {}} for i in range(10)])
+        self.failureResultOf(deferred, WebhooksOverLimitError)
+
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
     def test_create_webhooks_succeed(self, fake_random):
@@ -717,11 +743,11 @@ class MockScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.tenant_id = 'goo1234'
         self.mock_log = mock.MagicMock()
 
-    def test_list_events(self):
+    def test_fetch_events(self):
         """
-        Test that the 'list all events' method works.
+        Test that the `fetch_and_delete` method works.
         """
-        deferred = self.collection.fetch_batch_of_events(1234, 100)
+        deferred = self.collection.fetch_and_delete(2, 1234, 100)
         self.assertEqual(self.successResultOf(deferred), [])
 
 
@@ -733,6 +759,10 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
+        set_config_data({'limits': {'absolute': {'maxGroups': 10,
+                                                 'maxWebhooksPerPolicy': 10}}})
+        self.addCleanup(set_config_data, {})
+
         self.collection = MockScalingGroupCollection()
         self.tenant_id = 'goo1234'
         self.config = {
@@ -805,6 +835,22 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         mock_sgrp.assert_called_once_with(
             mock.ANY, self.tenant_id, '1', self.collection,
             {'config': self.config, 'launch': self.launch, 'policies': policies})
+
+    def test_max_groups_underlimit(self):
+        """
+        test scaling group creation when below maxGroups limit
+        """
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.assertTrue(isinstance(self.successResultOf(d), dict))
+
+    def test_max_groups_overlimit(self):
+        """
+        test scaling group creation when at maxGroups limit
+        """
+        set_config_data({'limits': {'absolute': {'maxGroups': 0}}})
+
+        d = self.collection.create_scaling_group(mock.Mock(), '1234', self.config, self.launch)
+        self.failureResultOf(d, ScalingGroupOverLimitError)
 
     def test_list_scaling_group_limits_number_of_groups(self):
         """
