@@ -28,6 +28,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.log import audit
 from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -71,6 +72,26 @@ def resume_scaling_group(log, transaction_id, scaling_group):
     raise NotImplementedError('Resume is not yet implemented')
 
 
+def _do_convergence_audit_log(_, log, delta, state):
+    """
+    Logs a convergence event to the audit log
+    """
+    audit_log = audit(log)
+    if delta < 0:
+        msg = "Deleting {0}".format(-delta)
+        event_type = "convergence.scale_down"
+    else:
+        msg = "Starting {convergence_delta} new"
+        event_type = "convergence.scale_up"
+
+    msg += " servers to satisfy desired capacity"
+
+    audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
+                  **state.get_capacity())
+    return state
+
+
+
 def obey_config_change(log, transaction_id, config, scaling_group, state):
     """
     Given the config change, do servers need to be started or deleted
@@ -100,13 +121,13 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
         deferred.addCallback(partial(execute_launch_config, bound_log,
                                      transaction_id, state,
                                      scaling_group=scaling_group, delta=delta))
-        deferred.addCallback(lambda _: state)
-        return deferred
     else:
         # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
-        deferred.addCallback(lambda _: state)
-        return deferred
+        deferred = exec_scale_down(bound_log, transaction_id, state,
+                                   scaling_group, -delta)
+
+    deferred.addCallback(_do_convergence_audit_log, bound_log, delta, state)
+    return deferred
 
 
 def maybe_execute_scaling_policy(
@@ -180,6 +201,12 @@ def maybe_execute_scaling_policy(
                 execute_bound_log.msg("cooldowns checked, Scaling down")
                 d = exec_scale_down(execute_bound_log, transaction_id, state,
                                     scaling_group, -delta)
+
+            d.addCallback(_do_convergence_audit_log,
+                          # rebind because we don't want anything else bound
+                          # (policy ID, etc)
+                          log.bind(scaling_group_id=scaling_group.uuid),
+                          delta, state)
             return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,

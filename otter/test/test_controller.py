@@ -17,7 +17,7 @@ from otter.supervisor import ISupervisor
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
 from otter.util.timestamp import MIN
-from otter.test.utils import CheckFailure, iMock, matches, patch
+from otter.test.utils import CheckFailure, iMock, matches, patch, mock_log
 
 
 class CalculateDeltaTestCase(TestCase):
@@ -575,7 +575,12 @@ class ObeyConfigChangeTestCase(TestCase):
             return_value=defer.succeed(None))
 
         self.log = mock.MagicMock()
-        self.state = mock.MagicMock(spec=[])  # so calling anything will fail
+        self.state = mock.MagicMock(spec=['get_capacity'])
+        self.state.get_capacity.return_value = {
+            'desired_capacity': 5,
+            'pending_capacity': 2,
+            'active_capacity': 3
+        }
 
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.group.view_launch_config.return_value = defer.succeed("launch")
@@ -653,6 +658,36 @@ class ObeyConfigChangeTestCase(TestCase):
         self.exec_scale_down.assert_called_once_with(
             self.log.bind.return_value, 'transaction-id', self.state,
             self.group, 5)
+
+    def test_audit_log_events_logged_on_positive_delta(self):
+        """
+        ``obey_config_change`` makes the correct audit log upon scale up
+        """
+        log = mock_log()
+        self.calculate_delta.return_value = 5
+        d = controller.obey_config_change(log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        log.msg.assert_called_once_with(
+            'Starting {convergence_delta} new servers to satisfy desired capacity',
+            scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
+            convergence_delta=5, desired_capacity=5, pending_capacity=2,
+            active_capacity=3, audit_log=True)
+
+    def test_audit_log_events_logged_on_negative_delta(self):
+        """
+        ``obey_config_change`` makes the correct audit log upon scale down
+        """
+        log = mock_log()
+        self.calculate_delta.return_value = -5
+        d = controller.obey_config_change(log, 'transaction-id',
+                                          'config', self.group, self.state)
+        self.assertIs(self.successResultOf(d), self.state)
+        log.msg.assert_called_once_with(
+            'Deleting 5 servers to satisfy desired capacity',
+            scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
+            convergence_delta=-5, desired_capacity=5, pending_capacity=2,
+            active_capacity=3, audit_log=True)
 
 
 class FindPendingJobsToCancelTests(TestCase):
@@ -902,6 +937,11 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
 
         self.mock_log = mock.MagicMock()
         self.mock_state = mock.MagicMock(GroupState)
+        self.mock_state.get_capacity.return_value = {
+            'desired_capacity': 5,
+            'pending_capacity': 2,
+            'active_capacity': 3
+        }
 
         self.group = iMock(IScalingGroup, tenant_id='tenant', uuid='group')
         self.group.view_config.return_value = defer.succeed("config")
@@ -946,8 +986,9 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
         self.assertEqual(result, self.mock_state)
 
         # log should have been updated
-        self.mock_log.bind.assert_called_once_with(
-            scaling_group_id=self.group.uuid, policy_id='pol1')
+        self.assertEqual(
+            self.mock_log.bind.mock_calls[0],
+            mock.call(scaling_group_id=self.group.uuid, policy_id='pol1'))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -980,8 +1021,9 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
         self.assertEqual(failure.value, expected)
 
         # log should have been updated
-        self.mock_log.bind.assert_called_once_with(
-            scaling_group_id=self.group.uuid, policy_id='pol1')
+        self.assertEqual(
+            self.mock_log.bind.mock_calls[0],
+            mock.call(scaling_group_id=self.group.uuid, policy_id='pol1'))
 
         self.mocks['check_cooldowns'].assert_called_once_with(
             self.mock_log.bind.return_value, self.mock_state, "config",
@@ -1070,6 +1112,38 @@ class MaybeExecuteScalingPolicyTestCase(TestCase):
 
         # state should have been updated
         self.mock_state.mark_executed.assert_called_once_with('pol1')
+
+    def test_audit_log_events_logged_on_positive_delta(self):
+        """
+        ``obey_config_change`` makes the correct audit log upon scale up
+        """
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = 5
+        d = controller.maybe_execute_scaling_policy(log, 'transaction',
+                                                    self.group, self.mock_state,
+                                                    'pol1')
+        self.assertEqual(self.successResultOf(d), self.mock_state)
+        log.msg.assert_called_with(
+            'Starting {convergence_delta} new servers to satisfy desired capacity',
+            scaling_group_id=self.group.uuid, event_type="convergence.scale_up",
+            convergence_delta=5, desired_capacity=5, pending_capacity=2,
+            active_capacity=3, audit_log=True)
+
+    def test_audit_log_events_logged_on_negative_delta(self):
+        """
+        ``obey_config_change`` makes the correct audit log upon scale down
+        """
+        log = mock_log()
+        self.mocks['calculate_delta'].return_value = -5
+        d = controller.maybe_execute_scaling_policy(log, 'transaction',
+                                                    self.group, self.mock_state,
+                                                    'pol1')
+        self.assertEqual(self.successResultOf(d), self.mock_state)
+        log.msg.assert_called_with(
+            'Deleting 5 servers to satisfy desired capacity',
+            scaling_group_id=self.group.uuid, event_type="convergence.scale_down",
+            convergence_delta=-5, desired_capacity=5, pending_capacity=2,
+            active_capacity=3, audit_log=True)
 
 
 class ExecuteLaunchConfigTestCase(TestCase):
