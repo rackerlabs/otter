@@ -130,6 +130,15 @@ class GroupState(object):
         """
         self.policy_touched[policy_id] = self.group_touched = self.now()
 
+    def get_capacity(self):
+        """
+        :returns: a dictionary with the desired_capcity, active_capacity, and
+        pending_capacity.
+        """
+        return {'active_capacity': len(self.active),
+                'pending_capacity': len(self.pending),
+                'desired_capacity': len(self.active) + len(self.pending)}
+
 
 class UnrecognizedCapabilityError(Exception):
     """
