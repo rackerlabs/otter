@@ -1,6 +1,9 @@
 {
   "event": {
     "properties": {
+      "audit_log": {
+        "type": "boolean"
+      },
       "server_id": {
         "index": "not_analyzed",
         "type": "string"
