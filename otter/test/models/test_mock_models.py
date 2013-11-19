@@ -13,7 +13,7 @@ from otter.models.mock import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError,
-    ScalingGroupOverLimitError)
+    ScalingGroupOverLimitError, WebhooksOverLimitError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -79,6 +79,9 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10}}})
+        self.addCleanup(set_config_data, {})
+
         self.tenant_id = '11111'
         self.group_id = '1'
         self.mock_log = mock.MagicMock()
@@ -520,6 +523,27 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         deferred = self.group.create_webhooks("otter-stacking", [{}])
         self.failureResultOf(deferred, NoSuchPolicyError)
 
+    def test_create_one_webhook_when_at_limit_fails(self):
+        """
+        Creating webhooks on a policy that already has the max number of
+        webhooks fails with a :class:`WebhooksOverLimitError`
+        """
+        self.group.policies = {'pol_id': {}}
+        self.group.webhooks['pol_id'] = {str(i): {} for i in range(10)}
+        deferred = self.group.create_webhooks("pol_id", [{}])
+        self.failureResultOf(deferred, WebhooksOverLimitError)
+
+    def test_create_too_many_webhooks_over_limit(self):
+        """
+        Creating enough webhooks on a policy to put it over the max number of
+        webhooks fails with a :class:`WebhooksOverLimitError`
+        """
+        self.group.policies = {'pol_id': {}}
+        self.group.webhooks['pol_id'] = {'1': {}}
+        deferred = self.group.create_webhooks("pol_id",
+                                              [{str(i): {}} for i in range(10)])
+        self.failureResultOf(deferred, WebhooksOverLimitError)
+
     @mock.patch('otter.models.mock.generate_capability',
                 return_value=("ver", "hash"))
     def test_create_webhooks_succeed(self, fake_random):
@@ -735,7 +759,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
 
     def setUp(self):
         """ Setup the mocks """
-        set_config_data({'limits': {'absolute': {'maxGroups': 10}}})
+        set_config_data({'limits': {'absolute': {'maxGroups': 10,
+                                                 'maxWebhooksPerPolicy': 10}}})
         self.addCleanup(set_config_data, {})
 
         self.collection = MockScalingGroupCollection()

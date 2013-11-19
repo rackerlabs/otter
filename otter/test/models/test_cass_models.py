@@ -22,7 +22,8 @@ from otter.models.cass import (
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
-    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError)
+    NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
+    WebhooksOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -204,6 +205,8 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         Create a mock group
         """
         self.connection = mock.MagicMock(spec=['execute'])
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 1000}}})
+        self.addCleanup(set_config_data, {})
 
         self.returns = [None]
 
@@ -947,7 +950,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             return mock_ids.pop(0)
 
         self.mock_key.side_effect = _return_uuid
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         result = self.validate_create_webhooks_return_value(
             '23456789',
             [{'name': 'a name'}, {'name': 'new name', 'metadata': {"k": "v"}}])
@@ -980,13 +983,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             return mock_ids.pop(0)
 
         self.mock_key.side_effect = _return_uuid
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
+        policy_id = '23456789'
 
         self.validate_create_webhooks_return_value(
-            '23456789',
+            policy_id,
             [{'name': 'a name'}, {'name': 'new name', 'metadata': {'k': 'v'}}])
 
-        expected_cql = (
+        expected_count_cql = (
+            'SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expected_params = {'tenantId': self.tenant_id, 'groupId': self.group_id,
+                           'policyId': policy_id}
+
+        expected_insert_cql = (
             'BEGIN BATCH '
             'INSERT INTO policy_webhooks("tenantId", "groupId", "policyId", "webhookId", '
             'data, capability, "webhookKey") VALUES (:tenantId, :groupId, :policyId, '
@@ -999,8 +1009,11 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         # can't test the parameters, because they contain serialized JSON.
         # have to pull out the serialized JSON, load it as an object, and then
         # compare
-        self.connection.execute.assert_called_with(
-            expected_cql, mock.ANY, ConsistencyLevel.TWO)
+        self.assertEqual(
+            self.connection.execute.mock_calls,
+            [mock.call(expected_count_cql, expected_params,
+                       ConsistencyLevel.TWO),
+             mock.call(expected_insert_cql, mock.ANY, ConsistencyLevel.TWO)])
 
         cql_params = self.connection.execute.call_args[0][1]
 
@@ -1009,10 +1022,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             capability_name = '{0}Capability'.format(name)
             cql_params[capability_name] = json.loads(cql_params[capability_name])
 
-        expected_params = {
-            "tenantId": '11111',
-            "groupId": '12345678g',
-            "policyId": '23456789',
+        expected_params.update({
             "webhook0Id": '100001',
             "webhook0": {'name': 'a name', 'metadata': {}, '_ver': 1},
             "webhook0Capability": {"ver": "hash", "_ver": 1},
@@ -1021,7 +1031,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             "webhook1": {'name': 'new name', 'metadata': {'k': 'v'}, '_ver': 1},
             "webhook1Capability": {"ver": "hash", "_ver": 1},
             "webhook1Key": "hash"
-        }
+        })
 
         self.assertEqual(cql_params, expected_params)
 
@@ -1029,9 +1039,50 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         Can't add webhooks to an invalid policy.
         """
-        self.returns = [[], None]
+        self.returns = [[]]
         d = self.group.create_webhooks('23456789', [{}, {'metadata': 'who'}])
         self.failureResultOf(d, NoSuchPolicyError)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_webhooks_already_beyond_limits(self, _):
+        """
+        Can't add a webhook if already at limit
+        """
+        policy_id = '23456789'
+        self.returns = [[{'count': 1000}], None]
+        d = self.group.create_webhooks(policy_id, [{}])
+        self.failureResultOf(d, WebhooksOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id,
+                         'policyId': policy_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+    @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
+                return_value=defer.succeed({}))
+    def test_add_many_webhooks_beyond_limits(self, _):
+        """
+        Can't add any of the webhooks if adding all would bring it above the
+        limit
+        """
+        policy_id = '23456789'
+        self.returns = [[{'count': 990}], None]
+        d = self.group.create_webhooks(policy_id, [{} for i in range(20)])
+        self.failureResultOf(d, WebhooksOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM policy_webhooks WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId AND "policyId" = :policyId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id,
+                         'policyId': policy_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
