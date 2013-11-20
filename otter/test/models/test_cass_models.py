@@ -1626,18 +1626,30 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
 
     def test_update_scaling_policy_schedule_no_change(self):
         """
-        Schedule policy update with no change in args does not update the scaling_schedule_v2 table.
-        It only updates the scaling_policies table
+        Schedule policy update with no args difference also updates scaling_schedule_v2 table.
         """
         self.returns = [None]
         self.get_policy.return_value = defer.succeed({"type": "schedule",
-                                                      "args": {"ott": "er"}})
-        d = self.group.update_policy(
-            '12345678',
-            {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
-        self.assertIsNone(self.successResultOf(d))  # update returns None
-        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}')
-        self.assertEqual(self.connection.execute.call_count, 1)
+                                                      "args": {"cron": "1 * * * *"}})
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "1 * * * *"}})
+        self.assertIsNone(self.successResultOf(d))
+        expected_cql = (
+            'BEGIN BATCH '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
+            'trigger, cron, version) '
+            'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :cron, :version) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policyId, :data, :version) '
+            'APPLY BATCH;')
+        expected_data = {
+            "data": '{"_ver": 1, "args": {"cron": "1 * * * *"}, '
+                    '"type": "schedule"}',
+            "groupId": '12345678g', "policyId": '12345678',
+            "tenantId": '11111', "trigger": "next_time",
+            "version": 'timeuuid', "bucket": 2, "cron": '1 * * * *'}
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
     def test_update_scaling_policy_type_change(self):
         """
