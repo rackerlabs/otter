@@ -2,6 +2,12 @@ FORMAT: 1A
 
 # Rackspace Autoscale
 
+## Authentication and Endpoints
+
+Every REST request for Auto Scale requires the inclusion of the X-Auth-Token HTTP header. 
+The regions you have access to are available in your service catalog.
+Obtain this token and your service catalog via the [Authentication service](http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content/Retrieving_Auth_Token.html).
+
 # Group Groups
 Autoscale REST endpoints having to do with a group or collection of groups (/tenantId/groups and /tenantId/groups/groupId)
 
