@@ -134,7 +134,7 @@ AUDIT_LOG_FIELDS = {
     "policy_id": basestring,
     "webhook_id": basestring,
     "data": dict,
-    "trasaction_id": basestring,
+    "transaction_id": basestring,
     "event_type": basestring,
     "is_error": bool,
     "desired_capacity": int,
