@@ -2,6 +2,7 @@
 Wrapper for handling faults in a scalable fashion
 """
 
+from copy import deepcopy
 from functools import wraps
 import json
 
@@ -151,7 +152,8 @@ def with_transaction_id():
             request.setHeader('X-Response-Id', transaction_id)
             self.log = self.log.bind(
                 system=reflect.fullyQualifiedName(f),
-                transaction_id=transaction_id)
+                transaction_id=transaction_id,
+                request_ip=request.getClientIP())
             self.log.bind(
                 method=request.method,
                 uri=request.uri,

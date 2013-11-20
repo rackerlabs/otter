@@ -37,6 +37,7 @@ class TransactionIdTestCase(TestCase):
         self.mockRequest.uri = '/'
         self.mockRequest.clientproto = 'HTTP/1.1'
         self.mockRequest.method = 'PROPFIND'
+        self.mockRequest.getClientIP.return_value = 'ip'
         values = {'referer': 'referrer(sic)',
                   'user-agent': 'Mosaic/1.0'}
 
@@ -76,7 +77,8 @@ class TransactionIdTestCase(TestCase):
 
         self.mock_log.bind.assert_called_once_with(
             system='otter.test.rest.test_decorators.doWork',
-            transaction_id='12345678')
+            transaction_id='12345678',
+            request_ip='ip')
         self.assertEqual(self.mock_log.bind().bind.call_args_list[0],
                          mock.call(useragent='Mosaic/1.0',
                                    clientproto='HTTP/1.1',
