@@ -125,7 +125,7 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
             </revision>
         </revhistory>
       <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
-        <raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
+        <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
