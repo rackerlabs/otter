@@ -14,8 +14,10 @@ from twisted.python.failure import Failure
 
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
-    with_transaction_id, log_arguments, paginatable, InvalidQueryArgument)
+    with_transaction_id, log_arguments, paginatable, InvalidQueryArgument,
+    AuditLogger)
 from otter.util.config import set_config_data
+from otter.test.utils import mock_log
 
 
 class BlahError(Exception):
@@ -567,3 +569,43 @@ class PaginatableTestCase(TestCase):
         d = self.app.paginate_me(self.mockRequest)
         self.assertEqual(self.successResultOf(d),
                          {'marker': '1234', 'limit': 10})
+
+
+class AuditLoggerTestCase(TestCase):
+    """
+    Tests for AuditLogger
+    """
+    def test_add_new_params(self):
+        """
+        Add updates the parameters without completely destroying the old
+        parameters
+        """
+        log = mock_log()
+        a = AuditLogger(log)
+        a.add(**{'gangnam': 'style', '_with': 'hammer'})
+        a.add(**{'_with': 'psy', 'extra': 'keyword'})
+        a.audit('')
+        log.msg.assert_called_once_with('', gangnam='style', _with='psy',
+                                        extra='keyword', audit_log=True)
+
+    def test_logs_the_message(self):
+        """
+        Whatever message is passed to 'audit' is logged as the message
+        """
+        log = mock_log()
+        a = AuditLogger(log)
+        a.audit('this is the audit log message')
+        log.msg.assert_called_once_with('this is the audit log message',
+                                        audit_log=True)
+
+    def test_set_logger(self):
+        """
+        `set_logger` replaces the logger with a new logger
+        """
+        log_a, log_b = mock_log(), mock_log()
+        a = AuditLogger(log_a)
+        a.set_logger(log_b)
+        a.audit('this is the audit log message')
+        log_b.msg.assert_called_once_with('this is the audit log message',
+                                          audit_log=True)
+        self.assertFalse(log_a.msg.called)
