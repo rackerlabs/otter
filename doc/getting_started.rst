@@ -225,15 +225,15 @@ Create a Scaling Group by submitting a POST request containing an edited version
                     },
                     "personality": [
                         {
-                            "path": '/root/.ssh/authorized_keys',
-                            "contents": "ssh-rsa AAAAB3Nza...LiPk== user@example.net"
+                            "path": "/root/.ssh/authorized_keys",
+                            "contents": "c3NoLXJzYSBBQUFBQjNOemEuLi5MaVBrPT0gdXNlckBleGFtcGxlLm5ldAo="
                         }
                     ],
                     "networks": [
                         {
                             "uuid": "11111111-1111-1111-1111-111111111111"
                         }
-                    ],
+                    ]
                 },
                 "loadBalancers": [
                     {
@@ -247,6 +247,8 @@ Create a Scaling Group by submitting a POST request containing an edited version
         ]
     }' \
          "https://ord.autoscale.api.rackspacecloud.com/v1.0/{tenantId}/groups/"
+
+Note ['launchConfiguration']['args']['personality']['contents'] is base64 of ssh-rsa AAAAB3Nza...LiPk== user@example.net
 
 This will create your scaling group, spin up the minimum number of servers, and then attach them to the load balancer you specified. To modify the group, you will need to create policies.
 
