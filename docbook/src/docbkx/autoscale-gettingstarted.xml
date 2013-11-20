@@ -55,7 +55,6 @@ format="SVG" scale="60"/>
     <title>&PRODNAME;API Getting Started Guide</title>
     <titleabbrev>&PRODABBV; API Getting Started Guide</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
-status.bar.text="Early Access"
 canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
@@ -73,6 +72,16 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             </annotation>
         </legalnotice>
         <revhistory>
+            <revision>
+                <date>2013-11-19</date>
+                <revdescription>
+                    <itemizedlist spacing="compact">
+                        <listitem>
+                            <para>Updating content for UA</para>
+                        </listitem>
+                    </itemizedlist>
+                </revdescription>
+            </revision>
             <revision>
                 <date>2013-10-31</date>
                 <revdescription>
@@ -447,7 +456,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         </section>
         <section
             xml:id="Authenticated_Webhooks_and_Anonymous_Webhooks">
-            <title>Webhooks, and Capability URLs</title>
+            <title>Webhooks and Capability URLs</title>
             <para>Auto Scale uses webhooks to initiate scaling events.
                 A webhook is an industry-standard protocol for sending
                 events between systems; for Auto Scale, they are used
@@ -492,8 +501,9 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 off that URL based on events happening outside of Auto
                 Scale.</para>
             <para>To execute a capability URL, locate the URL in your
-                webhook, and then submit a POST request against it, as
-                shown in the following example:</para>
+                webhook, and then submit a <command>POST
+                </command>request against it, as shown in the
+                following example:</para>
             <example><title>POST Request to Execute a Capability URL</title>
                 <programlisting language="json"><xi:include href="./samples/reqExecuteCapabilityURL.json" parse="text"/></programlisting></example>
             <para>Executing a capability URL or an anonymous webhook
@@ -726,7 +736,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <col width="60%"/>
                 <thead>
                     <tr>
-                        <td>Parameter Name</td>
+                        <td>Parameter</td>
                         <td>Description</td>
                     </tr>
                 </thead>
@@ -809,10 +819,10 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                         <tr>
                             <td><parameter>args</parameter></td>
                             <td>Specifies the item to be configured.
-                                Must be "server" or "loadbalancer."
-                                Most launch configurations have both a
-                                server and a loadbalancer
-                                configured.</td>
+                                Must be "server" and, in most cases,
+                                "loadbalancer." Most launch
+                                configurations have both a server and
+                                a loadbalancer configured.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1463,17 +1473,18 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
             </para>
             <section xml:id="Authenticate_using_cURL">
                 <title>Authenticate using cURL</title>
-                <para>To authenticate, you issue a POST request to the
+                <para>To authenticate, you issue a
+                        <command>POST</command> request to the
                     appropriate Rackspace Cloud Identity Service
                     endpoint. In the request body, supply one of the
                     following sets of credentials:</para>
                 <para>
                     <itemizedlist>
                         <listitem>
-                            <para>user name and password</para>
+                            <para>User name and password</para>
                         </listitem>
                         <listitem>
-                            <para>user name and API key</para>
+                            <para>User name and API key</para>
                         </listitem>
                     </itemizedlist>
                 </para>
@@ -1500,67 +1511,75 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
         <section xml:id="Save_Image">
             <title>Save an Image</title>
             <para>After authenticating to the Web service you create a
-                cloud server using one of the following
-                methods:</para>
-            <para>
-                <itemizedlist>
+                cloud server with a server image. Auto Scale will use
+                the configuration info in this server image as a
+                blueprint for create new server images.<orderedlist>
                     <listitem>
-                        <para> Create a server through the <link
-                                xlink:href="http://mycloud.rackspace.com/"
-                                >Control Panel</link>. </para>
-                    </listitem>
-                    <listitem>
-                        <para>Create a server through the Cloud
-                            Servers API by using a <link
-                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
-                                >Create Server</link> request. </para>
+                        <para>Create a server using one of the
+                            following methods:</para>
                         <para>
-                            <note>
-                                <para>The metadata parameter is
-                                   optional. The maximum size of the
-                                   metadata key and value is 255 bytes
-                                   each. For more information, see the
+                            <itemizedlist>
+                                <listitem>
+                                   <para> Create a server through the
                                    <link
-                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
-                                   >Server Metadata</link>
-                                   documentation.</para>
-                            </note>
+                                   xlink:href="http://mycloud.rackspace.com/"
+                                   >Control Panel</link>. </para>
+                                </listitem>
+                                <listitem>
+                                   <para>Create a server through the
+                                   Cloud Servers API by using a <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
+                                   >Create Server</link> request.
+                                   </para>
+                                </listitem>
+                            </itemizedlist>
                         </para>
                     </listitem>
-                </itemizedlist>
-            </para>
-            <para> With the Cloud Servers API, you can use a <link
-                    xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/images-d1e4427.html"
-                    >List Images</link> request to retrieve a list of
-                options available for configuring your server. </para>
-            <para>The following example shows how to request a list
-                cloud server images.</para>
-            <para>
-                <example>
-                    <title>Requesting a List of Cloud Server
-                        Images</title>
-                    <programlisting language="bash">$ curl -X GET \
+                    <listitem>
+                        <para>Use the Cloud Servers API to issue a
+                                <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/images-d1e4427.html"
+                                >List Images</link> request to
+                            retrieve a list of options available for
+                            configuring your server.  The following
+                            example shows how to request a list cloud
+                            server images.</para>
+                        <para>
+                            <example>
+                                <title>Requesting a List of Cloud
+                                   Server Images</title>
+                                <programlisting language="bash">$ curl -X GET \
         -H "Content-Type: application/json" \
         -H "X-Auth-token:{auth-token}" \
         https://ord.servers.api.rackspacecloud.com/v2/{tenant-id}/images?type=SNAPSHOT | python -mjson.tool
                     </programlisting>
-                </example>
-            </para>
-            <para>After creating your server you customize it so that
-                it can process your requests. For example, if you are
-                building a webhead scaling group, configure Apache to
-                start on launch and serve the files that you need. </para>
-            <para> After you have created and customized your server,
-                save its image and record the imageID value that is
-                returned in the response body. </para>
+                            </example>
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>After creating your server you customize
+                            it so that it can process your requests.
+                            For example, if you are building a webhead
+                            scaling group, configure Apache to start
+                            on launch and serve the files that you
+                            need.</para>
+                    </listitem>
+                    <listitem>
+                        <para>After you have created and customized
+                            your server, save its image and record the
+                            imageID value that is returned in the
+                            response body. </para>
+                    </listitem>
+                </orderedlist></para>
         </section>
         <section xml:id="Create_Group">
             <title>Create and Manage a Scaling Group</title>
             <para>You use the Autoscale API to create and manage your
                 scaling group.</para>
-            <para>To create a scaling group, submit a POST request
-                with the <parameter>tenantID</parameter> that you
-                obtained during the <link linkend="Authenticate"
+            <para>To create a scaling group, submit a
+                    <command>POST</command> request with the
+                    <parameter>tenantID</parameter> that you obtained
+                during the <link linkend="Authenticate"
                     >Authentication</link> step.The following example
                 shows how to create a scaling group. </para>
             <example>
@@ -1568,25 +1587,27 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <programlisting>POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
                 </programlisting>
                 <programlisting language="json"><xi:include href="./samples/reqCreateGroup.json" parse="text"/></programlisting>
-                <para>The POST request creates a scaling group, starts
-                    the minimum number of servers, and attaches those
-                    servers to the specified load balancer. </para>
-                <para>If the POST request is successful, the response
-                    data will be returned in JSON format as shown in
-                    the following example:</para>
+                <para>The <command>POST</command> request creates a
+                    scaling group, starts the minimum number of
+                    servers, and attaches those servers to the
+                    specified load balancer. </para>
+                <para>If the <command>POST</command> request is
+                    successful, the response data will be returned in
+                    JSON format as shown in the following
+                    example:</para>
                 <example><title>Response for Successful Create a Scaling Group Request</title><programlisting language="json"><xi:include href="./samples/resCreateGroup.json" parse="text"/></programlisting></example>
             </example>
             <example>
                 <title>List all Scaling Groups</title>
                 <para>To obtain a list of all scaling groups, submit a
-                    GET request with the
+                        <command>GET</command> request with the
                         <parameter>tenantId</parameter> parameter
                     specified in the request URL.</para>
                 <programlisting>GET /{tenantId}/groups
                 </programlisting>
                 <para>The following example shows a response for the
-                    GET request with a list of all scaling
-                    groups:</para>
+                        <command>GET</command> request with a list of
+                    all scaling groups:</para>
                 <example><title>Response for Successful List All Scaling Groups Request</title> <programlisting language="json"><xi:include href="./samples/resGetGroups.json" parse="text"/></programlisting></example>
             </example>
             <example>
@@ -1594,14 +1615,16 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     Configuration</title>
                 <para>To obtain a detailed view of your scaling group
                     configuration, including the launch configuration,
-                    and the scaling policies, submit a GET request
-                    with the <parameter>tenantId</parameter> and
+                    and the scaling policies, submit a
+                        <command>GET</command> request with the
+                        <parameter>tenantId</parameter> and
                         <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <programlisting>GET /{tenantId}/groups/{groupId}</programlisting>
-                <para>If the GET request is successful, the data is
-                    returned in the body of the response in JSON
-                    format as shown in the following example:</para>
+                <para>If the <command>GET</command> request is
+                    successful, the data is returned in the body of
+                    the response in JSON format as shown in the
+                    following example:</para>
                 <example><title>Response for Successful Manifested Scaling Group View Request</title><programlisting language="json"><xi:include href="./samples/resGetGroupManifest.json" parse="text"/></programlisting></example>
             </example>
             <example>
@@ -1610,14 +1633,15 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 <para>To obtain the current state of a scaling group,
                     including the current set of active entities, the
                     number of pending entities, and the desired number
-                    of entities, submit a GET request with the
-                        <parameter>tenantId</parameter> and
-                        <parameter>groupId</parameter> parameters
+                    of entities, submit a <command>GET</command>
+                    request with the <parameter>tenantId</parameter>
+                    and <parameter>groupId</parameter> parameters
                     specified in the request URL.</para>
                 <programlisting>GET /{tenantId}/groups/{groupId}</programlisting>
-                <para>If the GET request is successful, the data is
-                    returned in the body of the response in JSON
-                    format as shown in the following example:</para>
+                <para>If the <command>GET</command> request is
+                    successful, the data is returned in the body of
+                    the response in JSON format as shown in the
+                    following example:</para>
                 <example><title>Response for Successful Get Current State of Scaling Group
                         Request</title><programlisting language="json"><xi:include href="./samples/resGetGroupState.json" parse="text"/>
 </programlisting></example>
@@ -1630,29 +1654,32 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 deleting the scaling group depend on whether your
                 scaling group has active entities or not.</para>
             <para>When a group contains no servers, you can eliminate
-                the group by sending a DELETE request to its group ID. </para>
+                the group by sending a <command>DELETE</command>
+                request to its group ID. </para>
             <para>The following three options are possible for
                 deleting a scaling group:</para>
             <para>
                 <itemizedlist>
                     <listitem>
                         <para>If there are no active entities in your
-                            configuration, use the DELETE request to
+                            configuration, use the
+                                <command>DELETE</command> request to
                             delete the scaling group.</para>
                     </listitem>
                     <listitem>
                         <para>If there are active entities in your
                             configuration, update your scaling group
-                            configuration by submitting a PUT request
-                            and setting the
+                            configuration by submitting a <command>PUT
+                            </command>request and setting the
                                 <parameter>minEntities</parameter> and
                                 <parameter>maxEntities</parameter>
                             parameters to 0. </para>
                     </listitem>
                     <listitem>
                         <para>Force the deletion of your group by
-                            submitting a DELETE request and setting
-                            the <parameter>force</parameter> parameter
+                            submitting a <command>DELETE</command>
+                            request and setting the
+                                <parameter>force</parameter> parameter
                             to true.</para>
                     </listitem>
                 </itemizedlist>
@@ -1671,12 +1698,12 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                     <title>Delete a Scaling Group</title>
                     <programlisting language="json"><xi:include href="./samples/reqDeleteGroup.json" parse="text"/></programlisting>
                 </example>
-                <para>If the DELETE request is successful, a 204
-                    response code with no response body will be
-                    returned. If the request fails, a 403 response
-                    code will be returned with a message stating that
-                    your group still has active entities as shown in
-                    the following example:</para>
+                <para>If the <command>DELETE</command> request is
+                    successful, a 204 response code with no response
+                    body will be returned. If the request fails, a 403
+                    response code will be returned with a message
+                    stating that your group still has active entities
+                    as shown in the following example:</para>
                 <example><title>Response to Failed DELETE Request</title><programlisting>
 "Group d5f5f3ad-faef-4c8f-99c4-0e931189c521 for tenant 829409 still has entities."
                 </programlisting></example>
@@ -1684,16 +1711,17 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
           <section xml:id="Delete_Scaling_Group_with_Active_Entities">
                 <title>Delete a Scaling Group with Active
                     Entities<?sbr?><?sbr?></title>
-                <para>If you have submitted a DELETE request and
-                    received a response saying that your group still
-                    has active entities, go through the following
-                    steps:</para>
+                <para>If you have submitted a
+                        <command>DELETE</command> request and received
+                    a response saying that your group still has active
+                    entities, go through the following steps:</para>
                 <para>
                     <orderedlist>
                         <listitem>
                             <para>Update the scaling group
-                                configuration by submitting a PUT
-                                request that sets the
+                                configuration by submitting a
+                                   <command>PUT </command>request that
+                                sets the
                                    <parameter>minEntities</parameter>
                                 and <parameter>maxEntities</parameter>
                                 parameters to 0 as shown in the
@@ -1707,7 +1735,8 @@ PUT /{tenantId}/groups/{groupId}/config
 </programlisting>
                         </listitem>
                         <listitem>
-                            <para>Submit a DELETE request with the
+                            <para>Submit a <command>DELETE</command>
+                                request with the
                                    <parameter>tenantId</parameter> and
                                    <parameter>groupId</parameter>
                                 parameters specified in the request
@@ -1740,9 +1769,10 @@ DELETE /{tenantId}/groups/{groupId}
                             manually delete servers instead.</para>
                     </warning>
                 </para>
-                <para>To use the Force Delete option, submit a DELETE
-                    request with the <parameter>tenantId</parameter>
-                    and <parameter>groupId</parameter> parameters
+                <para>To use the Force Delete option, submit a
+                        <command>DELETE</command> request with the
+                        <parameter>tenantId</parameter> and
+                        <parameter>groupId</parameter> parameters
                     specified in the request URL, and set the
                         <parameter>force</parameter> parameter to
                         <parameter>true</parameter>. </para>
@@ -1753,7 +1783,8 @@ DELETE /{tenantId}/groups/{groupId}?force=true
                         <parameter>minEntities</parameter> and
                         <parameter>maxEntities</parameter> parameters
                     will automatically be set to 0 and the deletion of
-                    the group will begin. If the DELETE request is
+                    the group will begin. If the
+                        <command>DELETE</command> request is
                     successful, a 204 response code with an empty
                     response body will be returned.</para>
             </section>
