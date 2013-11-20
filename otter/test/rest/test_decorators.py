@@ -15,7 +15,7 @@ from twisted.python.failure import Failure
 from otter.rest.decorators import (
     fails_with, select_dict, succeeds_with, validate_body, InvalidJsonError,
     with_transaction_id, log_arguments, paginatable, InvalidQueryArgument,
-    AuditLogger)
+    AuditLogger, auditable)
 from otter.util.config import set_config_data
 from otter.test.utils import mock_log
 
@@ -609,3 +609,61 @@ class AuditLoggerTestCase(TestCase):
         log_b.msg.assert_called_once_with('this is the audit log message',
                                           audit_log=True)
         self.assertFalse(log_a.msg.called)
+
+
+class AuditableTestCase(TestCase):
+    """
+    Tests for auditable decorator
+    """
+    def test_sets_audit_logger(self):
+        """
+        If the auditable decorator is used, an auditable_data object is
+        passed to the wrapped function.
+        """
+        audit_loggers = []
+
+        class FakeApp(object):
+            log = mock_log()
+
+            @auditable('event_type', 'my message')
+            def handler(inner_self, request, audit_logger):
+                audit_loggers.append(audit_logger)
+
+        app = FakeApp()
+        app.handler(mock.Mock(spec=[]))
+
+        self.assertEqual(len(audit_loggers), 1)
+        self.assertIsInstance(audit_loggers[0], AuditLogger)
+
+    def test_audit_logs_produced_on_success(self):
+        """
+        Audit logs are logged on handler success, and results are propagated
+        """
+        class FakeApp(object):
+            log = mock_log()
+
+            @auditable('event_type', 'my message')
+            def handler(inner_self, request, audit_logger):
+                return 'yay'
+
+        app = FakeApp()
+        d = app.handler(mock.Mock(spec=[]))
+        self.assertEqual(self.successResultOf(d), 'yay')
+        app.log.msg.assert_called_once_with('my message', audit_log=True,
+                                            event_type='event_type')
+
+    def test_audit_logs_not_produced_on_failure(self):
+        """
+        Audit logs are not logged on handler failure
+        """
+        class FakeApp(object):
+            log = mock_log()
+
+            @auditable('event_type', 'my message')
+            def handler(inner_self, request, audit_logger):
+                raise ValueError('no logs!')
+
+        app = FakeApp()
+        d = app.handler(mock.Mock(spec=[]))
+        self.failureResultOf(d, ValueError)
+        self.assertFalse(app.log.msg.called)

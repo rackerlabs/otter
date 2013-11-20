@@ -259,3 +259,27 @@ class AuditLogger(object):
 
     def audit(self, message):
         self._logger.msg(message, **self._params)
+
+
+def auditable(event_type, msg_on_success):
+    """
+    Makes the result of an endpoint audit loggable - passes an
+    AuditLogger object to the handler so that it can set extra data to be
+    logged.
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(self, request, *args, **kwargs):
+            audit_logger = AuditLogger(self.log)
+            audit_logger.add(event_type=event_type)
+            kwargs['audit_logger'] = audit_logger
+
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
+
+            def audit_log_it(result):
+                audit_logger.audit(msg_on_success)
+                return result
+
+            return d.addCallback(audit_log_it)
+        return _
+    return decorator
