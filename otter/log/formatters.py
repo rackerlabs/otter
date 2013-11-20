@@ -149,7 +149,7 @@ AUDIT_LOG_FIELDS = {
 }
 
 
-def audit_log_formatter(eventDict, timestamp):
+def audit_log_formatter(eventDict, timestamp, hostname):
     """
     Format an eventDict into another dictionary that conforms to the audit log
     format.
@@ -162,6 +162,7 @@ def audit_log_formatter(eventDict, timestamp):
     audit_log_params = {
         "@version": 1,
         "@timestamp": timestamp,
+        "host": hostname,
         "is_error": False
     }
 
@@ -274,7 +275,8 @@ def ObserverWrapper(observer, hostname, seconds=None):
         # emit an audit log entry also, if it's an audit log
         if 'audit_log' in eventDict:
             log_params['audit_log_event_source'] = True
-            observer(audit_log_formatter(eventDict, log_params['timestamp']))
+            observer(audit_log_formatter(eventDict, log_params['timestamp'],
+                                         hostname))
 
         observer(log_params)
 

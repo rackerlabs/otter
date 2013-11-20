@@ -418,12 +418,15 @@ class ObserverWrapperTests(TestCase):
     def test_generates_new_audit_log(self):
         """
         The observer generates two logs for an audit-loggable eventDict -
-        the audit log dictionary and a regular log
+        the audit log dictionary and a regular log (passes timestamp and
+        hostname too)
         """
-        self.wrapper({'message': 'meh', 'audit_log': True})
+        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 't'})
         self.observer.has_calls([
             mock.call(matches(ContainsDict({'_message': Equals('meh'),
-                                            'audit_log': Equals(True)}))),
+                                            'audit_log': Equals(True),
+                                            '@timestamp': Equals('t'),
+                                            'host': Equals('hostname')}))),
             mock.call(matches(ContainsDict({
                 'short_message': Equals('meh'),
                 'audit_log_event_source': Equals(True)})))
@@ -439,11 +442,13 @@ class AuditLogFormatterTests(TestCase):
         audit log formatter filters extraneous fields out of the event dict
         """
         self.assertEquals(
-            audit_log_formatter({'message': ('Hello',), 'what': 'the'}, 0),
+            audit_log_formatter({'message': ('Hello',), 'what': 'the'}, 0,
+                                'hostname'),
             {
                 '@version': 1,
                 '_message': 'Hello',
                 '@timestamp': 0,
+                'host': 'hostname',
                 'is_error': False
             })
 
@@ -453,12 +458,14 @@ class AuditLogFormatterTests(TestCase):
         fault dictionary will be specified.  is_error will also be True.
         """
         self.assertEquals(
-            audit_log_formatter({'message': ('meh',), 'isError': 'yes'}, 0),
+            audit_log_formatter({'message': ('meh',), 'isError': 'yes'}, 0,
+                                'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
+                'host': 'hostname',
                 'fault': {'details': {}}
             })
 
@@ -468,12 +475,14 @@ class AuditLogFormatterTests(TestCase):
         """
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'why': 'is the sky blue'}, 0),
+                                 'why': 'is the sky blue'}, 0,
+                                'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh. is the sky blue',
                 '@timestamp': 0,
                 'is_error': True,
+                'host': 'hostname',
                 'fault': {'details': {}}
             })
 
@@ -483,12 +492,14 @@ class AuditLogFormatterTests(TestCase):
         """
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
-                                 'failure': Failure(ValueError('boo'))}, 0),
+                                 'failure': Failure(ValueError('boo'))}, 0,
+                                'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
+                'host': 'hostname',
                 'fault': {'details': {}, 'message': 'boo'}
             })
 
@@ -499,12 +510,14 @@ class AuditLogFormatterTests(TestCase):
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
-                                 'failure': Failure(ValueError('boo'))}, 0),
+                                 'failure': Failure(ValueError('boo'))}, 0,
+                                'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
+                'host': 'hostname',
                 'fault': {
                     'message': '1',
                     'details': {'x': 'y'}
@@ -521,12 +534,13 @@ class AuditLogFormatterTests(TestCase):
         self.assertEquals(
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
-                                 'failure': Failure(exc)}, 0),
+                                 'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh.',
                 '@timestamp': 0,
                 'is_error': True,
+                'host': 'hostname',
                 'fault': {
                     'message': '1',
                     'details': {'x': 'y', '1': 2, '3': 5}
@@ -547,7 +561,7 @@ class AuditLogFormatterTests(TestCase):
             audit_log_formatter({'message': ('meh',), 'isError': 'yes',
                                  'tenant_id': '5',
                                  'fault': {'details': {'x': 'y'}, 'message': '1'},
-                                 'failure': Failure(exc)}, 0),
+                                 'failure': Failure(exc)}, 0, 'hostname'),
             {
                 '@version': 1,
                 '_message': 'Failed: meh.',
@@ -555,6 +569,7 @@ class AuditLogFormatterTests(TestCase):
                 'is_error': True,
                 'scaling_group_id': '5',
                 'tenant_id': '5',
+                'host': 'hostname',
                 'fault': {
                     'message': '1',
                     'details': {'x': 'y', '1': 2}
