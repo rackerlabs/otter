@@ -52,7 +52,7 @@ format="SVG" scale="60"/>
     xmlns:raxm="http://docs.rackspace.com/api/metadata"
     xlink:href="http:// docs.autoscale.apiary.io/ ">
     <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
-    <title>&PRODNAME;API Getting Started Guide</title>
+    <title>&PRODNAME; API Getting Started Guide</title>
     <titleabbrev>&PRODABBV; API Getting Started Guide</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
 canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content"?>
