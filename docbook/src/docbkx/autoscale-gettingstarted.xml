@@ -55,7 +55,7 @@ format="SVG" scale="60"/>
     <title>&PRODNAME;API Getting Started Guide</title>
     <titleabbrev>&PRODABBV; API Getting Started Guide</titleabbrev>
     <?rax title.font.size="35px" subtitle.font.size="20px"
-canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstarted/content"?>
+canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstarted/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
         <productname>&PRODNAME;</productname>
@@ -135,7 +135,7 @@ canonical.url.base="http://docs.rackspace.com/autoscale/api/v1.0/cas-gettingstar
                 </revdescription>
             </revision>
         </revhistory>
-        <raxm:metadata role="hidden">
+        <raxm:metadata>
             <raxm:displayname>Getting Started Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>10</raxm:priority>

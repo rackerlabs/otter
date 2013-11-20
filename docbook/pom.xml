@@ -28,7 +28,7 @@
       <plugin>
         <groupId>com.rackspace.cloud.api</groupId>
         <artifactId>clouddocs-maven-plugin</artifactId>
-        <version>1.11.1</version>
+        <version>1.12.0</version>
         <executions>
           <execution>
             <id>autoscale</id>
@@ -54,10 +54,10 @@
         <configuration>
 	  <enableDisqus>internet</enableDisqus>
 	  <socialIcons>0</socialIcons>
-	  <metaRobots>1</metaRobots>
 	  <!-- notify these people when comments are posted on docs-internal.rackspace.com -->
 	  <feedbackEmail>rose.coste@rackspace.com,constanze.kratel@rackspace.com,felix.sargent@rackspace.com</feedbackEmail>
 	  <branding>rackspace</branding>
+	  <enableGoogleAnalytics>1</enableGoogleAnalytics>
 	  <!-- <failOnValidationerror>no</failOnValidationerror> -->
 	  <showXslMessages>true</showXslMessages>
 	  <highlightSource>false</highlightSource>
@@ -84,29 +84,4 @@
       </plugin>
     </plugins>
   </build>
-  <profiles>                                                                                              
-    <profile>                                                                                           
-      <id>Rackspace Research Repositories</id>                                                        
-      <activation>                                                                                    
-        <activeByDefault>true</activeByDefault>                                                     
-      </activation>                                                                                   
-      <repositories>                                                                                  
-        <repository>                                                                                
-          <id>rackspace-research</id>                                                             
-          <name>Rackspace Research Repository</name>                                              
-          <url>http://maven.research.rackspacecloud.com/content/groups/public/</url>              
-        </repository>                                                                               
-      </repositories>                                                                                 
-      <pluginRepositories>                                                                            
-        <pluginRepository>                                                                          
-          <id>rackspace-research</id>                                                             
-          <name>Rackspace Research Repository</name>                                              
-          <url>http://maven.research.rackspacecloud.com/content/groups/public/</url>
-          <snapshots>
-            <updatePolicy>always</updatePolicy>
-          </snapshots>
-        </pluginRepository>                                                                         
-      </pluginRepositories>                                                                           
-    </profile> 
-  </profiles>
 </project>
