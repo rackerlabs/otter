@@ -318,6 +318,7 @@ class CassStoreRestScalingPolicyTestCase(TestCase, RequestTestMixin, LockMixin):
         """
         keyspace.resume()
         self.root = Otter(store).app.resource()
+        store.kz_client = mock.Mock(Lock=self.mock_lock())
 
         set_config_data(limits)
         self.addCleanup(set_config_data, {})
