@@ -542,7 +542,7 @@ class CassScalingGroup(object):
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
-        lock = self.kz_client.Lock(LOCK_PATH, self.uuid)
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         # TODO: Better way to get reactor instead of importing?
         return with_lock(reactor, lock, log.bind(category='locking'), _modify_state)
@@ -893,7 +893,7 @@ class CassScalingGroup(object):
             d.addCallback(_maybe_delete)
             return d
 
-        lock = self.kz_client.Lock(LOCK_PATH, self.uuid)
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         return with_lock(reactor, lock, log.bind(category='locking'), _delete_group)
 

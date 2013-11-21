@@ -401,7 +401,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-        self.kz_lock.Lock.assert_called_once_with('/locks', self.group.uuid)
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
 
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
@@ -424,6 +424,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertEqual(self.connection.execute.call_count, 0)
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.assertEqual(self.lock.release.call_count, 0)
 
@@ -1517,6 +1518,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
@@ -1551,6 +1553,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
@@ -1568,6 +1571,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.failureResultOf(d, ValueError)
 
         self.assertFalse(self.connection.execute.called)
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
         self.lock._acquire.assert_called_once_with(timeout=120)
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
