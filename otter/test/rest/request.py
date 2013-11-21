@@ -70,6 +70,7 @@ def request(root_resource, method, endpoint, headers=None, body=None):
 
     # these are used when writing the response
     mock_request.code = 200
+    mock_request.getClientIP = mock.MagicMock(spec=(), return_value='ip')
     mock_request.setHeader = mock.MagicMock(spec=())
 
     # twisted request has a responseHeaders (outgoing headers) and

@@ -187,7 +187,7 @@ class GroupStateTestCase(TestCase):
         self.assertEqual(state.get_capacity(), {
             'desired_capacity': 11,
             'pending_capacity': 6,
-            'active_capacity': 5
+            'current_capacity': 5
         })
 
 
