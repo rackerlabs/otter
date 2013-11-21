@@ -349,8 +349,8 @@ class AutoscaleFixture(BaseTestFixture):
                 time.sleep(self.interval_time)
             else:
                 self.fail(
-                    "wait_for_active_list_in_group_state ran for 120 seconds for group {1} and did not "
-                    "observe the active server list achieving the expected servers count: {2}.".format(
+                    "wait_for_active_list_in_group_state ran for 120 seconds for group {0} and did not "
+                    "observe the active server list achieving the expected servers count: {1}.".format(
                         group_id, servers_after_scaledown))
         elif group_state.desiredCapacity == servers_after_scaledown:
             return
