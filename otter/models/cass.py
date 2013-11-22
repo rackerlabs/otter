@@ -682,7 +682,7 @@ class CassScalingGroup(object):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
-                if lastRev["type"] == 'schedule' and lastRev['args'] != data['args']:
+                if lastRev["type"] == 'schedule':
                     _build_schedule_policy(data, self.event_table, queries,
                                            cqldata, '', self.buckets)
 
