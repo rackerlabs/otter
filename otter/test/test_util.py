@@ -337,38 +337,6 @@ class WithLockTests(TestCase):
         """
         Acquires, calls method, releases and returns method's result. Logs time taken
         """
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
-        self.assertEqual(self.successResultOf(d), 'result')
-        self.lock.acquire.assert_called_once_with()
-        self.lock.release.assert_called_once_with()
-        self.method.assert_called_once_with(2, a=3)
-
-    def test_acquire_failed(self):
-        """
-        If acquire fails, method and release is not called
-        """
-        self.lock.acquire.side_effect = lambda: fail(ValueError('a'))
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
-        self.failureResultOf(d, ValueError)
-        self.lock.acquire.assert_called_once_with()
-        self.assertFalse(self.method.called)
-        self.assertFalse(self.lock.release.called)
-
-    def test_method_failure(self):
-        """
-        If method fails, lock is released and failure is propogated
-        """
-        self.method.return_value = fail(ValueError('a'))
-        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
-        self.failureResultOf(d, ValueError)
-        self.lock.acquire.assert_called_once_with()
-        self.lock.release.assert_called_once_with()
-        self.method.assert_called_once_with(2, a=3)
-
-    def test_logs(self):
-        """
-        Acquisition and release is logged with time taken
-        """
         acquire_d, release_d = Deferred(), Deferred()
         self.lock.acquire.side_effect = lambda: acquire_d
         self.lock.release.side_effect = lambda: release_d
@@ -386,5 +354,49 @@ class WithLockTests(TestCase):
         release_d.callback(None)
         self.log.msg.assert_called_with('Lock release in 3.0 seconds',
                                         release_time=3.0)
+        self.assertEqual(self.log.msg.call_count, 2)
 
         self.assertEqual(self.successResultOf(d), 'result')
+
+    def test_acquire_failed(self):
+        """
+        If acquire fails, method and release is not called. Acquisition failed is logged
+        """
+        acquire_d = Deferred()
+        self.lock.acquire.side_effect = lambda: acquire_d
+
+        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        self.assertNoResult(d)
+
+        self.reactor.advance(10)
+        acquire_d.errback(ValueError(None))
+        self.log.msg.assert_called_once_with('Lock acquisition failed in 10.0 seconds')
+        self.assertFalse(self.method.called)
+        self.failureResultOf(d, ValueError)
+
+    def test_methods_failure(self):
+        """
+        If method fails, lock is released and failure is propogated
+        Acquisition and release is logged with time taken
+        """
+        acquire_d, release_d = Deferred(), Deferred()
+        self.lock.acquire.side_effect = lambda: acquire_d
+        self.lock.release.side_effect = lambda: release_d
+        self.method.return_value = fail(ValueError('a'))
+
+        d = with_lock(self.reactor, self.lock, self.log, self.method, 2, a=3)
+        self.assertNoResult(d)
+
+        self.reactor.advance(10)
+        acquire_d.callback(None)
+        self.log.msg.assert_called_once_with('Lock acquisition in 10.0 seconds',
+                                             acquire_time=10.0)
+        self.method.assert_called_once_with(2, a=3)
+
+        self.reactor.advance(3)
+        release_d.callback(None)
+        self.log.msg.assert_called_with('Lock release in 3.0 seconds',
+                                        release_time=3.0)
+        self.assertEqual(self.log.msg.call_count, 2)
+
+        self.failureResultOf(d, ValueError)
