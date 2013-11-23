@@ -334,8 +334,8 @@ def delete_active_servers(log, transaction_id, scaling_group,
         state.remove_active(server['id'])
 
     # then start deleting those servers
-    return [get_supervisor().execute_delete_server(log, transaction_id,
-                                                   scaling_group, server_info)
+    supervisor = get_supervisor()
+    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
             for server_info in servers_to_evict]
 
 
@@ -357,6 +357,42 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
                               scaling_group, remaining, state)
 
     return defer.succeed(None)
+
+
+class _DeleteJob(object):
+    """
+    Server deletion job
+    """
+
+    def __init__(self, log, transaction_id, scaling_group, server_info, supervisor):
+        """
+        :param log: a bound logger instance that can be used for logging
+        :param str transaction_id: a transaction id
+        :param IScalingGroup scaling_group: the scaling group from where the server
+                    is deleted
+        :param dict server_info: a `dict` of server info
+        """
+        self.log = log.bind(server_id=server_info['id'])
+        self.trans_id = transaction_id
+        self.scaling_group = scaling_group
+        self.server_info = server_info
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the job
+        """
+        d = self.supervisor.execute_delete_server(
+            self.log, self.transaction_id, self.scaling_group, server_info)
+        d.addCallback(self._job_completed)
+        d.addCallback(self._job_failed)
+        self.log.msg('Started server deletion job')
+
+    def _job_completed(self, _):
+        self.log.msg('Server deletion job completed')
+
+    def _job_failed(self, failure):
+        self.log.msg('Server deletion job failed due to {reason}', reason=failure)
 
 
 class _Job(object):

@@ -152,7 +152,7 @@ class SupervisorService(object, Service):
                 (server['id'], server['lb_info']))
 
         d = self.auth_function(scaling_group.tenant_id)
-        log.msg("Authenticating for tenant")
+        log.msg("Delete: Authenticating for tenant")
         d.addCallback(when_authenticated)
 
         return d

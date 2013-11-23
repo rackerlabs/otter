@@ -439,17 +439,9 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg("Looking for load balancer endpoint: %(service_name)s",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
-
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
-            service_name=cloudServersOpenStack,
-            region=region)
 
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
@@ -461,6 +453,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
         *[[(loadbalancer_id, node['id']) for node in node_details['nodes']]
           for (loadbalancer_id, node_details) in loadbalancer_details])
 
+    log.msg('Removing from load balancers')
     d = gatherResults(
         [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
@@ -502,8 +495,7 @@ def verified_delete(log,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    del_log = log.bind(instance_id=server_id)
-    del_log.msg('Deleting server')
+    log.msg('Deleting server')
 
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.delete(path, headers=headers(auth_token))
@@ -526,6 +518,7 @@ def verified_delete(log,
 
         timeout_description = (
             "Waiting for Nova to actually delete server {0}".format(server_id))
+        log.msg(timeout_description)
 
         verify_d = retry_and_timeout(check_status, timeout,
                                      next_interval=repeating_interval(interval),
@@ -534,8 +527,8 @@ def verified_delete(log,
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
+            log.msg('Server deleted successfully: {time_delete} seconds.',
+                    time_delete=time_delete)
 
         verify_d.addCallback(on_success)
         verify_d.addErrback(del_log.err)

@@ -801,10 +801,9 @@ class DeleteActiveServersTests(TestCase):
             self, 'otter.controller.find_servers_to_evict',
             return_value=[self.data[id] for id in ('1', '4', '3')])
 
-        self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_delete_server.side_effect = [
-            defer.succeed(id) for id in range(3)]
+        self.del_job = patch(self, 'otter.controller._DeleteJob')
 
+        self.supervisor = iMock(ISupervisor)
         patch(self, 'otter.controller.get_supervisor',
               return_value=self.supervisor)
 
