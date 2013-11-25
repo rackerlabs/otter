@@ -153,8 +153,7 @@ def with_transaction_id():
             request.setHeader('X-Response-Id', transaction_id)
             self.log = self.log.bind(
                 system=reflect.fullyQualifiedName(f),
-                transaction_id=transaction_id,
-                request_ip=request.getClientIP())
+                transaction_id=transaction_id)
             self.log.bind(
                 method=request.method,
                 uri=request.uri,
@@ -274,7 +273,8 @@ def auditable(event_type, msg_on_success):
         @wraps(f)
         def _(self, request, *args, **kwargs):
             audit_logger = AuditLogger(self.log)
-            audit_logger.add(event_type=event_type)
+            audit_logger.add(event_type=event_type,
+                             request_ip=request.getClientIP())
             kwargs['audit_logger'] = audit_logger
 
             d = defer.maybeDeferred(f, self, request, *args, **kwargs)

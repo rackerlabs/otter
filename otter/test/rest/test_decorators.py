@@ -39,7 +39,6 @@ class TransactionIdTestCase(TestCase):
         self.mockRequest.uri = '/'
         self.mockRequest.clientproto = 'HTTP/1.1'
         self.mockRequest.method = 'PROPFIND'
-        self.mockRequest.getClientIP.return_value = 'ip'
         values = {'referer': 'referrer(sic)',
                   'user-agent': 'Mosaic/1.0'}
 
@@ -79,8 +78,7 @@ class TransactionIdTestCase(TestCase):
 
         self.mock_log.bind.assert_called_once_with(
             system='otter.test.rest.test_decorators.doWork',
-            transaction_id='12345678',
-            request_ip='ip')
+            transaction_id='12345678')
         self.assertEqual(self.mock_log.bind().bind.call_args_list[0],
                          mock.call(useragent='Mosaic/1.0',
                                    clientproto='HTTP/1.1',
@@ -615,6 +613,13 @@ class AuditableTestCase(TestCase):
     """
     Tests for auditable decorator
     """
+    def setUp(self):
+        """
+        Make sure request ip is grabbable
+        """
+        self.request = mock.Mock(spec=['getClientIP'])
+        self.request.getClientIP.return_value = 'ip'
+
     def test_sets_audit_logger(self):
         """
         If the auditable decorator is used, an auditable_data object is
@@ -630,7 +635,7 @@ class AuditableTestCase(TestCase):
                 audit_loggers.append(audit_logger)
 
         app = FakeApp()
-        app.handler(mock.Mock(spec=[]))
+        app.handler(self.request)
 
         self.assertEqual(len(audit_loggers), 1)
         self.assertIsInstance(audit_loggers[0], AuditLogger)
@@ -647,10 +652,11 @@ class AuditableTestCase(TestCase):
                 return 'yay'
 
         app = FakeApp()
-        d = app.handler(mock.Mock(spec=[]))
+        d = app.handler(self.request)
         self.assertEqual(self.successResultOf(d), 'yay')
         app.log.msg.assert_called_once_with('my message', audit_log=True,
-                                            event_type='event_type')
+                                            event_type='event_type',
+                                            request_ip='ip')
 
     def test_audit_logs_not_produced_on_failure(self):
         """
@@ -664,6 +670,6 @@ class AuditableTestCase(TestCase):
                 raise ValueError('no logs!')
 
         app = FakeApp()
-        d = app.handler(mock.Mock(spec=[]))
+        d = app.handler(self.request)
         self.failureResultOf(d, ValueError)
         self.assertFalse(app.log.msg.called)
