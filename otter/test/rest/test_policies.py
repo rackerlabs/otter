@@ -546,6 +546,23 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['error']['type'], 'NoSuchPolicyError')
         self.flushLoggedErrors(NoSuchPolicyError)
 
+    @mock.patch('otter.rest.policies.log', new_callable=mock_log)
+    def test_delete_policy_audit_logged(self, logger):
+        """
+        Policy deletion is audit-logged
+        """
+        self.root = Otter(self.mock_store).app.resource()
+        self.assertFalse(logger.msg.called)
+
+        self.mock_group.delete_policy.return_value = defer.succeed(None)
+        self.assert_status_code(204, method="DELETE")
+        logger.msg.assert_any_call(
+            'Deleted scaling policy.', request_ip='ip',
+            event_type='request.policy.delete',
+            audit_log=True, tenant_id='11111', scaling_group_id='1',
+            policy_id=self.policy_id, transaction_id='transaction-id',
+            system=mock.ANY)
+
     def test_execute_policy_success(self):
         """
         Try to execute a policy.
