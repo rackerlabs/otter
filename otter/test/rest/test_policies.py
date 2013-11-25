@@ -17,8 +17,10 @@ from otter.json_schema.group_examples import policy as policy_examples
 from otter.json_schema import rest_schemas, validate
 from otter.models.interface import NoSuchPolicyError
 from otter.rest.decorators import InvalidJsonError
+from otter.rest.application import Otter
 
 from otter.test.rest.request import DummyException, RestAPITestMixin
+from otter.test.utils import mock_log
 from otter.rest.bobby import set_bobby
 from otter.bobby import BobbyClient
 
@@ -238,6 +240,28 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
         ]
         self.assertEqual(resp, {"policies": [expected_policy]})
 
+    @mock.patch('otter.rest.policies.log', new_callable=mock_log)
+    def test_policy_create_audit_logged(self, logger):
+        """
+        Policy creation is audit-logged
+        """
+        self.root = Otter(self.mock_store).app.resource()
+        self.assertFalse(logger.msg.called)
+        resp = policy_examples()[0]
+        resp['id'] = '5'
+
+        self.mock_group.create_policies.return_value = defer.succeed([resp])
+        self.assert_status_code(
+            201, None, 'POST', json.dumps(policy_examples()[:1]),
+            # location header points to the policy list
+            '/v1.0/11111/groups/1/policies/')
+        logger.msg.assert_any_call(
+            'Created at least one policy.', request_ip='ip',
+            event_type='request.policy.create',
+            audit_log=True, tenant_id='11111', scaling_group_id='1',
+            transaction_id='transaction-id', data={'policies': [resp]},
+            system=mock.ANY)
+
 
 class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
     """
@@ -266,7 +290,6 @@ class AllBobbyPoliciesTestCase(RestAPITestMixin, TestCase):
         """
         Tries to create a regular policy with bobby active
         """
-
         self.mock_group.create_policies.return_value = defer.succeed([
             dict(id="5", **policy_examples()[0])])
         response_body = self.assert_status_code(
