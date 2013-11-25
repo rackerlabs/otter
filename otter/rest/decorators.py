@@ -258,6 +258,9 @@ class AuditLogger(object):
         self._params.update(kwargs)
 
     def audit(self, message):
+        """
+        Actually log the audit log.
+        """
         self._logger.msg(message, **self._params)
 
 
