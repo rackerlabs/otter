@@ -320,10 +320,7 @@ def find_servers_to_evict(log, state, delta):
 def delete_active_servers(log, transaction_id, scaling_group,
                           delta, state):
     """
-    Start deleting active servers
-
-    Returns a list of Deferreds corresponding to deletion of a server. Each Deferred
-    in the list gets fired when that server is deleted
+    Start deleting active servers jobs
     """
 
     # find servers to evict
@@ -334,8 +331,8 @@ def delete_active_servers(log, transaction_id, scaling_group,
         state.remove_active(server['id'])
 
     # then start deleting those servers
-    return [get_supervisor().execute_delete_server(log, transaction_id,
-                                                   scaling_group, server_info)
+    supervisor = get_supervisor()
+    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
             for server_info in servers_to_evict]
 
 
@@ -359,6 +356,44 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     return defer.succeed(None)
 
 
+class _DeleteJob(object):
+    """
+    Server deletion job
+    """
+
+    def __init__(self, log, transaction_id, scaling_group, server_info, supervisor):
+        """
+        :param log: a bound logger instance that can be used for logging
+        :param str transaction_id: a transaction id
+        :param IScalingGroup scaling_group: the scaling group from where the server
+                    is deleted
+        :param dict server_info: a `dict` of server info
+        """
+        self.log = log.bind(system='otter.job.delete', server_id=server_info['id'])
+        self.trans_id = transaction_id
+        self.scaling_group = scaling_group
+        self.server_info = server_info
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the job
+        """
+        d = self.supervisor.execute_delete_server(
+            self.log, self.trans_id, self.scaling_group, self.server_info)
+        d.addCallback(self._job_completed)
+        d.addErrback(self._job_failed)
+        self.log.msg('Started server deletion job')
+
+    def _job_completed(self, _):
+        self.log.msg('Server deletion job completed')
+
+    def _job_failed(self, failure):
+        # REVIEW: Logging this as err since failing to delete a server will cost
+        # money to customers and affect us. We should know and try to delete it manually asap
+        self.log.err(failure, 'Server deletion job failed')
+
+
 class _Job(object):
     """
     Private class representing a server creation job.  This calls the supervisor
@@ -372,7 +407,7 @@ class _Job(object):
             should be created
         :param dict launch_config: the launch config to scale up a server
         """
-        self.log = log
+        self.log = log.bind(system='otter.job.launch')
         self.transaction_id = transaction_id
         self.scaling_group = scaling_group
         self.supervisor = supervisor
@@ -420,8 +455,9 @@ class _Job(object):
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
                 self.log.msg('Job removed. Deleting server')
-                self.supervisor.execute_delete_server(
-                    self.log, self.transaction_id, self.scaling_group, result)
+                job = _DeleteJob(self.log, self.transaction_id,
+                                 self.scaling_group, result, self.supervisor)
+                job.start()
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
@@ -435,8 +471,9 @@ class _Job(object):
             f.trap(NoSuchScalingGroupError)
             self.log.msg('Relevant scaling group has been removed. '
                          'Deleting server.')
-            self.supervisor.execute_delete_server(
-                self.log, self.transaction_id, self.scaling_group, result)
+            job = _DeleteJob(self.log, self.transaction_id,
+                             self.scaling_group, result, self.supervisor)
+            job.start()
 
         d.addErrback(delete_if_group_deleted)
         return d

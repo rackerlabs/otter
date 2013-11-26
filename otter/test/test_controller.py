@@ -797,59 +797,89 @@ class DeleteActiveServersTests(TestCase):
         }  # ascending order by time would be: 1, 4, 3, 2, 5
         self.fake_state = GroupState('t', 'g', 'n', self.data, {}, False, False,
                                      False)
+        self.evict_servers = {'1': self.data['1'], '4': self.data['4'],
+                              '3': self.data['3']}
+
         self.find_servers_to_evict = patch(
             self, 'otter.controller.find_servers_to_evict',
-            return_value=[self.data[id] for id in ('1', '4', '3')])
+            return_value=self.evict_servers.values())
+
+        self.jobs = [mock.Mock(), mock.Mock(), mock.Mock()]
+        self.del_job = patch(
+            self, 'otter.controller._DeleteJob', side_effect=self.jobs)
 
         self.supervisor = iMock(ISupervisor)
-        self.supervisor.execute_delete_server.side_effect = [
-            defer.succeed(id) for id in range(3)]
-
         patch(self, 'otter.controller.get_supervisor',
               return_value=self.supervisor)
 
-    def test_supervisor_called(self):
+    def test_success(self):
         """
-        ``otter.supervisor.execute_delete_server`` is called
+        Removes servers to evict from state and create `_DeleteJob` to start
+        deleting them
         """
-        # caching as self.data will get changed from delete_active_servers
-        d1, d2, d3 = self.data['1'], self.data['4'], self.data['3']
         controller.delete_active_servers(self.log, 'trans-id', 'group',
                                          3, self.fake_state)
+
+        # find_servers_to_evict was called
+        self.find_servers_to_evict.assert_called_once_with(
+            self.log, self.fake_state, 3)
+
+        # active servers removed from state
+        self.assertTrue(
+            all([_id not in self.fake_state.active for _id in self.evict_servers]))
+
+        # _DeketeJob was created for each server to delete
         self.assertEqual(
-            self.supervisor.execute_delete_server.mock_calls,
-            [mock.call(self.log, 'trans-id', 'group', d1),
-             mock.call(self.log, 'trans-id', 'group', d2),
-             mock.call(self.log, 'trans-id', 'group', d3)])
+            self.del_job.call_args_list,
+            [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
+                for data in self.evict_servers.values()])
+        self.assertTrue(all([job.start.called for job in self.jobs]))
 
-    def test_active_servers_removed(self):
-        """
-        active servers to be deleted are removed from GroupState
-        """
-        controller.delete_active_servers(self.log, 'trans-id', 'group',
-                                         3, self.fake_state)
-        for id in ('1', '4', '3'):
-            self.assertNotIn(id, self.fake_state.active)
 
-    def test_deferreds_returned(self):
-        """
-        List of Deferreds are returned with expected values
-        """
-        dl = controller.delete_active_servers(self.log, 'trans-id',
-                                              'group', 3, self.fake_state)
-        for i, d in enumerate(dl):
-            result = self.successResultOf(d)
-            self.assertEqual(result, i)
+class DeleteJobTests(TestCase):
+    """
+    Tests for :class:`controller._DeleteJob`
+    """
 
-    def test_max_delta(self):
+    def setUp(self):
         """
-        All the servers are deleted when delta is max
+        Create sample _DeleteJob
         """
-        self.supervisor.execute_delete_server.side_effect = None
-        self.find_servers_to_evict.return_value = self.data.values()
-        controller.delete_active_servers(self.log, 'trans-id', 'group',
-                                         5, self.fake_state)
-        self.assertEqual(len(self.fake_state.active), 0)
+        self.supervisor = iMock(ISupervisor)
+        log = mock.Mock()
+        self.job = controller._DeleteJob(log, 'trans_id', 'group', {'id': 2, 'b': 'lah'},
+                                         self.supervisor)
+        log.bind.assert_called_once_with(system='otter.job.delete', server_id=2)
+        self.log = log.bind.return_value
+
+    def test_start(self):
+        """
+        `start` calls `supervisor.execute_delete_server`
+        """
+        self.job.start()
+
+        self.supervisor.execute_delete_server.assert_called_once_with(
+            self.log, 'trans_id', 'group', {'id': 2, 'b': 'lah'})
+        d = self.supervisor.execute_delete_server.return_value
+        d.addCallback.assert_called_once_with(self.job._job_completed)
+        d.addErrback.assert_called_once_with(self.job._job_failed)
+        self.log.msg.assert_called_once_with('Started server deletion job')
+
+    def test_job_completed(self):
+        """
+        `_job_completed` just logs success msg
+        """
+        self.job._job_completed('ignore')
+        self.log.msg.assert_called_with('Server deletion job completed')
+
+    def test_job_failed(self):
+        """
+        `_job_failed` logs failure
+        """
+        self.supervisor.execute_delete_server.return_value = defer.fail(ValueError('a'))
+        self.job.start()
+        self.log.err.assert_called_once_with(CheckFailure(ValueError),
+                                             'Server deletion job failed')
 
 
 class ExecScaleDownTests(TestCase):
@@ -1169,6 +1199,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.supervisor.execute_config.side_effect = fake_execute
 
         patch(self, 'otter.controller.get_supervisor', return_value=self.supervisor)
+        self.del_job = patch(self, 'otter.controller._DeleteJob')
 
         self.log = mock.MagicMock()
 
@@ -1183,7 +1214,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 5)
         self.assertEqual(self.supervisor.execute_config.mock_calls,
-                         [mock.call(self.log, '1',
+                         [mock.call(self.log.bind.return_value, '1',
                                     self.group, 'launch')] * 5)
 
     def test_positive_delta_execute_config_failures_propagated(self):
@@ -1244,7 +1275,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
 
         self.assertEqual(self.group.modify_state.call_count, 3)
 
-    def test_job_sucess(self):
+    def test_job_success(self):
         """
         ``execute_launch_config`` sets it up so that when a job succeeds, it is
         removed from pending and the server is added to active.  It is also
@@ -1263,9 +1294,10 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.assertEqual(s.pending, {})  # job removed
         self.assertIn('s1', s.active)    # active server added
 
-        self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind.return_value.bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind.return_value.bind().msg.call_count, 1)
+        # first bind is system='otter.job.launch'
+        self.log.bind.return_value.bind.assert_called_once_with(job_id='1')
+        self.log.bind().bind().bind.assert_called_once_with(server_id='s1')
+        self.assertEqual(self.log.bind().bind().bind().msg.call_count, 1)
 
     def test_pending_server_delete(self):
         """
@@ -1289,9 +1321,11 @@ class ExecuteLaunchConfigTestCase(TestCase):
         s.remove_job('1')
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
-        self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log.bind.return_value, '1',
-            self.group, {'id': 's1'})
+        # first bind is system='otter.job.launch', second is job_id='1'
+        self.del_job.assert_called_once_with(
+            self.log.bind.return_value.bind.return_value, '1', self.group,
+            {'id': 's1'}, self.supervisor)
+        self.del_job.return_value.start.assert_called_once_with()
 
     def test_job_failure(self):
         """
@@ -1321,8 +1355,10 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.assertEqual(len(written), 1)
         self.assertEqual(written[0], s)
 
-        self.log.bind.assert_called_once_with(job_id='1')
-        self.log.bind().msg.assert_called_with('Job failed', reason=f)
+        # first bind is system='otter.job.launch'
+        log = self.log.bind.return_value
+        log.bind.assert_called_once_with(job_id='1')
+        log.bind.return_value.msg.assert_called_with('Job failed', reason=f)
 
     def test_modify_state_failure_logged(self):
         """
@@ -1334,9 +1370,10 @@ class ExecuteLaunchConfigTestCase(TestCase):
                                          'launch', self.group, 1)
         self.execute_config_deferreds[0].callback({'id': 's1'})
 
-        self.log.bind.assert_called_once_with(job_id='1')
-
-        self.log.bind.return_value.err.assert_called_once_with(
+        # first bind is system='otter.job.launch'
+        log = self.log.bind.return_value
+        log.bind.assert_called_once_with(job_id='1')
+        log.bind.return_value.err.assert_called_once_with(
             CheckFailure(AssertionError))
 
 
@@ -1374,6 +1411,9 @@ class PrivateJobHelperTestCase(TestCase):
 
         self.job = controller._Job(self.log, self.transaction_id, self.group,
                                    self.supervisor)
+        self.log.bind.assert_called_once_with(system='otter.job.launch')
+        self.log = self.log.bind.return_value
+        self.del_job = patch(self, 'otter.controller._DeleteJob')
 
     def test_start_calls_supervisor(self):
         """
@@ -1464,9 +1504,10 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log.bind.return_value, self.transaction_id, self.group,
-            {'id': 'active'})
+        self.del_job.assert_called_once_with(
+            self.log.bind.return_value, self.transaction_id,
+            self.group, {'id': 'active'}, self.supervisor)
+        self.del_job.return_value.start.assert_called_once_with()
 
         self.assertEqual(self.log.bind.return_value.err.call_count, 0)
 
@@ -1521,9 +1562,10 @@ class PrivateJobHelperTestCase(TestCase):
         self.job.start('launch')
         self.completion_deferred.callback({'id': 'active'})
 
-        self.supervisor.execute_delete_server.assert_called_once_with(
-            self.log.bind.return_value, self.transaction_id, self.group,
-            {'id': 'active'})
+        self.del_job.assert_called_once_with(
+            self.log.bind.return_value, self.transaction_id,
+            self.group, {'id': 'active'}, self.supervisor)
+        self.del_job.return_value.start.assert_called_once_with()
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """
