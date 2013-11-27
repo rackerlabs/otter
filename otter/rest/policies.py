@@ -155,7 +155,7 @@ class OtterPolicies(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
-    @auditable('request.policy.create', 'Created at least one policy.')
+    @auditable('request.policy.create', 'Created policies.')
     @validate_body(rest_schemas.create_policies_request)
     def create_policies(self, request, data, audit_logger):
         """
@@ -243,11 +243,11 @@ class OtterPolicies(object):
 
         deferred.addCallback(format_policies_and_send_redirect)
 
-        def audit_it(result):
+        def audit_data(result):
             audit_logger.add(data=result)
             return result
 
-        deferred.addCallback(audit_it)
+        deferred.addCallback(audit_data)
         deferred.addCallback(json.dumps)
         return deferred
 
@@ -346,7 +346,7 @@ class OtterPolicy(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    @auditable('request.policy.delete', 'Deleted scaling policy.')
+    @auditable('request.policy.delete', 'Deleted scaling policy {policy_id}.')
     def delete_policy(self, request, audit_logger):
         """
         Delete a scaling policy. If successful, no response body will be returned.

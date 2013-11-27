@@ -256,7 +256,7 @@ class AllPoliciesTestCase(RestAPITestMixin, TestCase):
             # location header points to the policy list
             '/v1.0/11111/groups/1/policies/')
         logger.msg.assert_any_call(
-            'Created at least one policy.', request_ip='ip',
+            'Created policies.', request_ip='ip',
             event_type='request.policy.create',
             audit_log=True, tenant_id='11111', scaling_group_id='1',
             transaction_id='transaction-id', data={'policies': [resp]},
@@ -557,7 +557,7 @@ class OnePolicyTestCase(RestAPITestMixin, TestCase):
         self.mock_group.delete_policy.return_value = defer.succeed(None)
         self.assert_status_code(204, method="DELETE")
         logger.msg.assert_any_call(
-            'Deleted scaling policy.', request_ip='ip',
+            'Deleted scaling policy {policy_id}.', request_ip='ip',
             event_type='request.policy.delete',
             audit_log=True, tenant_id='11111', scaling_group_id='1',
             policy_id=self.policy_id, transaction_id='transaction-id',
