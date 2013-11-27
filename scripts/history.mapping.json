@@ -1,0 +1,124 @@
+{
+  "event": {
+    "properties": {
+      "audit_log": {
+        "type": "boolean"
+      },
+      "server_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "request_ip": {
+        "type": "multi_field",
+        "fields": {
+            "request_ip": {
+                "type": "ip"
+            },
+            "untouched": {
+                "index": "not_analyzed",
+                "type": "string"
+            }
+        }
+      },
+      "user_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "event_type": {
+        "type": "multi_field",
+        "fields": {
+            "event_type": {
+                "type": "string"
+            },
+            "untouched": {
+                "index": "not_analyzed",
+                "type": "string"
+            }
+        }
+      },
+      "@version": {
+        "type": "long"
+      },
+      "@timestamp": {
+        "type": "date",
+        "format": "dateOptionalTime"
+      },
+      "parent_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "_message": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "webhook_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "as_user_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "convergence_delta": {
+        "type": "long"
+      },
+      "previous_desired_capacity": {
+        "type": "long"
+      },
+      "tenant_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "scaling_group_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "desired_capacity": {
+        "type": "long"
+      },
+      "current_capacity": {
+        "type": "long"
+      },
+      "fault": {
+        "properties": {
+          "code": {
+            "type": "long"
+          },
+          "message": {
+            "type": "multi_field",
+            "fields": {
+                "message": {
+                    "type": "string"
+                },
+                "untouched": {
+                    "index": "not_analyzed",
+                    "type": "string"
+                }
+            }
+          },
+          "details": {
+            "type": "object",
+            "enabled": false
+          }
+        }
+      },
+      "transaction_id": {
+        "index": "not_analyzed",
+        "type": "string"
+      },
+      "pending_capacity": {
+        "type": "long"
+      },
+      "is_error": {
+        "type": "boolean"
+      },
+      "data": {
+        "type": "object",
+        "enabled": false
+      },
+      "policy_id": {
+        "type": "string"
+      }
+    }
+  }
+}

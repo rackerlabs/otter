@@ -9,7 +9,7 @@
       "server": {
         "name": "autoscale_server",
         "imageRef": "0d589460-f177-4b0f-81c1-8ab8903ac7d8",
-        "flavorRef": "2",
+        "flavorRef": "performance1-2",
         "OS-DCF:diskConfig": "AUTO",
         "metadata": {
           "build_config": "core",

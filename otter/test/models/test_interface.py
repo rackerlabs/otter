@@ -175,6 +175,21 @@ class GroupStateTestCase(TestCase):
         self.assertEqual(state.group_touched, '0')
         self.assertEqual(state.policy_touched, {'pid': '0'})
 
+    def test_get_capacity(self):
+        """
+        Getting capacity returns a dictionary with the desired capacity,
+        active capacity, and pending capacity
+        """
+        state = GroupState('tid', 'gid', 'name',
+                           {str(i): {} for i in range(5)},
+                           {str(i): {} for i in range(6)},
+                           'date', {}, True, now='0')
+        self.assertEqual(state.get_capacity(), {
+            'desired_capacity': 11,
+            'pending_capacity': 6,
+            'active_capacity': 5
+        })
+
 
 class IScalingGroupProviderMixin(object):
     """
@@ -396,19 +411,18 @@ class IScalingScheduleCollectionProviderMixin(object):
         """
         verifyObject(IScalingScheduleCollection, self.collection)
 
-    def validate_fetch_batch_of_events(self, *args, **kwargs):
+    def validate_fetch_and_delete(self, *args, **kwargs):
         """
-        Calls ``fetch_batch_of_events()`` and validates that it returns a
+        Calls ``fetch_and_delete()`` and validates that it returns a
         list of dict
 
-        :return: the return value of ``fetch_batch_of_events()``
+        :return: the return value of ``fetch_and_delete()``
         """
         result = self.successResultOf(
-            self.collection.fetch_batch_of_events(*args, **kwargs))
+            self.collection.fetch_and_delete(*args, **kwargs))
 
-        self.assertEqual(type(result), list)
+        self.assertTrue(isinstance(result, list))
         for elem in result:
-            self.assertEqual(type(elem), dict)
-            self.assertEqual(len(elem), 5)
+            self.assertTrue(isinstance(elem, dict))
 
         return result

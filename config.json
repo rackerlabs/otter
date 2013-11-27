@@ -12,9 +12,18 @@
         "url": "https://staging.identity.api.rackspacecloud.com/v2.0",
         "admin_url": "https://staging.identity.api.rackspacecloud.com/v2.0"
     },
+    "zookeeper": {
+        "hosts": "127.0.0.1:2181,127.0.0.1:2182,127.0.0.1:2183",
+        "threads": 100
+    },
     "scheduler": {
         "interval": 10,
-        "batchsize": 100
+        "batchsize": 100,
+        "buckets": 10,
+        "partition": {
+            "path": "/scheduler_partition",
+            "time_boundary": 15
+        }
     },
     "limits": {
         "pagination": 100,
