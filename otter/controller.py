@@ -42,8 +42,8 @@ class CannotExecutePolicyError(DetailedException):
     """
     def __init__(self, tenant_id, group_id, policy_id, why, **kwargs):
         super(CannotExecutePolicyError, self).__init__(
-            ("Cannot execute scaling policy {policy_id} for group "
-             "{scaling_group_id} for tenant {tenant_id}: " + why),
+            ("Cannot execute scaling policy {{policy_id}} for group "
+             "{{scaling_group_id}} for tenant {{tenant_id}}: {0}".format(why)),
             tenant_id=tenant_id, scaling_group_id=group_id,
             policy_id=policy_id, **kwargs)
 
