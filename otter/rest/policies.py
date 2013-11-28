@@ -58,7 +58,7 @@ class OtterPolicies(object):
     def __init__(self, store, tenant_id, scaling_group_id):
         self.log = log.bind(system='otter.rest.policies',
                             tenant_id=tenant_id,
-                            group_id=scaling_group_id)
+                            scaling_group_id=scaling_group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
