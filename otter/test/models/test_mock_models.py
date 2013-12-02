@@ -13,7 +13,7 @@ from otter.models.mock import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError,
     NoSuchPolicyError, NoSuchWebhookError, UnrecognizedCapabilityError,
-    ScalingGroupOverLimitError, WebhooksOverLimitError)
+    ScalingGroupOverLimitError, WebhooksOverLimitError, PoliciesOverLimitError)
 
 from otter.test.models.test_interface import (
     IScalingGroupProviderMixin,
@@ -79,7 +79,8 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         """
         Create a mock group
         """
-        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10}}})
+        set_config_data({'limits': {'absolute': {'maxWebhooksPerPolicy': 10,
+                                                 'maxPoliciesPerGroup': 10}}})
         self.addCleanup(set_config_data, {})
 
         self.tenant_id = '11111'
@@ -297,6 +298,24 @@ class MockScalingGroupTestCase(IScalingGroupProviderMixin, TestCase):
         self.assertGreater(len(list_result), len(create_response))
         for item in create_response:
             self.assertIn(item, list_result)
+
+    def test_add_one_policy_overlimit(self):
+        """
+        If current policies is at max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.group.policies = {str(i): {} for i in range(10)}
+        d = self.group.create_policies([{"b": "lah"}])
+        self.failureResultOf(d, PoliciesOverLimitError)
+
+    def test_add_multiple_policies_overlimit(self):
+        """
+        If current policies + new policies will go over max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.group.policies = {str(i): {} for i in range(9)}
+        d = self.group.create_policies([{"b": "lah"}] * 5)
+        self.failureResultOf(d, PoliciesOverLimitError)
 
     def test_delete_group_removes_self_from_collection_if_state_empty(self):
         """
@@ -760,7 +779,8 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
     def setUp(self):
         """ Setup the mocks """
         set_config_data({'limits': {'absolute': {'maxGroups': 10,
-                                                 'maxWebhooksPerPolicy': 10}}})
+                                                 'maxWebhooksPerPolicy': 10,
+                                                 'maxPoliciesPerGroup': 10}}})
         self.addCleanup(set_config_data, {})
 
         self.collection = MockScalingGroupCollection()
