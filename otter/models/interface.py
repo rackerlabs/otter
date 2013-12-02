@@ -132,10 +132,10 @@ class GroupState(object):
 
     def get_capacity(self):
         """
-        :returns: a dictionary with the desired_capcity, active_capacity, and
+        :returns: a dictionary with the desired_capcity, current_capacity, and
         pending_capacity.
         """
-        return {'active_capacity': len(self.active),
+        return {'current_capacity': len(self.active),
                 'pending_capacity': len(self.pending),
                 'desired_capacity': len(self.active) + len(self.pending)}
 

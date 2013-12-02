@@ -9,6 +9,8 @@ from jsonschema import ValidationError
 
 from twisted.internet import defer
 from twisted.python import reflect
+
+from otter.log import audit
 from otter.util.config import config_value
 from otter.util.hashkey import generate_transaction_id
 from otter.util.deferredutils import unwrap_first_error
@@ -231,3 +233,56 @@ def paginatable(f):
         kwargs['paginate'] = paginate
         return f(self, request, *args, **kwargs)
     return _
+
+
+class AuditLogger(object):
+    """
+    An object mainly for storing the results of audit loggable info while
+    within the decorated function.  Also will audit-log the
+    """
+    def __init__(self, log):
+        self._params = {}
+        self.set_logger(log)
+
+    def set_logger(self, log):
+        """
+        Sets the logger to a new bound log
+        """
+        self._logger = audit(log)
+
+    def add(self, **kwargs):
+        """
+        Add new structured data to be logged in the audit log
+        """
+        self._params.update(kwargs)
+
+    def audit(self, message):
+        """
+        Actually log the audit log.
+        """
+        self._logger.msg(message, **self._params)
+
+
+def auditable(event_type, msg_on_success):
+    """
+    Makes the result of an endpoint audit loggable - passes an
+    AuditLogger object to the handler so that it can set extra data to be
+    logged.
+    """
+    def decorator(f):
+        @wraps(f)
+        def _(self, request, *args, **kwargs):
+            audit_logger = AuditLogger(self.log)
+            audit_logger.add(event_type=event_type,
+                             request_ip=request.getClientIP())
+            kwargs['audit_logger'] = audit_logger
+
+            d = defer.maybeDeferred(f, self, request, *args, **kwargs)
+
+            def audit_log_it(result):
+                audit_logger.audit(msg_on_success)
+                return result
+
+            return d.addCallback(audit_log_it)
+        return _
+    return decorator
