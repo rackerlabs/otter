@@ -23,7 +23,7 @@ from otter.models.cass import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
-    WebhooksOverLimitError)
+    WebhooksOverLimitError, PoliciesOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -855,17 +855,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.list_policies()
         r = self.successResultOf(d)
         self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy3'}])
-
-    def test_add_first_checks_view_config(self):
-        """
-        Before a policy is added, `view_config` is first called to determine
-        that there is such a scaling group
-        """
-        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
-        self.returns = [None]
-        d = self.group.create_policies([{"b": "lah"}])
-        self.successResultOf(d)
-        self.group.view_config.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
@@ -1748,13 +1737,60 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         super(ScalingGroupAddPoliciesTests, self).setUp()
         self.view_config = patch(self, 'otter.models.cass.CassScalingGroup.view_config',
                                  return_value=defer.succeed({}))
+        set_config_data({'limits': {'absolute': {'maxPoliciesPerGroup': 1000}}})
+        self.addCleanup(set_config_data, {})
+
+    def test_add_one_policy_overlimit(self):
+        """
+        If current policies is at max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.returns = [[{'count': 1000}]]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.failureResultOf(d, PoliciesOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+    def test_add_multiple_policies_overlimit(self):
+        """
+        If current policies + new policies will go over max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.returns = [[{'count': 998}]]
+        d = self.group.create_policies([{"b": "lah"}] * 5)
+        self.failureResultOf(d, PoliciesOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+    def test_add_first_checks_view_config(self):
+        """
+        Before a policy is added, `view_config` is first called to determine
+        that there is such a scaling group
+        """
+        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
+        self.returns = [[{'count': 0}], None]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.successResultOf(d)
+        self.group.view_config.assert_called_once_with()
 
     def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy, and what is returned is a
         list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         d = self.group.create_policies([{"b": "lah"}])
         result = self.successResultOf(d)
         expectedCql = (
@@ -1779,7 +1815,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         Test that you can add a scaling policy with 'at' schedule and what is
         returned is a list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         expected_at = '2012-10-20T03:23:45'
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
                'args': {'at': expected_at}}
@@ -1815,7 +1851,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         Test that you can add a scaling policy with 'cron' schedule and what is
         returned is a list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
                'args': {'cron': '* * * * *'}}
 
