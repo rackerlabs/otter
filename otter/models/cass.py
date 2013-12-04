@@ -15,7 +15,7 @@ from otter.models.interface import (
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
-    WebhooksOverLimitError)
+    WebhooksOverLimitError, PoliciesOverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
@@ -125,6 +125,8 @@ _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId
 _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                          '"policyId" = :policyId;')
+_cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
+                        'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
@@ -650,6 +652,25 @@ class CassScalingGroup(object):
         """
         self.log.bind(policies=data).msg("Creating policies")
 
+        def _do_limits_check(lastRev):
+            d = self.connection.execute(
+                _cql_count_for_group.format(cf=self.policies_table),
+                {"tenantId": self.tenant_id,
+                 "groupId": self.uuid},
+                get_consistency_level("count", "policies"))
+            return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
+
+        def _check_limit(curr_policies):
+            max_policies = config_value('limits.absolute.maxPoliciesPerGroup')
+            curr_policies = curr_policies[0]['count']
+            if curr_policies + len(data) > max_policies:
+                raise PoliciesOverLimitError(
+                    curr_policies=curr_policies,
+                    max_policies=max_policies,
+                    new_policies=len(data),
+                    tenant_id=self.tenant_id,
+                    group_id=self.uuid)
+
         def _do_create_pol(lastRev):
             queries = []
             cqldata = {"tenantId": self.tenant_id,
@@ -665,6 +686,7 @@ class CassScalingGroup(object):
             return d.addCallback(lambda _: outpolicies)
 
         d = self.view_config()
+        d.addCallback(_do_limits_check)
         d.addCallback(_do_create_pol)
         return d
 
