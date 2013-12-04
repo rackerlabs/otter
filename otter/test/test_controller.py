@@ -1458,7 +1458,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.job.start('launch')
         self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback('blob')
+        self.completion_deferred.callback({'id': 'blob'})
         self.assertEqual(self.group.modify_state.call_count, 1)
 
     def test_modify_state_called_on_job_completion_failure(self):

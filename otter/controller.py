@@ -386,7 +386,8 @@ class _DeleteJob(object):
         self.log.msg('Started server deletion job')
 
     def _job_completed(self, _):
-        self.log.msg('Server deletion job completed')
+        audit(self.log).msg('Server deleted.', event_type="server.delete")
+
 
     def _job_failed(self, failure):
         # REVIEW: Logging this as err since failing to delete a server will cost
@@ -450,27 +451,36 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
+        server_id = result['id']
+        log = self.log.bind(server_id=server_id)
+
+        deletable = ("A pending server that is no longer needed is now active, "
+                     "and hence deletable.  Deletion starting.")
+
         def handle_success(group, state):
             if self.job_id not in state.pending:
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
-                self.log.msg('Job removed. Deleting server')
+                audit(log).msg(deletable, event_type="server.deletable")
+
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
                 job.start()
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
-                self.log.bind(server_id=result['id']).msg(
-                    "Job completed, resulting in an active server.")
+                audit(log).msg("Server is active.", event_type="server.active")
             return state
 
         d = self.scaling_group.modify_state(handle_success)
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
-            self.log.msg('Relevant scaling group has been removed. '
-                         'Deleting server.')
+            # extra info does not get added to the audit log, but will be seen
+            # in general logs
+            audit(log).msg(deletable, event_type="server.deletable",
+                           extra_info="Scaling group has been deleted.")
+
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)
             job.start()
