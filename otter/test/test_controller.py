@@ -1271,9 +1271,9 @@ class ExecuteLaunchConfigTestCase(TestCase):
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
 
-        self.execute_config_deferreds[0].callback(None)              # job id 1
+        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback(None)              # job id 3
+        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
 
         self.assertEqual(self.group.modify_state.call_count, 3)
 
@@ -1295,11 +1295,6 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.execute_config_deferreds[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
         self.assertIn('s1', s.active)    # active server added
-
-        # first bind is system='otter.job.launch'
-        self.log.bind.return_value.bind.assert_called_once_with(job_id='1')
-        self.log.bind().bind().bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind().bind().bind().msg.call_count, 1)
 
     def test_pending_server_delete(self):
         """
