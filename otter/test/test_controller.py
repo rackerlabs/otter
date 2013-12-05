@@ -867,10 +867,12 @@ class DeleteJobTests(TestCase):
 
     def test_job_completed(self):
         """
-        `_job_completed` just logs success msg
+        `_job_completed` audit logs a successful deletion
         """
+        log = self.job.log = mock_log()
         self.job._job_completed('ignore')
-        self.log.msg.assert_called_with('Server deletion job completed')
+        log.msg.assert_called_with('Server deleted.', audit_log=True,
+                                   event_type='server.delete')
 
     def test_job_failed(self):
         """

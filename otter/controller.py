@@ -388,7 +388,6 @@ class _DeleteJob(object):
     def _job_completed(self, _):
         audit(self.log).msg('Server deleted.', event_type="server.delete")
 
-
     def _job_failed(self, failure):
         # REVIEW: Logging this as err since failing to delete a server will cost
         # money to customers and affect us. We should know and try to delete it manually asap
