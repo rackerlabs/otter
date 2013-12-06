@@ -1157,7 +1157,7 @@ class DeleteServerTests(TestCase):
         d = delete_server(self.log, 'DFW', fake_service_catalog,
                           'my-auth-token', instance_details)
         self.successResultOf(d)
-        self.log.msg.assert_any_call('Server to delete does not exist')
+        self.log.msg.assert_any_call('Server to delete does not exist', server_id='a')
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
     def test_delete_server_propagates_loadbalancer_failures(
@@ -1215,6 +1215,7 @@ class DeleteServerTests(TestCase):
                                                  headers=expected_headers)
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers)
+        self.log.msg.assert_called_with(mock.ANY, server_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
         """
@@ -1302,7 +1303,8 @@ class DeleteServerTests(TestCase):
             mock.call('http://url/servers/serverId', headers=expected_headers),
             mock.call('http://url/servers/serverId', headers=expected_headers)
         ])
-        self.log.err.assert_called_once_with(CheckFailure(TimedOutError))
+        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
+                                             server_id='serverId')
 
         # the loop has stopped
         clock.advance(5)
