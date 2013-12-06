@@ -475,8 +475,6 @@ class _Job(object):
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
-            # extra info does not get added to the audit log, but will be seen
-            # in general logs
             audit(log).msg(
                 "A pending server belonging to a deleted scaling group "
                 "({scaling_group_id}) is now active, and hence deletable. "
