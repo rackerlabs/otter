@@ -57,22 +57,6 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
-    def test_admin_options(self):
-        """
-        The port long option should end up in the 'port' key.
-        """
-        config = Options()
-        config.parseOptions(['--admin=tcp:9789'])
-        self.assertEqual(config['admin'], 'tcp:9789')
-
-    def test_short_admin_options(self):
-        """
-        The a short option should end up in the 'admin' key.
-        """
-        config = Options()
-        config.parseOptions(['-a', 'tcp:9789'])
-        self.assertEqual(config['admin'], 'tcp:9789')
-
     def test_store_options(self):
         """
         The mock long flag option should end up in the 'mock' key
@@ -130,6 +114,16 @@ class APIMakeServiceTests(TestCase):
         """
         makeService(test_config)
         self.service.assert_any_call('tcp:9789', self.Site.return_value)
+
+    def test_no_admin(self):
+        """
+        makeService does not create admin service if admin config value is
+        not there
+        """
+        config = test_config.copy()
+        del config['admin']
+        makeService(config)
+        self.assertTrue('tcp:9789' not in [args[0] for args, _ in self.service.call_args_list])
 
     def test_unicode_service_site_on_port(self):
         """

@@ -48,8 +48,6 @@ class Options(usage.Options):
     """
 
     optParameters = [
-        ["admin", "a", "tcp:9001",
-         "strports description of the admin API port."],
         ["port", "p", "tcp:9000",
          "strports description of the port for API connections."],
         ["config", "c", "config.json",
@@ -138,12 +136,13 @@ def makeService(config):
     api_service.setServiceParent(s)
 
     # Setup admin service
-    admin = OtterAdmin(admin_store)
-    admin_site = Site(admin.app.resource())
-    admin_site.displayTracebacks = False
-
-    admin_service = service(str(config_value('admin')), admin_site)
-    admin_service.setServiceParent(s)
+    admin_port = config_value('admin')
+    if admin_port:
+        admin = OtterAdmin(admin_store)
+        admin_site = Site(admin.app.resource())
+        admin_site.displayTracebacks = False
+        admin_service = service(str(admin_port), admin_site)
+        admin_service.setServiceParent(s)
 
     # Setup Kazoo client
     if config_value('zookeeper'):
