@@ -453,14 +453,14 @@ class _Job(object):
         server_id = result['id']
         log = self.log.bind(server_id=server_id)
 
-        deletable = ("A pending server that is no longer needed is now active, "
-                     "and hence deletable.  Deletion starting.")
-
         def handle_success(group, state):
             if self.job_id not in state.pending:
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
-                audit(log).msg(deletable, event_type="server.deletable")
+                audit(log).msg(
+                    "A pending server that is no longer needed is now active, "
+                    "and hence deletable.  Deleting said server.",
+                    event_type="server.deletable")
 
                 job = _DeleteJob(self.log, self.transaction_id,
                                  self.scaling_group, result, self.supervisor)
@@ -477,8 +477,11 @@ class _Job(object):
             f.trap(NoSuchScalingGroupError)
             # extra info does not get added to the audit log, but will be seen
             # in general logs
-            audit(log).msg(deletable, event_type="server.deletable",
-                           extra_info="Scaling group has been deleted.")
+            audit(log).msg(
+                "A pending server belonging to a deleted scaling group "
+                "({scaling_group_id}) is now active, and hence deletable. "
+                "Deleting said server.",
+                event_type="server.deletable")
 
             job = _DeleteJob(self.log, self.transaction_id,
                              self.scaling_group, result, self.supervisor)

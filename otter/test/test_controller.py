@@ -1540,7 +1540,7 @@ class PrivateJobHelperTestCase(TestCase):
 
         log.msg.assert_called_once_with(
             ("A pending server that is no longer needed is now active, "
-             "and hence deletable.  Deletion starting."),
+             "and hence deletable.  Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id='job_id',
             audit_log=True)
 
@@ -1615,10 +1615,11 @@ class PrivateJobHelperTestCase(TestCase):
         self.successResultOf(self.completion_deferred)
 
         log.msg.assert_called_once_with(
-            ("A pending server that is no longer needed is now active, "
-             "and hence deletable.  Deletion starting."),
+            ("A pending server belonging to a deleted scaling group "
+             "({scaling_group_id}) is now active, and hence deletable. "
+             "Deleting said server."),
             event_type="server.deletable", server_id='yay', job_id='job_id',
-            audit_log=True, extra_info='Scaling group has been deleted.')
+            audit_log=True)
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """
