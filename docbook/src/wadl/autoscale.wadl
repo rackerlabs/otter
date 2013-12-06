@@ -817,7 +817,10 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
 		     required="false"
 		     type="string"
 		     path="$.[*].args.at">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time, in seconds at which this policy will be executed. 
+	              For example, <code>"at": "2013-12-05T03:12:00Z"</code>. The policy will be triggered within a 10 second range of the time specified by "at", 
+	              so if you set the "at" seconds to 10:20:32, it will be triggered anytime between 10:20:32 to 10:20:42.
+	              This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
