@@ -867,10 +867,12 @@ class DeleteJobTests(TestCase):
 
     def test_job_completed(self):
         """
-        `_job_completed` just logs success msg
+        `_job_completed` audit logs a successful deletion
         """
+        log = self.job.log = mock_log()
         self.job._job_completed('ignore')
-        self.log.msg.assert_called_with('Server deletion job completed')
+        log.msg.assert_called_with('Server deleted.', audit_log=True,
+                                   event_type='server.delete')
 
     def test_job_failed(self):
         """
@@ -1269,9 +1271,9 @@ class ExecuteLaunchConfigTestCase(TestCase):
         controller.execute_launch_config(self.log, '1', self.fake_state,
                                          'launch', self.group, 3)
 
-        self.execute_config_deferreds[0].callback(None)              # job id 1
+        self.execute_config_deferreds[0].callback({'id': '1'})       # job id 1
         self.execute_config_deferreds[1].errback(Exception('meh'))   # job id 2
-        self.execute_config_deferreds[2].callback(None)              # job id 3
+        self.execute_config_deferreds[2].callback({'id': '3'})       # job id 3
 
         self.assertEqual(self.group.modify_state.call_count, 3)
 
@@ -1293,11 +1295,6 @@ class ExecuteLaunchConfigTestCase(TestCase):
         self.execute_config_deferreds[0].callback({'id': 's1'})
         self.assertEqual(s.pending, {})  # job removed
         self.assertIn('s1', s.active)    # active server added
-
-        # first bind is system='otter.job.launch'
-        self.log.bind.return_value.bind.assert_called_once_with(job_id='1')
-        self.log.bind().bind().bind.assert_called_once_with(server_id='s1')
-        self.assertEqual(self.log.bind().bind().bind().msg.call_count, 1)
 
     def test_pending_server_delete(self):
         """
@@ -1458,7 +1455,7 @@ class PrivateJobHelperTestCase(TestCase):
         """
         self.job.start('launch')
         self.assertEqual(self.group.modify_state.call_count, 0)
-        self.completion_deferred.callback('blob')
+        self.completion_deferred.callback({'id': 'blob'})
         self.assertEqual(self.group.modify_state.call_count, 1)
 
     def test_modify_state_called_on_job_completion_failure(self):
@@ -1488,6 +1485,23 @@ class PrivateJobHelperTestCase(TestCase):
             self.state.active,
             {'active': matches(ContainsDict({'id': Equals('active')}))})
 
+    def test_job_completion_success_audit_logged(self):
+        """
+        If the job succeeded, and the job ID is still in pending, it is audit
+        logged as a "server.active" event.
+        """
+        self.state = GroupState('tenant', 'group', 'name', {},
+                                {self.job_id: {}}, None, {}, False)
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            "Server is active.", event_type="server.active", server_id='yay',
+            job_id='job_id', audit_log=True)
+
     def test_job_completion_success_job_deleted_pending(self):
         """
         If the job succeeded, but the job ID is no longer in pending, the
@@ -1510,6 +1524,25 @@ class PrivateJobHelperTestCase(TestCase):
         self.del_job.return_value.start.assert_called_once_with()
 
         self.assertEqual(self.log.bind.return_value.err.call_count, 0)
+
+    def test_job_completion_success_job_deleted_audit_logged(self):
+        """
+        If the job succeeded, but the job ID is no longer in pending, it is
+        audit logged as a "server.deletable" event.
+        """
+        self.state = GroupState('tenant', 'group', 'name', {}, {}, None,
+                                {}, False)
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            ("A pending server that is no longer needed is now active, "
+             "and hence deletable.  Deleting said server."),
+            event_type="server.deletable", server_id='yay', job_id='job_id',
+            audit_log=True)
 
     def test_job_completion_failure_job_removed(self):
         """
@@ -1566,6 +1599,27 @@ class PrivateJobHelperTestCase(TestCase):
             self.log.bind.return_value, self.transaction_id,
             self.group, {'id': 'active'}, self.supervisor)
         self.del_job.return_value.start.assert_called_once_with()
+
+    def test_job_completion_success_NoSuchScalingGroupError_audit_logged(self):
+        """
+        If the job succeeded, but the job ID is no longer in pending, it is
+        audit logged as a "server.deletable" event.
+        """
+        self.group.modify_state.side_effect = (
+            lambda *args: defer.fail(NoSuchScalingGroupError('tenant', 'group')))
+
+        log = self.job.log = mock_log()
+        self.job.start('launch')
+        self.completion_deferred.callback({'id': 'yay'})
+
+        self.successResultOf(self.completion_deferred)
+
+        log.msg.assert_called_once_with(
+            ("A pending server belonging to a deleted scaling group "
+             "({scaling_group_id}) is now active, and hence deletable. "
+             "Deleting said server."),
+            event_type="server.deletable", server_id='yay', job_id='job_id',
+            audit_log=True)
 
     def test_job_completion_failure_NoSuchScalingGroupError(self):
         """
