@@ -21,6 +21,7 @@ import itertools
 from copy import deepcopy
 
 from twisted.internet.defer import gatherResults, maybeDeferred
+from twisted.python.failure import Failure
 
 import treq
 
@@ -66,6 +67,26 @@ def server_details(server_endpoint, auth_token, server_id):
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
+
+
+def wait_for_lb_active(lb_path, auth_token, timeout=15 * 60, interval=10, clock=None):
+    """
+    Wait for load balancer to become active
+    """
+
+    def is_active():
+        d = treq.get(lb_path, headers=headers(auth_token))
+        d.addCallback(check_success, [200])
+        d.addCallback(treq.json_content)
+        d.addCallback(lambda r: r['loadBalancer']['status'] == 'ACTIVE')
+        d.addCallback(lambda active: Failure(TransientRetryError) if not active else None)
+        return d
+
+    d = retry_and_timeout(
+        is_active, timeout, can_retry=None, # all errors are transient
+        next_interval=repeating_interval(interval), clock=clock,
+        deferred_description='Timed out waiting for load balancer to become active')
+    return d
 
 
 def wait_for_active(log,
@@ -168,15 +189,21 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
-    path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
+    lb_path = append_segments(endpoint, 'loadbalancers', str(lb_id))
+    nodes_path = append_segments(lb_path, 'nodes')
 
-    d = treq.post(path, headers=headers(auth_token),
-                  data=json.dumps({"nodes": [{"address": ip_address,
-                                              "port": port,
-                                              "condition": "ENABLED",
-                                              "type": "PRIMARY"}]}))
-    d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, path, 'add')
+    def add(_):
+        d = treq.post(nodes_path, headers=headers(auth_token),
+                      data=json.dumps({"nodes": [{"address": ip_address,
+                                                  "port": port,
+                                                  "condition": "ENABLED",
+                                                  "type": "PRIMARY"}]}))
+        d.addCallback(check_success, [200, 202])
+        d.addErrback(wrap_request_error, nodes_path, 'add')
+        return d
+
+    d = wait_for_lb_active(lb_path, auth_token)
+    d.addCallback(add)
 
     def when_done(result):
         undo.push(remove_from_load_balancer,
@@ -411,7 +438,6 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     d.addErrback(wrap_request_error, path, 'remove')
     d.addCallback(lambda _: None)
     return d
-
 
 def delete_server(log, region, service_catalog, auth_token, instance_details):
     """
