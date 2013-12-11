@@ -52,9 +52,8 @@ format="SVG" scale="60"/>
          xml:id="autoscale-devguide">
 <!-- The &PRODNAME; and &PRODABBV; are set in the entities at the top of this document -->
 <title>&PRODNAME; Developer Guide</title>
-<titleabbrev>&PRODABBV; DevGuide</titleabbrev>
+<titleabbrev>&PRODABBV; Developer Guide</titleabbrev>
 <?rax title.font.size="35px" subtitle.font.size="20px"
-status.bar.text="Early Access"
 canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/content"?>
     <info>
         <releaseinfo>API v1.0</releaseinfo>
@@ -71,6 +70,16 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
             </annotation>
         </legalnotice>
         <revhistory>
+          <revision>
+            <date>2013-11-19</date>
+            <revdescription>
+              <itemizedlist spacing="compact">
+                <listitem>
+                  <para>Updating content for UA</para>
+                </listitem>
+              </itemizedlist>
+            </revdescription>
+          </revision>
           <revision>
             <date>2013-08-21</date>
             <revdescription>
@@ -116,7 +125,7 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
             </revision>
         </revhistory>
       <!-- raxm:product appears in WAR for publication: cas-v1.0-autoscale-devguide-internal.war -->
-        <raxm:metadata role="hidden" xmlns:raxm="http://docs.rackspace.com/api/metadata">
+        <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
             <raxm:displayname>API Developer Guide</raxm:displayname>
             <raxm:product version="v1.0">cas</raxm:product>
             <raxm:priority>20</raxm:priority>
@@ -124,14 +133,14 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
     </info>
 <chapter xml:id="Overview">
     <title>Overview</title>
-    <para> The &PRODNAME; is a web service that automatically scales
-        resources in response to an increase or decrease in overall
-        workload based on user-defined policies. You can set up a
-        schedule for launching &PROD; or define an event that is
-        triggered by Cloud Monitoring. You can also specify a minimum
-        and maximum number of cloud servers, the amount of resources
-        that you want to increase or decrease, and the thresholds in
-        Cloud Monitoring that trigger the scaling activities. </para>
+    <para>&PRODNAME; is a web service that automatically scales
+      resources in response to an increase or decrease in overall
+      workload based on user-defined policies. You can set up a
+      schedule for launching &PROD; or define an event that is
+      triggered by Cloud Monitoring. You can also specify a minimum
+      and maximum number of cloud servers, the amount of resources
+      that you want to increase or decrease, and the thresholds in
+      Cloud Monitoring that trigger the scaling activities. </para>
   <para>
       To use &PROD;, you define a scaling group consisting of cloud servers and cloud load balancers.
       Then you define policies, either schedule-based or monitoring-based. For monitoring-based policies,
@@ -143,19 +152,28 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-devguide/co
       workloads, you can begin with a minimal cloud
       configuration and grow only when the cost of that growth is
       justified. </para>
-    <para> &PROD;
-      requires the following services to work together: <itemizedlist>
+    <para>In this chapter, you will learn about the following:</para>
+    <para>
+      <itemizedlist>
         <listitem>
-          <para> Cloud Monitoring (for monitoring-based policies) </para>
+          <para><link linkend="Intended_Audience-d1e166">Intended
+              Audience</link></para>
         </listitem>
         <listitem>
-          <para> Cloud Servers </para>
+          <para><link linkend="Doc_Change_History">Document Change
+              History</link></para>
         </listitem>
         <listitem>
-          <para> Cloud Load Balancers </para>
+          <para><link linkend="Resources-000">Additional
+              Resources</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Pricing_SLA-d1e1362">Pricing and
+              Service Level</link></para>
         </listitem>
       </itemizedlist>
     </para>
+    <para> </para>
     <section xml:id="Intended_Audience-d1e166">
         <title>Intended Audience</title>
         <para>This document is intended for software developers who
@@ -226,11 +244,11 @@ is external so it's handy for Getting Started to share -->
         <para>For the Early Access period, there is no Service Level Agreement (SLA) for &PRODNAME;. </para>
     </section>
     </chapter>
-    <chapter xml:id="Concepts-dle001">
-        <title>Concepts</title>
-        <para> To use the &PROD; API effectively, you should
-            understand several key concepts:
-        </para>
+    <chapter xml:id="Glossary">
+      <title>Auto Scale Core Concepts</title>
+      <para> To use the &PROD; API effectively, you should
+        understand several key concepts:
+      </para>
       <!-- Glossary section, defining basic terms,
 is external so it's handy for Getting Started to share -->
       <xi:include href="chapters/glossary.xml"/>
@@ -238,6 +256,46 @@ is external so it's handy for Getting Started to share -->
     </chapter>
       <chapter xml:id="Gen_API_Info-de01">
     <title>General API Information</title>
+    <para>
+      <itemizedlist>
+        <listitem>
+          <para><link linkend="Authentication-d1e01"
+              >Authentication</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="serviceEndpoints">Service Access
+              Endpoints</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="contractVersion">Contract
+              Versions</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Request_Response_Types-d1e903">Request
+              and Response Types</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Limits-d1e1208">Limits</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="datetimeformat">Date and Time
+              Format</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="pagination">Pagination</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="server-flavors">Server
+            Flavors</link></para>
+        </listitem>
+        <listitem linkend="audit-log">
+          <para><link linkend="audit-log">Audit Logs</link></para>
+        </listitem>
+        <listitem linkend="faults-dle101">
+          <para><link linkend="faults-dle101">Faults</link></para>
+        </listitem>
+      </itemizedlist>
+    </para>
     <para>The &PROD; API is implemented using a RESTful web service
       interface. Like other products in the Rackspace Cloud suite,
       &PROD; shares a common token-based authentication system that
@@ -249,23 +307,28 @@ is external so it's handy for Getting Started to share -->
     </note>
     <section xml:id="Authentication-d1e647">
       <title>Authentication</title>
-        <para> Every REST request for &PROD; requires the inclusion of
-        a specific authorization token, supplied by the
+      <para><link linkend="Retrieving_Auth_Token">Retrieving the
+          Authentication Token</link></para>
+        <para>Every REST request for &PROD; requires the inclusion of
+        a specific authentication token, supplied by the
           <code>X-Auth-Token</code> HTTP header. Customers obtain this
         token by first using the Rackspace Cloud Identity service and
         supplying a valid user name and API access key. </para>
       <section xml:id="Retrieving_Auth_Token">
         <title>Retrieving the Authentication Token</title>
-        <para> The authenticate operation provides clients with an
+        <para> The authenticate operation provides users with an
           authentication token and a list of regional cloud endpoints.
           The sample requests and responses in this section illustrate
           a general case. In your authentication request, use your own
           credentials rather than the sample values shown for
-          <code>username</code> and <code>apiKey</code>. When you
+            <code>username</code> and <code>apiKey</code>. When you
           authenticate successfully, the response to your
-          authentication request includes a catalog of the
-          services to which you have subscribed rather than the sample
-          values shown. </para>
+          authentication request includes a catalog of the services to
+          which you have subscribed rather than the sample values
+          shown. </para>
+        <para>The following table describes a request for an
+          authentication token and the examples that follow show the
+          request and response in JSON format.</para>
         <table rules="all">
           <caption>Request for Authentication Token</caption>
           <tbody>
@@ -360,8 +423,8 @@ is external so it's handy for Getting Started to share -->
               identified by the <code>expires</code> attribute.
                 The<code>expires</code> attribute predicts a token's
               maximum possible lifespan but does not guarantee that it
-              will reach that lifespan. Clients are encouraged to
-              cache a token until it expires. </para>
+              will reach that lifespan. Users are encouraged to cache
+              a token until it expires. </para>
             <para>Authentication tokens are typically valid for 24
               hours. Applications should be designed to
               re-authenticate after receiving a
@@ -455,8 +518,8 @@ is external so it's handy for Getting Started to share -->
           </callout>
           <callout arearefs="response.json.region">
             <para>A service can expose endpoints in different regions.
-              Regional endpoints allow clients to provision resources
-              in a manner that provides high availability. </para>
+              Regional endpoints allow users to provision resources in
+              a manner that provides high availability. </para>
             <para>Some services are not region specific. These
               services supply a single, non-regional endpoint and do
               not provide access to internal URLs. </para>
@@ -505,12 +568,6 @@ is external so it's handy for Getting Started to share -->
         service is therefore responsible for appropriate replication,
         caching, and overall maintenance of &PRODNAME; data across
         regional boundaries to other &PROD; servers.</para>
-      <important>
-        <para>
-          For the Early Access period, you can use &PROD; endpoints in ORD and DFW.
-          Endpoints in LON and SYD will be available soon.
-        </para>
-      </important>
       <para>The following table lists the service access endpoints for
         &PROD;.</para>
       <?rax-fo keep-with-next?>
@@ -565,16 +622,16 @@ is external so it's handy for Getting Started to share -->
       </para>
       <para>Replace the Tenant ID,
           <parameter>1234</parameter>, with your actual Tenant ID.</para>
-      <para>You will find your account number after the final '/' in
-        the <code>publicURL</code> field returned by the
-        authentication response. For example, in <olink
+      <para>You will find your tenant Id after the final '/' in the
+          <code>publicURL</code> field returned by the authentication
+        response. For example, in <olink
           targetdoc="autoscale-devguide"
           targetptr="auth-response-example-json">Example 2,
           “Authentication Response for US Endpoint: JSON”</olink> the
           <code>publicURL</code> field for <code>autoscale</code>
           ("https://ord.autoscale.api.rackspacecloud.com/v1.0/<emphasis
-          role="bold">1100111</emphasis>") shows that the account
-        number is 1100111. </para>
+          role="bold">1100111</emphasis>") shows that the tenant Id is
+        1100111. </para>
     </section>
     <section xml:id="contractVersion">
       <title>Contract Versions</title>
@@ -649,9 +706,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         <para>Rate limits are specified in terms of both a
           human-readable wildcard URI and a machine-processable
           regular expression. The regular expression boundary matcher
-          '^' takes effect after the root URI path. For example, the
-          regular expression <code>^/v1.0/execute</code> would match
-          the bolded portion of the following URI:
+          '^' takes effect after the root URI path. </para>
+        <para>For example, the regular expression
+            <code>^/v1.0/execute</code> would match the bolded portion
+          of the following URI:
             https://ord.autoscale.api.rackspacecloud.com<emphasis
             role="bold">/v1.0/execute</emphasis>. </para>
         <para>For any user, all &PROD; operations are limited to 1,000
@@ -662,7 +720,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           <caption>Default Rate Limits</caption>
           <thead>
             <tr align="center">
-              <td colspan="1">Verb</td>
+              <td colspan="1">Method</td>
               <td colspan="2">URI</td>
               <td colspan="2">RegEx</td>
               <td colspan="1">Default</td>
@@ -806,6 +864,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           </tr>
         </tbody>
       </table>
+      <para>
+        <note>
+          <para>In Auto Scale, the time specified always refers to the
+            "GMT" time zone.</para>
+        </note>
+      </para>
     </section>
         <section xml:id="pagination">
       <title>Pagination</title>
@@ -816,10 +880,10 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       <para>The pagination limit for the Auto Scale API is 100. This
         means you can view 100 items at a time. </para>
       <para>For example, if you want to get a list of all the scaling
-        groups, and there are more than 100 groups, you will see the
-        first 100 groups on one page and then a link at the bottom of
-        the page that takes you to the next page, which contains the
-        next 100 items. </para>
+        groups, and there are more than 100 groups, you see the first
+        100 groups on one page and then a link at the bottom of the
+        page that takes you to the next page, which contains the next
+        100 items. </para>
       <para>A pagination limit that is set beyond 100 is defaulted to
         100. And a limit that is set to smaller than 1 is defaulted to
         1. </para>
@@ -849,7 +913,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         URI:</para>
       <para>
         <table rules="all">
-          <caption>Limit and Marker Pagination Parameters</caption>
+          <caption>limit and marker Pagination Parameters</caption>
+          <col width="20%"/>
+          <col width="80%"/>
           <thead>
             <tr>
               <td>Parameter</td>
@@ -858,7 +924,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           </thead>
           <tbody>
             <tr>
-              <td>limit</td>
+              <td><parameter>limit</parameter></td>
               <td>Specifies the number of items that can be returned
                 on one page. If the client requests a <emphasis
                   role="italic">limit</emphasis> beyond the 100 items
@@ -866,7 +932,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                 code will be returned.</td>
             </tr>
             <tr>
-              <td>marker</td>
+              <td><parameter>marker</parameter></td>
               <td>Specifies the Id of the last item in the previous
                 list. Items are sorted by create time in descending
                 order. When a create time is not available they are
@@ -879,7 +945,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       </para>
       <para>
         <note>
-          <para>The limit and marker parameters are both
+          <para>The <parameter>limit</parameter> and
+              <parameter>marker</parameter> parameters are both
             optional.</para>
         </note>
       </para>
@@ -889,6 +956,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         set:</para>
       <table rules="all">
         <caption>Values for Rel Parameter</caption>
+        <col width="20%"/>
+        <col width="80%"/>
         <thead>
           <tr>
             <td>Value</td>
@@ -916,7 +985,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           </tr>
         </tbody>
       </table>
-      <example>
+      <section xml:id="Paginating_Group_Lists">
         <title>Paginating Group Lists</title>
         <para>When submitting a request for a group manifest, you
           receive a list of all the available scaling groups and
@@ -924,7 +993,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
           response body will only list 100, and provide a next link in
           the <parameter>rel</parameter> parameter as shown in the
           following example: </para>
-        <programlisting language="json">{
+        <example>
+          <title>Paginating Group Lists Example</title>
+          <programlisting language="json">{
        "groups": [
             ...
        ],
@@ -938,13 +1009,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
    }
 
 </programlisting>
-      </example>
+        </example>
       <para>The <parameter>limit</parameter> parameter in the example
         above is set to 100, which means no more than 100 items can be
         displayed on one page. For Auto Scale, this number must be
-        between 1 and 100, inclusive. So if you provide a query
-        argument of more than 100, it will default to 100, and if you
-        set the limit to less than 1, it will default to 1. </para>
+        between 1 and 100. So if you provide a query argument of more
+        than 100, it will default to 100, and if you set the limit to
+        less than 1, it will default to 1. </para>
       <para>If you provide an invalid query argument for
           <parameter>limit</parameter>, a 400 response code will be
         returned. The <parameter>marker</parameter>parameter specifies
@@ -952,8 +1023,8 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
         returned, all the groups displayed will have group Ids that
         are greater than
         "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
-      <para>
-        <example>
+        </section>
+        <section xml:id="Paginating_Policy_Lists">
           <title>Paginating Policy Lists</title>
           <para>When you submit a request to obtain all the policies
             associated with a scaling group, a list of policies will
@@ -961,7 +1032,9 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             response body will only list 100, and provide a next link
             in the <parameter>rel</parameter> parameter as shown in
             the following example: </para>
-          <programlisting language="json"> {
+          <example>
+            <title>Paginating Policy Lists Example</title>
+            <programlisting language="json"> {
        "policies": [
             ...
        ],
@@ -974,21 +1047,24 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
        ]
    }
 </programlisting>
+          </example>
           <para>The <parameter>marker</parameter> parameter points to
             the last seen policy Id. When you click on the link that
             is returned, all the policies displayed will have policy
             Ids that are greater than
             "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
-        </example>
-        <example>
-      <title>Paginating Webhook Lists</title>
-      <para>When you submit a request to obtain all the webhooks
+        </section>
+        <section xml:id="Paginating_Webhook_lists">
+          <title>Paginating Webhook Lists</title>
+          <para>When you submit a request to obtain all the webhooks
             associated with a policy, a list of webhooks will be
             returned. However, if there are too many webhooks, the
             response body will only list 100, and provide a next link
             in the <parameter>rel</parameter> parameter as shown in
             the following example: </para>
-      <programlisting language="json"> {
+          <example>
+            <title>Paginating Webhook Lists Example</title>
+            <programlisting language="json"> {
        "webhooks": [
             ...
        ],
@@ -1000,23 +1076,24 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
            }
        ]
    }</programlisting>
+          </example>
           <para>The <parameter>marker</parameter> parameter points to
             the last seen webhook Id. When you click on the link that
             is provided in the response body, all the webhooks
             displayed will have webhook Ids that are greater than
             "f82bb000-f451-40c8-9dc3-6919097d2f7e".</para>
-          </example></para> </section>
+        </section>
+          </section>
           <section xml:id="server-flavors">
             <title>Server Flavors</title>
             <para>When configuring a Cloud Server image through the
-        Control Panel or the API, users can chose from a specific
-        server flavor. A flavor is an available hardware configuration
-        for a server. Each flavor has a unique combination of disk
-        space and memory capacity. The server flavor that is specified
-        in the Control Panel maps to a specific flavor id in the
-        Rackspace API. The following table outlines the mapping
-        between flavor Id and the available flavors in the Control
-        Panel. </para>
+        Control Panel or the API, users can chose a specific server
+        flavor. A flavor is an available hardware configuration for a
+        server. Each flavor has a unique combination of disk space and
+        memory capacity. The server flavor that is specified in the
+        Control Panel maps to a specific flavor id in the Rackspace
+        API. The following table outlines the mapping between flavor
+        Id and the available flavors in the Control Panel. </para>
             <table rules="all">
                 <caption>Rackspace Cloud Server Flavors</caption>
               <col width="30%"/>
@@ -1157,18 +1234,13 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       </para>
           </section>
       <section xml:id="audit-log">
-        <title>Audit Log</title>
+      <title>Audit Logs</title>
       <para>Because of the deferred nature of Auto Scale, most errors
         occur outside of the user's session. Errors are logged to a
         user's cloud feed as an audit log. The audit log contains all
-        the events that have occurred within a user's scaling group. </para>
-      <para>The following example shows an audit log for the
-        successful creation of a scaling group.</para>
-        <programlisting language="json"><xi:include href="./samples/auditlogcreatescalinggroup.py" parse="text"/>
-</programlisting>
-        <para>The following example shows an audit log for the
-        successful creation of a webhook.</para>
-        </section>
+        the events that have occurred within a user's scaling group.
+      </para>
+    </section>
       <section xml:id="faults-dle101">
         <title>Faults</title>
       <para>If any &PRODNAME; request results in an error, the service
@@ -1218,12 +1290,57 @@ Content-Type: application/json
       </chapter>
   <chapter xml:id="Working_with_Auto_Scale_API">
     <title>Working with the Auto Scale API</title>
+    <para>In this chapter you will learn how to do the following:</para>
+    <para>
+      <itemizedlist>
+        <listitem>
+          <para><link linkend="Manage_Launch_Configuration">Manage the
+              Launch Configuration for your Scaling
+            Group</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Create_Scaling_Policies">Create Scaling
+              Policies</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Create_and_Manage_Webhooks">Create and
+              Manage Webhooks</link></para>
+        </listitem>
+        <listitem>
+          <para><link linkend="Execute_Scaling_Policy">Execute a
+              Scaling Policy</link></para>
+        </listitem>
+      </itemizedlist>
+    </para>
     <section xml:id="Manage_Launch_Configuration">
-      <title>Manage the Launch Configuration for your Scaling
-        Group</title>
+      <title>Manage the Configuration for your Scaling Group</title>
       <para>You can use the Auto Scale API to view and update the
-        launch configuration for your scaling group.</para>
-      <example>
+        launch configuration for your scaling group:</para>
+      <para>
+        <itemizedlist>
+          <listitem>
+            <para><link linkend="Get_Configuration_for_Scaling_Group"
+                >Get the Current Configuration for your Scaling
+                Group</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Edit_Configuration_for_Scaling_Group"
+                >Edit the Current Configuraiton for your Scaling
+                Group</link></para>
+          </listitem>
+          <listitem>
+            <para><link
+                linkend="Get_Launch_Configuration_for_Scaling_Group"
+                >Get the Launch Configuration for your Scaling
+                Group</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Edit_Launch_Config">Edit the Launch
+                Configuration for your Scaling Group</link></para>
+          </listitem>
+        </itemizedlist>
+      </para>
+      <section xml:id="Get_Configuration_for_Scaling_Group">
         <title>Get the Current Configuration for your Scaling
           Group</title>
         <para>To obtain the configuration for a scaling group, which
@@ -1233,14 +1350,14 @@ Content-Type: application/json
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting>
+        <example><title>Get Configuration for your Scaling Group Request</title><programlisting>GET /{tenantId}/groups/{groupId}/config</programlisting></example>
         <para>If the <command>GET</command> request is successful, the
           data is returned in the body of the response in JSON format
           as shown in the following example:</para>
-        <programlisting language="json"><xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
+        <example><title>Response to Successful Get Configuration Request</title><programlisting language="json"><xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
+</programlisting></example>
+      </section>
+      <section xml:id="Edit_Configuration_for_Scaling_Group">
         <title>Edit the Current Configuration for your Scaling
           Group</title>
         <para>To edit the configuration for a scaling group, which
@@ -1250,14 +1367,14 @@ Content-Type: application/json
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
+        <example><title>Edit the Configuration for a Scaling Group Request</title><programlisting> PUT /{tenantId}/groups/{groupId}/config </programlisting>
         <programlisting language="json"><xi:include href="./samples/reqPutGroupConfig.json" parse="text"/>
-</programlisting>
+</programlisting></example>
         <para>If the <command>PUT</command> request is successful, a
           204 response code with an empty response body will be
           returned </para>
-      </example>
-      <example>
+      </section>
+      <section xml:id="Get_Launch_Configuration_for_Scaling_Group">
         <title>Get the Launch Configuration for your Scaling
           Group</title>
         <para>To obtain the launch configuration for a scaling group,
@@ -1268,15 +1385,15 @@ Content-Type: application/json
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting> GET /{tenantId}/groups/{groupId}/launch</programlisting>
+        <example><title>Get the Launch Configuration for a Scaling Group Request</title><programlisting> GET /{tenantId}/groups/{groupId}/launch</programlisting></example>
         <para>If the <command>GET</command> request is successfull,
           the data will be returned in the body of the response in
           JSON format as shown in the following example:</para>
-        <programlisting language="json">
+        <example><title>Response to a Successful Get the Launch Configuration for a Scaling Group</title><programlisting language="json">
 <xi:include href="./samples/resGetLaunchConfig.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
+</programlisting></example>
+      </section>
+      <section xml:id="Edit_Launch_Config">
         <title>Edit the Launch Configuration for your Scaling
           Group</title>
         <para>To edit the launch configuration for a scaling group,
@@ -1289,16 +1406,19 @@ Content-Type: application/json
           the server type, server image, load balancers, network, and
           any other information you want to edit, as shown in the
           following example. </para>
-        <programlisting> PUT /{tenantId}/groups/{groupId}/launch </programlisting>
-        <programlisting language="json"><xi:include href="./samples/reqPutLaunchConfig.json" parse="text"/>
+        <example>
+          <title>Edit the Launch Configuration for a Scaling Group
+            Example</title>
+          <programlisting> PUT /{tenantId}/groups/{groupId}/launch </programlisting>
+          <programlisting language="json"><xi:include href="./samples/reqPutLaunchConfig.json" parse="text"/>
 </programlisting>
+        </example>
         <para>If the <command>PUT</command> request is successful, a
           204 response code with an empty response body will be
           returned.</para>
-      </example>
-      <example>
-        <title>Pause Execution of all Policies for a Scaling
-          Group<?sbr?></title>
+      </section>
+      <section xml:id="Pause_Execution_of_Scaling_Policies">
+        <title>Pause Execution of All Scaling Policies</title>
         <para>
           <note>
             <para>The Pause feature has not been implemented in the
@@ -1311,12 +1431,16 @@ Content-Type: application/json
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting> POST /{tenantId}/groups/{groupId}/pause</programlisting>
+        <example>
+          <title>Pause Execution of all Policies for a Scaling
+            Group</title>
+          <programlisting> POST /{tenantId}/groups/{groupId}/pause</programlisting>
+        </example>
         <para>If the <command>POST</command> request is successful, a
           204 response code is returned with an empty response
           body.</para>
-      </example>
-      <example>
+      </section>
+      <section xml:id="Resume_Execution_of_Scaling_Policies">
         <title>Resume Execution of all Policies for a Scaling
           Group</title>
         <para>
@@ -1331,11 +1455,14 @@ Content-Type: application/json
           the <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting> POST /{tenantId}/groups/{groupId}/resume</programlisting>
+        <example>
+          <title>Resume Execution of All Scaling Policies</title>
+          <programlisting> POST /{tenantId}/groups/{groupId}/resume</programlisting>
+        </example>
         <para>If the <command>POST</command> request is successful, a
           204 response code is returned with an empty response
           body.</para>
-      </example>
+      </section>
     </section>
     <section xml:id="Create_Scaling_Policies">
       <title>Create Scaling Policies</title>
@@ -1343,15 +1470,13 @@ Content-Type: application/json
         scaling policies for your scaling group. Create a scaling
         policy by submitting a <command>POST</command> request that
         contains the <parameter>tenantID</parameter> that you obtained
-        during the Authentication<olink
-          targetdoc="autoscale-getting-started"
+        during the <olink targetdoc="autoscale-getting-started"
           targetptr="Authenticate">“Authenticate”</olink> step and the
-          <parameter>groupID</parameter> that you obtained durring the
-        Create and Manage a Scaling Grou<olink
-          targetdoc="autoscale-getting-started"
+          <parameter>groupID</parameter> that you obtained during the
+          <olink targetdoc="autoscale-getting-started"
           targetptr="Create_Group">“Create and Manage a Scaling
-          Group”</olink>p step. </para>
-      <para> You can specify multiple policies to manage your scaling
+          Group”</olink> step. </para>
+      <para>You can specify multiple policies to manage your scaling
         group.</para>
       <para>
         <note>
@@ -1364,48 +1489,73 @@ Content-Type: application/json
           </para>
         </note>
       </para>
-      <example>
-        <title>Creating a Scaling Policy</title>
-        <para>To create a scaling policy, submit a POST request with
-          the <parameter>tenantId</parameter> and
+      <para>
+        <itemizedlist>
+          <listitem>
+            <para><link linkend="Create_a_Scaling_Policy">Create a
+                Scaling Policy</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Obtain_List_of_Scaling_Policies"
+                >Obtain a List of Scalijng Policies</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Getting_Individual_Scaling_Policy"
+                >Get an Indiviual Scaling Policy</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Updating_Scaling_Policy">Update a
+                Scaling Policy</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Deleting_Scaling_Policy">Delete a
+                Scaling Policy</link></para>
+          </listitem>
+        </itemizedlist>
+      </para>
+      <section xml:id="Create_a_Scaling_Policy">
+        <title>Create a Scaling Policy</title>
+        <para>To create a scaling policy, submit a
+            <command>POST</command> request with the
+            <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL. The following example shows how to create a
           policy that scales the group up by one server with a
           cooldown phase of 150 seconds and a scaling policy that
           scales the group down by 5.5 percent with a cooldown phase
           of 6 seconds.</para>
-        <programlisting>
+        <example><title>Create a Scaling Policy</title><programlisting>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/
-                </programlisting>
+                </programlisting></example>
         <programlisting language="json">
 <xi:include href="./samples/reqCreatePolicies.json" parse="text"/>
 </programlisting>
         <para>If the <command>POST</command> request is successful, an
           array of scaling policies is provided in the request body in
           JSON format, as shown in the following example.</para>
-        <programlisting language="json">
+        <example><title>Response to Successful Create a Scaling Policy Request</title><programlisting language="json">
 <xi:include href="./samples/resCreatePolicies.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Obtaining a List of Scaling Policies</title>
+</programlisting></example>
+      </section>
+      <section xml:id="Obtain_List_of_Scaling_Policies">
+        <title>Obtain a List of Scaling Policies</title>
         <para>To obtain a list of scaling policies for a scaling
           group, submit a <command>GET</command> request with the
             <parameter>tenantId</parameter> and
             <parameter>groupId</parameter> parameters specified in the
           request URL.</para>
-        <programlisting>
+       <example><title>Obtain a List of Scaling Policies Request</title> <programlisting>
 GET /{tenantId}/groups/{groupId}/policies
-                </programlisting>
+                </programlisting></example>
         <para>If the <command>GET</command> request is successful, the
           response data will be returned in JSON format as shown in
           the following example:</para>
-        <programlisting language="json">
+        <example><title>Response to Successful Obtain a List of Scaling Policies Request</title><programlisting language="json">
 <xi:include href="./samples/resGetPolicies.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Getting an Individual Scaling Policy</title>
+</programlisting></example>
+      </section>
+      <section xml:id="Getting_Individual_Scaling_Policy">
+        <title>Get an Individual Scaling Policy</title>
         <para>To obtain information about an individual scaling
           policy, including policy id, name, type, adjustment, and
           cooldown, submit a <command>GET</command> request with the
@@ -1413,18 +1563,18 @@ GET /{tenantId}/groups/{groupId}/policies
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL. </para>
-        <programlisting>
+        <example><title>Get an Individual Scaling Policy Request</title><programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}
-                </programlisting>
+                </programlisting></example>
         <para>If the <command>GET</command> request is successful, the
           data will be returned in the response body in JSON format as
           shown in the following example:</para>
-        <programlisting language="json">
+        <example><title>Response to a Successful Get an Individual Scaling Policy Request</title><programlisting language="json">
 <xi:include href="./samples/resGetPolicy.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Updating a Scaling Policy</title>
+</programlisting></example>
+      </section>
+      <section xml:id="Updating_Scaling_Policy">
+        <title>Update a Scaling Policy</title>
         <para>To update a scaling policy, submit a
             <command>PUT</command> request, with the
             <parameter>tenantId</parameter>,
@@ -1433,33 +1583,33 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}
           the request URL. In the request body provide a name for the
           policy, a change value, and a value for the cooldown and a
           method for triggering the policy, for example a webhook. In
-          the following example, the configuration is scaled up by 1
+          the following example, the configuration is scaled up by one
           server with a cooldown phase of 1800 seconds. </para>
-        <programlisting>
+       <example><title>Update a Scaling Policy Request</title> <programlisting>
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}
 </programlisting>
         <programlisting language="json">
 <xi:include href="./samples/reqPutPolicy.json" parse="text"/>
-</programlisting>
+</programlisting></example>
         <para>If the <command>PUT</command> request is successful, a
           204 response code with an empty response body will be
           returned. </para>
-      </example>
-      <example>
-        <title>Deleting a Scaling Policy</title>
+      </section>
+      <section xml:id="Deleting_Scaling_Policy">
+        <title>Delete a Scaling Policy</title>
         <para>To delete a scaling policy, submit a
             <command>DELETE</command> request with the
             <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL. </para>
-        <programlisting>
+        <example><title>Delete a Scaling Policy Request</title><programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
-                </programlisting>
+                </programlisting></example>
         <para>If the <command>DELETE</command> request is successful,
           a 204 response code with an empty response body will be
           returned. </para>
-      </example>
+      </section>
     </section>
     <section xml:id="Create_and_Manage_Webhooks">
       <title>Create and Manage Webhooks</title>
@@ -1469,8 +1619,32 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
         is set, a pre-configured event, such as an alarm set through
         Cloud Monitoring, causes an HTTP POST callback request to be
         sent to a configured URI. </para>
-      <example>
-        <title>Creating a Scaling Webhook: Request</title>
+      <para>
+        <itemizedlist>
+          <listitem>
+            <para><link linkend="Create_scaling_webhook">Create a
+                Webhook</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Get_List_of_Scaling_Webhooks">Get a
+                List of all Webhooks and their Ids</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Update_Scaling_Webhook">Update a
+                Webhook</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Get_Info_About_Webhook">Get
+                Information about a Specific Webhook</link></para>
+          </listitem>
+          <listitem>
+            <para><link linkend="Delete_Scaling_Webhook">Delete a
+                Webhook</link></para>
+          </listitem>
+        </itemizedlist>
+      </para>
+      <section xml:id="Create_scaling_webhook">
+        <title>Create a Webhook</title>
         <para>To create a webhook, submit a <command>POST</command>
           request with the <parameter>tenantID</parameter>,
             <parameter>groupID</parameter>, and
@@ -1479,40 +1653,39 @@ DELETE /{tenantId}/groups/{groupId}/policies/{policyId}
           as well as any metadata for the webhook. The following
           example shows how to create a webhook for a scaling
           policy.</para>
-        <programlisting>
+        <example><title>Create a Webhook Request</title><programlisting>
 POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/{groupID}/policies/{policyID}/webhooks
                 </programlisting>
         <programlisting language="json">
 <xi:include href="./samples/reqCreateWebhook.json" parse="text"/>
-</programlisting>
+</programlisting></example>
         <para>If the <command>POST</command> request is successful,
           the data will be returned in JSON format as shown in the
           following example:</para>
-        <programlisting language="json">
+        <example><title>Response to a Successful Create a Webhook Request</title><programlisting language="json">
 <xi:include href="./samples/resCreateWebhook.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Get a List of all Scaling Webhooks and their
-          Ids</title>
+</programlisting></example>
+      </section>
+      <section xml:id="Get_List_of_Scaling_Webhooks">
+        <title>Get a List of all Webhooks and their Ids</title>
         <para>To obtain a list of all scaling webhooks and their
           corresponding ids, submit a <command>GET</command> request
           with the <parameter>tenantId</parameter>,
             <parameter>groupId</parameter> and
             <parameter>policyId</parameter> parameters specified in
           the request URL.</para>
-        <programlisting>
+        <example><title>Get a List of Scaling Webhooks and their Ids Request</title><programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
-                </programlisting>
+                </programlisting></example>
         <para>If the <command>GET</command> request is successful, the
           data will be returned in the response body in JSON format as
           shown in the following example:</para>
-        <programlisting language="json">
+       <example><title>Response to a Successful Get a List of Scaling Webhooks Request</title><programlisting language="json">
 <xi:include href="./samples/resGetWebhooks.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Update a Scaling Webhook</title>
+</programlisting></example> 
+      </section>
+      <section xml:id="Update_Scaling_Webhook">
+        <title>Update a Webhook</title>
         <para>To modify a scaling webhook, submit a
             <command>PUT</command> request with the
             <parameter>tenantId</parameter>,
@@ -1522,68 +1695,65 @@ GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks
           the request URL. In the request body, specify a name and
           metadata for the webhook as shown in the following
           example.</para>
-        <programlisting>
+        <example><title>Update a Webhook Request</title><programlisting>
 PUT /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
                 </programlisting>
-        <programlisting language="json"><xi:include href="./samples/reqPutWebhook.json" parse="text"/></programlisting>
+          <programlisting language="json"><xi:include href="./samples/reqPutWebhook.json" parse="text"/></programlisting></example>
         <para>If the <command>PUT</command> request is successful, a
           204 response code with an empty response body will be
           returned.</para>
-      </example>
-      <example>
+      </section>
+      <section xml:id="Get_Info_About_Webhook">
         <title>Get Information about a Specific Webhook</title>
         <para>To obtain details about a specific webhook, submit a
-            <command>GET</command> request with the
+            <command>GET</command>request with the
             <parameter>tenantId</parameter>,
             <parameter>groupId</parameter>,
             <parameter>policyId</parameter> and
             <parameter>webhookId</parameter> parameters specified in
           the request URL.</para>
-        <programlisting>
+       <example><title>Get Information about a Webhook Request</title> <programlisting>
 GET /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-                </programlisting>
+                </programlisting></example>
         <para>If the <command>GET</command> request is successful, the
           data will be returned in JSON format as shown in the
           following example:</para>
-        <programlisting language="json">
+        <example><title>Example of Successful Response to Get Info about a Webhook Request</title><programlisting language="json">
 <xi:include href="./samples/resGetWebhook.json" parse="text"/>
-</programlisting>
-      </example>
-      <example>
-        <title>Delete a Scaling Webhook</title>
-        <para>To delete a scaling policy webhook, submit a
-            <command>DELETE</command> request with the
-            <parameter>tenantID</parameter>,
+</programlisting></example>
+      </section>
+      <section xml:id="Delete_Scaling_Webhook">
+        <title>Delete a Webhook</title>
+        <para>To delete a webhook, submit a <command>DELETE</command>
+          request with the <parameter>tenantID</parameter>,
             <parameter>groupID</parameter>,
             <parameter>policyID</parameter>, and the
             <parameter>webhookID</parameter> parameters specified in
           the request URL.</para>
-        <programlisting>
+       <example><title>Delete a Webhook Request</title> <programlisting>
 DELETE /{tenantId}/groups/{groupId}/policies/{policyId}/webhooks/{webhookId}
-                </programlisting>
-        <para>If the <command>DELETE</command> request is successful,
-          a 204 response code with an empty response body will be
-          returned. </para>
-      </example>
+                </programlisting></example>
+        <para>If the DELETE request is successful, a 204 response code
+          with an empty response body will be returned. </para>
+      </section>
     </section>
     <section xml:id="Execute_Scaling_Policy">
       <title>Execute a Scaling Policy</title>
       <para> After you define a scaling policy, you can activate that
         policy by issuing a <command>POST</command> request against
         its URL. </para>
+      <para>To activate a scaling policy, submit a <command>POST
+        </command>request with the <parameter>tenantId</parameter>,
+          <parameter>groupId</parameter> and
+          <parameter>policyId</parameter> parameters specified in the
+        request URL.</para>
       <example>
-        <title>Activating a Scaling Policy</title>
-        <para>To activate a scaling policy, submit a
-            <command>POST</command> request with the
-            <parameter>tenantId</parameter>,
-            <parameter>groupId</parameter> and
-            <parameter>policyId</parameter> parameters specified in
-          the request URL.</para>
+        <title>Activate a Scaling Policy Request</title>
         <programlisting>
  POST /{tenantId}/groups/{groupId}/policies/{policyId}/execute
                 </programlisting>
       </example>
-      <para> The <command>POST</command> request causes the <link
+      <para> The<command> POST</command> request causes the <link
           linkend="Create_Scaling_Policies">scaling policy</link> to
         execute, which causes the scaling group to transform if it is
         able to do so. </para>

@@ -55,7 +55,7 @@ class OtterWebhooks(object):
     def __init__(self, store, tenant_id, group_id, policy_id):
         self.log = log.bind(system='otter.rest.webhooks',
                             tenant_id=tenant_id,
-                            group_id=group_id,
+                            scaling_group_id=group_id,
                             policy_id=policy_id)
         self.store = store
         self.tenant_id = tenant_id
@@ -238,7 +238,7 @@ class OtterWebhook(object):
     def __init__(self, store, tenant_id, group_id, policy_id, webhook_id):
         self.log = log.bind(system='otter.rest.webhook',
                             tenant_id=tenant_id,
-                            group_id=group_id,
+                            scaling_group_id=group_id,
                             policy_id=policy_id,
                             webhook_id=webhook_id)
         self.store = store

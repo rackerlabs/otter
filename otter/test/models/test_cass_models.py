@@ -23,7 +23,7 @@ from otter.models.cass import (
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError, ScalingGroupOverLimitError,
-    WebhooksOverLimitError)
+    WebhooksOverLimitError, PoliciesOverLimitError)
 
 from otter.test.utils import LockMixin, DummyException, mock_log
 from otter.test.models.test_interface import (
@@ -38,7 +38,6 @@ from otter.util.config import set_config_data
 
 from twisted.internet import defer
 from silverberg.client import ConsistencyLevel
-from silverberg.lock import BusyLockError
 
 
 def _de_identify(json_obj):
@@ -237,9 +236,15 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
         self.launch_config = _de_identify(group_examples.launch_server_config()[0])
         self.policies = []
         self.mock_log = mock.MagicMock()
+
+        self.kz_lock = mock.Mock()
+        self.lock = self.mock_lock()
+        self.kz_lock.Lock.return_value = self.lock
+
         self.group = CassScalingGroup(self.mock_log, self.tenant_id,
                                       self.group_id,
-                                      self.connection, itertools.cycle(range(2, 10)))
+                                      self.connection, itertools.cycle(range(2, 10)),
+                                      self.kz_lock)
         self.mock_log.bind.assert_called_once_with(system='CassScalingGroup',
                                                    tenant_id=self.tenant_id,
                                                    scaling_group_id=self.group_id)
@@ -258,10 +263,6 @@ class CassScalingGroupTestCase(IScalingGroupProviderMixin, LockMixin, TestCase):
 
         self.mock_next_cron_occurrence = patch(
             self, 'otter.models.cass.next_cron_occurrence', return_value='next_time')
-
-        self.lock = self.mock_lock()
-        self.basic_lock_mock = patch(self, 'otter.models.cass.BasicLock',
-                                     return_value=self.lock)
 
 
 class CassScalingGroupTests(CassScalingGroupTestCase):
@@ -400,24 +401,19 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         expectedData,
                                                         ConsistencyLevel.TWO)
 
-        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks',
-                                                     self.group.uuid, max_retry=5,
-                                                     retry_wait=mock.ANY, log=mock.ANY)
-        args, kwargs = self.basic_lock_mock.call_args_list[0]
-        self.assertTrue(3 <= kwargs['retry_wait'] <= 5)
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
 
-        self.lock.acquire.assert_called_once_with()
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))
     def test_modify_state_lock_not_acquired(self, mock_serial):
         """
-        ``modify_state`` writes the state the modifier returns to the database
+        ``modify_state`` raises error if lock is not acquired and does not
+        do anything else
         """
-        def acquire():
-            return defer.fail(BusyLockError('', ''))
-        self.lock.acquire.side_effect = acquire
+        self.lock.acquire.side_effect = lambda timeout: defer.fail(ValueError('a'))
 
         def modifier(group, state):
             raise
@@ -425,37 +421,16 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
         d = self.group.modify_state(modifier)
-        result = self.failureResultOf(d)
-        self.assertTrue(result.check(BusyLockError))
+        self.failureResultOf(d, ValueError)
 
         self.assertEqual(self.connection.execute.call_count, 0)
-        self.lock.acquire.assert_called_once_with()
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.assertEqual(self.lock.release.call_count, 0)
-
-    def test_modify_state_lock_with_different_retry(self):
-        """
-        `modify_state` gets lock by retrying with different wait intervals each time
-        """
-        def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
-
-        self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
-        self.returns = [None, None]
-
-        self.group.modify_state(modifier)
-        args, kwargs = self.basic_lock_mock.call_args_list[-1]
-        first_retry_wait = kwargs['retry_wait']
-        self.assertTrue(3 <= first_retry_wait <= 5)
-
-        self.group.modify_state(modifier)
-        args, kwargs = self.basic_lock_mock.call_args_list[-1]
-        second_retry_wait = kwargs['retry_wait']
-        self.assertTrue(3 <= second_retry_wait <= 5)
-        self.assertNotEqual(first_retry_wait, second_retry_wait)
 
     def test_modify_state_lock_log_category_locking(self):
         """
-        `modify_state` locks with log with category as locking
+        `modify_state` locking logs with category='locking'
         """
         def modifier(group, state):
             return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
@@ -468,9 +443,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         log.bind.assert_called_once_with(system='CassScalingGroup.modify_state')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.basic_lock_mock.assert_called_once_with(
-            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=mock.ANY,
-            log=log.bind().bind())
+        self.assertEqual(log.bind().bind().msg.call_count, 2)
 
     def test_modify_state_propagates_modifier_error_and_does_not_save(self):
         """
@@ -882,17 +855,6 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         d = self.group.list_policies()
         r = self.successResultOf(d)
         self.assertEqual(r, [{'id': 'policy1'}, {'id': 'policy3'}])
-
-    def test_add_first_checks_view_config(self):
-        """
-        Before a policy is added, `view_config` is first called to determine
-        that there is such a scaling group
-        """
-        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
-        self.returns = [None]
-        d = self.group.create_policies([{"b": "lah"}])
-        self.successResultOf(d)
-        self.group.view_config.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.succeed({}))
@@ -1545,7 +1507,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.lock.acquire.assert_called_once_with()
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -1579,7 +1542,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
-        self.lock.acquire.assert_called_once_with()
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.lock._acquire.assert_called_once_with(timeout=120)
         self.lock.release.assert_called_once_with()
 
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
@@ -1587,50 +1551,30 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         """
         If the lock is not acquired, do not delete the group.
         """
-        def acquire():
-            return defer.fail(BusyLockError('', ''))
-        self.lock.acquire.side_effect = acquire
+        self.lock.acquire.side_effect = lambda timeout: defer.fail(ValueError('a'))
 
         mock_view_state.return_value = defer.succeed(GroupState(
             self.tenant_id, self.group_id, 'a', {}, {}, None, {}, False))
 
         d = self.group.delete_group()
-        result = self.failureResultOf(d)
-        self.assertTrue(result.check(BusyLockError))
+        self.failureResultOf(d, ValueError)
 
-        self.assertEqual(self.connection.execute.call_count, 0)
-        self.lock.acquire.assert_called_once_with()
+        self.assertFalse(self.connection.execute.called)
+        self.kz_lock.Lock.assert_called_once_with('/locks/' + self.group.uuid)
+        self.lock._acquire.assert_called_once_with(timeout=120)
 
-    @mock.patch('otter.models.cass.random.uniform')
     @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_lock_with_random_retry(self, mock_view_state, mock_rand_uniform):
-        """
-        The lock is created with random retry wait
-        """
-        mock_rand_uniform.return_value = 3.56
-
-        self.group.delete_group()
-
-        mock_rand_uniform.assert_called_once_with(3, 5)
-        self.basic_lock_mock.assert_called_once_with(self.connection, 'locks', self.group.uuid,
-                                                     max_retry=5, retry_wait=3.56, log=mock.ANY)
-
-    @mock.patch('otter.models.cass.random.uniform')
-    @mock.patch('otter.models.cass.CassScalingGroup.view_state')
-    def test_delete_lock_with_log_category_locking(self, mock_view_state, mock_rand_uniform):
+    def test_delete_lock_with_log_category_locking(self, mock_view_state):
         """
         The lock is created with log with category as locking
         """
-        mock_rand_uniform.return_value = 3.56
         log = self.group.log = mock.Mock()
 
         self.group.delete_group()
 
         log.bind.assert_called_once_with(system='CassScalingGroup.delete_group')
         log.bind().bind.assert_called_once_with(category='locking')
-        self.basic_lock_mock.assert_called_once_with(
-            self.connection, 'locks', self.group.uuid, max_retry=5, retry_wait=3.56,
-            log=log.bind().bind())
+        self.assertEqual(log.bind().bind().msg.call_count, 2)
 
 
 class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
@@ -1675,18 +1619,30 @@ class CassScalingGroupUpdatePolicyTests(CassScalingGroupTestCase):
 
     def test_update_scaling_policy_schedule_no_change(self):
         """
-        Schedule policy update with no change in args does not update the scaling_schedule_v2 table.
-        It only updates the scaling_policies table
+        Schedule policy update with no args difference also updates scaling_schedule_v2 table.
         """
         self.returns = [None]
         self.get_policy.return_value = defer.succeed({"type": "schedule",
-                                                      "args": {"ott": "er"}})
-        d = self.group.update_policy(
-            '12345678',
-            {"b": "lah", "type": "schedule", "args": {"ott": "er"}})
-        self.assertIsNone(self.successResultOf(d))  # update returns None
-        self.validate_policy_update('{"_ver": 1, "b": "lah", "type": "schedule", "args": {"ott": "er"}}')
-        self.assertEqual(self.connection.execute.call_count, 1)
+                                                      "args": {"cron": "1 * * * *"}})
+        d = self.group.update_policy('12345678', {"type": "schedule",
+                                                  "args": {"cron": "1 * * * *"}})
+        self.assertIsNone(self.successResultOf(d))
+        expected_cql = (
+            'BEGIN BATCH '
+            'INSERT INTO scaling_schedule_v2(bucket, "tenantId", "groupId", "policyId", '
+            'trigger, cron, version) '
+            'VALUES (:bucket, :tenantId, :groupId, :policyId, :trigger, :cron, :version) '
+            'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
+            'VALUES (:tenantId, :groupId, :policyId, :data, :version) '
+            'APPLY BATCH;')
+        expected_data = {
+            "data": '{"_ver": 1, "args": {"cron": "1 * * * *"}, '
+                    '"type": "schedule"}',
+            "groupId": '12345678g', "policyId": '12345678',
+            "tenantId": '11111', "trigger": "next_time",
+            "version": 'timeuuid', "bucket": 2, "cron": '1 * * * *'}
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
 
     def test_update_scaling_policy_type_change(self):
         """
@@ -1781,13 +1737,60 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         super(ScalingGroupAddPoliciesTests, self).setUp()
         self.view_config = patch(self, 'otter.models.cass.CassScalingGroup.view_config',
                                  return_value=defer.succeed({}))
+        set_config_data({'limits': {'absolute': {'maxPoliciesPerGroup': 1000}}})
+        self.addCleanup(set_config_data, {})
+
+    def test_add_one_policy_overlimit(self):
+        """
+        If current policies is at max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.returns = [[{'count': 1000}]]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.failureResultOf(d, PoliciesOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+    def test_add_multiple_policies_overlimit(self):
+        """
+        If current policies + new policies will go over max policies, fail with
+        PoliciesOverLimitError
+        """
+        self.returns = [[{'count': 998}]]
+        d = self.group.create_policies([{"b": "lah"}] * 5)
+        self.failureResultOf(d, PoliciesOverLimitError)
+
+        expected_cql = (
+            'SELECT COUNT(*) FROM scaling_policies WHERE "tenantId" = :tenantId '
+            'AND "groupId" = :groupId;')
+        expected_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
+
+        self.connection.execute.assert_called_once_with(
+            expected_cql, expected_data, ConsistencyLevel.TWO)
+
+    def test_add_first_checks_view_config(self):
+        """
+        Before a policy is added, `view_config` is first called to determine
+        that there is such a scaling group
+        """
+        self.group.view_config = mock.MagicMock(return_value=defer.succeed({}))
+        self.returns = [[{'count': 0}], None]
+        d = self.group.create_policies([{"b": "lah"}])
+        self.successResultOf(d)
+        self.group.view_config.assert_called_once_with()
 
     def test_add_scaling_policy(self):
         """
         Test that you can add a scaling policy, and what is returned is a
         list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         d = self.group.create_policies([{"b": "lah"}])
         result = self.successResultOf(d)
         expectedCql = (
@@ -1812,7 +1815,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         Test that you can add a scaling policy with 'at' schedule and what is
         returned is a list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         expected_at = '2012-10-20T03:23:45'
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
                'args': {'at': expected_at}}
@@ -1848,7 +1851,7 @@ class ScalingGroupAddPoliciesTests(CassScalingGroupTestCase):
         Test that you can add a scaling policy with 'cron' schedule and what is
         returned is a list of the scaling policies with their ids
         """
-        self.returns = [None]
+        self.returns = [[{'count': 0}], None]
         pol = {'cooldown': 5, 'type': 'schedule', 'name': 'scale up by 10', 'change': 10,
                'args': {'cron': '* * * * *'}}
 

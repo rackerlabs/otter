@@ -4,32 +4,32 @@ Cassandra implementation of the store for the front-end scaling groups engine
 import time
 import itertools
 import uuid
+import functools
 
 from zope.interface import implementer
 
-from twisted.internet import defer
+from twisted.internet import defer, reactor
 from jsonschema import ValidationError
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, IScalingGroup,
     IScalingGroupCollection, NoSuchScalingGroupError, NoSuchPolicyError,
     NoSuchWebhookError, UnrecognizedCapabilityError,
     IScalingScheduleCollection, IAdmin, ScalingGroupOverLimitError,
-    WebhooksOverLimitError)
+    WebhooksOverLimitError, PoliciesOverLimitError)
 from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
+from otter.util.deferredutils import with_lock
 from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
-from silverberg.lock import BasicLock, with_lock
 
 import json
-import random
 from datetime import datetime
 
 
-LOCK_TABLE_NAME = 'locks'
+LOCK_PATH = '/locks'
 
 
 def serialize_json_data(data, ver):
@@ -125,6 +125,8 @@ _cql_count_for_tenant = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId
 _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId AND '
                          '"policyId" = :policyId;')
+_cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
+                        'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
 
@@ -426,7 +428,7 @@ class CassScalingGroup(object):
     Also, because deletes are done as tombstones rather than actually deleting,
     deletes are also updates and hence a read must be performed before deletes.
     """
-    def __init__(self, log, tenant_id, uuid, connection, buckets):
+    def __init__(self, log, tenant_id, uuid, connection, buckets, kz_client):
         """
         Creates a CassScalingGroup object.
         """
@@ -437,6 +439,7 @@ class CassScalingGroup(object):
         self.uuid = uuid
         self.connection = connection
         self.buckets = buckets
+        self.kz_client = kz_client
         self.group_table = "scaling_group"
         self.launch_table = "launch_config"
         self.policies_table = "scaling_policies"
@@ -541,11 +544,10 @@ class CassScalingGroup(object):
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5),
-                         log=log.bind(category='locking'))
-
-        return with_lock(lock, _modify_state)
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        # TODO: Better way to get reactor instead of importing?
+        return with_lock(reactor, lock, log.bind(category='locking'), _modify_state)
 
     def update_config(self, data):
         """
@@ -650,6 +652,25 @@ class CassScalingGroup(object):
         """
         self.log.bind(policies=data).msg("Creating policies")
 
+        def _do_limits_check(lastRev):
+            d = self.connection.execute(
+                _cql_count_for_group.format(cf=self.policies_table),
+                {"tenantId": self.tenant_id,
+                 "groupId": self.uuid},
+                get_consistency_level("count", "policies"))
+            return d.addCallback(_check_limit).addCallback(lambda _: lastRev)
+
+        def _check_limit(curr_policies):
+            max_policies = config_value('limits.absolute.maxPoliciesPerGroup')
+            curr_policies = curr_policies[0]['count']
+            if curr_policies + len(data) > max_policies:
+                raise PoliciesOverLimitError(
+                    curr_policies=curr_policies,
+                    max_policies=max_policies,
+                    new_policies=len(data),
+                    tenant_id=self.tenant_id,
+                    group_id=self.uuid)
+
         def _do_create_pol(lastRev):
             queries = []
             cqldata = {"tenantId": self.tenant_id,
@@ -665,6 +686,7 @@ class CassScalingGroup(object):
             return d.addCallback(lambda _: outpolicies)
 
         d = self.view_config()
+        d.addCallback(_do_limits_check)
         d.addCallback(_do_create_pol)
         return d
 
@@ -682,7 +704,7 @@ class CassScalingGroup(object):
             if "type" in lastRev:
                 if lastRev["type"] != data["type"]:
                     raise ValidationError("Cannot change type of a scaling policy")
-                if lastRev["type"] == 'schedule' and lastRev['args'] != data['args']:
+                if lastRev["type"] == 'schedule':
                     _build_schedule_policy(data, self.event_table, queries,
                                            cqldata, '', self.buckets)
 
@@ -893,11 +915,9 @@ class CassScalingGroup(object):
             d.addCallback(_maybe_delete)
             return d
 
-        lock = BasicLock(self.connection, LOCK_TABLE_NAME, self.uuid,
-                         max_retry=5, retry_wait=random.uniform(3, 5),
-                         log=log.bind(category='locking'))
-
-        return with_lock(lock, _delete_group)
+        lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
+        lock.acquire = functools.partial(lock.acquire, timeout=120)
+        return with_lock(reactor, lock, log.bind(category='locking'), _delete_group)
 
 
 def _delete_many_query_and_params(cf, column, column_values):
@@ -966,6 +986,7 @@ class CassScalingGroupCollection:
         self.state_table = "group_state"
         self.event_table = "scaling_schedule_v2"
         self.buckets = None
+        self.kz_client = None
 
     def set_scheduler_buckets(self, buckets):
         """
@@ -1080,7 +1101,7 @@ class CassScalingGroupCollection:
         see :meth:`otter.models.interface.IScalingGroupCollection.get_scaling_group`
         """
         return CassScalingGroup(log, tenant_id, scaling_group_id,
-                                self.connection, self.buckets)
+                                self.connection, self.buckets, self.kz_client)
 
     def fetch_and_delete(self, bucket, now, size=100):
         """

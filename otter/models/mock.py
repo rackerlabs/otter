@@ -13,7 +13,8 @@ from otter.models.interface import (
     GroupNotEmptyError, GroupState, IScalingGroup, IScalingGroupCollection,
     NoSuchScalingGroupError, NoSuchPolicyError, NoSuchWebhookError,
     UnrecognizedCapabilityError, IScalingScheduleCollection,
-    IAdmin, ScalingGroupOverLimitError, WebhooksOverLimitError)
+    IAdmin, ScalingGroupOverLimitError, WebhooksOverLimitError,
+    PoliciesOverLimitError)
 from otter.util.hashkey import generate_capability
 from otter.util.config import config_value
 
@@ -237,6 +238,14 @@ class MockScalingGroup:
         """
         if self.error is not None:
             return defer.fail(self.error)
+
+        max_policies = config_value('limits.absolute.maxPoliciesPerGroup')
+        cur_policies = len(self.policies)
+        if cur_policies + len(data) > max_policies:
+            return defer.fail(PoliciesOverLimitError(self.tenant_id, self.uuid,
+                                                     max_policies,
+                                                     cur_policies,
+                                                     len(data)))
 
         return_data = []
 

@@ -502,12 +502,19 @@ def verified_delete(log,
 
     :return: Deferred that fires when the expected status has been seen.
     """
-    del_log = log.bind(instance_id=server_id)
-    del_log.msg('Deleting server')
+    serv_log = log.bind(server_id=server_id)
+    serv_log.msg('Deleting server')
 
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.delete(path, headers=headers(auth_token))
-    d.addCallback(check_success, [204])
+
+    def log_404(response):
+        if response.code == 404:
+            serv_log.msg('Server to delete does not exist')
+        return response
+
+    d.addCallback(log_404)
+    d.addCallback(check_success, [204, 404])
     d.addErrback(wrap_request_error, path, 'server_delete')
 
     if clock is None:  # pragma: no cover
@@ -534,11 +541,11 @@ def verified_delete(log,
 
         def on_success(_):
             time_delete = clock.seconds() - start_time
-            del_log.msg('Server deleted successfully: {time_delete} seconds.',
-                        time_delete=time_delete)
+            serv_log.msg('Server deleted successfully: {time_delete} seconds.',
+                         time_delete=time_delete)
 
         verify_d.addCallback(on_success)
-        verify_d.addErrback(del_log.err)
+        verify_d.addErrback(serv_log.err)
 
     d.addCallback(verify)
     return d

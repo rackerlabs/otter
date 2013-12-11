@@ -57,22 +57,6 @@ class APIOptionsTests(TestCase):
         config.parseOptions(['-p', 'tcp:9999'])
         self.assertEqual(config['port'], 'tcp:9999')
 
-    def test_admin_options(self):
-        """
-        The port long option should end up in the 'port' key.
-        """
-        config = Options()
-        config.parseOptions(['--admin=tcp:9789'])
-        self.assertEqual(config['admin'], 'tcp:9789')
-
-    def test_short_admin_options(self):
-        """
-        The a short option should end up in the 'admin' key.
-        """
-        config = Options()
-        config.parseOptions(['-a', 'tcp:9789'])
-        self.assertEqual(config['admin'], 'tcp:9789')
-
     def test_store_options(self):
         """
         The mock long flag option should end up in the 'mock' key
@@ -113,6 +97,7 @@ class APIMakeServiceTests(TestCase):
         self.addCleanup(Otter_patcher.stop)
 
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
+        self.store = self.CassScalingGroupCollection.return_value
 
     def test_service_site_on_port(self):
         """
@@ -129,6 +114,16 @@ class APIMakeServiceTests(TestCase):
         """
         makeService(test_config)
         self.service.assert_any_call('tcp:9789', self.Site.return_value)
+
+    def test_no_admin(self):
+        """
+        makeService does not create admin service if admin config value is
+        not there
+        """
+        config = test_config.copy()
+        del config['admin']
+        makeService(config)
+        self.assertTrue('tcp:9789' not in [args[0] for args, _ in self.service.call_args_list])
 
     def test_unicode_service_site_on_port(self):
         """
@@ -200,7 +195,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.CassScalingGroupCollection.return_value)
+        self.Otter.assert_called_once_with(self.store)
 
     def test_mock_store(self):
         """
@@ -235,20 +230,31 @@ class APIMakeServiceTests(TestCase):
     @mock.patch('otter.tap.api.TxKazooClient')
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
         """
-        TxKazooClient is started and calls `setup_scheduler`
+        TxKazooClient is started and calls `setup_scheduler`. Its instance
+        is also set in store.kz_client after start has finished
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+
         kz_client = mock.Mock(spec=['start'])
-        kz_client.start.return_value = defer.succeed(None)
+        start_d = defer.Deferred()
+        kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
+        self.store.kz_client = None
 
         parent = makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
-        mock_setup_scheduler.assert_called_once_with(
-            parent, self.CassScalingGroupCollection.return_value, kz_client)
+
+        # setup_scheduler and store.kz_client is not called yet
+        self.assertFalse(mock_setup_scheduler.called)
+        self.assertIsNone(self.store.kz_client)
+
+        # they are called after start completes
+        start_d.callback(None)
+        mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
+        self.assertEqual(self.store.kz_client, kz_client)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')
@@ -258,14 +264,14 @@ class APIMakeServiceTests(TestCase):
         Error is logged
         """
         config = test_config.copy()
-        config['zookeeper'] = {'hosts': 'zk_hosts'}
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
         kz_client = mock.Mock(spec=['start'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
         makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts')
+        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
         kz_client.start.assert_called_once_with()
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
