@@ -28,6 +28,7 @@ import json
 
 from twisted.internet import defer
 
+from otter.log import audit
 from otter.models.interface import NoSuchScalingGroupError
 from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
@@ -71,6 +72,29 @@ def resume_scaling_group(log, transaction_id, scaling_group):
     raise NotImplementedError('Resume is not yet implemented')
 
 
+def _do_convergence_audit_log(_, log, delta, state):
+    """
+    Logs a convergence event to the audit log
+    """
+    audit_log = audit(log)
+
+    if delta < 0:
+        msg = "Deleting {0}".format(-delta)
+        event_type = "convergence.scale_down"
+    else:
+        msg = "Starting {convergence_delta} new"
+        event_type = "convergence.scale_up"
+
+    msg += " servers to satisfy desired capacity"
+
+    audit_log.msg(msg, event_type=event_type, convergence_delta=delta,
+                  # setting policy_id/webhook_id to None is a hack to prevent
+                  # them from making it into the audit log
+                  policy_id=None, webhook_id=None,
+                  **state.get_capacity())
+    return state
+
+
 def obey_config_change(log, transaction_id, config, scaling_group, state):
     """
     Given the config change, do servers need to be started or deleted
@@ -100,13 +124,13 @@ def obey_config_change(log, transaction_id, config, scaling_group, state):
         deferred.addCallback(partial(execute_launch_config, bound_log,
                                      transaction_id, state,
                                      scaling_group=scaling_group, delta=delta))
-        deferred.addCallback(lambda _: state)
-        return deferred
     else:
         # delta < 0 (scale down)
-        deferred = exec_scale_down(bound_log, transaction_id, state, scaling_group, -delta)
-        deferred.addCallback(lambda _: state)
-        return deferred
+        deferred = exec_scale_down(bound_log, transaction_id, state,
+                                   scaling_group, -delta)
+
+    deferred.addCallback(_do_convergence_audit_log, bound_log, delta, state)
+    return deferred
 
 
 def maybe_execute_scaling_policy(
@@ -114,7 +138,7 @@ def maybe_execute_scaling_policy(
         transaction_id,
         scaling_group,
         state,
-        policy_id):
+        policy_id, version=None):
     """
     Checks whether and how much a scaling policy can be executed.
 
@@ -124,6 +148,7 @@ def maybe_execute_scaling_policy(
     :param state: a :class:`otter.models.interface.GroupState` representing the
         state
     :param policy_id: the policy id to execute
+    :param version: the policy version to check before executing
 
     :return: a ``Deferred`` that fires with the updated
         :class:`otter.models.interface.GroupState` if successful
@@ -139,7 +164,7 @@ def maybe_execute_scaling_policy(
     bound_log.msg("beginning to execute scaling policy")
 
     # make sure that the policy (and the group) exists before doing anything else
-    deferred = scaling_group.get_policy(policy_id)
+    deferred = scaling_group.get_policy(policy_id, version)
 
     def _do_get_configs(policy):
         deferred = defer.gatherResults([
@@ -179,6 +204,9 @@ def maybe_execute_scaling_policy(
                 execute_bound_log.msg("cooldowns checked, Scaling down")
                 d = exec_scale_down(execute_bound_log, transaction_id, state,
                                     scaling_group, -delta)
+
+            d.addCallback(_do_convergence_audit_log, bound_log,
+                          delta, state)
             return d.addCallback(mark_executed)
 
         raise CannotExecutePolicyError(scaling_group.tenant_id,
@@ -292,10 +320,7 @@ def find_servers_to_evict(log, state, delta):
 def delete_active_servers(log, transaction_id, scaling_group,
                           delta, state):
     """
-    Start deleting active servers
-
-    Returns a list of Deferreds corresponding to deletion of a server. Each Deferred
-    in the list gets fired when that server is deleted
+    Start deleting active servers jobs
     """
 
     # find servers to evict
@@ -306,8 +331,8 @@ def delete_active_servers(log, transaction_id, scaling_group,
         state.remove_active(server['id'])
 
     # then start deleting those servers
-    return [get_supervisor().execute_delete_server(log, transaction_id,
-                                                   scaling_group, server_info)
+    supervisor = get_supervisor()
+    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
             for server_info in servers_to_evict]
 
 
@@ -331,6 +356,44 @@ def exec_scale_down(log, transaction_id, state, scaling_group, delta):
     return defer.succeed(None)
 
 
+class _DeleteJob(object):
+    """
+    Server deletion job
+    """
+
+    def __init__(self, log, transaction_id, scaling_group, server_info, supervisor):
+        """
+        :param log: a bound logger instance that can be used for logging
+        :param str transaction_id: a transaction id
+        :param IScalingGroup scaling_group: the scaling group from where the server
+                    is deleted
+        :param dict server_info: a `dict` of server info
+        """
+        self.log = log.bind(system='otter.job.delete', server_id=server_info['id'])
+        self.trans_id = transaction_id
+        self.scaling_group = scaling_group
+        self.server_info = server_info
+        self.supervisor = supervisor
+
+    def start(self):
+        """
+        Start the job
+        """
+        d = self.supervisor.execute_delete_server(
+            self.log, self.trans_id, self.scaling_group, self.server_info)
+        d.addCallback(self._job_completed)
+        d.addErrback(self._job_failed)
+        self.log.msg('Started server deletion job')
+
+    def _job_completed(self, _):
+        audit(self.log).msg('Server deleted.', event_type="server.delete")
+
+    def _job_failed(self, failure):
+        # REVIEW: Logging this as err since failing to delete a server will cost
+        # money to customers and affect us. We should know and try to delete it manually asap
+        self.log.err(failure, 'Server deletion job failed')
+
+
 class _Job(object):
     """
     Private class representing a server creation job.  This calls the supervisor
@@ -344,7 +407,7 @@ class _Job(object):
             should be created
         :param dict launch_config: the launch config to scale up a server
         """
-        self.log = log
+        self.log = log.bind(system='otter.job.launch')
         self.transaction_id = transaction_id
         self.scaling_group = scaling_group
         self.supervisor = supervisor
@@ -387,28 +450,40 @@ class _Job(object):
         Job succeeded. If the job exists, move the server from pending to active
         and log.  If not, then the job has been canceled, so delete the server.
         """
+        server_id = result['id']
+        log = self.log.bind(server_id=server_id)
+
         def handle_success(group, state):
             if self.job_id not in state.pending:
                 # server was slated to be deleted when it completed building.
                 # So, deleting it now
-                self.log.msg('Job removed. Deleting server')
-                self.supervisor.execute_delete_server(
-                    self.log, self.transaction_id, self.scaling_group, result)
+                audit(log).msg(
+                    "A pending server that is no longer needed is now active, "
+                    "and hence deletable.  Deleting said server.",
+                    event_type="server.deletable")
+
+                job = _DeleteJob(self.log, self.transaction_id,
+                                 self.scaling_group, result, self.supervisor)
+                job.start()
             else:
                 state.remove_job(self.job_id)
                 state.add_active(result['id'], result)
-                self.log.bind(server_id=result['id']).msg(
-                    "Job completed, resulting in an active server.")
+                audit(log).msg("Server is active.", event_type="server.active")
             return state
 
         d = self.scaling_group.modify_state(handle_success)
 
         def delete_if_group_deleted(f):
             f.trap(NoSuchScalingGroupError)
-            self.log.msg('Relevant scaling group has been removed. '
-                         'Deleting server.')
-            self.supervisor.execute_delete_server(
-                self.log, self.transaction_id, self.scaling_group, result)
+            audit(log).msg(
+                "A pending server belonging to a deleted scaling group "
+                "({scaling_group_id}) is now active, and hence deletable. "
+                "Deleting said server.",
+                event_type="server.deletable")
+
+            job = _DeleteJob(self.log, self.transaction_id,
+                             self.scaling_group, result, self.supervisor)
+            job.start()
 
         d.addErrback(delete_if_group_deleted)
         return d

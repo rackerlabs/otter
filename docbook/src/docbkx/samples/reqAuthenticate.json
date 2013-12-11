@@ -11,7 +11,7 @@ Content-Length: 54
       "RAX-KSKEY:apiKeyCredentials":
       {
          "username": "jsmith",
-         "apiKey": "aaaaa-bbbbb-ccccc-12345678"
+         "apiKey": "aaaaabbbbbccccc12345678"
       }
    }
 }

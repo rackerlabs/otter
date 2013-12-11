@@ -11,3 +11,4 @@ pyOpenSSL==0.13
 jsonfig==0.1.1
 testtools==0.9.32
 croniter==0.3.3
+txkazoo==0.0.2

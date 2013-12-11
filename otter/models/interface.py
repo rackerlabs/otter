@@ -130,6 +130,15 @@ class GroupState(object):
         """
         self.policy_touched[policy_id] = self.group_touched = self.now()
 
+    def get_capacity(self):
+        """
+        :returns: a dictionary with the desired_capcity, current_capacity, and
+        pending_capacity.
+        """
+        return {'current_capacity': len(self.active),
+                'pending_capacity': len(self.pending),
+                'desired_capacity': len(self.active) + len(self.pending)}
+
 
 class UnrecognizedCapabilityError(Exception):
     """
@@ -210,6 +219,21 @@ class WebhooksOverLimitError(Exception):
              "webhook limit of {m} per policy.")
             .format(t=tenant_id, g=group_id, p=policy_id, m=max_webhooks,
                     c=curr_webhooks, n=new_webhooks))
+
+
+class PoliciesOverLimitError(Exception):
+    """
+    Error to be raised when client requests number of new policies that
+    will put them over maxPolicies
+    """
+    def __init__(self, tenant_id, group_id, max_policies, curr_policies,
+                 new_policies):
+        super(PoliciesOverLimitError, self).__init__(
+            ("Currently there are {c} policies for tenant {t}, scaling group "
+             "{g}. Creating {n} new policies would exceed the "
+             "policy limit of {m} per group.")
+            .format(t=tenant_id, g=group_id, m=max_policies,
+                    c=curr_policies, n=new_policies))
 
 
 class IScalingGroup(Interface):
@@ -346,6 +370,8 @@ class IScalingGroup(Interface):
 
         :raises: :class:`NoSuchScalingGroupError` if this scaling group (one
             with this uuid) does not exist
+        :raises: :class:`PoliciesOverLimitError` if newly created policies
+            breaches maximum policies per group
         """
 
     def update_policy(policy_id, data):
@@ -383,12 +409,15 @@ class IScalingGroup(Interface):
             with this uuid) does not exist
         """
 
-    def get_policy(policy_id):
+    def get_policy(policy_id, version=None):
         """
         Gets the specified policy on this particular scaling group.
 
         :param policy_id: the uuid of the policy
         :type policy_id: ``str``
+
+        :param version: version of policy to check as Type-1 UUID
+        :type version: ``UUID``
 
         :return: a policy, as specified by
             :data:`otter.json_schema.group_schemas.policy`
@@ -525,9 +554,12 @@ class IScalingScheduleCollection(Interface):
     A list of scaling events in the future
     """
 
-    def fetch_batch_of_events(now, size=100):
+    def fetch_and_delete(bucket, now, size=100):
         """
-        Fetch a batch of scheduled events.
+        Fetch and delete and batch of scheduled events in a bucket
+
+        :param bucket: bucket whose events to be fetched
+        :type param: ``int``
 
         :param now: the current time
         :type now: ``datetime``
@@ -535,18 +567,15 @@ class IScalingScheduleCollection(Interface):
         :param size: the size of the request
         :type size: ``int``
 
-        :return: list of dict representing a row
+        :return: Deferred that fires with list of dict representing a row
         """
 
-    def update_delete_events(delete_policy_ids, update_policies):
+    def add_cron_events(cron_events):
         """
-        Update trigger times and Delete scheduled event of given policy Ids
+        Add cron events equally distributed among the buckets
 
-        :param delete_policy_ids: list of policy IDs to delete
-        :type policy_ids: ``list``
-
-        :param update_policies: list of `dict` returned in `fetch_batch_of_events`
-        :type policy_ids: ``list``
+        :param cron_events: list of events (dict) to be added
+        :type cron_events: ``list``
 
         :return: None
         """

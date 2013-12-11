@@ -11,7 +11,7 @@ from twisted.internet import defer
 
 from otter.json_schema import rest_schemas, group_schemas
 from otter.log import log
-from otter.rest.decorators import (validate_body, fails_with,
+from otter.rest.decorators import (validate_body, fails_with, auditable,
                                    succeeds_with, with_transaction_id, paginatable)
 from otter.rest.errors import exception_codes
 from otter.rest.otterapp import OtterApp
@@ -58,7 +58,7 @@ class OtterPolicies(object):
     def __init__(self, store, tenant_id, scaling_group_id):
         self.log = log.bind(system='otter.rest.policies',
                             tenant_id=tenant_id,
-                            group_id=scaling_group_id)
+                            scaling_group_id=scaling_group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.scaling_group_id = scaling_group_id
@@ -155,8 +155,9 @@ class OtterPolicies(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(201)
+    @auditable('request.policy.create', 'Created policies.')
     @validate_body(rest_schemas.create_policies_request)
-    def create_policies(self, request, data):
+    def create_policies(self, request, data, audit_logger):
         """
         Create one or many new scaling policies.
         Scaling policies must include a name, type, adjustment, and cooldown.
@@ -241,6 +242,12 @@ class OtterPolicies(object):
             deferred.addCallback(_add_to_bobby, bobby)
 
         deferred.addCallback(format_policies_and_send_redirect)
+
+        def audit_data(result):
+            audit_logger.add(data=result)
+            return result
+
+        deferred.addCallback(audit_data)
         deferred.addCallback(json.dumps)
         return deferred
 
@@ -339,7 +346,8 @@ class OtterPolicy(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(204)
-    def delete_policy(self, request):
+    @auditable('request.policy.delete', 'Deleted scaling policy {policy_id}.')
+    def delete_policy(self, request, audit_logger):
         """
         Delete a scaling policy. If successful, no response body will be returned.
         """
