@@ -103,8 +103,29 @@ def timeout_deferred(deferred, timeout, clock, deferred_description=None):
     deferred.addBoth(cancel_timeout)
 
 
+def _retry_without_cancel(do_work, timeout, can_retry, next_interval, clock,
+                          deferred_description):
+
+    retrier = _Retrier(do_work, can_retry, next_interval, clock)
+    deferred = retrier.start()
+
+    stop_d = Deferred(retrier.stop)
+    timeout_deferred(stop_d)
+
+    deferred.chainDeferred(stop_d)
+
+    def convert_timeout(f):
+        # if we timed it out, convert it to a TimedOutError.
+        # Otherwise, propagate it.
+        f.trap(CancelledError)
+        raise TimedOutError(timeout, deferred_description)
+
+    stop_d.addErrback(convert_timeout)
+    return stop_d
+
+
 def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
-                      clock=None, deferred_description=None):
+                      cancel_on_timeout=True, clock=None, deferred_description=None):
     """
     Retry a function until the function succeeds or timeout has been reached.
     This is just a composition of :func:`timeout_deferred` and :func:`retry`
@@ -114,11 +135,16 @@ def retry_and_timeout(do_work, timeout, can_retry=None, next_interval=None,
         from twisted.internet import reactor
         clock = reactor
 
-    d = retry(do_work, can_retry=can_retry, next_interval=next_interval,
-              clock=clock)
-    timeout_deferred(d, timeout, clock=clock,
-                     deferred_description=deferred_description)
-    return d
+    if cancel_on_timeout:
+        d = retry(do_work, can_retry=can_retry, next_interval=next_interval,
+                  clock=clock)
+        timeout_deferred(d, timeout, clock=clock,
+                         deferred_description=deferred_description)
+        return d
+    else:
+        return _retry_without_cancel(do_work, can_retry=can_retry,
+                                     next_interval=next_interval, clock=clock,
+                                     deferred_description=deferred_description)
 
 
 class DeferredPool(object):
