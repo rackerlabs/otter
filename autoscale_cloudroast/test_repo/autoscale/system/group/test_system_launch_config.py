@@ -18,8 +18,8 @@ class LaunchConfigTest(AutoscaleFixture):
         Instantiate client and configs
         """
         super(LaunchConfigTest, cls).setUpClass()
-        cls.upd_server_name = "upd_lc_config"
-        cls.upd_image_ref = cls.lc_image_ref_alt
+        cls.upd_server_name = "updlc_config"
+        cls.upd_image_ref = cls.lc_image_ref
         cls.upd_flavor_ref = "3"
 
     @tags(speed='quick')
@@ -188,6 +188,33 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
 
+    @tags(speed='test')
+    def test_system_update_launchconfig_while_group_building_and_scale_down(self):
+        """
+        Create a scaling group and scale up. While servers are building, update launch config
+        and scale down. Servers with the latest launch config are deleted. (AUTO-384)
+        """
+        minentities = 2
+        group = self._create_group(minentities=minentities, policy=True)
+        group_before_upd = group
+        self._update_launch_config(
+            group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
+        self._execute_policy(group)
+        scale_down_change = - self.sp_change
+        policy_down = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change=scale_down_change,
+            sp_cooldown=0)
+        self._execute_policy(group, policy_down['id'])
+        active_server_list_after_scale_down = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities)
+        self._verify_server_list_for_launch_config(
+            active_server_list_after_scale_down,
+            group_before_upd.launchConfiguration.server.name,
+            group_before_upd.launchConfiguration.server.imageRef,
+            group_before_upd.launchConfiguration.server.flavorRef)
+
     @tags(speed='quick')
     def test_system_update_launchconfig_group_minentities(self):
         """
@@ -316,7 +343,7 @@ class LaunchConfigTest(AutoscaleFixture):
                         'type': 'webhook'
                         }]
             create_group_response = self.autoscale_behaviors.create_scaling_group_given(
-                gc_min_entities=minentities, gc_max_entities=maxentities,
+                gc_min_entities=minentities, gc_max_entities=maxentities, lc_name='test-issue',
                 gc_cooldown=0, sp_list=sp_list)
         else:
             create_group_response = self.autoscale_behaviors.create_scaling_group_given(
@@ -325,7 +352,7 @@ class LaunchConfigTest(AutoscaleFixture):
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {0}'.format(group.id))
-        self.resources.add(group, self.empty_scaling_group)
+        #self.resources.add(group, self.empty_scaling_group)
         return group
 
     def _update_launch_config(self, group, server_name=None, image_ref=None,
