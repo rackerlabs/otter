@@ -69,26 +69,6 @@ def server_details(server_endpoint, auth_token, server_id):
     return d.addCallback(treq.json_content)
 
 
-def wait_for_lb_active(lb_path, auth_token, timeout=15 * 60, interval=10, clock=None):
-    """
-    Wait for load balancer to become active
-    """
-
-    def is_active():
-        d = treq.get(lb_path, headers=headers(auth_token))
-        d.addCallback(check_success, [200])
-        d.addCallback(treq.json_content)
-        d.addCallback(lambda r: r['loadBalancer']['status'] == 'ACTIVE')
-        d.addCallback(lambda active: Failure(TransientRetryError) if not active else None)
-        return d
-
-    d = retry_and_timeout(
-        is_active, timeout, can_retry=None, # all errors are transient
-        next_interval=repeating_interval(interval), clock=clock,
-        deferred_description='Timed out waiting for load balancer to become active')
-    return d
-
-
 def wait_for_active(log,
                     server_endpoint,
                     auth_token,
@@ -171,12 +151,13 @@ def create_server(server_endpoint, auth_token, server_config):
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
+def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
     TODO: Handle load balancer node metadata.
 
+    :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param str lb_config: An lb_config dictionary.
@@ -189,21 +170,31 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     """
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
-    lb_path = append_segments(endpoint, 'loadbalancers', str(lb_id))
-    nodes_path = append_segments(lb_path, 'nodes')
+    path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
+    log = log.bind(lb_id=lb_id)
 
-    def add(_):
-        d = treq.post(nodes_path, headers=headers(auth_token),
+    def log_unexpected_errors(f):
+        if not f.check(APIError):
+            log.err(f, 'Unknown error while adding node to lb')
+            return f
+        if f.value.code not in (422, 413):
+            log.msg('Unexpected status {status} while adding node to lb',
+                    status=f.value.code, error=RequestError(f, path, 'add_node'))
+        raise RequestError(f, path, 'add_node')
+
+    def add():
+        d = treq.post(path, headers=headers(auth_token),
                       data=json.dumps({"nodes": [{"address": ip_address,
                                                   "port": port,
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}]}))
         d.addCallback(check_success, [200, 202])
-        d.addErrback(wrap_request_error, nodes_path, 'add')
+        d.addErrback(log_unexpected_errors)
         return d
 
-    d = wait_for_lb_active(lb_path, auth_token)
-    d.addCallback(add)
+    d = retry_and_timeout(add, 15 * 60, can_retry=None, # all errors are transient
+                          next_interval=repeating_interval(10), cancel_on_timeout=False,
+                          deferred_description='Timed out trying to add node')
 
     def when_done(result):
         undo.push(remove_from_load_balancer,
@@ -216,11 +207,12 @@ def add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo):
     return d.addCallback(treq.json_content).addCallback(when_done)
 
 
-def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
+def add_to_load_balancers(log, endpoint, auth_token, lb_configs, ip_address, undo):
     """
     Add the specified IP to mulitple load balancer based on the configs in
     lb_configs.
 
+    :param log: A bound logger
     :param str endpoint: Load balancer endpoint URI.
     :param str auth_token: Keystone Auth Token.
     :param list lb_configs: List of lb_config dictionaries.
@@ -238,7 +230,7 @@ def add_to_load_balancers(endpoint, auth_token, lb_configs, ip_address, undo):
         try:
             lb_config = lb_iter.next()
 
-            d = add_to_load_balancer(endpoint, auth_token, lb_config, ip_address, undo)
+            d = add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
             d.addCallback(lambda response, lb_id: (lb_id, response), lb_config['loadBalancerId'])
             d.addCallback(results.append)
             d.addCallback(add_next)
@@ -399,7 +391,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(
-            lb_endpoint, auth_token, lb_config, ip_address, undo)
+            ilog, lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 

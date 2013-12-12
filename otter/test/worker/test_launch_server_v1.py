@@ -780,7 +780,7 @@ class ServerTests(TestCase):
                                                 '1')
 
         add_to_load_balancers.assert_called_once_with(
-            'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            self.log, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
             '10.0.0.1', self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
