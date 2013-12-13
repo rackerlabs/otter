@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 Initial implementation of a version one launch_server_v1 config.
 
@@ -30,7 +31,7 @@ from otter.util.http import (append_segments, headers, check_success,
                              wrap_request_error)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
-from otter.util.retry import (repeating_interval, transient_errors_except,
+from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
                               TransientRetryError)
 
 
@@ -197,6 +198,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                                                   "port": port,
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}]}))
+        # Below for testing only - since my brain stopped working
+        d.addCallback(lambda r: print('rcode', r.code) or r)
         d.addCallback(log_response_code, log, 'Node to delete does not exist', 404)
         d.addCallback(check_success, [200, 202, 404])
         d.addErrback(log_unexpected_errors)

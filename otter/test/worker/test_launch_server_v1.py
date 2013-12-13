@@ -26,7 +26,7 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch, CheckFailure
+from otter.test.utils import DummyException, mock_log, patch, CheckFailure, mock_treq
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -122,15 +122,14 @@ class LoadBalancersTests(TestCase):
         """
         set up test dependencies for load balancers.
         """
-        self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
+        self.json_content = {'nodes': [{'id': 1}]}
+        self.treq = patch(self, 'otter.worker.launch_server_v1.treq',
+                          new=mock_treq(code=200, json_content=self.json_content,
+                                        method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
+        self.log = mock_log()
 
         self.undo = iMock(IUndoStack)
-
-    def test_addlb_retries(self):
-        """
-        add_to_load_balancer will retry again
-        """
 
     def test_add_to_load_balancer(self):
         """
@@ -138,13 +137,6 @@ class LoadBalancersTests(TestCase):
         the specified load balancer endpoint witht he specified auth token,
         load balancer id, port, and ip address.
         """
-        response = mock.Mock()
-        response.code = 200
-        self.treq.post.return_value = succeed(response)
-
-        content = {'nodes': [{'id': 1}]}
-        self.treq.json_content.return_value = succeed(content)
-
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
@@ -152,7 +144,7 @@ class LoadBalancersTests(TestCase):
                                  self.undo)
 
         result = self.successResultOf(d)
-        self.assertEqual(result, content)
+        self.assertEqual(result, self.json_content)
 
         self.treq.post.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes',
@@ -168,7 +160,34 @@ class LoadBalancersTests(TestCase):
                                      'condition': 'ENABLED',
                                      'type': 'PRIMARY'}]})
 
-        self.treq.json_content.assert_called_once_with(response)
+        self.treq.json_content.assert_called_once_with(mock.ANY)
+
+    def test_addlb_retries(self):
+        """
+        add_to_load_balancer will retry again until it succeeds
+        """
+        self.codes = [422] * 10 + [200]
+
+        def responses(*args):
+            print 'responses'
+            code = self.codes.pop(0)
+            return succeed(mock.Mock(code=code))
+
+        self.treq.post.side_effect = responses
+        #self.treq.post.side_effect = lambda *_: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([10] * 11)
+        print self.codes, len(self.treq.post.mock_calls), self.treq.json_content.mock_calls
+        self.successResultOf(d)
+        self.assertEqual(self.treq.post.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes',
+                                    headers=expected_headers, data=mock.ANY)] * 11)
 
     def test_add_to_load_balancer_propagates_api_failure(self):
         """
@@ -181,7 +200,7 @@ class LoadBalancersTests(TestCase):
 
         self.treq.content.return_value = succeed(error_body)
 
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
