@@ -426,7 +426,7 @@ class _Job(object):
         """
         Job has failed. Remove the job, if it exists, and log the error.
         """
-        self.log.msg('Job failed', reason=f)
+        self.log.err(f, 'Launching server failed')
 
         def handle_failure(group, state):
             # if it is not in pending, then the job was probably deleted before
