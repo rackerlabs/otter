@@ -42,9 +42,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_scale_down_webhook[
                           'execute_response'], 202)
-        self.wait_for_expected_group_state_on_scaledown(self.group.id,
-                                                        self.servers_before_scaledown,
-                                                        self.group.groupConfiguration.minEntities)
+        self.wait_for_expected_group_state(self.group.id,
+                                           self.group.groupConfiguration.minEntities)
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             self.group.groupConfiguration.minEntities)
@@ -65,9 +64,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             current=self.group.groupConfiguration.minEntities +
             self.policy_up['change'],
             percentage=policy_down['change_percent'])
-        self.wait_for_expected_group_state_on_scaledown(self.group.id,
-                                                        self.servers_before_scaledown,
-                                                        servers_from_scale_down)
+        self.wait_for_expected_group_state(self.group.id,
+                                           servers_from_scale_down)
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             servers_from_scale_down)
@@ -86,9 +84,8 @@ class ScalingDownExecuteWebhookTest(AutoscaleFixture):
             execute_webhook=True)
         self.assertEquals(execute_webhook_desired_capacity[
                           'execute_response'], 202)
-        self.wait_for_expected_group_state_on_scaledown(self.group.id,
-                                                        self.servers_before_scaledown,
-                                                        policy_down['desired_capacity'])
+        self.wait_for_expected_group_state(self.group.id,
+                                           policy_down['desired_capacity'])
         self.assert_servers_deleted_successfully(
             self.group.launchConfiguration.server.name,
             policy_down['desired_capacity'])
