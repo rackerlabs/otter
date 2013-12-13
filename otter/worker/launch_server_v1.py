@@ -151,7 +151,15 @@ def create_server(server_endpoint, auth_token, server_config):
     return d.addCallback(treq.json_content)
 
 
-def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo):
+def log_response_code(response, log, msg, code):
+    """
+    Log `msg` if response.code is same as code
+    """
+    if response.code == code:
+        log.msg(msg)
+    return response
+
+def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP addressed to a load balancer based on the lb_config.
 
@@ -177,10 +185,11 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
         if not f.check(APIError):
             log.err(f, 'Unknown error while adding node to lb')
             return f
+        error = RequestError(f, path, 'add_node')
         if f.value.code not in (422, 413):
-            log.msg('Unexpected status {status} while adding node to lb',
-                    status=f.value.code, error=RequestError(f, path, 'add_node'))
-        raise RequestError(f, path, 'add_node')
+            log.msg('Unexpected status {status} while adding node to lb: {error}',
+                    status=f.value.code, error=error)
+        raise error
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -188,13 +197,14 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo)
                                                   "port": port,
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}]}))
-        d.addCallback(check_success, [200, 202])
+        d.addCallback(log_response_code, log, 'Node to delete does not exist', 404)
+        d.addCallback(check_success, [200, 202, 404])
         d.addErrback(log_unexpected_errors)
         return d
 
-    d = retry_and_timeout(add, 15 * 60, can_retry=None, # all errors are transient
-                          next_interval=repeating_interval(10), cancel_on_timeout=False,
-                          deferred_description='Timed out trying to add node')
+    # keep trying to add every 10 seconds for 15 mins
+    d = retry(add, can_retry=retry_times(15 * 6),
+              next_interval=repeating_interval(10), clock=clock)
 
     def when_done(result):
         undo.push(remove_from_load_balancer,
@@ -526,12 +536,7 @@ def verified_delete(log,
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.delete(path, headers=headers(auth_token))
 
-    def log_404(response):
-        if response.code == 404:
-            serv_log.msg('Server to delete does not exist')
-        return response
-
-    d.addCallback(log_404)
+    d.addCallback(log_response_code, serv_log, 'Server to delete does not exist', 404)
     d.addCallback(check_success, [204, 404])
     d.addErrback(wrap_request_error, path, 'server_delete')
 

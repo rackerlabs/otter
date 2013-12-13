@@ -127,6 +127,11 @@ class LoadBalancersTests(TestCase):
 
         self.undo = iMock(IUndoStack)
 
+    def test_addlb_retries(self):
+        """
+        add_to_load_balancer will retry again
+        """
+
     def test_add_to_load_balancer(self):
         """
         add_to_load_balancer will make a properly formed post request to
@@ -140,7 +145,7 @@ class LoadBalancersTests(TestCase):
         content = {'nodes': [{'id': 1}]}
         self.treq.json_content.return_value = succeed(content)
 
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
