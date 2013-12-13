@@ -115,7 +115,9 @@ class _Retrier(object):
 
     def stop(self):
         """
-        Stop retrying by cancelling next schedule
+        Stop retrying by cancelling next schedule but will not disturb currently
+        running operation. Use start()'s deferred.cancel() to stop retrying and stop
+        currently running operation
         """
         self.cancelled = True
         if self.delayed_call is not None:
