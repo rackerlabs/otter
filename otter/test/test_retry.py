@@ -8,7 +8,8 @@ from twisted.internet.defer import CancelledError, Deferred, succeed
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
-from otter.util.retry import retry, repeating_interval, transient_errors_except
+from otter.util.retry import (retry, repeating_interval, transient_errors_except,
+                              retry_times)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -304,6 +305,15 @@ class CanRetryHelperTests(TestCase):
         the function it returns will treat it as terminal (returns False)
         """
         can_retry = transient_errors_except(DummyException)
+        self.assertFalse(can_retry(Failure(DummyException())))
+
+    def test_retry_times(self):
+        """
+        `retry_times` returns function that will retry given number of times
+        """
+        can_retry = retry_times(3)
+        for exception in (DummyException(), NotImplementedError(), ValueError()):
+            self.assertTrue(can_retry(Failure(exception)))
         self.assertFalse(can_retry(Failure(DummyException())))
 
 
