@@ -5,9 +5,7 @@ rest endpoints that return the audit log
 """
 import json
 
-from twisted.internet import reactor
-from twisted.web.client import Agent
-from twisted.web.http_headers import Headers
+import treq
 
 from otter.log import log
 from otter.rest.otterapp import OtterApp
@@ -46,11 +44,10 @@ class OtterHistory(object):
             return json.dumps(data)
 
         # TODO: filter by tenant id.
-        agent = Agent(reactor)
-        d = agent.request('GET', host, Headers({'User-Agent': ['otter']}), None)
+        d = treq.get(host)
 
         def handle_response(response):
-            request.write(response)
+            request.write(response.content)
             request.finish()
         d.addCallback(handle_response)
 

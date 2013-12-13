@@ -6,7 +6,6 @@ import json
 import mock
 from twisted.internet import defer
 from twisted.trial.unittest import TestCase
-from twisted.web.client import Agent
 
 from otter.test.rest.request import RestAPITestMixin, request
 from otter.util.config import set_config_data
@@ -25,18 +24,17 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         super(OtterHistoryTestCase, self).setUp()
         set_config_data({'elasticsearch': {'host': "http://dummy/search"}})
 
-    @mock.patch('otter.rest.history.Agent')
-    def test_history(self, _Agent):
+    @mock.patch('otter.rest.history.treq')
+    def test_history(self, treq):
         """
         the history api endpoint returns the items from the audit log
         """
         data = {'abc': 'def'}
-        agent = mock.create_autospec(Agent)
+        response = mock.Mock(content=json.dumps(data))
 
-        def _request(*args, **kwargs):
-            return defer.succeed(json.dumps(data))
-        agent.request.side_effect = _request
-        _Agent.return_value = agent
+        def get(*args, **kwargs):
+            return defer.succeed(response)
+        treq.get.side_effect = get
 
         result = self.successResultOf(
             request(self.root, "GET", self.endpoint))
