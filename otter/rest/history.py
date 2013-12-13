@@ -47,8 +47,7 @@ class OtterHistory(object):
         d = treq.get(host)
 
         def handle_response(response):
-            request.write(response.content)
-            request.finish()
+            return response.content
         d.addCallback(handle_response)
 
         return d
