@@ -421,7 +421,8 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     return d
 
 
-def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
+def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
+                              node_id, clock=None):
     """
     Remove a node from a load balancer.
 
@@ -431,12 +432,19 @@ def remove_from_load_balancer(endpoint, auth_token, loadbalancer_id, node_id):
     :param str node_id: The ID for a node in that cloudloadbalancer.
 
     :returns: A Deferred that fires with None if the operation completed successfully,
-        or errbacks with an APIError.
+        or errbacks with an RequestError.
     """
+    lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
-    d = treq.delete(path, headers=headers(auth_token))
-    d.addCallback(check_success, [200, 202])
-    d.addErrback(wrap_request_error, path, 'remove')
+
+    def remove():
+        d = treq.delete(path, headers=headers(auth_token))
+        d.addCallback(check_success, [200, 202])
+        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
+        return d
+
+    d = retry(remove, can_retry=retry_times(15 * 6),
+              next_interval=repeating_interval(10), clock=clock)
     d.addCallback(lambda _: None)
     return d
 
@@ -481,7 +489,7 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
           for (loadbalancer_id, node_details) in loadbalancer_details])
 
     d = gatherResults(
-        [remove_from_load_balancer(lb_endpoint, auth_token, loadbalancer_id, node_id)
+        [remove_from_load_balancer(log, lb_endpoint, auth_token, loadbalancer_id, node_id)
          for (loadbalancer_id, node_id) in node_info], consumeErrors=True)
 
     def when_removed_from_loadbalancers(_ignore):

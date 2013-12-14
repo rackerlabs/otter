@@ -189,8 +189,7 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer will retry again and again for 15 * 6 times.
         It will fail after that
         """
-        self.codes = [422] * (15 * 7)
-        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -385,37 +384,72 @@ class LoadBalancersTests(TestCase):
         remove_from_load_balancer makes a DELETE request against the
         URL represting the load balancer node.
         """
-        response = mock.Mock()
-        response.code = 200
+        self.treq.delete.return_value = succeed(mock.Mock(code=200))
 
-        self.treq.delete.return_value = succeed(response)
-
-        d = remove_from_load_balancer('http://url/', 'my-auth-token', 12345, 1)
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
         self.assertEqual(self.successResultOf(d), None)
 
         self.treq.delete.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes/1',
             headers=expected_headers)
 
-    def test_remove_from_load_balancer_propagates_api_failure(self):
+    def test_removelb_retries(self):
         """
-        remove_from_load_balancer will propagate API failures.
+        remove_from_load_balancer will retry again until it succeeds
         """
-        response = mock.Mock()
-        response.code = 500
+        self.codes = [422] * 10 + [200]
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
 
-        self.treq.delete.return_value = succeed(response)
-        self.treq.content.return_value = succeed(error_body)
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
 
-        d = remove_from_load_balancer('http://url/', 'my-auth-token',
-                                      '12345', '1')
-        failure = self.failureResultOf(d)
+        clock.pump([10] * 11)
+        self.assertIsNone(self.successResultOf(d))
+        self.assertEqual(self.treq.delete.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                                    headers=expected_headers)] * 11)
 
-        self.assertTrue(failure.check(RequestError))
+    def test_removelb_retries_times_out(self):
+        """
+        remove_from_load_balancer will retry again and again for 15 * 6 times.
+        It will fail after that
+        """
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=422))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([10] * (15 * 6))
+        failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
-
         self.assertTrue(real_failure.check(APIError))
-        self.assertEqual(real_failure.value.code, 500)
+        self.assertEqual(real_failure.value.code, 422)
+        self.assertEqual(self.treq.delete.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes/1',
+                                    headers=expected_headers)] * ((15 * 6) + 1))
+
+    def test_addlb_retries_logs(self):
+        """
+        add_to_load_balancer will log unexpeted failures while it is trying
+        """
+        self.codes = [500, 503, 422, 422, 401, 200]
+        bad_codes = [500, 503, 401]
+        self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = remove_from_load_balancer(
+            self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
+
+        clock.pump([10] * 6)
+        self.successResultOf(d)
+        self.log.msg.assert_has_calls(
+            [mock.call('Unexpected status {status} while {msg}: {error}',
+                       status=code, msg='remove_node',
+                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345,
+                       node_id=1)
+                      for code in bad_codes])
 
 
 class BobbyServerTests(TestCase):
@@ -1174,9 +1208,9 @@ class DeleteServerTests(TestCase):
                           instance_details)
         self.successResultOf(d)
 
-        remove_from_load_balancer.has_calls([
-            mock.call('http://dfw.lbaas/', 'my-auth-token', 12345, 1),
-            mock.call('http://dfw.lbaas/', 'my-auth-token', 54321, 2)
+        remove_from_load_balancer.assert_has_calls([
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 12345, 1),
+            mock.call(self.log, 'http://dfw.lbaas/', 'my-auth-token', 54321, 2)
         ], any_order=True)
 
         self.assertEqual(remove_from_load_balancer.call_count, 2)
