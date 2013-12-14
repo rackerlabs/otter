@@ -373,6 +373,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     server_config = launch_config['server']
 
     log = log.bind(server_name=server_config['name'])
+    ilog = [None]
 
     d = create_server(server_endpoint, auth_token, server_config)
 
@@ -382,9 +383,9 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
-        ilog = log.bind(server_id=server_id)
+        ilog[0] = log.bind(server_id=server_id)
         return wait_for_active(
-            ilog,
+            ilog[0],
             server_endpoint,
             auth_token,
             server_id)
@@ -394,7 +395,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     def add_lb(server):
         ip_address = private_ip_addresses(server)[0]
         lbd = add_to_load_balancers(
-            ilog, lb_endpoint, auth_token, lb_config, ip_address, undo)
+            ilog[0], lb_endpoint, auth_token, lb_config, ip_address, undo)
         lbd.addCallback(lambda lb_response: (server, lb_response))
         return lbd
 

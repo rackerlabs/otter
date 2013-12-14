@@ -800,7 +800,8 @@ class ServerTests(TestCase):
             (54321, ('10.0.0.1', 81))
         ])
 
-        d = launch_server(self.log,
+        log = mock.Mock()
+        d = launch_server(log,
                           'DFW',
                           self.scaling_group,
                           fake_service_catalog,
@@ -824,8 +825,11 @@ class ServerTests(TestCase):
                                                 'my-auth-token',
                                                 '1')
 
+        log.bind.assert_called_once_with(server_name='as000000')
+        log = log.bind.return_value
+        log.bind.assert_called_once_with(server_id='1')
         add_to_load_balancers.assert_called_once_with(
-            self.log, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
+            log.bind.return_value, 'http://dfw.lbaas/', 'my-auth-token', prepared_load_balancers,
             '10.0.0.1', self.undo)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancers')
