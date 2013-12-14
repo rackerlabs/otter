@@ -28,7 +28,7 @@ import treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error)
+                             wrap_request_error, APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -187,6 +187,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
             log.err(f, 'Unknown error while adding node to lb')
             return f
         error = RequestError(f, path, 'add_node')
+        # 422 is PENDING_UPDATE and 413 is API limit reached
         if f.value.code not in (422, 413):
             log.msg('Unexpected status {status} while adding node to lb: {error}',
                     status=f.value.code, error=error)
@@ -198,10 +199,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                                                   "port": port,
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}]}))
-        # Below for testing only - since my brain stopped working
-        d.addCallback(lambda r: print('rcode', r.code) or r)
-        d.addCallback(log_response_code, log, 'Node to delete does not exist', 404)
-        d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(check_success, [200, 202])
         d.addErrback(log_unexpected_errors)
         return d
 

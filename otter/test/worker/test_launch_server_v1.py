@@ -167,14 +167,7 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer will retry again until it succeeds
         """
         self.codes = [422] * 10 + [200]
-
-        def responses(*args):
-            print 'responses'
-            code = self.codes.pop(0)
-            return succeed(mock.Mock(code=code))
-
-        self.treq.post.side_effect = responses
-        #self.treq.post.side_effect = lambda *_: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -183,31 +176,75 @@ class LoadBalancersTests(TestCase):
                                  '192.168.1.1',
                                  self.undo, clock=clock)
         clock.pump([10] * 11)
-        print self.codes, len(self.treq.post.mock_calls), self.treq.json_content.mock_calls
-        self.successResultOf(d)
+        result = self.successResultOf(d)
+        self.assertEqual(result, self.json_content)
         self.assertEqual(self.treq.post.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY)] * 11)
 
-    def test_add_to_load_balancer_propagates_api_failure(self):
+    def test_addlb_retries_times_out(self):
         """
-        add_to_load_balancer will propagate API failures.
+        add_to_load_balancer will retry again and again for 15 * 6 times.
+        It will fail after that
         """
-        response = mock.Mock()
-        response.code = 500
-
-        self.treq.post.return_value = succeed(response)
-
-        self.treq.content.return_value = succeed(error_body)
+        self.codes = [422] * (15 * 7)
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
-                                 self.undo)
+                                 self.undo, clock=clock)
+        clock.pump([10] * (15 * 6))
+        f = self.failureResultOf(d, RequestError)
+        self.assertEqual(f.value.reason.value.code, 422)
+        self.assertEqual(self.treq.post.mock_calls,
+                         [mock.call('http://url/loadbalancers/12345/nodes',
+                                    headers=expected_headers, data=mock.ANY)] * ((15 * 6) + 1))
 
-        failure = self.failureResultOf(d)
-        self.assertTrue(failure.check(RequestError))
+    def test_addlb_retries_logs(self):
+        """
+        add_to_load_balancer will log unexpeted failures while it is trying
+        """
+        self.codes = [500, 503, 422, 413, 401, 200]
+        bad_codes = [500, 503, 401]
+        self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        clock = Clock()
+
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([10] * 6)
+        self.successResultOf(d)
+        self.log.msg.assert_has_calls(
+            [mock.call('Unexpected status {status} while adding node to lb: {error}',
+                       status=code, error=mock.ANY, lb_id=12345) for code in bad_codes])
+
+    def failed_add_to_lb(self, code=500):
+        """
+        Helper function to ensure add_to_load_balancer fails by returning failure
+        again and again until it times out
+        """
+        self.treq.post.side_effect = lambda *a, **kw: succeed(mock.Mock(code=code))
+        clock = Clock()
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
+                                 {'loadBalancerId': 12345,
+                                  'port': 80},
+                                 '192.168.1.1',
+                                 self.undo, clock=clock)
+        clock.pump([10] * (15 * 6))
+        return d
+
+    def test_add_to_load_balancer_propagates_api_failure(self):
+        """
+        add_to_load_balancer will propagate API failures.
+        """
+        d = self.failed_add_to_lb()
+
+        failure = self.failureResultOf(d, RequestError)
         real_failure = failure.value.reason
 
         self.assertTrue(real_failure.check(APIError))
@@ -218,13 +255,7 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer pushes an inverse remove_from_load_balancer
         operation onto the undo stack.
         """
-        response = mock.Mock()
-        response.code = 200
-
-        self.treq.post.return_value = succeed(response)
-        self.treq.json_content.return_value = succeed({'nodes': [{'id': 1}]})
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
+        d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
                                  {'loadBalancerId': 12345,
                                   'port': 80},
                                  '192.168.1.1',
@@ -243,21 +274,9 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer doesn't push an operation onto the undo stack
         if it fails.
         """
-        response = mock.Mock()
-        response.code = 500
-
-        self.treq.post.return_value = succeed(response)
-        self.treq.content.return_value = succeed("{'nodes': [{'id': 1}]}")
-
-        d = add_to_load_balancer('http://url/', 'my-auth-token',
-                                 {'loadBalancerId': 12345,
-                                  'port': 80},
-                                 '192.168.1.1',
-                                 self.undo)
-
+        d = self.failed_add_to_lb()
         self.failureResultOf(d, RequestError)
-
-        self.assertEqual(self.undo.push.call_count, 0)
+        self.assertFalse(self.undo.push.called)
 
     @mock.patch('otter.worker.launch_server_v1.add_to_load_balancer')
     def test_add_to_load_balancers(self, add_to_load_balancer):
@@ -270,12 +289,12 @@ class LoadBalancersTests(TestCase):
         add_to_load_balancer_deferreds = [d1, d2]
 
         def _add_to_load_balancer(
-                endpoint, auth_token, lb_config, ip_address, undo):
+                log, endpoint, auth_token, lb_config, ip_address, undo):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [{'loadBalancerId': 12345,
                                     'port': 80},
                                    {'loadBalancerId': 54321,
@@ -310,7 +329,7 @@ class LoadBalancersTests(TestCase):
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [{'loadBalancerId': 12345,
                                     'port': 80},
                                    {'loadBalancerId': 54321,
@@ -321,6 +340,7 @@ class LoadBalancersTests(TestCase):
         self.assertNoResult(d)
 
         add_to_load_balancer.assert_called_once_with(
+            self.log,
             'http://url/',
             'my-auth-token',
             {'loadBalancerId': 12345, 'port': 80},
@@ -331,6 +351,7 @@ class LoadBalancersTests(TestCase):
         d1.callback(None)
 
         add_to_load_balancer.assert_called_with(
+            self.log,
             'http://url/',
             'my-auth-token',
             {'loadBalancerId': 54321, 'port': 81},
@@ -348,7 +369,7 @@ class LoadBalancersTests(TestCase):
         when no load balancers are configured.
         """
 
-        d = add_to_load_balancers('http://url/', 'my-auth-token',
+        d = add_to_load_balancers(self.log, 'http://url/', 'my-auth-token',
                                   [],
                                   '192.168.1.1',
                                   self.undo)
