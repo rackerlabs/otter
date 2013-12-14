@@ -26,7 +26,9 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import DummyException, mock_log, patch, CheckFailure, mock_treq
+from otter.test.utils import (DummyException, mock_log, patch, CheckFailure,
+                              mock_treq, matches)
+from testtools.matchers import IsInstance
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -207,7 +209,7 @@ class LoadBalancersTests(TestCase):
         """
         add_to_load_balancer will log unexpeted failures while it is trying
         """
-        self.codes = [500, 503, 422, 413, 401, 200]
+        self.codes = [500, 503, 422, 422, 401, 200]
         bad_codes = [500, 503, 401]
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
         clock = Clock()
@@ -220,8 +222,10 @@ class LoadBalancersTests(TestCase):
         clock.pump([10] * 6)
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
-            [mock.call('Unexpected status {status} while adding node to lb: {error}',
-                       status=code, error=mock.ANY, lb_id=12345) for code in bad_codes])
+            [mock.call('Unexpected status {status} while {msg}: {error}',
+                       status=code, msg='add_node',
+                       error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
+                      for code in bad_codes])
 
     def failed_add_to_lb(self, code=500):
         """

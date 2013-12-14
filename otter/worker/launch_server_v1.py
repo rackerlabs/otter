@@ -160,6 +160,22 @@ def log_response_code(response, log, msg, code):
         log.msg(msg)
     return response
 
+
+def log_lb_unexpected_errors(f, path, log, msg):
+    """
+    Log load-balancer unexpected errors
+    """
+    if not f.check(APIError):
+        log.err(f, 'Unknown error while ' + msg)
+        return f
+    error = RequestError(f, path, msg)
+    # 422 is PENDING_UPDATE
+    if f.value.code != 422:
+        log.msg('Unexpected status {status} while {msg}: {error}',
+                msg=msg, status=f.value.code, error=error)
+    raise error
+
+
 def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo, clock=None):
     """
     Add an IP addressed to a load balancer based on the lb_config.
@@ -180,18 +196,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     lb_id = lb_config['loadBalancerId']
     port = lb_config['port']
     path = append_segments(endpoint, 'loadbalancers', str(lb_id), 'nodes')
-    log = log.bind(lb_id=lb_id)
-
-    def log_unexpected_errors(f):
-        if not f.check(APIError):
-            log.err(f, 'Unknown error while adding node to lb')
-            return f
-        error = RequestError(f, path, 'add_node')
-        # 422 is PENDING_UPDATE and 413 is API limit reached
-        if f.value.code not in (422, 413):
-            log.msg('Unexpected status {status} while adding node to lb: {error}',
-                    status=f.value.code, error=error)
-        raise error
+    lb_log = log.bind(loadbalancer_id=lb_id)
 
     def add():
         d = treq.post(path, headers=headers(auth_token),
@@ -200,7 +205,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                                                   "condition": "ENABLED",
                                                   "type": "PRIMARY"}]}))
         d.addCallback(check_success, [200, 202])
-        d.addErrback(log_unexpected_errors)
+        d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
         return d
 
     # keep trying to add every 10 seconds for 15 mins
