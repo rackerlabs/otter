@@ -141,9 +141,7 @@ def retry_times(max_tries):
 
     def can_retry(f):
         tries[0] += 1
-        if tries[0] > max_tries:
-            return False
-        return True
+        return tries[0] <= max_tries
 
     return can_retry
 

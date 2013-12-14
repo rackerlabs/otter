@@ -1355,7 +1355,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         # first bind is system='otter.job.launch'
         log = self.log.bind.return_value
         log.bind.assert_called_once_with(job_id='1')
-        log.bind.return_value.msg.assert_called_with('Job failed', reason=f)
+        log.bind.return_value.err.assert_called_with(f, 'Launching server failed')
 
     def test_modify_state_failure_logged(self):
         """
@@ -1560,8 +1560,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_once_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1580,8 +1580,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """
