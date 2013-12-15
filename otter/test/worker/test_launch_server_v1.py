@@ -224,7 +224,7 @@ class LoadBalancersTests(TestCase):
             [mock.call('Unexpected status {status} while {msg}: {error}',
                        status=code, msg='add_node',
                        error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
-                      for code in bad_codes])
+             for code in bad_codes])
 
     def failed_add_to_lb(self, code=500):
         """
@@ -430,7 +430,7 @@ class LoadBalancersTests(TestCase):
                          [mock.call('http://url/loadbalancers/12345/nodes/1',
                                     headers=expected_headers)] * ((15 * 6) + 1))
 
-    def test_addlb_retries_logs(self):
+    def test_removelb_retries_logs(self):
         """
         add_to_load_balancer will log unexpeted failures while it is trying
         """
@@ -449,7 +449,7 @@ class LoadBalancersTests(TestCase):
                        status=code, msg='remove_node',
                        error=matches(IsInstance(RequestError)), loadbalancer_id=12345,
                        node_id=1)
-                      for code in bad_codes])
+             for code in bad_codes])
 
 
 class BobbyServerTests(TestCase):

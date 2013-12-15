@@ -1,4 +1,3 @@
-from __future__ import print_function
 """
 Initial implementation of a version one launch_server_v1 config.
 
@@ -22,7 +21,6 @@ import itertools
 from copy import deepcopy
 
 from twisted.internet.defer import gatherResults, maybeDeferred
-from twisted.python.failure import Failure
 
 import treq
 
@@ -447,6 +445,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
               next_interval=repeating_interval(10), clock=clock)
     d.addCallback(lambda _: None)
     return d
+
 
 def delete_server(log, region, service_catalog, auth_token, instance_details):
     """
