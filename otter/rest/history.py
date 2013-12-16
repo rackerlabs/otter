@@ -12,6 +12,7 @@ from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import fails_with, succeeds_with, with_transaction_id
 from otter.rest.errors import exception_codes
 from otter.util.config import config_value
+from otter.util.http import check_success
 
 
 class OtterHistory(object):
@@ -45,9 +46,11 @@ class OtterHistory(object):
 
         # TODO: filter by tenant id.
         d = treq.get(host)
+        d.addCallback(check_success, [200])
 
         def handle_response(response):
-            return response.content
+            # TODO: mutate the response content to be an audit log.
+            return treq.content(response)
         d.addCallback(handle_response)
 
         return d

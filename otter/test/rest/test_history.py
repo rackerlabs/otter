@@ -29,16 +29,22 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         """
         the history api endpoint returns the items from the audit log
         """
-        data = {'abc': 'def'}
-        response = mock.Mock(content=json.dumps(data))
+        data = json.dumps({'abc': 'def'})
+        response = mock.Mock(code=200)
 
         def get(*args, **kwargs):
             return defer.succeed(response)
         treq.get.side_effect = get
 
+        def content(*args, **kwargs):
+            return defer.succeed(data)
+        treq.content.side_effect = content
+
         result = self.successResultOf(
             request(self.root, "GET", self.endpoint))
 
-        body = self.assert_status_code(200)
-        result = json.loads(body)
-        self.assertEqual(result, data)
+        self.assertEqual(200, result.response.code)
+        self.assertEqual(data, result.content)
+
+        treq.get.assert_called_once_with()
+        treq.content.assert_called_once_with(response)
