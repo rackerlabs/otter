@@ -211,6 +211,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
               next_interval=repeating_interval(10), clock=clock)
 
     def when_done(result):
+        lb_log.msg('Added to load balancer')
         undo.push(remove_from_load_balancer,
                   endpoint,
                   auth_token,
@@ -433,17 +434,21 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         or errbacks with an RequestError.
     """
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
+    # TODO: Will remove this after testing
+    lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
     def remove():
         d = treq.delete(path, headers=headers(auth_token))
         d.addCallback(check_success, [200, 202])
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
+        # To avoid the twisted hang bug - TESTING
+        d.addCallback(treq.content)
         return d
 
     d = retry(remove, can_retry=retry_times(15 * 6),
               next_interval=repeating_interval(10), clock=clock)
-    d.addCallback(lambda _: None)
+    d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
 
