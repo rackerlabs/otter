@@ -130,7 +130,6 @@ class UpdateSchedulerTests(AutoscaleFixture):
         cron_style_policy = self.autoscale_behaviors.create_schedule_policy_given(
             group_id=self.group.id,
             schedule_cron=self.cron_policy_args['cron'])
-        sleep(self.scheduler_interval)
         self.verify_group_state(self.group.id, self.group.groupConfiguration.minEntities)
         self._update_policy(self.group.id, cron_style_policy, self.cron_policy_args,
                             name='test-only-upd-name')
