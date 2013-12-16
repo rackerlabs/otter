@@ -21,6 +21,7 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
     invalid_methods = ("DELETE", "PUT", "POST")
 
     def setUp(self):
+        """Set an elastic search config var."""
         super(OtterHistoryTestCase, self).setUp()
         set_config_data({'elasticsearch': {'host': "http://dummy/search"}})
 
