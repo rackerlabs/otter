@@ -130,6 +130,7 @@ class LoadBalancersTests(TestCase):
                                         method='post'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.log = mock_log()
+        self.log.msg.return_value = None
 
         self.undo = iMock(IUndoStack)
 
@@ -387,8 +388,8 @@ class LoadBalancersTests(TestCase):
         self.treq.delete.return_value = succeed(mock.Mock(code=200))
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
-        self.assertEqual(self.successResultOf(d), None)
 
+        self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes/1',
             headers=expected_headers)
