@@ -150,7 +150,7 @@ def create_server(server_endpoint, auth_token, server_config):
     return d.addCallback(treq.json_content)
 
 
-def log_response_code(response, log, msg, code):
+def log_on_response_code(response, log, msg, code):
     """
     Log `msg` if response.code is same as code
     """
@@ -539,7 +539,7 @@ def verified_delete(log,
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.delete(path, headers=headers(auth_token))
 
-    d.addCallback(log_response_code, serv_log, 'Server to delete does not exist', 404)
+    d.addCallback(log_on_response_code, serv_log, 'Server to delete does not exist', 404)
     d.addCallback(check_success, [204, 404])
     d.addErrback(wrap_request_error, path, 'server_delete')
 
