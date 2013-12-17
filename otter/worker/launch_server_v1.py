@@ -167,10 +167,12 @@ def log_lb_unexpected_errors(f, path, log, msg):
         log.err(f, 'Unknown error while ' + msg)
         return f
     error = RequestError(f, path, msg)
+    log.msg('Got LB error while {m}: {e}', m=msg, e=error)
+    # TODO: Will do it after LB delete works fine
     # 422 is PENDING_UPDATE
-    if f.value.code != 422:
-        log.msg('Unexpected status {status} while {msg}: {error}',
-                msg=msg, status=f.value.code, error=error)
+    #if f.value.code != 422:
+    #    log.msg('Unexpected status {status} while {msg}: {error}',
+    #            msg=msg, status=f.value.code, error=error)
     raise error
 
 
@@ -434,7 +436,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         or errbacks with an RequestError.
     """
     lb_log = log.bind(loadbalancer_id=loadbalancer_id, node_id=node_id)
-    # TODO: Will remove this after testing
+    # TODO: Will remove this once LB ERROR state is fixed and it is working fine
     lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
