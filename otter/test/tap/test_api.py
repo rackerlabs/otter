@@ -195,7 +195,7 @@ class APIMakeServiceTests(TestCase):
         api store.
         """
         makeService(test_config)
-        self.Otter.assert_called_once_with(self.store)
+        self.Otter.assert_called_once_with(self.store, None)
 
     def test_mock_store(self):
         """
@@ -213,6 +213,17 @@ class APIMakeServiceTests(TestCase):
             mock_calls = getattr(mocked, 'mock_calls')
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
+
+    def test_api_config_options(self):
+        """
+        makeService passes api config options to Otter if specified
+        """
+        api_config = {
+            'launch_config_validation': True
+        }
+
+        makeService(dict(api=api_config, **test_config))
+        self.Otter.assert_called_once_with(self.store, api_config)
 
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):

@@ -128,7 +128,7 @@ def makeService(config):
 
     set_supervisor(supervisor)
 
-    otter = Otter(store)
+    otter = Otter(store, config_value('api'))
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 

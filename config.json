@@ -25,6 +25,9 @@
             "time_boundary": 15
         }
     },
+    "api": {
+        "launch_config_validation": true
+    },
     "limits": {
         "pagination": 100,
         "absolute": {
