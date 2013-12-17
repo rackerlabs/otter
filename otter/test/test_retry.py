@@ -9,7 +9,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter.util.retry import (retry, repeating_interval, transient_errors_except,
-                              retry_times)
+                              retry_times, compose_retries)
 from otter.test.utils import CheckFailure, DummyException
 
 
@@ -315,6 +315,19 @@ class CanRetryHelperTests(TestCase):
         for exception in (DummyException(), NotImplementedError(), ValueError()):
             self.assertTrue(can_retry(Failure(exception)))
         self.assertFalse(can_retry(Failure(DummyException())))
+
+    def test_compose_retries(self):
+        """
+        `compose_retries` returns True only if all its function returns True
+        """
+        f1 = lambda f: f % 2 == 0
+        f2 = lambda f: f % 5 == 0
+        can_retry = compose_retries(f1, f2)
+        # True only if both f1 and f2 return True
+        self.assertTrue(can_retry(10))
+        # False otherwise
+        self.assertFalse(can_retry(8))
+        self.assertFalse(can_retry(3))
 
 
 class NextIntervalHelperTests(TestCase):
