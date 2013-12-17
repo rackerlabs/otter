@@ -19,6 +19,8 @@ from otter import controller
 from otter.supervisor import get_supervisor
 from otter.rest.errors import InvalidMinEntities
 
+from twisted.internet.defer import succeed
+
 
 class OtterConfig(object):
     """
@@ -111,13 +113,16 @@ class OtterLaunch(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id, api_config=None):
         self.log = log.bind(system='otter.rest.launch',
                             tenant_id=tenant_id,
                             group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.api_config = api_config
+        if api_config is None:
+            self.api_config = {}
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -225,6 +230,9 @@ class OtterLaunch(object):
         Users may have an invalid configuration based on dependencies.
         """
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
+        if self.api_config.get('launch_config_validation', True):
+            deferred = get_supervisor().validate_launch_config(self.log, self.tenant_id, data)
+        else:
+            deferred = succeed(None)
         deferred.addCallback(lambda _: rec.update_launch_config(data))
         return deferred

@@ -390,9 +390,9 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(resp['error']['type'], 'InternalError')
         self.flushLoggedErrors(DummyException)
 
-    def test_update_invalid_launch_config_fail_400(self):
+    def test_update_invalid_launch_config_with_validation_on_fail_400(self):
         """
-        Invalid launch configuration gives 400 error
+        Invalid launch configuration, if validation is on, gives 400 error
         """
         self.supervisor.validate_launch_config.return_value = defer.fail(
             InvalidLaunchConfiguration('hmph'))
@@ -403,6 +403,21 @@ class LaunchConfigTestCase(RestAPITestMixin, TestCase):
 
         self.assertEqual(resp['error']['message'], 'hmph')
         self.flushLoggedErrors(InvalidLaunchConfiguration)
+
+    def test_update_invalid_launch_config_with_validation_off_succeeds(self):
+        """
+        Invalid launch configuration, if validation is off, succeeds
+        """
+        self.set_api_config({'launch_config_validation': False})
+        self.supervisor.validate_launch_config.return_value = defer.fail(
+            InvalidLaunchConfiguration('hmph'))
+
+        self.mock_group.update_launch_config.return_value = defer.succeed(None)
+        self.assert_status_code(
+            204, method='PUT', body=json.dumps(launch_examples()[0]))
+
+        self.assertFalse(self.supervisor.validate_launch_config.called)
+        self.supervisor.validate_launch_config.return_value.addErrback(lambda _: None)
 
     def test_update_launch_config_success(self):
         """

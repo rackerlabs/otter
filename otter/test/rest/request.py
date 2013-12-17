@@ -292,6 +292,12 @@ class RestAPITestMixin(RequestTestMixin):
         """
         set_config_data({})
 
+    def set_api_config(self, config=None):
+        """
+        Sets the API configuration data
+        """
+        self.root = Otter(self.mock_store, config).app.resource()
+
     def test_invalid_methods_are_405(self):
         """
         All methods other than GET return a 405: Forbidden Method
