@@ -394,6 +394,20 @@ class LoadBalancersTests(TestCase):
             'http://url/loadbalancers/12345/nodes/1',
             headers=expected_headers)
 
+    def test_remove_from_load_balancer_on_404(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if it is already deleted
+        i.e. it returns 404. It also logs it
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(
+            'Node to delete does not exist', loadbalancer_id=12345, node_id=1)
+
     def test_removelb_retries(self):
         """
         remove_from_load_balancer will retry again until it succeeds

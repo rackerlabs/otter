@@ -440,7 +440,8 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
 
     def remove():
         d = treq.delete(path, headers=headers(auth_token))
-        d.addCallback(check_success, [200, 202])
+        d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
+        d.addCallback(check_success, [200, 202, 404])
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
         # To avoid the twisted hang bug - TESTING
         d.addCallback(treq.content)
