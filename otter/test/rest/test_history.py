@@ -47,5 +47,5 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(200, result.response.code)
         self.assertEqual(data, result.content)
 
-        treq.get.assert_called_once_with()
+        treq.get.assert_called_once_with('http://dummy/search')
         treq.content.assert_called_once_with(response)
