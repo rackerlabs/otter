@@ -36,6 +36,10 @@ from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
 
 
+# Amount of time spaced between starting delete jobs when scaling down
+DELETE_WAIT_INTERVAL = 20
+
+
 class CannotExecutePolicyError(Exception):
     """
     Exception to be raised when the policy cannot be executed
@@ -318,7 +322,7 @@ def find_servers_to_evict(log, state, delta):
 
 
 def delete_active_servers(log, transaction_id, scaling_group,
-                          delta, state):
+                          delta, state, clock=None):
     """
     Start deleting active servers jobs
     """
@@ -331,9 +335,13 @@ def delete_active_servers(log, transaction_id, scaling_group,
         state.remove_active(server['id'])
 
     # then start deleting those servers
+    if not clock:
+        from twisted.internet import reactor
+        clock = reactor
     supervisor = get_supervisor()
-    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
-            for server_info in servers_to_evict]
+    for i, server_info in enumerate(servers_to_evict):
+        job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
+        clock.callLater(i * DELETE_WAIT_INTERVAL, job.start)
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):
