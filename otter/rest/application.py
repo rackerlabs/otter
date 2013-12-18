@@ -1,6 +1,8 @@
 """
 Contains the actual Klein app and base route handlers for the REST service.
 """
+import json
+
 from twisted.web.server import Request
 
 from otter.rest.otterapp import OtterApp
@@ -58,3 +60,10 @@ class Otter(object):
         return audit history
         """
         return OtterHistory(self.store, tenant_id).app.resource()
+
+    @app.route('/health')
+    def health_check(self, request):
+        """
+        Return whether health checks succeeded
+        """
+        return json.dumps(self.store.health_check())
