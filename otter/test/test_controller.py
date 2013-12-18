@@ -20,6 +20,25 @@ from otter.util.timestamp import MIN
 from otter.test.utils import CheckFailure, iMock, matches, patch, mock_log
 
 
+class CannotExecutePolicyErrorTest(TestCase):
+    """
+    Tests for :class:`otter.controller.CannotExecutePolicyError`
+    """
+    def test_CannotExecutePolicyError(self):
+        """
+        CannotExecutePolicyError stores relevant info in the details attribute
+        """
+        e = controller.CannotExecutePolicyError('t', 'g', 'p', 'reason',
+                                                random='keyword')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g',
+                                     'policy_id': 'p',
+                                     'random': 'keyword'})
+        self.assertEqual(
+            str(e),
+            'Cannot execute scaling policy p for group g for tenant t: reason')
+
+
 class CalculateDeltaTestCase(TestCase):
     """
     Tests for :func:`otter.controller.calculate_delta`

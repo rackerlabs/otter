@@ -13,7 +13,10 @@ from twisted.trial.unittest import TestCase
 
 from otter.models.interface import (
     GroupState, IScalingGroup, IScalingGroupCollection, IScalingScheduleCollection,
-    NoSuchScalingGroupError)
+    NoSuchScalingGroupError, DetailedException, UnrecognizedCapabilityError,
+    NoSuchPolicyError, NoSuchWebhookError, GroupNotEmptyError,
+    ScalingGroupOverLimitError, WebhooksOverLimitError)
+
 from otter.json_schema.group_schemas import launch_config
 from otter.json_schema import model_schemas, validate
 
@@ -426,3 +429,105 @@ class IScalingScheduleCollectionProviderMixin(object):
             self.assertTrue(isinstance(elem, dict))
 
         return result
+
+
+class DetailedErrorTestCase(TestCase):
+    """
+    Tests that all the errors have a details object with structured data
+    """
+    def test_DetailedException(self):
+        """
+        DetailedException puts all of its keyword arguments in a details
+        attribute, and passes the formatted format string onto the superclass
+        Exception.
+        """
+        de = DetailedException("the {jumper} jumped over the {obstacle}",
+                               jumper="horse", obstacle="narwhal",
+                               extra="unformatted")
+        self.assertEqual(de.details, {'jumper': 'horse', 'obstacle': 'narwhal',
+                                      'extra': 'unformatted'})
+        self.assertEqual(str(de), "the horse jumped over the narwhal")
+
+    def test_UnrecognizedCapabilityError(self):
+        """
+        UnrecognizedCapabilityError stores relevant info in the details
+        attribute
+        """
+        e = UnrecognizedCapabilityError('hash', 'ver')
+        self.assertEqual(e.details, {'capability_hash': 'hash',
+                                     'capability_version': 'ver'})
+        self.assertEqual(str(e),
+                         'Unrecognized (version ver) capability hash hash')
+
+    def test_NoSuchScalingGroupError(self):
+        """
+        NoSuchScalingGroupError stores relevant info in the details attribute
+        """
+        e = NoSuchScalingGroupError('t', 'g')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g'})
+        self.assertEqual(str(e), 'No such scaling group g for tenant t')
+
+    def test_NoSuchPolicyError(self):
+        """
+        NoSuchPolicyError stores relevant info in the details attribute
+        """
+        e = NoSuchPolicyError('t', 'g', 'p')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g',
+                                     'policy_id': 'p'})
+        self.assertEqual(
+            str(e),
+            'No such scaling policy p for group g for tenant t')
+
+    def test_NoSuchWebhookError(self):
+        """
+        NoSuchWebhookError stores relevant info in the details attribute
+        """
+        e = NoSuchWebhookError('t', 'g', 'p', 'w')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g',
+                                     'policy_id': 'p',
+                                     'webhook_id': 'w'})
+        self.assertEqual(
+            str(e),
+            'No such webhook w for policy p in group g for tenant t')
+
+    def test_GroupNotEmptyError(self):
+        """
+        GroupNotEmptyError stores relevant info in the details attribute
+        """
+        e = GroupNotEmptyError('t', 'g')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g'})
+        self.assertEqual(
+            str(e),
+            'Group g for tenant t still has entities, so cannot be deleted.')
+
+    def test_ScalingGroupOverLimitError(self):
+        """
+        ScalingGroupOverLimitError stores relevant info in the details attribute
+        """
+        e = ScalingGroupOverLimitError('t', 'n')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'max_groups': 'n'})
+        self.assertEqual(
+            str(e), "Allowed limit of n scaling groups reached by tenant t")
+
+    def test_WebhooksOverLimitError(self):
+        """
+        WebhooksOverLimitError stores relevant info in the details attribute
+        """
+        e = WebhooksOverLimitError('t', 'g', 'p', max_webhooks='n',
+                                   curr_webhooks='c', new_webhooks='m')
+        self.assertEqual(e.details, {'tenant_id': 't',
+                                     'scaling_group_id': 'g',
+                                     'policy_id': 'p',
+                                     'current_webhooks': 'c',
+                                     'new_webhooks': 'm',
+                                     'max_webhooks': 'n'})
+        self.assertEqual(
+            str(e),
+            ("Currently there are c webhooks for tenant t, scaling group "
+             "g, policy p.  Creating m new webhooks would exceed the "
+             "webhook limit of n per policy."))

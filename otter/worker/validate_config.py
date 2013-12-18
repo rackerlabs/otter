@@ -8,6 +8,7 @@ import base64
 import re
 import itertools
 
+from otter.models.interface import DetailedException
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
@@ -17,7 +18,7 @@ from otter.util.http import (append_segments, headers, check_success,
 b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
 
 
-class InvalidLaunchConfiguration(Exception):
+class InvalidLaunchConfiguration(DetailedException):
     """
     Represents an invalid launch configuration
     """
@@ -30,7 +31,8 @@ class UnknownImage(InvalidLaunchConfiguration):
     """
     def __init__(self, image_ref):
         super(UnknownImage, self).__init__(
-            'Invalid imageRef "{}" in launchConfiguration'.format(image_ref))
+            'Invalid imageRef "{image_ref}" in launchConfiguration',
+            image_ref=image_ref)
         self.image_ref = image_ref
 
 
@@ -40,7 +42,8 @@ class InactiveImage(InvalidLaunchConfiguration):
     """
     def __init__(self, image_ref):
         super(InactiveImage, self).__init__(
-            'Inactive imageRef "{}" in launchConfiguration'.format(image_ref))
+            'Inactive imageRef "{image_ref}" in launchConfiguration',
+            image_ref=image_ref)
         self.image_ref = image_ref
 
 
@@ -50,7 +53,8 @@ class UnknownFlavor(InvalidLaunchConfiguration):
     """
     def __init__(self, flavor_ref):
         super(UnknownFlavor, self).__init__(
-            'Invalid flavorRef "{}" in launchConfiguration'.format(flavor_ref))
+            'Invalid flavorRef "{flavor_ref}" in launchConfiguration',
+            flavor_ref=flavor_ref)
         self.flavor_ref = flavor_ref
 
 
@@ -59,9 +63,9 @@ class InvalidPersonality(InvalidLaunchConfiguration):
     Personality is invalid either because content is not base64 encoded or some other
     reason
     """
-    def __init__(self, msg):
+    def __init__(self, msg, **kwargs):
         super(InvalidPersonality, self).__init__(
-            msg or 'Invalid personality in launch configuration')
+            msg or 'Invalid personality in launch configuration', **kwargs)
 
 
 class InvalidBase64Encoding(InvalidPersonality):
@@ -70,7 +74,8 @@ class InvalidBase64Encoding(InvalidPersonality):
     """
     def __init__(self, path):
         super(InvalidBase64Encoding, self).__init__(
-            'Invalid base64 encoding for contents of path "{}"'.format(path))
+            'Invalid base64 encoding for contents of path "{personality_path}"',
+            personality_path=path)
         self.path = path
 
 
@@ -80,8 +85,9 @@ class InvalidMaxPersonality(InvalidPersonality):
     """
     def __init__(self, max_personality, length):
         super(InvalidMaxPersonality, self).__init__(
-            'Number of files "{}" in personality exceeds maximum limit "{}"'.format(
-                length, max_personality))
+            ('Number of files "{num_personality_files}" in personality exceeds '
+             'maximum limit "{max_personality_files}"'),
+            num_personality_files=length, max_personality_files=max_personality)
         self.max_personality = max_personality
         self.personality_length = length
 
@@ -92,7 +98,9 @@ class InvalidFileContentSize(InvalidPersonality):
     """
     def __init__(self, path, max_size):
         super(InvalidFileContentSize, self).__init__(
-            'File "{}" content\'s size exceeds maximum size "{}"'.format(path, max_size))
+            ('File "{personality_path}" content\'s size exceeds maximum size '
+             '"{max_personality_size}"'),
+            personality_path=path, max_personality_size=max_size)
         self.path = path
         self.max_size = max_size
 
