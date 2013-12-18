@@ -55,7 +55,7 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
-def server_details(server_endpoint, auth_token, server_id):
+def server_details(server_endpoint, auth_token, server_id, log=None):
     """
     Fetch the details of a server as specified by id.
 
@@ -68,7 +68,7 @@ def server_details(server_endpoint, auth_token, server_id):
     :return: A dict of the server details.
     """
     path = append_segments(server_endpoint, 'servers', server_id)
-    d = treq.get(path, headers=headers(auth_token))
+    d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, path, 'server_details')
     return d.addCallback(treq.json_content)
@@ -123,7 +123,7 @@ def wait_for_active(log,
             else:
                 raise TransientRetryError()  # just poll again
 
-        sd = server_details(server_endpoint, auth_token, server_id)
+        sd = server_details(server_endpoint, auth_token, server_id, log=log)
         sd.addCallback(check_status)
         return sd
 
@@ -138,7 +138,7 @@ def wait_for_active(log,
         deferred_description=timeout_description)
 
 
-def create_server(server_endpoint, auth_token, server_config):
+def create_server(server_endpoint, auth_token, server_config, log=None):
     """
     Create a new server.
 
@@ -150,7 +150,7 @@ def create_server(server_endpoint, auth_token, server_config):
     """
     path = append_segments(server_endpoint, 'servers')
     d = treq.post(path, headers=headers(auth_token),
-                  data=json.dumps({'server': server_config}))
+                  data=json.dumps({'server': server_config}), log=log)
     d.addCallback(check_success, [202])
     d.addErrback(wrap_request_error, path, 'server_create')
     return d.addCallback(treq.json_content)
@@ -209,7 +209,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
                       data=json.dumps({"nodes": [{"address": ip_address,
                                                   "port": port,
                                                   "condition": "ENABLED",
-                                                  "type": "PRIMARY"}]}))
+                                                  "type": "PRIMARY"}]}),
+                      log=lb_log)
         d.addCallback(check_success, [200, 202])
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
         return d
@@ -391,7 +392,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     log = log.bind(server_name=server_config['name'])
     ilog = [None]
 
-    d = create_server(server_endpoint, auth_token, server_config)
+    d = create_server(server_endpoint, auth_token, server_config, log=log)
 
     def wait_for_server(server):
         server_id = server['server']['id']
@@ -451,7 +452,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
     def remove():
-        d = treq.delete(path, headers=headers(auth_token))
+        d = treq.delete(path, headers=headers(auth_token), log=lb_log)
         d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
         d.addCallback(check_success, [200, 202, 404])
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
@@ -549,7 +550,7 @@ def verified_delete(log,
     serv_log.msg('Deleting server')
 
     path = append_segments(server_endpoint, 'servers', server_id)
-    d = treq.delete(path, headers=headers(auth_token))
+    d = treq.delete(path, headers=headers(auth_token), log=serv_log)
 
     d.addCallback(log_on_response_code, serv_log, 'Server to delete does not exist', 404)
     d.addCallback(check_success, [204, 404])
@@ -563,7 +564,7 @@ def verified_delete(log,
         def check_status():
             check_d = treq.head(
                 append_segments(server_endpoint, 'servers', server_id),
-                headers=headers(auth_token))
+                headers=headers(auth_token), log=serv_log)
             check_d.addCallback(check_success, [404])
             return check_d
 
