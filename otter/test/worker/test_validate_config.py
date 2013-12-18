@@ -194,7 +194,8 @@ class ValidateImageTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_image(self.log, 'token', 'endpoint', 'image_ref')
         self.successResultOf(d)
-        self.treq.get.assert_called_with('endpoint/images/image_ref', headers=self.headers)
+        self.treq.get.assert_called_with(
+            'endpoint/images/image_ref', headers=self.headers, log=self.log)
 
     def test_inactive_image(self):
         """
@@ -244,7 +245,8 @@ class ValidateFlavorTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_flavor(self.log, 'token', 'endpoint', 'flavornum')
         self.successResultOf(d)
-        self.treq.get.assert_called_once_with('endpoint/flavors/flavornum', headers=self.headers)
+        self.treq.get.assert_called_once_with(
+            'endpoint/flavors/flavornum', headers=self.headers, log=self.log)
 
     def test_unknown_flavor(self):
         """
@@ -291,7 +293,8 @@ class ValidatePersonalityTests(TestCase):
         self.headers['x-auth-token'] = ['token']
         d = validate_personality(self.log, 'token', 'endpoint', self.personality)
         self.successResultOf(d)
-        self.treq.get.assert_called_once_with('endpoint/limits', headers=self.headers)
+        self.treq.get.assert_called_once_with(
+            'endpoint/limits', headers=self.headers, log=self.log)
 
     def test_limit_failure_succeeds(self):
         """
