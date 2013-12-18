@@ -18,8 +18,11 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store):
+    def __init__(self, store, api_config=None):
         self.store = store
+        self.api_config = api_config
+        if api_config is None:
+            self.api_config = {}
 
     @app.route('/')
     def base(self, request):
@@ -35,7 +38,7 @@ class Otter(object):
         """
         group routes delegated to OtterGroups.
         """
-        return OtterGroups(self.store, tenant_id).app.resource()
+        return OtterGroups(self.store, tenant_id, self.api_config).app.resource()
 
     @app.route('/v1.0/execute/<string:capability_version>/<string:capability_hash>/')
     def execute(self, request, capability_version, capability_hash):

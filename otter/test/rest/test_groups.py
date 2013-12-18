@@ -136,9 +136,9 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
                                 body=json.dumps(request_body))
         self.flushLoggedErrors()
 
-    def test_create_invalid_launch_config(self):
+    def test_create_invalid_launch_config_with_validation_on(self):
         """
-        Invalid launch configuration raises 400
+        Invalid launch configuration, if validation is enabled, raises 400
         """
         self.supervisor.validate_launch_config.return_value = defer.fail(
             InvalidLaunchConfiguration('meh'))
@@ -149,6 +149,21 @@ class AllGroupsEndpointTestCase(RestAPITestMixin, TestCase):
         self.assert_status_code(400, method='POST',
                                 body=json.dumps(request_body))
         self.flushLoggedErrors()
+
+    def test_create_invalid_launch_config_with_validation_off(self):
+        """
+        Invalid launch configuration, if validation is disabled, returns 200
+        """
+        self.set_api_config({'launch_config_validation': False})
+        self.supervisor.validate_launch_config.return_value = defer.fail(
+            InvalidLaunchConfiguration('meh'))
+
+        request_body = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0]
+        }
+        self._test_successful_create(request_body)
+        self.supervisor.validate_launch_config.return_value.addErrback(lambda _: None)
 
     def test_no_groups_returns_empty_list(self):
         """

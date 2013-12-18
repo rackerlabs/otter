@@ -57,11 +57,14 @@ class OtterGroups(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id):
+    def __init__(self, store, tenant_id, api_config=None):
         self.log = log.bind(system='otter.rest.groups',
                             tenant_id=tenant_id)
         self.store = store
         self.tenant_id = tenant_id
+        self.api_config = api_config
+        if api_config is None:
+            self.api_config = {}
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -312,8 +315,11 @@ class OtterGroups(object):
         if data['groupConfiguration']['minEntities'] > data['groupConfiguration']['maxEntities']:
             raise InvalidMinEntities("minEntities must be less than or equal to maxEntities")
 
-        deferred = get_supervisor().validate_launch_config(
-            self.log, self.tenant_id, data['launchConfiguration'])
+        if self.api_config.get('launch_config_validation', True):
+            deferred = get_supervisor().validate_launch_config(
+                self.log, self.tenant_id, data['launchConfiguration'])
+        else:
+            deferred = defer.succeed(None)
 
         deferred.addCallback(
             lambda _: self.store.create_scaling_group(self.log, self.tenant_id,
@@ -360,7 +366,8 @@ class OtterGroups(object):
         Routes requiring a specific group_id are delegated to
         OtterGroup.
         """
-        return OtterGroup(self.store, self.tenant_id, group_id).app.resource()
+        g = OtterGroup(self.store, self.tenant_id, group_id, self.api_config)
+        return g.app.resource()
 
 
 class OtterGroup(object):
@@ -369,13 +376,16 @@ class OtterGroup(object):
     """
     app = OtterApp()
 
-    def __init__(self, store, tenant_id, group_id):
+    def __init__(self, store, tenant_id, group_id, api_config=None):
         self.log = log.bind(system='otter.rest.group',
                             tenant_id=tenant_id,
                             scaling_group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
+        self.api_config = api_config
+        if api_config is None:
+            self.api_config = {}
 
     @app.route('/', methods=['GET'])
     @with_transaction_id()
@@ -566,7 +576,8 @@ class OtterGroup(object):
         """
         config route handled by OtterConfig
         """
-        return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
+        g = OtterConfig(self.store, self.tenant_id, self.group_id)
+        return g.app.resource()
 
     @app.route('/launch/')
     @with_transaction_id()
@@ -574,7 +585,7 @@ class OtterGroup(object):
         """
         launch route handled by OtterLaunch
         """
-        return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
+        return OtterLaunch(self.store, self.tenant_id, self.group_id, self.api_config).app.resource()
 
     @app.route('/policies/', branch=True)
     @with_transaction_id()
