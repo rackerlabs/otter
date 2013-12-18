@@ -821,6 +821,9 @@ class DeleteActiveServersTests(TestCase):
         deleting them
         """
         clock = Clock()
+        # nothing in the deferred pool
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
+
         controller.delete_active_servers(self.log, 'trans-id', 'group',
                                          3, self.fake_state, clock)
 
@@ -838,13 +841,19 @@ class DeleteActiveServersTests(TestCase):
             [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
                 for i, data in enumerate(self.evict_servers.values())])
 
+        done = self.supervisor.deferred_pool.notify_when_empty()
+
         # They were started at intervals
         self.assertTrue(all([not job.start.called for job in self.jobs]))
         for i, job in enumerate(self.jobs):
+            # deferred pool is not empty until every single job is done.
+            self.assertNoResult(done)
             clock.advance(i * 20)
             self.assertTrue(job.start.called)
             self.assertTrue(all([not job.start.called for job in self.jobs[i + 1:]]))
 
+        # now pool should be empty
+        self.successResultOf(done)
 
 class DeleteJobTests(TestCase):
     """
