@@ -237,6 +237,15 @@ class DeleteServerTests(SupervisorTests):
             self.auth_token,
             (self.fake_server['id'], self.fake_server['lb_info']))
 
+    def test_execute_delete_added_to_pool(self):
+        """
+        `execute_delete_server` returned deferred is added to the pool
+        """
+        self.delete_server.return_value = Deferred()
+        d = self.supervisor.execute_delete_server(
+            self.log, 'transaction-id', self.group, self.fake_server)
+        self.assertIn(d, self.supervisor.deferred_pool._pool)
+
     def test_execute_delete_auths(self):
         """
         ``execute_delete_server`` asks the provided authentication function for
