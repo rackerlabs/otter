@@ -14,6 +14,7 @@ from twisted.trial.unittest import TestCase
 
 from otter import controller
 from otter.supervisor import ISupervisor
+from otter.util.deferredutils import DeferredPool
 
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
@@ -810,6 +811,7 @@ class DeleteActiveServersTests(TestCase):
             self, 'otter.controller._DeleteJob', side_effect=self.jobs)
 
         self.supervisor = iMock(ISupervisor)
+        self.supervisor.deferred_pool = DeferredPool()
         patch(self, 'otter.controller.get_supervisor',
               return_value=self.supervisor)
 
