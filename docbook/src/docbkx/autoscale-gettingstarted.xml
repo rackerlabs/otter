@@ -166,11 +166,6 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                     <para>Prerequisites for Using Auto Scale</para>
                 </listitem>
                 <listitem>
-                    <para>Auto Scale Core Concepts, such as Webhooks,
-                        Scaling Groups, and Scaling Policies, and
-                        Cooldowns</para>
-                </listitem>
-                <listitem>
                     <para>How Auto Scale Works</para>
                 </listitem>
             </itemizedlist>
@@ -180,13 +175,6 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                 <listitem>
                     <para>Create a Scaling Group and a Launch
                         Configuration</para>
-                </listitem>
-                <listitem>
-                    <para>Specify a Scaling Policy and Webhook</para>
-                </listitem>
-                <listitem>
-                    <para>Use Auto Scale API operations to obtain
-                        information about your scaling group.</para>
                 </listitem>
                 <listitem>
                     <para>Delete a scaling group.</para>
@@ -213,24 +201,6 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                     </listitem>
                 </itemizedlist>
             </para>
-            <para>To use Rackspace Auto Scale, you need to complete
-                the following tasks:</para>
-            <itemizedlist>
-                <listitem>
-                    <para> Create servers by using Cloud Servers. For
-                        more information, see the <link
-                            xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/index.html"
-                            >Next Generation Cloud Servers™ Developer
-                            Guide</link>. </para>
-                </listitem>
-                <listitem>
-                    <para> Create load balancers by using Cloud Load
-                        Balancers. For more information see the <link
-                            xlink:href="http://docs.rackspace.com/loadbalancers/api/v1.0/clb-devguide/content/index.html"
-                            >Rackspace Cloud Load Balancers Developers
-                            Guide</link>. </para>
-                </listitem>
-            </itemizedlist>
         </section>
         <section xml:id="serviceEndpoints">
             <title>Service Access Endpoints</title>
@@ -239,11 +209,6 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                 replication, caching, and overall maintenance of
                 &PRODNAME; data across regional boundaries to other
                 &PROD; servers.</para>
-            <important>
-                <para> For the Early Access period, you can use &PROD;
-                    endpoints in ORD and DFW. Endpoints in LON and SYD
-                    will be available soon. </para>
-            </important>
             <para>The following table lists the service access
                 endpoints for &PROD;.</para>
             <?rax-fo keep-with-next?>
@@ -331,7 +296,51 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                 <para>This document pertains to contract version
                     1.0.</para>
             </note>
-        </section>
+            <para/>
+            </section>
+            <section xml:id="Sending_Requests_through_the_API">
+                <title>Sending Requests through the API</title>
+                <para>There are several options for sending requests
+                    through an API: </para>
+                <itemizedlist>
+                    <listitem>
+                        <para>Developers and testers can use cURL, the
+                            command-line tool from <link
+                                xlink:href="http://curl.haxx.se/"
+                                >http://curl.haxx.se/</link>. With
+                            cURL you can send HTTP requests and
+                            receive responses from the command line.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>If you prefer a more graphical
+                            interface, the ReST client for Firefox
+                            also works for testing API calls. For more
+                            information, see <link
+                                xlink:href="https://addons.mozilla.org/en-US/firefox/addon/restclient/"
+                                >https://addons.mozilla.org/en-US/firefox/addon/restclient/</link>.
+                        </para>
+                    </listitem>
+                    <listitem>
+                        <para>You can also download and install
+                            rest-client from <link
+                                xlink:href="http://code.google.com/p/rest-client/"
+                                >http://code.google.com/p/rest-client/</link>.
+                            Test-client is a Java application that
+                            lets you test ReSTful web services.
+                        </para>
+                    </listitem>
+                </itemizedlist>
+                <para>
+                    <tip>
+                        <para> If you want to try these steps in your
+                            own environment, you can use <link
+                                xlink:href="http://docs.autoscale.apiary.io/"
+                                >http://docs.autoscale.apiary.io/</link>
+                            to generate cURL commands. </para>
+                    </tip>
+                </para>
+            </section>
     </chapter>
     <chapter xml:id="Core_Concepts">
         <title>How Auto Scale Works</title>
@@ -491,73 +500,49 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
     
     <chapter xml:id="Autoscale_API">
         <title>Creating your first &PROD; Group</title>
-        <para>You can create a autoscaling group in five steps:</para>
+        <para>In this section, you will learn how to create your first
+            Auto Scale Group using a schedule-based
+            configuration.</para>
+        <para>To create your first scaling group, you will need to
+            complete the following steps:</para>
         <para>
             <itemizedlist>
                 <listitem>
-                    <para>Generate an Authentication Token</para>
+                    <para><link
+                            linkend="Generate_Authentication_Token"
+                            >Generate an Authentication
+                        Token</link></para>
                 </listitem>
                 <listitem>
-                    <para><link linkend="Save_Image">Save an
-                            Image</link></para>
+                    <para><link linkend="List_Server_Images">List
+                            Cloud Server Images</link></para>
                 </listitem>
                 <listitem>
-                    <para><link linkend="Create_Group">Create and
-                            Manage a Scaling Group</link></para>
+                    <para><link linkend="Create_Cloud_Server">Create a
+                            Cloud Server</link></para>
                 </listitem>
                 <listitem>
-                    <para><link linkend="Delete_Scaling_Group">Delete
-                            a Scaling Group</link></para>
+                    <para><link linkend="Create_a_Cloud_Server_Image"
+                            >Create a Cloud Server Image</link></para>
+                </listitem>
+                <listitem>
+                    <para><link linkend="Create_Group">Create a
+                            Scaling Group</link></para>
                 </listitem>
             </itemizedlist>
         </para>
-       <section xml:id="Sending_Requests_through_the_API"><title>Sending Requests through the API</title><para>There are several options for sending requests through
-            an API: </para>
-        <itemizedlist>
-            <listitem>
-                <para>Developers and testers can use cURL, the
-                    command-line tool from <link
-                        xlink:href="http://curl.haxx.se/"
-                        >http://curl.haxx.se/</link>. With cURL you
-                    can send HTTP requests and receive responses from
-                    the command line. </para>
-            </listitem>
-            <listitem>
-                <para>If you prefer a more graphical interface, the
-                    ReST client for Firefox also works for testing API
-                    calls. For more information, see <link
-                        xlink:href="https://addons.mozilla.org/en-US/firefox/addon/restclient/"
-                        >https://addons.mozilla.org/en-US/firefox/addon/restclient/</link>.
-                </para>
-            </listitem>
-            <listitem>
-                <para>You can also download and install rest-client
-                    from <link
-                        xlink:href="http://code.google.com/p/rest-client/"
-                        >http://code.google.com/p/rest-client/</link>.
-                    Test-client is a Java application that lets you
-                    test ReSTful web services. </para>
-            </listitem>
-        </itemizedlist>
-        <para>
-            <tip>
-                <para> If you want to try these steps in your own
-                    environment, you can use <link
-                        xlink:href="http://docs.autoscale.apiary.io/"
-                        >http://docs.autoscale.apiary.io/</link> to
-                    generate cURL commands. </para>
-          
-            </tip>
-        </para>
-       </section>
+        <note><para>For some of the steps described in this chapter you can use the
+                Rackspace API or the Control Panel. Because this Guide
+                aims at developers, the steps described here are for
+                the API, but the Control Panel offers another resource
+                for completing these tasks.</para></note>
         <section xml:id="Generate_Authentication_Token">
             <title>Generate an Authentication Token</title>
             <para>You need to generate a token whether you use cURL or
                 a ReST client.</para>
-            <para>In order to use the ReST API, you will first need to
-                obtain an authentication token, which will need to be
-                passed in for each request using the
-                    <code>X-Auth-Token</code> header. </para>
+            <para>The authentication token will need to be passed in
+                for each request using the <code>X-Auth-Token</code>
+                header. </para>
             <para>The following example demonstrates how to use cURL
                 to obtain the authentication token and the account
                 number. You will need to supply the authentication
@@ -772,8 +757,9 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
             </para>
         </section>
                    <section xml:id="List_Server_Images"><title>List Cloud Server Images</title>
-            <para>Before you create a server, list images so that you
-                can choose one for your new server. </para>
+            <para>Before you create a server through the Cloud Server
+                API, you need to obtain a list of available images so
+                that you can choose one for your new server. </para>
             <para>After you choose an image, copy its image ID. You
                 use this image ID when you create the server.</para>
                             <para>Use the Cloud Servers API to issue a
@@ -815,45 +801,65 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                     </orderedlist></para></section>
             <section xml:id="Create_Cloud_Server">
                 <title>Create a Cloud Server</title>
-                <para>After authenticating to the Web service you
-                    create a cloud server with a server image. Auto
-                    Scale will use the configuration info in this
-                    server image as a blueprint for create new server
-                    images.</para>
-                <para>You can reate a server using one of the
-                    following methods:<orderedlist>
-                        <listitem>
-                            <para> Create a server through the <link
-                                   xlink:href="http://mycloud.rackspace.com/"
-                                   >Control Panel</link>. </para>
-                        </listitem>
-                        <listitem>
-                            <para>Create a server through the Cloud
-                                Servers API by using a <link
-                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
-                                   >Create Server</link> request.
-                            </para>
-                        </listitem>
-                    </orderedlist></para>
+                <para>After you have obtained the imageID for the
+                server image you want to create, you need to create
+                your cloud server. Auto Scale will use the
+                configuration info in this server image as a blueprint
+                for create new server images.</para>
+                <para>You can create a server using one of the
+                following methods:<orderedlist>
+                    <listitem>
+                        <para> Create a server through the <link
+                                xlink:href="http://mycloud.rackspace.com/"
+                                >Control Panel</link>. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Create a server through the Cloud
+                            Servers API by using a <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/CreateServers.html"
+                                >Create Server</link> request. </para>
+                    </listitem>
+                </orderedlist></para>
+            </section>
+            <section xml:id="Create_a_Cloud_Server_Image">
+                <title>Create a Cloud Server Image</title>
+                <para>After you have created a Cloud Server, you need
+                to create an image, which Auto Scale will use to
+                create new servers.</para>
+                <para>You can create a server image using one of the
+                following methods:<orderedlist>
+                    <listitem>
+                        <para> Create a server image through the <link
+                                xlink:href="http://mycloud.rackspace.com/"
+                                >Control Panel</link>. Make sure to
+                            record the imageID value for the image you
+                            have created. </para>
+                    </listitem>
+                    <listitem>
+                        <para>Create a server image through the Cloud
+                            Servers API by using a <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Create_Image-d1e4655.html"
+                                >Create Image</link> request to obtain
+                            the imageID value, use a <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-gettingstarted/content/curl_list_images.html"
+                                >List Images</link> request as shown
+                            in the <link linkend="List_Server_Images"
+                                >List Cloud Server Images</link>
+                            section.</para>
+                    </listitem>
+                </orderedlist></para>
             </section>
                 <section xml:id="Create_Group">
                 <title>Create a Scaling Group</title>
-                <para>You use the Autoscale API to create and manage
-                    your scaling group.</para>
-                <para>To create a scaling group, submit a
-                        <command>POST</command> request with the
-                        <parameter>tenantID</parameter> that you
-                    obtained during authentication.The following
-                    example shows how to create a scaling group. </para>
+                <para>Now you are ready to create your first scaling
+                group. For this exercise, you will create a
+                schedule-based scaling group that will trigger a
+                scaling event at 11 P.M. daily. The following example
+                shows how to create a schedule-based scaling group by
+                submitting a POST request using cURL.</para>
                 <example>
                     <title>Creating a Scaling Group</title>
-                    <programlisting>POST https://autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups/
-                </programlisting>
                     <programlisting language="json"><xi:include href="./samples/reqCreateGroup.json" parse="text"/></programlisting>
-                    <para>The <command>POST</command> request creates
-                        a scaling group, starts the minimum number of
-                        servers, and attaches those servers to the
-                        specified load balancer. </para>
                     <para>If the <command>POST</command> request is
                         successful, the response data will be returned
                         in JSON format as shown in the following
@@ -862,23 +868,6 @@ canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-gettingstar
                         <title>Response for Successful Create a
                             Scaling Group Request</title>
                         <programlisting language="json"><xi:include href="./samples/resCreateGroup.json" parse="text"/></programlisting>
-                    </example>
-                </example>
-                <example>
-                    <title>List all Scaling Groups</title>
-                    <para>To obtain a list of all scaling groups,
-                        submit a <command>GET</command> request with
-                        the <parameter>tenantId</parameter> parameter
-                        specified in the request URL.</para>
-                    <programlisting>GET /{tenantId}/groups
-                </programlisting>
-                    <para>The following example shows a response for
-                        the <command>GET</command> request with a list
-                        of all scaling groups:</para>
-                    <example>
-                        <title>Response for Successful List All
-                            Scaling Groups Request</title>
-                        <programlisting language="json"><xi:include href="./samples/resGetGroups.json" parse="text"/></programlisting>
                     </example>
                 </example>
             </section>
