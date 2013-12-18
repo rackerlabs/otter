@@ -454,8 +454,7 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         d.addCallback(treq.content)
         return d
 
-    d = retry(remove, can_retry=retry_times(15 * 6),
-              next_interval=repeating_interval(10), clock=clock)
+    d = remove()
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
