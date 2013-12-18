@@ -61,9 +61,10 @@ class Otter(object):
         """
         return OtterHistory(self.store, tenant_id).app.resource()
 
-    @app.route('/health')
+    @app.route('/health', methods=['GET'])
     def health_check(self, request):
         """
         Return whether health checks succeeded
         """
-        return json.dumps(self.store.health_check())
+        request.setHeader('X-Response-Id', 'health_check')
+        return self.store.health_check().addCallback(json.dumps)
