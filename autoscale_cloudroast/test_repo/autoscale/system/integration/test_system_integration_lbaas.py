@@ -66,6 +66,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         group = (self.autoscale_behaviors.create_scaling_group_given(
             gc_min_entities=self.gc_min_entities_alt,
             network_type='public')).entity
+        self.resources.add(group, self.empty_scaling_group)
         active_server_list = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)

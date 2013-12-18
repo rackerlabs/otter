@@ -22,7 +22,7 @@ from copy import deepcopy
 
 from twisted.internet.defer import gatherResults, maybeDeferred
 
-import treq
+from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,

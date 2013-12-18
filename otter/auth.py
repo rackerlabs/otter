@@ -43,7 +43,7 @@ from twisted.internet.defer import succeed, Deferred
 
 from zope.interface import Interface, implementer
 
-import treq
+from otter.util import logging_treq as treq
 
 from otter.log import log
 from otter.util.http import (

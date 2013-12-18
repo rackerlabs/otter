@@ -154,6 +154,7 @@ class SupervisorService(object, Service):
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
+        self.deferred_pool.add(d)
 
         return d
 
