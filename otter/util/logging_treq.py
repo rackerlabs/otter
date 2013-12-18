@@ -3,8 +3,9 @@ A wrapper around treq to log all requests along with the status code and time
 it took.
 """
 
-import time
 import treq
+
+from twisted.internet import reactor
 
 from otter.log import log as default_log
 
@@ -16,7 +17,7 @@ def _log_request(treq_call, url, **kwargs):
     :param callable f: a ``treq`` request method, such as ``treq.request``, or
         ``treq.get``, ``treq.post``, etc.
     """
-    time_func = kwargs.pop('time_function', time.time)
+    time_func = kwargs.pop('time_function', reactor.seconds)
     log = kwargs.pop('log', default_log)
     method = kwargs.get('method', treq_call.__name__)
 
