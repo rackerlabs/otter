@@ -3,10 +3,11 @@ Contains code to validate launch config
 """
 
 from twisted.internet import defer
-import treq
 import base64
 import re
 import itertools
+
+from otter.util import logging_treq as treq
 
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value

@@ -120,7 +120,7 @@ class SupervisorService(object, Service):
             # to pass to the controller to store in the active state is returned
             server_details, lb_info = result
             log.msg("Done executing launch config.",
-                    instance_id=server_details['server']['id'])
+                    server_id=server_details['server']['id'])
             return {
                 'id': server_details['server']['id'],
                 'links': server_details['server']['links'],
@@ -154,6 +154,7 @@ class SupervisorService(object, Service):
         d = self.auth_function(scaling_group.tenant_id)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
+        self.deferred_pool.add(d)
 
         return d
 

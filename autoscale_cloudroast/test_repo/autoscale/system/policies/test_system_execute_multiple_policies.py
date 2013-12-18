@@ -148,6 +148,7 @@ class ExecuteMultiplePoliciesTest(AutoscaleFixture):
         """
         policy_count = 3
         group = (self.autoscale_behaviors.create_scaling_group_min()).entity
+        self.resources.add(group, self.empty_scaling_group)
         policy_id_list = []
         for _ in range(policy_count):
             create_policy_response = self.autoscale_behaviors.create_policy_given(

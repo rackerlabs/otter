@@ -22,7 +22,7 @@ from copy import deepcopy
 
 from twisted.internet.defer import gatherResults, maybeDeferred
 
-import treq
+from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
@@ -330,17 +330,9 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg("Looking for load balancer endpoint",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
-
-    log.msg("Looking for cloud servers endpoint",
-            service_name=cloudServersOpenStack,
-            region=region)
 
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
@@ -360,7 +352,7 @@ def launch_server(log, region, scaling_group, service_catalog, auth_token,
         undo.push(
             verified_delete, log, server_endpoint, auth_token, server_id)
 
-        ilog = log.bind(instance_id=server_id)
+        ilog = log.bind(server_id=server_id)
         return wait_for_active(
             ilog,
             server_endpoint,
@@ -439,17 +431,9 @@ def delete_server(log, region, service_catalog, auth_token, instance_details):
     cloudLoadBalancers = config_value('cloudLoadBalancers')
     cloudServersOpenStack = config_value('cloudServersOpenStack')
 
-    log.msg("Looking for load balancer endpoint: %(service_name)s",
-            service_name=cloudLoadBalancers,
-            region=lb_region)
-
     lb_endpoint = public_endpoint_url(service_catalog,
                                       cloudLoadBalancers,
                                       lb_region)
-
-    log.msg("Looking for cloud servers endpoint: %(service_name)s",
-            service_name=cloudServersOpenStack,
-            region=region)
 
     server_endpoint = public_endpoint_url(service_catalog,
                                           cloudServersOpenStack,
