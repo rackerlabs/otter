@@ -32,6 +32,12 @@ from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
                               TransientRetryError)
 
+# Number of times to retry when adding/removing nodes from LB
+LB_MAX_RETRIES = 10
+
+# Interval between subsequent retries
+LB_RETRY_INTERVAL = 10
+
 
 class UnexpectedServerStatus(Exception):
     """
@@ -208,9 +214,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
         return d
 
-    # keep trying to add every 10 seconds for 15 mins
-    d = retry(add, can_retry=retry_times(15 * 6),
-              next_interval=repeating_interval(10), clock=clock)
+    d = retry(add, can_retry=retry_times(LB_MAX_RETRIES),
+              next_interval=repeating_interval(LB_RETRY_INTERVAL), clock=clock)
 
     def when_done(result):
         lb_log.msg('Added to load balancer')
