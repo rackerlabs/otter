@@ -855,6 +855,7 @@ class DeleteActiveServersTests(TestCase):
         # now pool should be empty
         self.successResultOf(done)
 
+
 class DeleteJobTests(TestCase):
     """
     Tests for :class:`controller._DeleteJob`
