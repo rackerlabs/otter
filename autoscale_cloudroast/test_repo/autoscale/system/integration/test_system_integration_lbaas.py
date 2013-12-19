@@ -224,6 +224,44 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                 group.id, group.groupConfiguration.minEntities)
             self.assert_servers_deleted_successfully(group.launchConfiguration.server.name)
 
+    @tags(speed='test', type='lbaas')
+    def test_load_balancer_pending_update_or_error_state(self):
+        """
+        Ensure all the servers are created and added to the load balancer and then deleted
+        and node removedd from the load balancer when scale down to 0 servers
+        """
+        policy_up_data = {'desired_capacity': 3}
+        policy_down_data = {'desired_capacity': 1}
+        group = self._create_group_given_lbaas_id(self.load_balancer_3)
+        active_server_list = self.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        print active_server_list
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
+            group.id, 3)
+        print activeservers_after_scale
+        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
+        print active_servers_from_scale
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+                                                        self.load_balancer_3)
+        test_lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(
+            self.load_balancer_3)]
+        print test_lb_node_list
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
+        activeservers_scaledown = self.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        print activeservers_scaledown
+        test = self._get_ipv4_address_list_on_servers(activeservers_scaledown)
+        print test
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
+                                                        self.load_balancer_3)
+        self._verify_only_expected_nodes_remain(self.load_balancer_3, test)
+        self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name,
+            self.gc_min_entities_alt)
+
     def _create_group_given_lbaas_id(self, *lbaas_ids):
         """
         Given the args, creates a group with minentities > 0 and the given number of lbaas
@@ -236,6 +274,21 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         group = create_group_response.entity
         self.resources.add(group, self.empty_scaling_group)
         return group
+
+    def _verify_only_expected_nodes_remain(self, lbaas_id, expected_node):
+        """
+        Waits for all but the expected node to be deleted from the load balancer
+        """
+        end_time = time.time() + 600
+        while time.time() < end_time:
+            lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(lbaas_id)]
+            if str(expected_node[0]) == str(lb_node_list[0]):
+                print("get out!!!!!!!!!!!!!!!!!")
+                break
+            time.sleep(10)
+        else:
+            self.fail("waited one minute for all but the expected node to be delete from load"
+                      "balancer {0} but {1} exist".format(lbaas_id, lb_node_list))
 
     def _verify_lbs_on_group_have_servers_as_nodes(self, group_id, server_ids_list, *lbaas_ids):
         """
