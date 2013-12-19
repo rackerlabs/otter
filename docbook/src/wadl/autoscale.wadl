@@ -411,8 +411,8 @@
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This method deletes the specified scaling group if the group is empty.
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 error message is returned. Pass force=true to force
-                delete the group, ignoring pending/active entities.
+                the group contains pending or active entities, deletion fails and a 409 error message is returned. If there are pending or active servers in the scaling group,  pass force=true to force
+                delete the group. Passing force=true will immediately delete all active servers in the group. Pending servers will be deleted once they finish building and become active.
             </p>
         </doc>
         <response status="204"/>
