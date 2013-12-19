@@ -214,8 +214,12 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'add_node')
         return d
 
-    d = retry(add, can_retry=retry_times(LB_MAX_RETRIES),
-              next_interval=repeating_interval(LB_RETRY_INTERVAL), clock=clock)
+    d = retry(
+        add,
+        can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
+        next_interval=repeating_interval(
+            config_value('worker.lb_retry_interval') or LB_RETRY_INTERVAL),
+        clock=clock)
 
     def when_done(result):
         lb_log.msg('Added to load balancer')
