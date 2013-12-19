@@ -422,7 +422,18 @@
     <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group State">
             <db:para role="shortdesc">
-               This method returns the state of a scaling group.
+               This method returns the state of a scaling group. This value can be one of the following:
+                <ul>
+                    <li>paused</li>
+                    <li>pendingCapacity</li>
+                    <li>name</li>
+                    <li>Active</li>
+                    <li>activeCapacity</li>
+                    <li>desiredCapacity</li>
+                    <!-- <li>a request to create a policy based on change percentage in response to an alarm</li> -->
+                    <li>A request to create multiple policies, followed by the matching response</li>
+                </ul>
+
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This method retrieves the current state of the specified scaling group.
