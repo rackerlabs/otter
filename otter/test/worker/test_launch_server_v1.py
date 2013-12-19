@@ -297,7 +297,7 @@ class LoadBalancersTests(TestCase):
 
         self.successResultOf(d)
         self.undo.push.assert_called_once_with(
-            remove_from_load_balancer,
+            remove_from_load_balancer, matches(IsInstance(self.log.__class__)),
             'http://url/', 'my-auth-token',
             12345,
             1)

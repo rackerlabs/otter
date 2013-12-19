@@ -224,6 +224,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     def when_done(result):
         lb_log.msg('Added to load balancer')
         undo.push(remove_from_load_balancer,
+                  lb_log,
                   endpoint,
                   auth_token,
                   lb_id,
