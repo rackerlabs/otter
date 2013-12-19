@@ -960,18 +960,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
     </section>
     <section xml:id="datetimeformat">
       <title>Date and Time Format</title>
-      <para>The &PROD; service uses an ISO-8601 compliant date format
-        for the display and consumption of date and time values. While
-        the standard allows specification of time zones, &PROD; does
-        not use time zones. All times are expressed as GMT. </para>
+      <para>The &PROD; service uses a specific date format for the
+        display and consumption of date and time values. While the
+        standard allows specification of time zones, &PROD; does not
+        use time zones. All times are expressed as UTC time
+        zone.</para>
       <para>The following tables show how the date and time format
-        works. The first table identifies the elements of the ISO-8601
-        standard. The second table shows how a sample time appears
-        when formatted for use by &PROD; in compliance with the
-        ISO-8601 standard. </para>
+        works. The first table identifies the date and time.  The
+        second table shows how a sample time appears when formatted
+        for use by &PROD;. </para>
       <table rules="all" width="566">
-        <caption>Explanation of ISO-8601 Date and Time Format
-          Codes</caption>
+        <caption>Explanation of  Date and Time Format Codes</caption>
         <col width="14%"/>
         <col width="86%"/>
         <thead>
@@ -1009,10 +1008,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <td>ss</td>
             <td>Two-digit seconds of the minute (00-59)</td>
           </tr>
-          <tr>
-            <td>SSS</td>
-            <td>Three-digit milliseconds of the second</td>
-          </tr>
+      
           <tr>
             <td>Z</td>
             <td>RFC 822 time zone</td>
@@ -1039,7 +1035,7 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       <para>
         <note>
           <para>In Auto Scale, the time specified always refers to the
-            "GMT" time zone.</para>
+            "UTC" time zone.</para>
         </note>
       </para>
     </section>
