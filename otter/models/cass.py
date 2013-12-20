@@ -20,13 +20,15 @@ from otter.util.cqlbatch import Batch
 from otter.util.hashkey import generate_capability, generate_key_str
 from otter.util import timestamp
 from otter.util.config import config_value
-from otter.util.deferredutils import with_lock
+from otter.util.deferredutils import with_lock, timeout_deferred
 from otter.scheduler import next_cron_occurrence
 
 from silverberg.client import ConsistencyLevel
 
 import json
 from datetime import datetime
+
+from kazoo.protocol.states import KazooState
 
 
 LOCK_PATH = '/locks'
@@ -128,6 +130,10 @@ _cql_count_for_policy = ('SELECT COUNT(*) FROM {cf} WHERE '
 _cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId '
                         'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
+
+# seems to be pretty quick no matter the consistency - unfortunately this only checks
+# connectability to cassandra, and not whether the otter keyspace is correct, etc.
+_cql_health_check = ('SELECT now() FROM system.local;')
 
 
 def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
@@ -1175,6 +1181,54 @@ class CassScalingGroupCollection:
         d.addCallback(lambda results: [r[0]['count'] for r in results])
         d.addCallback(lambda results: dict(zip(
             ('groups', 'policies', 'webhooks'), results)))
+        return d
+
+    def health_check(self, clock=None):
+        """
+        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+
+        In addition to ``healthy`` and ``time``, returns whether it can
+        connect to cassandra and zookeeper
+        """
+        if clock is None:
+            clock = reactor
+
+        if self.kz_client is None:
+            zk_health = {'zookeeper': False,
+                         'zookeeper_state': 'Not connected yet'}
+        elif not self.kz_client.connected:
+            zk_health = {'zookeeper': False,
+                         'zookeeper_state': 'Not connected yet'}
+        else:
+            state = self.kz_client.state
+            zk_health = {'zookeeper': state == KazooState.CONNECTED,
+                         'zookeeper_state': state}
+
+        start_time = clock.seconds()
+
+        d = self.connection.execute(
+            _cql_health_check.format(cf=self.group_table), {},
+            get_consistency_level('health', 'check'))
+
+        # stop health check after 15 seconds
+        timeout_deferred(d, 15, clock=clock,
+                         deferred_description='cassandra health check')
+
+        d.addCallback(lambda _: dict(
+            healthy=zk_health['zookeeper'],
+            cassandra=True,
+            cassandra_time=(clock.seconds() - start_time),
+            **zk_health
+        ))
+
+        d.addErrback(lambda f: dict(
+            healthy=False,
+            cassandra=False,
+            cassandra_failure=repr(f.value),
+            cassandra_time=clock.seconds() - start_time,
+            **zk_health
+        ))
+
         return d
 
 

@@ -32,12 +32,14 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance
+from testtools.matchers import IsInstance, ContainsDict, Equals
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
 
 from twisted.internet import defer
+from twisted.internet.task import Clock
 from silverberg.client import ConsistencyLevel
+from kazoo.protocol.states import KazooState
 
 
 def _de_identify(json_obj):
@@ -1989,10 +1991,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[{"count": 0}], None]
 
         def _responses(*args):
-            result = _de_identify(self.returns.pop(0))
+            result = self.returns.pop(0)
             if isinstance(result, Exception):
                 return defer.fail(result)
-            return defer.succeed(result)
+            return defer.succeed(_de_identify(result))
 
         self.connection.execute.side_effect = _responses
 
@@ -2436,6 +2438,120 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)
+
+
+class CassScalingGroupsCollectionHealthCheckTestCase(
+        IScalingGroupCollectionProviderMixin, TestCase):
+    """
+    Tests for :class:`CassScalingGroupCollection`
+    """
+
+    def setUp(self):
+        """ Setup the mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection.execute.return_value = defer.succeed([])
+        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.CONNECTED)
+        self.clock = Clock()
+
+    def test_health_check_no_zookeeper(self):
+        """
+        Health check fails if there is no zookeeper client
+        """
+        self.collection.kz_client = None
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(False), 'zookeeper': Equals(False),
+             'zookeeper_state': Equals('Not connected yet')}
+        )))
+
+    def test_health_check_zookeeper_not_connected(self):
+        """
+        Health check fails if there is no zookeeper client
+        """
+        self.collection.kz_client = mock.MagicMock(connected=False)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(False), 'zookeeper': Equals(False),
+             'zookeeper_state': Equals('Not connected yet')}
+        )))
+
+    def test_health_check_zookeeper_connected(self):
+        """
+        Health check for zookeeper succeeds if the zookeeper client state is
+        CONNECTED
+        """
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.CONNECTED)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'zookeeper': Equals(True),
+             'zookeeper_state': Equals('CONNECTED')}
+        )))
+
+    def test_health_check_zookeeper_suspended(self):
+        """
+        Health check fails if the zookeeper client state is not CONNECTED
+        """
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.SUSPENDED)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(False), 'zookeeper': Equals(False),
+             'zookeeper_state': Equals('SUSPENDED')}
+        )))
+
+    def test_health_check_cassandra_fails(self):
+        """
+        Health check fails if cassandra fails
+        """
+        self.connection.execute.return_value = defer.fail(Exception('boo'))
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(False),
+             'cassandra': Equals(False),
+             'cassandra_failure': Equals("Exception('boo',)"),
+             'cassandra_time': Equals(0)}
+        )))
+
+    def test_health_check_cassandra_times_out(self):
+        """
+        Health check for cassandra fails if cassandra check times out
+        """
+        self.connection.execute.return_value = defer.Deferred()
+        d = self.collection.health_check(self.clock)
+        self.assertNoResult(d)
+
+        self.clock.advance(15)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(False),
+             'cassandra': Equals(False),
+             'cassandra_failure': Equals("TimedOutError('cassandra health check "
+                                         "timed out after 15 seconds.',)"),
+             'cassandra_time': Equals(15)}
+        )))
+        # to make sure the deferred doesn't get GCed without being called
+        self.connection.execute.return_value.callback(None)
+
+    def test_health_check_cassandra_succeeds(self):
+        """
+        Health check fails if cassandra fails
+        """
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'cassandra': Equals(True),
+             'cassandra_time': Equals(0)}
+        )))
+
+    def test_health_check_succeeds_if_both_succeed(self):
+        """
+        If both zookeeper and cassandra are healthy, the store is healthy
+        """
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
+            {'healthy': Equals(True)}
+        )))
 
 
 class CassAdminTestCase(TestCase):
