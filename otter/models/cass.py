@@ -131,7 +131,9 @@ _cql_count_for_group = ('SELECT COUNT(*) FROM {cf} WHERE "tenantId" = :tenantId 
                         'AND "groupId" = :groupId;')
 _cql_count_all = ('SELECT COUNT(*) FROM {cf};')
 
-_cql_health_check = ('SELECT COUNT(1) from {cf} LIMIT 1;')
+# seems to be pretty quick no matter the consistency - unfortunately this only checks
+# connectability to cassandra, and not whether the otter keyspace is correct, etc.
+_cql_health_check = ('SELECT now() FROM system.local;')
 
 
 def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
