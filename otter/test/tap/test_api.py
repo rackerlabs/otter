@@ -189,6 +189,14 @@ class APIMakeServiceTests(TestCase):
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
 
+    def test_cassandra_cluster_disconnects_on_stop(self):
+        """
+        Cassandra cluster connection is disconnected when main service is stopped
+        """
+        service = makeService(test_config)
+        service.stopService()
+        self.LoggingCQLClient.return_value.disconnect.assert_called_once_with()
+
     def test_cassandra_store(self):
         """
         makeService configures the CassScalingGroupCollection as the

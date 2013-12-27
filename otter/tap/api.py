@@ -11,7 +11,7 @@ from twisted.internet.task import coiterate
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
-from twisted.application.service import MultiService
+from twisted.application.service import Service, MultiService
 
 from twisted.web.server import Site
 
@@ -80,6 +80,23 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
+class FunctionalService(Service):
+    """
+    A simple service that has stores functions to call when starting and
+    stopping service
+    """
+
+    def __init__(self, start=None, stop=None):
+        """
+        :param start: A single argument callable to be called when service is started
+        :param stop: A single argument callable to be called when service is stopped
+        """
+        if start:
+            self.startService = start
+        if stop:
+            self.stopService = stop
+
+
 def makeService(config):
     """
     Set up the otter-api service.
@@ -122,6 +139,9 @@ def makeService(config):
         cache_ttl)
 
     s = MultiService()
+
+    # Setup cassandra cluster to disconnect when otter shuts down
+    s.addService(FunctionalService(stop=cassandra_cluster.disconnect))
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
