@@ -285,6 +285,27 @@ class APIMakeServiceTests(TestCase):
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
 
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+        """
+        TxKazooClient is stopped when parent service stops
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+        self.store.kz_client = None
+
+        parent = makeService(config)
+        parent.stopService()
+
+        self.assertTrue(kz_client.stop.called)
+
+
+
+
 
 class SchedulerSetupTests(TestCase):
     """

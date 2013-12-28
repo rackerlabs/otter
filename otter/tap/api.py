@@ -178,6 +178,8 @@ def makeService(config):
         # delete will fail
         d.addCallback(lambda _: setattr(store, 'kz_client', kz_client))
         d.addErrback(log.err, 'Could not start TxKazooClient')
+        # Setup kazoo to stop when shutting down
+        s.addService(FunctionalService(stop=kz_client.stop))
 
     return s
 
