@@ -304,9 +304,6 @@ class APIMakeServiceTests(TestCase):
         self.assertTrue(kz_client.stop.called)
 
 
-
-
-
 class SchedulerSetupTests(TestCase):
     """
     Tests for `setup_scheduler`
