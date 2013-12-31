@@ -37,3 +37,14 @@ Scale Policy Schema
         "cooldown": 150,
         "type": "webhook"
     }
+**Document type: scale_by_schedule_policy**::
+
+    {
+        "name": "scale up by 1 server every hour",
+        "change": 1,
+        "cooldown": 150,
+        "type": "schedule",
+        "args": {
+            "cron": "0 * * * *"
+        }
+    }    
