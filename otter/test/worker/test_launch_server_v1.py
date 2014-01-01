@@ -1381,8 +1381,8 @@ class DeleteServerTests(TestCase):
                                                  headers=expected_headers,
                                                  log=mock.ANY)
         self.treq.get.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers,
-                                               log=mock.ANY)
+                                              headers=expected_headers,
+                                              log=mock.ANY)
         self.log.msg.assert_called_with(mock.ANY, server_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
@@ -1435,8 +1435,8 @@ class DeleteServerTests(TestCase):
         self.treq.get.return_value.callback(mock.Mock(spec=['code'], code=200))
 
         self.treq.get.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers,
-                                               log=mock.ANY)
+                                              headers=expected_headers,
+                                              log=mock.ANY)
 
         self.treq.get.return_value = succeed(
             mock.Mock(spec=['code'], code=404))
