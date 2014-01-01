@@ -562,10 +562,12 @@ def verified_delete(log,
 
     def verify(_):
         def check_status():
-            check_d = treq.head(
+            check_d = treq.get(
                 append_segments(server_endpoint, 'servers', server_id),
                 headers=headers(auth_token), log=serv_log)
             check_d.addCallback(check_success, [404])
+            # TODO: Due to twisted/treq bug that hangs on next call
+            check_d.addCallback(treq.content)
             return check_d
 
         start_time = clock.seconds()

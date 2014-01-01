@@ -1371,7 +1371,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
 
-        self.treq.head.return_value = Deferred()
+        self.treq.get.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
@@ -1380,7 +1380,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.assert_called_once_with('http://url/servers/serverId',
                                                  headers=expected_headers,
                                                  log=mock.ANY)
-        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+        self.treq.get.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers,
                                                log=mock.ANY)
         self.log.msg.assert_called_with(mock.ANY, server_id='serverId')
@@ -1393,7 +1393,7 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code', 'headers'], code=500, headers=None))
         self.treq.content.return_value = succeed(error_body)
-        self.treq.head.return_value = Deferred()
+        self.treq.get.return_value = Deferred()
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
                             'serverId', clock=clock)
@@ -1408,7 +1408,7 @@ class DeleteServerTests(TestCase):
         clock = Clock()
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
-        self.treq.head.return_value = fail(DummyException('failure'))
+        self.treq.get.return_value = fail(DummyException('failure'))
         self.treq.content.side_effect = lambda *args: succeed("")
 
         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
@@ -1426,23 +1426,23 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.content.side_effect = lambda *args: succeed("")
-        self.treq.head.return_value = Deferred()
+        self.treq.get.return_value = Deferred()
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, clock=clock)
 
         self.assertEqual(self.log.msg.call_count, 1)
-        self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
+        self.treq.get.return_value.callback(mock.Mock(spec=['code'], code=200))
 
-        self.treq.head.assert_called_once_with('http://url/servers/serverId',
+        self.treq.get.assert_called_once_with('http://url/servers/serverId',
                                                headers=expected_headers,
                                                log=mock.ANY)
 
-        self.treq.head.return_value = succeed(
+        self.treq.get.return_value = succeed(
             mock.Mock(spec=['code'], code=404))
 
         clock.advance(5)
-        self.treq.head.assert_has_calls([
+        self.treq.get.assert_has_calls([
             mock.call('http://url/servers/serverId', headers=expected_headers,
                       log=mock.ANY),
             mock.call('http://url/servers/serverId', headers=expected_headers,
@@ -1452,7 +1452,7 @@ class DeleteServerTests(TestCase):
 
         # the loop has stopped
         clock.advance(5)
-        self.assertEqual(self.treq.head.call_count, 2)
+        self.assertEqual(self.treq.get.call_count, 2)
 
     def test_verified_delete_retries_verification_until_timeout(self):
         """
@@ -1463,14 +1463,14 @@ class DeleteServerTests(TestCase):
         self.treq.delete.return_value = succeed(
             mock.Mock(spec=['code'], code=204))
         self.treq.content.side_effect = lambda *args: succeed("")
-        self.treq.head.side_effect = lambda *args, **kwargs: succeed(
-            mock.Mock(spec=['code'], code=204))
+        self.treq.get.side_effect = lambda *args, **kwargs: succeed(
+            mock.Mock(spec=['code'], code=200))
 
         verified_delete(self.log, 'http://url/', 'my-auth-token',
                         'serverId', interval=5, timeout=11, clock=clock)
 
         clock.advance(11)
-        self.treq.head.assert_has_calls([
+        self.treq.get.assert_has_calls([
             mock.call('http://url/servers/serverId', headers=expected_headers,
                       log=mock.ANY),
             mock.call('http://url/servers/serverId', headers=expected_headers,
@@ -1481,4 +1481,4 @@ class DeleteServerTests(TestCase):
 
         # the loop has stopped
         clock.advance(5)
-        self.assertEqual(self.treq.head.call_count, 2)
+        self.assertEqual(self.treq.get.call_count, 2)
