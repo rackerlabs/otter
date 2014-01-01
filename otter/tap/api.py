@@ -27,6 +27,7 @@ from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
+from otter.auth import RetryingAuthenticator
 from otter.auth import CachingAuthenticator
 
 from otter.log import log
@@ -114,11 +115,15 @@ def makeService(config):
 
     authenticator = CachingAuthenticator(
         reactor,
-        ImpersonatingAuthenticator(
-            config_value('identity.username'),
-            config_value('identity.password'),
-            config_value('identity.url'),
-            config_value('identity.admin_url')),
+        RetryingAuthenticator(
+            reactor,
+            ImpersonatingAuthenticator(
+                config_value('identity.username'),
+                config_value('identity.password'),
+                config_value('identity.url'),
+                config_value('identity.admin_url')),
+            max_retries=config_value('identity.max_retries'),
+            retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
     s = MultiService()
