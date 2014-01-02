@@ -325,3 +325,34 @@ class Webhook(AutoMarshallingModel):
                 newkey = re.split('}', each)[1]
                 setattr(webhook, newkey, webhook_dict[each])
         return webhook
+
+
+class Webhooks(AutoMarshallingModel):
+    """
+    Response object for paginated webhooks
+    """
+    def __init__(self, **kwargs):
+        super(Webhooks, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of a Webhook based on the json serialized_str
+        passed in.
+        """
+        json_dict = json.loads(serialized_str)
+        return cls._dict_to_obj(json_dict)
+
+    @classmethod
+    def _dict_to_obj(cls, webhooks_dict):
+        """
+        Helper method to turn dictionary into Webhooks instance.
+        """
+        webhooks = Webhooks(**webhooks_dict)
+        if hasattr(webhooks, 'webhooks_links'):
+            webhooks.webhooks_links = Links._dict_to_obj(webhooks.webhooks_links)
+        if hasattr(webhooks, 'webhooks'):
+            webhooks.webhooks = [Webhook._dict_to_obj(w) for w in webhooks.webhooks]
+        return webhooks

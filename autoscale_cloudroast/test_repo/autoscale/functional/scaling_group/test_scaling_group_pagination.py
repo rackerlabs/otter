@@ -19,8 +19,6 @@ class GroupPaginationTest(AutoscaleFixture):
         """
         super(GroupPaginationTest, self).setUp()
         self._create_multiple_groups(3)
-        self.total_groups = len(
-            (self.autoscale_client.list_scaling_groups().entity).groups)
 
     def tearDown(self):
         """
@@ -51,7 +49,7 @@ class GroupPaginationTest(AutoscaleFixture):
         on the tenant and verify groups are listed in batches of the limit specified
         with a link for the next few groups.
         """
-        param = self.total_groups - 1
+        param = self.get_total_num_groups() - 1
         list_group = self._list_group_with_given_limit(param)
         self._assert_list_groups_with_limits_and_next_link(param, list_group)
         rem_list_group = self.autoscale_client.list_scaling_groups(
@@ -65,7 +63,7 @@ class GroupPaginationTest(AutoscaleFixture):
         on the tenant and verify all the groups are listed without a link for the next
         few groups.
         """
-        param = self.total_groups
+        param = self.get_total_num_groups()
         list_groups = self._list_group_with_given_limit(param)
         self._assert_list_groups_with_limits_and_next_link(param, list_groups, False)
 
@@ -75,9 +73,10 @@ class GroupPaginationTest(AutoscaleFixture):
         on the tenant and verify all the groups are listed without a link for the next
         few groups.
         """
-        param = self.total_groups + 2
+        total_groups = self.get_total_num_groups()
+        param = total_groups + 2
         list_groups = self._list_group_with_given_limit(param)
-        self._assert_list_groups_with_limits_and_next_link(self.total_groups, list_groups, False)
+        self._assert_list_groups_with_limits_and_next_link(total_groups, list_groups, False)
 
     def test_list_groups_with_invalid_limits(self):
         """
@@ -102,10 +101,11 @@ class GroupPaginationTest(AutoscaleFixture):
         Verify when the limit is over the set limit(100), all groups upto a 100
         are returned
         """
+        total_groups = self.get_total_num_groups()
         params = [101, 1000]
         for each_param in params:
             list_groups = self._list_group_with_given_limit(each_param, 200)
-            self._assert_list_groups_with_limits_and_next_link(self.total_groups, list_groups, False)
+            self._assert_list_groups_with_limits_and_next_link(total_groups, list_groups, False)
 
     def test_list_groups_with_marker(self):
         """

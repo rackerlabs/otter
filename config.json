@@ -25,6 +25,10 @@
             "time_boundary": 15
         }
     },
+    "worker": {
+        "lb_max_retries": 10,
+        "lb_retry_interval": 10
+    },
     "limits": {
         "pagination": 100,
         "absolute": {
