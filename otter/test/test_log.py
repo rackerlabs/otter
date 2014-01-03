@@ -328,11 +328,11 @@ class ObserverWrapperTests(TestCase):
         self.wrapper({'message': ('Hello',)})
 
         self.observer.assert_called_once_with({
-            'source_host': 'localhost',
+            'host': 'localhost',
             '@version': 1,
             'short_message': 'Hello',
             'message': 'Hello',
-            'type': '',
+            'otter_facility': '',
             '@timestamp': datetime.fromtimestamp(0).isoformat(),
             'level': 6,
         })

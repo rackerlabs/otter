@@ -255,12 +255,12 @@ def ObserverWrapper(observer, hostname, seconds=None):
 
         log_params = {
             "@version": 1,
-            "source_host": hostname,
+            "host": hostname,
             "short_message": short_message,
             "message": full_message,
             "@timestamp": datetime.fromtimestamp(eventDict.get("time", seconds())).isoformat(),
             "level": eventDict.get("level", level),
-            "type": eventDict.get("system", ""),
+            "otter_facility": eventDict.get("system", ""),
         }
 
         if "file" in eventDict:
