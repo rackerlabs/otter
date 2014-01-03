@@ -421,11 +421,11 @@ class ObserverWrapperTests(TestCase):
         the audit log dictionary and a regular log (passes timestamp and
         hostname too)
         """
-        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 't'})
+        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 1234.0})
         self.observer.has_calls([
             mock.call(matches(ContainsDict({'_message': Equals('meh'),
                                             'audit_log': Equals(True),
-                                            '@timestamp': Equals('t'),
+                                            '@timestamp': Equals(1234),
                                             'host': Equals('hostname')}))),
             mock.call(matches(ContainsDict({
                 'short_message': Equals('meh'),

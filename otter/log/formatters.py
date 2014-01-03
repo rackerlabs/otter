@@ -275,7 +275,7 @@ def ObserverWrapper(observer, hostname, seconds=None):
         # emit an audit log entry also, if it's an audit log
         if 'audit_log' in eventDict:
             log_params['audit_log_event_source'] = True
-            observer(audit_log_formatter(eventDict, log_params['timestamp'],
+            observer(audit_log_formatter(eventDict, log_params['@timestamp'],
                                          hostname))
 
         observer(log_params)
