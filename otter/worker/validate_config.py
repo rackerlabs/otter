@@ -3,10 +3,11 @@ Contains code to validate launch config
 """
 
 from twisted.internet import defer
-import treq
 import base64
 import re
 import itertools
+
+from otter.util import logging_treq as treq
 
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
@@ -187,7 +188,7 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
     Validate Image by getting the image information. It ensures that image is active
     """
     url = append_segments(server_endpoint, 'images', image_ref)
-    d = treq.get(url, headers=headers(auth_token))
+    d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(raise_error, 404, UnknownImage(image_ref), url, 'get_image')
 
@@ -204,7 +205,7 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     Validate flavor by getting its information
     """
     url = append_segments(server_endpoint, 'flavors', flavor_ref)
-    d = treq.get(url, headers=headers(auth_token))
+    d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(raise_error, 404, UnknownFlavor(flavor_ref), url, 'get_flavor')
 
@@ -220,7 +221,7 @@ def validate_personality(log, auth_token, server_endpoint, personality):
     """
     # Get limits
     url = append_segments(server_endpoint, 'limits')
-    d = treq.get(url, headers=headers(auth_token))
+    d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, url, 'get_limits')
 

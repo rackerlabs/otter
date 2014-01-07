@@ -129,6 +129,42 @@ def transient_errors_except(*args):
     return can_retry
 
 
+def retry_times(max_tries):
+    """
+    Returns a ``can_retry`` function for :py:func:retry` that ignores all
+    errors and returns True until it has been called `max_tries` number of times
+
+    :return: a function that accepts a :class:`Failure` and returns ``True``
+        until it has been called ``max_tries`` times. Otherwise, returns ``False``
+    """
+    tries = [0]
+
+    def can_retry(f):
+        tries[0] += 1
+        return tries[0] <= max_tries
+
+    return can_retry
+
+
+def compose_retries(*can_retry_funcs):
+    """
+    Compose other can_retry functions into a single function that calls each
+    of the passed can_retry function in the sequence and returns True only if all
+    of them return True
+
+    :return: a function that accepts a :class:`Failure` and returns ``True``
+        only if all `can_retry_funcs` return True on that failure.
+        Otherwise, returns ``False``
+    """
+    def can_retry(f):
+        for func in can_retry_funcs:
+            if not func(f):
+                return False
+        return True
+
+    return can_retry
+
+
 def repeating_interval(interval):
     """
     Returns a ``can_retry`` function for :py:func:retry` that returns the

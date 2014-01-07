@@ -8,11 +8,13 @@ import mock
 from testtools.matchers import ContainsDict, Equals
 
 from twisted.internet import defer
+from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter import controller
 from otter.supervisor import ISupervisor
+from otter.util.deferredutils import DeferredPool
 
 from otter.models.interface import (
     GroupState, IScalingGroup, NoSuchPolicyError, NoSuchScalingGroupError)
@@ -809,6 +811,7 @@ class DeleteActiveServersTests(TestCase):
             self, 'otter.controller._DeleteJob', side_effect=self.jobs)
 
         self.supervisor = iMock(ISupervisor)
+        self.supervisor.deferred_pool = DeferredPool()
         patch(self, 'otter.controller.get_supervisor',
               return_value=self.supervisor)
 
@@ -817,8 +820,12 @@ class DeleteActiveServersTests(TestCase):
         Removes servers to evict from state and create `_DeleteJob` to start
         deleting them
         """
+        clock = Clock()
+        # nothing in the deferred pool
+        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
+
         controller.delete_active_servers(self.log, 'trans-id', 'group',
-                                         3, self.fake_state)
+                                         3, self.fake_state, clock)
 
         # find_servers_to_evict was called
         self.find_servers_to_evict.assert_called_once_with(
@@ -828,12 +835,25 @@ class DeleteActiveServersTests(TestCase):
         self.assertTrue(
             all([_id not in self.fake_state.active for _id in self.evict_servers]))
 
-        # _DeketeJob was created for each server to delete
+        # _DeleteJob was created for each server to delete
         self.assertEqual(
             self.del_job.call_args_list,
             [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
-                for data in self.evict_servers.values()])
-        self.assertTrue(all([job.start.called for job in self.jobs]))
+                for i, data in enumerate(self.evict_servers.values())])
+
+        done = self.supervisor.deferred_pool.notify_when_empty()
+
+        # They were started at intervals
+        self.assertTrue(all([not job.start.called for job in self.jobs]))
+        for i, job in enumerate(self.jobs):
+            # deferred pool is not empty until every single job is done.
+            self.assertNoResult(done)
+            clock.advance(i * 20)
+            self.assertTrue(job.start.called)
+            self.assertTrue(all([not job.start.called for job in self.jobs[i + 1:]]))
+
+        # now pool should be empty
+        self.successResultOf(done)
 
 
 class DeleteJobTests(TestCase):
@@ -1355,7 +1375,7 @@ class ExecuteLaunchConfigTestCase(TestCase):
         # first bind is system='otter.job.launch'
         log = self.log.bind.return_value
         log.bind.assert_called_once_with(job_id='1')
-        log.bind.return_value.msg.assert_called_with('Job failed', reason=f)
+        log.bind.return_value.err.assert_called_with(f, 'Launching server failed')
 
     def test_modify_state_failure_logged(self):
         """
@@ -1560,8 +1580,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_once_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_once_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_failure_job_deleted_pending(self):
         """
@@ -1580,8 +1600,8 @@ class PrivateJobHelperTestCase(TestCase):
         self.assertEqual(self.state.pending, {})
         self.assertEqual(self.state.active, {})
 
-        self.log.bind.return_value.msg.assert_called_with(
-            'Job failed', reason=CheckFailure(DummyException))
+        self.log.bind.return_value.err.assert_called_with(
+            CheckFailure(DummyException), 'Launching server failed')
 
     def test_job_completion_success_NoSuchScalingGroupError(self):
         """

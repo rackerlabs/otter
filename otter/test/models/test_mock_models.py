@@ -1047,6 +1047,13 @@ class MockScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         for deferred in failed_deferreds:
             self.failureResultOf(deferred, NoSuchScalingGroupError)
 
+    def test_health_check(self):
+        """
+        Health check always returns healthy
+        """
+        d = self.collection.health_check()
+        self.assertEqual(self.successResultOf(d), {'healthy': True})
+
 
 class MockAdminTestCase(TestCase):
     """

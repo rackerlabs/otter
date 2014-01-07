@@ -328,6 +328,24 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
+    def wait_for_expected_group_state(self, group_id, expected_servers):
+        """
+        :summary: verify the group state reached the expected servers count.
+        :param group_id: Group id
+        :param expected_servers: Number of servers expected
+        """
+        end_time = time.time() + 120
+        while time.time() < end_time:
+            group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
+            if group_state.desiredCapacity == expected_servers:
+                return
+            time.sleep(self.interval_time)
+        else:
+            self.fail(
+                "wait_for_exepected_group_state ran for 120 seconds for group {0} and did not "
+                "observe the active server list achieving the expected servers count: {1}.".format(
+                    group_id, expected_servers))
+
     def check_for_expected_number_of_building_servers(
         self, group_id, expected_servers,
             desired_capacity=None, server_name=None):
@@ -428,7 +446,7 @@ class AutoscaleFixture(BaseTestFixture):
         Returns the total number of webhooks on a given policy.
         Note: This will work only after the test webhook pagination branch is merged
         """
-        list_webhooks = self.autoscale_client.list_webhooks().entity
+        list_webhooks = self.autoscale_client.list_webhooks(group_id, policy_id).entity
         webhooks_num = len(list_webhooks.webhooks)
         while (hasattr(list_webhooks.webhooks_links, 'next')):
             list_webhooks = self.autoscale_client.list_webhooks(
