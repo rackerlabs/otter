@@ -159,7 +159,8 @@ class LoadBalancersTests(TestCase):
         self.treq.post.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes',
             headers=expected_headers,
-            data=mock.ANY
+            data=mock.ANY,
+            log=matches(IsInstance(self.log.__class__))
         )
 
         data = self.treq.post.mock_calls[0][2]['data']
@@ -172,7 +173,7 @@ class LoadBalancersTests(TestCase):
 
         self.treq.json_content.assert_called_once_with(mock.ANY)
 
-    def test_addlb_retries(self):
+    def test_add_lb_retries(self):
         """
         add_to_load_balancer will retry again until it succeeds
         """
@@ -190,9 +191,10 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(result, self.json_content)
         self.assertEqual(self.treq.post.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes',
-                                    headers=expected_headers, data=mock.ANY)] * 11)
+                                    headers=expected_headers, data=mock.ANY,
+                                    log=matches(IsInstance(self.log.__class__)))] * 11)
 
-    def test_addlb_defaults_retries_configs(self):
+    def test_add_lb_defaults_retries_configs(self):
         """
         add_to_load_balancer will use global defaults LB_RETRY_INTERVAL, LB_MAX_RETRIES
         when not configured
@@ -209,7 +211,9 @@ class LoadBalancersTests(TestCase):
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes',
-                                    headers=expected_headers, data=mock.ANY)] * (LB_MAX_RETRIES + 1))
+                                    headers=expected_headers, data=mock.ANY,
+                                    log=matches(IsInstance(self.log.__class__)))]
+                         * (LB_MAX_RETRIES + 1))
 
     def failed_add_to_lb(self, code=500):
         """
@@ -226,7 +230,7 @@ class LoadBalancersTests(TestCase):
         clock.pump([self.retry_interval] * self.max_retries)
         return d
 
-    def test_addlb_retries_times_out(self):
+    def test_addl_b_retries_times_out(self):
         """
         add_to_load_balancer will retry again and again for worker.lb_max_retries times.
         It will fail after that. This also checks that API failure is propogated
@@ -238,9 +242,10 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(
             self.treq.post.mock_calls,
             [mock.call('http://url/loadbalancers/12345/nodes',
-                       headers=expected_headers, data=mock.ANY)] * (self.max_retries + 1))
+                       headers=expected_headers, data=mock.ANY,
+                       log=matches(IsInstance(self.log.__class__)))] * (self.max_retries + 1))
 
-    def test_addlb_retries_logs(self):
+    def test_add_lb_retries_logs(self):
         """
         add_to_load_balancer will log all failures while it is trying
         """
@@ -260,7 +265,7 @@ class LoadBalancersTests(TestCase):
             [mock.call('Got LB error while {m}: {e}', loadbalancer_id=12345,
                        m='add_node', e=matches(IsInstance(RequestError)))] * bad_codes_len)
 
-    def test_addlb_retries_logs_unexpected_errors(self):
+    def test_add_lb_retries_logs_unexpected_errors(self):
         """
         add_to_load_balancer will log unexpeted failures while it is trying
         """
@@ -282,7 +287,7 @@ class LoadBalancersTests(TestCase):
                        error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
              for code in bad_codes])
 
-    test_addlb_retries_logs_unexpected_errors.skip = 'Until LB error is fixed'
+    test_add_lb_retries_logs_unexpected_errors.skip = 'Until LB error is fixed'
 
     def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
         """
@@ -357,7 +362,7 @@ class LoadBalancersTests(TestCase):
 
         add_to_load_balancer_deferreds = [d1, d2]
 
-        def _add_to_load_balancer(*args):
+        def _add_to_load_balancer(*args, **kwargs):
             return add_to_load_balancer_deferreds.pop(0)
 
         add_to_load_balancer.side_effect = _add_to_load_balancer
@@ -421,7 +426,7 @@ class LoadBalancersTests(TestCase):
         self.assertEqual(self.successResultOf(d), None)
         self.treq.delete.assert_called_once_with(
             'http://url/loadbalancers/12345/nodes/1',
-            headers=expected_headers)
+            headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
 
     def test_remove_from_load_balancer_on_404(self):
         """
@@ -731,7 +736,7 @@ class ServerTests(TestCase):
                             clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
-                                          'serverId')
+                                          'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 1)
 
         server_status[0] = 'ACTIVE'
@@ -739,7 +744,7 @@ class ServerTests(TestCase):
         clock.advance(5)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
-                                          'serverId')
+                                          'serverId', log=mock.ANY)
         self.assertEqual(server_details.call_count, 2)
 
         result = self.successResultOf(d)
@@ -928,7 +933,8 @@ class ServerTests(TestCase):
 
         create_server.assert_called_once_with('http://dfw.openstack/',
                                               'my-auth-token',
-                                              expected_server_config)
+                                              expected_server_config,
+                                              log=mock.ANY)
 
         wait_for_active.assert_called_once_with(mock.ANY,
                                                 'http://dfw.openstack/',
@@ -1300,7 +1306,8 @@ class DeleteServerTests(TestCase):
         self.successResultOf(d)
 
         self.treq.delete.assert_called_once_with(
-            'http://dfw.openstack/servers/a', headers=expected_headers)
+            'http://dfw.openstack/servers/a', headers=expected_headers,
+            log=mock.ANY)
 
     @mock.patch('otter.worker.launch_server_v1.remove_from_load_balancer')
     def test_delete_server_succeeds_on_unknown_server(
@@ -1371,9 +1378,11 @@ class DeleteServerTests(TestCase):
         self.assertIsNone(self.successResultOf(d))
 
         self.treq.delete.assert_called_once_with('http://url/servers/serverId',
-                                                 headers=expected_headers)
+                                                 headers=expected_headers,
+                                                 log=mock.ANY)
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers)
+                                               headers=expected_headers,
+                                               log=mock.ANY)
         self.log.msg.assert_called_with(mock.ANY, server_id='serverId')
 
     def test_verified_delete_propagates_delete_server_api_failures(self):
@@ -1426,15 +1435,18 @@ class DeleteServerTests(TestCase):
         self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
 
         self.treq.head.assert_called_once_with('http://url/servers/serverId',
-                                               headers=expected_headers)
+                                               headers=expected_headers,
+                                               log=mock.ANY)
 
         self.treq.head.return_value = succeed(
             mock.Mock(spec=['code'], code=404))
 
         clock.advance(5)
         self.treq.head.assert_has_calls([
-            mock.call('http://url/servers/serverId', headers=expected_headers),
-            mock.call('http://url/servers/serverId', headers=expected_headers)
+            mock.call('http://url/servers/serverId', headers=expected_headers,
+                      log=mock.ANY),
+            mock.call('http://url/servers/serverId', headers=expected_headers,
+                      log=mock.ANY)
         ])
         self.assertEqual(self.log.msg.call_count, 2)
 
@@ -1459,8 +1471,10 @@ class DeleteServerTests(TestCase):
 
         clock.advance(11)
         self.treq.head.assert_has_calls([
-            mock.call('http://url/servers/serverId', headers=expected_headers),
-            mock.call('http://url/servers/serverId', headers=expected_headers)
+            mock.call('http://url/servers/serverId', headers=expected_headers,
+                      log=mock.ANY),
+            mock.call('http://url/servers/serverId', headers=expected_headers,
+                      log=mock.ANY)
         ])
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
                                              server_id='serverId')

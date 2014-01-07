@@ -691,6 +691,16 @@ class IScalingGroupCollection(Interface):
             count of tenants policies, webhooks and groups as ``dict``
         """
 
+    def health_check(clock=None):
+        """
+        Returns a JSON dictionary specifying whether the store is healthy.  The
+        dictionary must have the parameters ``'healthy': boolean``, but can
+        contain other information as well
+
+        :param clock: an option clock with which to use for testing.
+        :return: ``dict`` containing health information.
+        """
+
 
 class IAdmin(Interface):
     """

@@ -491,6 +491,14 @@ class MockScalingGroupCollection:
         """
         return defer.succeed(None)
 
+    def health_check(self, clock=None):
+        """
+        This is always healthy.
+
+        see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
+        """
+        return defer.succeed({'healthy': True})
+
 
 @implementer(IAdmin)
 class MockAdmin(object):
