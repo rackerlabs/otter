@@ -24,7 +24,7 @@ class SchedulerService(TimerService):
     """
 
     def __init__(self, batchsize, interval, store, kz_client,
-                 zk_partition_path, time_boundary, buckets, clock=None):
+                 zk_partition_path, time_boundary, buckets, clock=None, threshold=600):
         """
         Initialize the scheduler service
 
@@ -44,6 +44,7 @@ class SchedulerService(TimerService):
         self.zk_partition_path = zk_partition_path
         self.time_boundary = time_boundary
         self.kz_partition = None
+        self.threshold = threshold
         self.log = otter_log.bind(system='otter.scheduler')
 
     def startService(self):
@@ -61,6 +62,33 @@ class SchedulerService(TimerService):
         """
         TimerService.stopService(self)
         return self.kz_partition.finish()
+
+    def health_check(self):
+        """
+        Checks if scheduler service is healthy by comparing oldest event w.r.t current
+        time. If oldtest event is older than a threshold, then it is not healthy
+
+        :return: Deferred that fires with tuple (Bool, `dict` of extra debug info)
+        """
+        if not self.kz_partition.allocated:
+            # TODO: Until there is check added for not being allocted for long time
+            # it is fine to assume service is not healthy when it is allocating since
+            # allocating should happen only on deploy or network issues
+            return defer.succeed((False, {'reason': 'Not allocted'}))
+
+        def check_older_events(events):
+            now = datetime.utcnow()
+            old_events = []
+            for event in events:
+                if event and (now - event['trigger']).total_seconds() > self.threshold:
+                    old_events.append(event)
+            return not bool(old_events), {'old_events': old_events}
+
+        d = defer.gatherResults(
+            [self.store.get_oldest_event(bucket) for bucket in self.kz_partition],
+            consumeErrors=True)
+        d.addCallback(check_older_events)
+        return d
 
     def check_events(self, batchsize):
         """
