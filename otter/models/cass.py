@@ -533,6 +533,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         log = self.log.bind(system='CassScalingGroup.modify_state')
+        consistency = get_consistency_level('update', 'state')
 
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -547,10 +548,10 @@ class CassScalingGroup(object):
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
             return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
-                                           params, get_consistency_level('update', 'state'))
+                                           params, consistency)
 
         def _modify_state():
-            d = self.view_state()
+            d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 

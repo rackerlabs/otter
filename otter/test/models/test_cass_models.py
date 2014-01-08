@@ -344,7 +344,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
              'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
         self.returns = [cass_response]
         d = self.group.view_state(consistency=ConsistencyLevel.ALL)
-        r = self.successResultOf(d)
+        self.successResultOf(d)
         self.connection.execute.assert_called_once_with(mock.ANY,
                                                         mock.ANY,
                                                         ConsistencyLevel.ALL)
@@ -411,12 +411,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
+        self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
             ':policyTouched, :paused)')
-
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
