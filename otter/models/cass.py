@@ -511,16 +511,19 @@ class CassScalingGroup(object):
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
-    def view_state(self):
+    def view_state(self, consistency=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
+        if consistency is None:
+            consistency = get_consistency_level('view', 'partial')
+
         view_query = _cql_view_group_state.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'partial'),
+                          consistency,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_unmarshal_state)

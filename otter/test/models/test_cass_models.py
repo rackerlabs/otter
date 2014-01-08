@@ -333,6 +333,22 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        'a', {'A': 'R'},
                                        {'P': 'R'}, '123', {'PT': 'R'}, False))
 
+    def test_view_respsects_consistency_argument(self):
+        """
+        If a consistency argument is passed to ``view_state``, it is honored
+        over the default consistency
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+        self.returns = [cass_response]
+        d = self.group.view_state(consistency=ConsistencyLevel.ALL)
+        r = self.successResultOf(d)
+        self.connection.execute.assert_called_once_with(mock.ANY,
+                                                        mock.ANY,
+                                                        ConsistencyLevel.ALL)
+
     def test_view_state_no_such_group(self):
         """
         Calling ``view_state`` on a group that doesn't exist raises a
