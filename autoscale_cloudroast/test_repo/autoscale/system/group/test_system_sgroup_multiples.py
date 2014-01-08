@@ -5,8 +5,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import time
 
-import unittest
-
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
 
@@ -122,8 +120,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.assertEquals(create_group_beyond_max.status_code, 422,
                           msg='{0} groups exist on the tenant'.format(self.get_total_num_groups()))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -140,8 +137,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_scheduler_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -163,8 +159,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
         Verify the maximum scaling policies are allowed on a scaling policy.
