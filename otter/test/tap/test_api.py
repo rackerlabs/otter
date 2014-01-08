@@ -244,7 +244,9 @@ class APIMakeServiceTests(TestCase):
 
         parent = makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
+        self.log.bind.assert_called_with(system='kazoo')
+        mock_txkz.assert_called_once_with(
+            hosts='zk_hosts', threads=20, txlog=self.log.bind.return_value)
         kz_client.start.assert_called_once_with()
 
         # setup_scheduler and store.kz_client is not called yet
@@ -271,7 +273,8 @@ class APIMakeServiceTests(TestCase):
 
         makeService(config)
 
-        mock_txkz.assert_called_once_with(hosts='zk_hosts', threads=20)
+        mock_txkz.assert_called_once_with(
+            hosts='zk_hosts', threads=20, txlog=mock.ANY)
         kz_client.start.assert_called_once_with()
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),

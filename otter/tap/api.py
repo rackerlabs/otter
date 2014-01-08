@@ -148,7 +148,7 @@ def makeService(config):
     if config_value('zookeeper'):
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
-                                  threads=threads)
+                                  threads=threads, txlog=log.bind(system='kazoo'))
         d = kz_client.start()
         # Setup scheduler service after starting
         d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
