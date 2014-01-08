@@ -203,7 +203,8 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                                  'insert': ConsistencyLevel.ONE,
                                  'delete': ConsistencyLevel.QUORUM},
-                       'group': {'create': ConsistencyLevel.QUORUM}}
+                       'group': {'create': ConsistencyLevel.QUORUM},
+                       'state': {'update': ConsistencyLevel.QUORUM}}
 
 
 def get_consistency_level(operation, resource):

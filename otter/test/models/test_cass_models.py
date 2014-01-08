@@ -139,6 +139,13 @@ class GetConsistencyTests(TestCase):
         level = get_consistency_level('create', 'group')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
+    def test_update_state(self):
+        """
+        Gives QUORUM on updating state
+        """
+        level = get_consistency_level('update', 'state')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
 
 class VerifiedViewTests(TestCase):
     """
