@@ -1,5 +1,5 @@
 """
-Test to create and verify get and list group.
+Test to create and verify list group.
 """
 from test_repo.autoscale.fixtures import AutoscaleFixture
 
@@ -7,7 +7,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 class ScalingGroupListTest(AutoscaleFixture):
 
     """
-    Verify get and list group.
+    Verify list group.
     """
 
     @classmethod
@@ -28,36 +28,6 @@ class ScalingGroupListTest(AutoscaleFixture):
                           cls.autoscale_client.delete_scaling_group)
         cls.resources.add(cls.third_scaling_group.id,
                           cls.autoscale_client.delete_scaling_group)
-
-    def test_get_scaling_group(self):
-        """
-        Verify the get group for response code 200, headers and data.
-        """
-        group_info_response = self.autoscale_client.\
-            view_manifest_config_for_scaling_group(
-                group_id=self.first_scaling_group.id)
-        group_info = group_info_response.entity
-        self.assertEqual(200, group_info_response.status_code,
-                         msg='The get scaling group call failed with {0} for group'
-                         ' {1}'.format(group_info_response.status_code,
-                                       self.first_scaling_group.id))
-        self.validate_headers(group_info_response.headers)
-        self.assertEqual(group_info.id, self.first_scaling_group.id,
-                         msg='Group id did not match for group '
-                         '{0}'.format(self.first_scaling_group.id))
-        self.assertEqual(group_info.groupConfiguration.name,
-                         self.first_scaling_group.groupConfiguration.name,
-                         msg='Group name did not match for group '
-                         '{0}'.format(self.first_scaling_group.id))
-        self.assertEqual(group_info.groupConfiguration.minEntities,
-                         self.first_scaling_group.groupConfiguration.minEntities,
-                         msg="Group's minimum entities did not match for group "
-                         "{0}".format(self.first_scaling_group.id))
-        self.assertEqual(group_info.launchConfiguration,
-                         self.first_scaling_group.launchConfiguration,
-                         msg="Group's launch configurations did not match for group "
-                         '{0}'.format(self.first_scaling_group.id))
-        self.assert_group_state(group_info.state)
 
     def test_default_maxentities_set_on_a_group(self):
         """
