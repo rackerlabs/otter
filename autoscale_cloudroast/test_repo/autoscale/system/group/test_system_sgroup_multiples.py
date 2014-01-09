@@ -130,9 +130,9 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
         self.assertEquals(self.get_total_num_policies(self.first_scaling_group.id),
                           self.max_policies)
-        policy_beyond_max = self.autoscale_behaviors.create_policy_min(
-            self.first_scaling_group.id)
-        self.assertEquals(policy_beyond_max['status_code'], 422,
+        policy_beyond_max = self.autoscale_client.create_policy(
+            self.first_scaling_group.id, 'test', 0, change=1, policy_type='webhook')
+        self.assertEquals(policy_beyond_max.status_code, 422,
                           msg='Created {0} policies on the '
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
@@ -151,10 +151,10 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           self.max_policies,
                           msg='Policies on the group {0} is under/over max '
                           'allowed'.format(self.first_scaling_group.id))
-        policy_beyond_max = self.autoscale_behaviors.create_schedule_policy_given(
-            self.first_scaling_group.id,
-            sp_change_percent=100)
-        self.assertEquals(policy_beyond_max['status_code'], 422,
+        policy_beyond_max = self.autoscale_client.create_policy(
+            self.first_scaling_group.id, 'test', 0, change=1, policy_type='schedule',
+            args={'cron': '* * * * *'})
+        self.assertEquals(policy_beyond_max.status_code, 422,
                           msg='Created {0} policies on the '
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
