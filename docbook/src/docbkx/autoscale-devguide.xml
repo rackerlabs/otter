@@ -1625,10 +1625,11 @@ Content-Type: application/json
                         <tr>
                             <td><parameter>name</parameter></td>
                             <td>Specifies the name of the server. The
-                name of the server will be automatically generated and
-                will look like the following:
-                autoscale_server-AS12fabe. The name of the server may
-                be truncated to fit within the limit of 255
+                name of the server will be automatically generated
+                using the following formula:
+                [serverName]-AS[uniqueHash], and will look like the
+                following: autoscale_server-AS12fabe. The name of the
+                server may be truncated to fit within the limit of 255
                 characters.</td>
                         </tr>
                         <tr>
