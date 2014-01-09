@@ -423,7 +423,7 @@
         <doc title="Get Group State">
             <db:para role="shortdesc">
                This method returns the state of a scaling group. The GroupState object consists of the following properties:
-                <ul>
+                <ul xmlns="http://www.w3.org/1999/xhtml">
                     <li>paused - specifies whether execution of
                         scaling policies for the group is currently
                         suspended. If this value is set to true, the
@@ -761,7 +761,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
             </p>
             <p xmlns="http://www.w3.org/1999/xhtml">
             Use the JSON response to obtain information about the newly-created policy or policies:
-            <ul>
+            <ul xmlns="http://www.w3.org/1999/xhtml">
                 <li>The response header points to the List Policies endpoint.</li>
                 <li>The response body provides an array of scaling policies.</li>
             </ul>
@@ -772,7 +772,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
                 <wadl:doc xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
 		  <p>
 		    The examples that are provided below show several methods for creating a scaling policy:
-		    <ul>
+		    <ul xmlns="http://www.w3.org/1999/xhtml">
                       <li>A request to create a policy based on desired capacity</li>
                       <li>A request to create a policy based on incremental change</li>
                       <li>A request to create a policy based on change percentage</li>
