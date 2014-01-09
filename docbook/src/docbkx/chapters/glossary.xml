@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE glossary [
+<!DOCTYPE glosslist [
 <!-- in PDF: for line 1 on the cover page -->
 <!ENTITY PRODNAME "Rackspace Auto Scale"> 
 <!-- in PDF: for page headers -->
@@ -7,7 +7,7 @@
 <!-- in body -->
 <!ENTITY PROD "Auto Scale">               
 ]>
-<glossary 
+<glosslist 
     xmlns="http://docbook.org/ns/docbook"
     xmlns:xi="http://www.w3.org/2001/XInclude"
     xmlns:xlink="http://www.w3.org/1999/xlink" version="5.0"
@@ -84,4 +84,4 @@
             </para>
         </glossdef>
     </glossentry>
-</glossary>
+</glosslist>
