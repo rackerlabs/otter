@@ -600,22 +600,27 @@ is external so it's handy for Getting Started to share -->
                 ><code>https://dfw.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
               </td>
             </tr>
+            <tr>
+              <td colspan="2">Dulles (IAD)</td>
+              <td colspan="5"
+                  ><code>https://iad.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2">Hong Kong (HKG)</td>
+              <td colspan="5"
+                  ><code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
+              </td>
+            </tr>
             <tr align="left">
               <td colspan="2">London (LON)</td>
-              <td colspan="5">
-                <code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-              </td>
+              <td colspan="5"
+                  ><code>https://lon.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
             </tr>
             <tr align="left">
               <td colspan="2">Sydney (SYD)</td>
-              <td colspan="5">
-                <code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/
-              </td>
-            </tr>
-            <tr align="left">
-              <td colspan="2">Hong Kong (HKG)</td>
               <td colspan="5"
-                  ><code>https://hkg.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
+                  ><code>https://syd.autoscale.api.rackspacecloud.com/v1.0/</code><parameter>1234</parameter>/ </td>
             </tr>
           </tbody>
         </table>
