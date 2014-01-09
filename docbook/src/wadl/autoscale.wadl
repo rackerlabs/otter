@@ -423,7 +423,7 @@
         <doc title="Get Group State">
             <db:para role="shortdesc">
                This method returns the state of a scaling group. The GroupState object consists of the following properties:
-                <ul>
+                <ul xmlns="http://www.w3.org/1999/xhtml">
                     <li>paused - specifies whether execution of
                         scaling policies for the group is currently
                         suspended. If this value is set to true, the
