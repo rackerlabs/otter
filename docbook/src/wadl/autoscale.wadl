@@ -310,7 +310,7 @@
 		     required="false"
 		     type="string"
 		     path="$.scalingPolicies.[*].args.at">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
@@ -817,7 +817,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
 		     required="false"
 		     type="string"
 		     path="$.[*].args.at">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
@@ -934,7 +934,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
                     required="false"
                     type="string"
                     path="$.scalingPolicies.[*].args.at">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
                 </param>
                 <param style="plain"
                     name="changePercent"
