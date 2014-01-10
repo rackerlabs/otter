@@ -229,27 +229,26 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         """
         Ensure all the servers are created and added to the load balancer and then deleted
         and node removed from the load balancer when scale down to desired capacity 1.
+        Note: Mimic has load_balancer_3 set as the load balancer that returns pending update
+        state less than 10 times.
         """
         policy_up_data = {'desired_capacity': 10}
         policy_down_data = {'desired_capacity': 1}
         group = self._create_group_given_lbaas_id(self.load_balancer_3)
-        active_server_list = self.wait_for_expected_number_of_active_servers(
-            group.id,
-            self.gc_min_entities_alt)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
-        activeservers_after_scale = self.wait_for_expected_number_of_active_servers(
+        activeservers_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group.id, policy_up_data['desired_capacity'])
-        active_servers_from_scale = set(activeservers_after_scale) - set(active_server_list)
-        self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_servers_from_scale,
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_after_scale_up,
                                                         self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
-        activeservers_scaledown = self.wait_for_expected_number_of_active_servers(
+        activeservers_after_scaledown = self.wait_for_expected_number_of_active_servers(
             group.id,
-            self.gc_min_entities_alt)
-        test = self._get_ipv4_address_list_on_servers(activeservers_scaledown)
-        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_scaledown,
+            policy_down_data['desired_capacity'])
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_after_scaledown,
                                                         self.load_balancer_3)
-        self._verify_only_expected_nodes_remain(self.load_balancer_3, test)
+        servers_removed = set(activeservers_after_scale_up) - set(activeservers_after_scaledown)
+        ip_list = self._get_ipv4_address_list_on_servers(servers_removed)
+        self._verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, ip_list)
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name,
             self.gc_min_entities_alt)
@@ -279,14 +278,14 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.resources.add(group, self.empty_scaling_group)
         return group
 
-    def _verify_only_expected_nodes_remain(self, lbaas_id, expected_node):
+    def _verify_given_ips_do_not_exist_as_nodes_on_lb(self, lbaas_id, ip_list):
         """
-        Waits for all but the expected node to be deleted from the load balancer
+        Waits for nodes in the ip_list to be deleted from the given load balancer
         """
         end_time = time.time() + 600
         while time.time() < end_time:
             lb_node_list = [each_node.address for each_node in self._get_node_list_from_lb(lbaas_id)]
-            if str(expected_node[0]) == str(lb_node_list[0]):
+            if set(lb_node_list).isdisjoint(ip_list):
                 break
             time.sleep(10)
         else:
