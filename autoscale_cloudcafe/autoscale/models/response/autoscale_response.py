@@ -356,3 +356,167 @@ class Webhooks(AutoMarshallingModel):
         if hasattr(webhooks, 'webhooks'):
             webhooks.webhooks = [Webhook._dict_to_obj(w) for w in webhooks.webhooks]
         return webhooks
+
+
+class Audit(AutoMarshallingModel):
+    """
+    A marshalling object for audit log returned by the history resource
+    The log consists of a timestamp ordered list of events (HistoryEvent objects)
+    """
+
+    def __init__(self, **kwargs):
+        super(Audit, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+            # DEBUG
+            print "\n DEBUG:: Audit - init - keys --- ", keys
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of an Audit Log based on the json serialized string passed in
+        """
+        ret = None
+        json_dict = json.loads(serialized_str)
+        ret = cls._dict_to_obj(json_dict)
+        return ret
+
+    @classmethod
+    def _dict_to_obj(cls, history_dict):
+        """
+        Helper method to turn a dictionary into an Audit instance
+        """
+        history = Audit(**history_dict)
+        if hasattr(history, 'events'):
+            history.events = []
+            for event in history.events:
+                e = HistoryEvent._dict_to_obj       # Turn the dictionary into a HistoryEvent object
+                history.append(e)
+        return history
+
+
+class HistoryEvent(AutoMarshallingModel):
+    """
+    A marshalling object for the events in the audit log produced by the history API call
+    """
+
+    def __init__(self, **kwargs):
+        super(HistoryEvent, self).__init__()
+        for keys, values in kwargs.items():
+            setattr(self, keys, values)
+            # DEBUG
+            print "\n DEBUG:: HistoryEvent - init - keys --- ", keys
+
+    @classmethod
+    def _json_to_obj(cls, serialized_str):
+        """
+        Returns an instance of event based on the json serialized string passed in
+        """
+        ret = None
+        json_dict = json.loads(serialized_str)
+        ret = cls._dict_to_obj(json_dict)
+        return ret
+
+    @classmethod
+    def _dict_to_obj(cls, event_dict):
+        """
+        Converts the dictionary representing a single event into an object
+        """
+        event = HistoryEvent(**event_dict)
+        # If the event type is a request event, convert the value associated with the 'data' key
+        # into a request object based on event_type
+        if hasattr(event, 'data'):
+            # TODO: More elegant means than giant if block
+            try:
+                if event.event_type.startswith('request.group.create'):
+                    event.data = ScalingGroup._dict_to_obj(event.data)
+                elif event.event_type.startswith('request.group.config.update'):
+                    event.data = ScalingGroup._dict_to_obj(event.data)
+                elif event.event_type.startswith('request.launch_config.update'):
+                    event.data = ScalingGroup._dict_to_obj(event.data)
+                elif event.event_type.startswith('request.policy.create'):
+                    event.data = [Policy._dict_to_obj(p) for p in event.data]
+                elif event.event_type.startswith('request.webhook.create'):
+                    event.data = [Webhook._dict_to_obj(w) for w in event.data]
+            except:
+                print "DEBUG: Error marshalling audit log"
+        # TODO - create a fault object - for now leave as a fault dictionary
+        #if hasattr(event, 'fault'):
+            #event.fault - Fault._dict_to_obj(event.fault)
+        return event
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

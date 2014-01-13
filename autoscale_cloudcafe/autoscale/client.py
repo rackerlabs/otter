@@ -4,7 +4,8 @@ Client objects for all the autoscale api calls
 from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
                                                           ScalingGroup, Groups,
-                                                          Policies, Webhooks)
+                                                          Policies, Webhooks,
+                                                          Audit)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -408,7 +409,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, args=None,  check_label=None,
+                      policy_type=None, args=None, check_label=None,
                       check_type=None, check_url=None, check_method=None,
                       monitoring_zones=None, check_timeout=None, check_period=None,
                       target_alias=None, alarm_criteria=None,
@@ -651,6 +652,21 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         url = webhook_url
         return self.request('POST', url,
                             requestslib_kwargs=requestslib_kwargs)
+
+    def get_history(self, url=None, requestslib_kwargs=None):
+        """
+        :summary: Request the history audit log
+        :return: Response object containing response code 200 (on success) and a body
+                 containing the audit log details
+        :rtype: Response Object
+
+        GET
+        '/<string:tenantId>/history'
+        """
+        url = url or '%s/history' % (self.url)
+        return self.request('GET', url,
+                            requestslib_kwargs=requestslib_kwargs,
+                            response_entity_type=Audit)
 
 
 class LbaasAPIClient(AutoMarshallingRestClient):
