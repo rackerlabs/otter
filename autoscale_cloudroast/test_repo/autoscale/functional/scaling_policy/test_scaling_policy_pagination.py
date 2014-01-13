@@ -13,6 +13,15 @@ class PolicyPaginationTest(AutoscaleFixture):
     list of autoscale policies.
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize autoscale configs, behaviors and client
+        """
+        super(PolicyPaginationTest, cls).setUpClass()
+        cls.limits_response = cls.autoscale_client.view_limits().entity
+        cls.max_policies = cls.limits_response.absolute.maxPoliciesPerGroup
+
     def setUp(self):
         """
         Create a new scaling group for each test case and create three policies on the group
@@ -40,18 +49,13 @@ class PolicyPaginationTest(AutoscaleFixture):
         """
 
         # There are already 3 policies from setUp
-        self._create_multiple_scaling_policies(self.pagination_limit)
+        to_build = self.max_policies - self.get_total_num_policies(self.group.id)
+        self._create_multiple_scaling_policies(to_build)
         params = [None, 100000]
         for each_param in params:
             list_policies = self._list_policies_with_given_limit(params)
-            # check that at least (limit) items are listed, and a next link was provided
             self._assert_list_policies_with_limits_and_next_link(self.pagination_limit,
                                                                  list_policies)
-            rem_list_policy =\
-                self.autoscale_client.list_policies(self.group.id,
-                                                    url=list_policies.policies_links.next).entity
-            # Check that there is at least one policy on the next page
-            self._assert_list_policies_with_limits_and_next_link(1, rem_list_policy, False)
 
     def test_list_policies_with_specified_limit_less_than_number_of_policies(self):
         """
