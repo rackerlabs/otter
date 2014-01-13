@@ -289,8 +289,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
                 break
             time.sleep(10)
         else:
-            self.fail("waited one minute for all but the expected node to be delete from load"
-                      "balancer {0} but {1} exist".format(lbaas_id, lb_node_list))
+            self.fail("waited one minute for nodes {0} to be deleted from load"
+                      "balancer {1} but {2} exist".format(ip_list, lbaas_id, lb_node_list))
 
     def _verify_lbs_on_group_have_servers_as_nodes(self, group_id, server_ids_list, *lbaas_ids):
         """
