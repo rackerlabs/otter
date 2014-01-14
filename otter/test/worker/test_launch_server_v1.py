@@ -1387,11 +1387,10 @@ class DeleteServerTests(TestCase):
         self.assertEqual(
             self.treq.delete.mock_calls,
             [mock.call('http://url/servers/serverId', headers=expected_headers,
-                      log=mock.ANY)] * 4)
+                       log=mock.ANY)] * 4)
         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
                                              server_id='serverId')
 
         # the loop has stopped
         self.clock.pump([5])
         self.assertEqual(self.treq.delete.call_count, 4)
-
