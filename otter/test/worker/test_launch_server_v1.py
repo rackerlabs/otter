@@ -27,9 +27,8 @@ from otter.worker.launch_server_v1 import (
 )
 
 
-from otter.test.utils import (DummyException, mock_log, patch, CheckFailure,
-                              mock_treq, matches)
-from testtools.matchers import IsInstance
+from otter.test.utils import mock_log, patch, CheckFailure, mock_treq, matches
+from testtools.matchers import IsInstance, StartsWith
 from otter.util.http import APIError, RequestError, wrap_request_error
 from otter.util.config import set_config_data
 from otter.util.deferredutils import unwrap_first_error, TimedOutError
@@ -1271,10 +1270,13 @@ class DeleteServerTests(TestCase):
         patch(self, 'otter.util.http.treq', new=self.treq)
 
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.treq.content.side_effect = lambda *a, **kw: succeed("")
 
         self.remove_from_load_balancer = patch(
             self, 'otter.worker.launch_server_v1.remove_from_load_balancer')
         self.remove_from_load_balancer.return_value = succeed(None)
+
+        self.clock = Clock()
 
     def test_delete_server_deletes_load_balancer_node(self):
         """
@@ -1343,149 +1345,53 @@ class DeleteServerTests(TestCase):
                           'my-auth-token', instance_details)
         self.failureResultOf(d, TimedOutError)
 
+    def test_verified_delete_retries_until_success(self):
+        """
+        If the first delete didn't work, wait a bit and try again until the
+        server has been deleted, since a server can sit in DELETE state for a
+        bit.  Deferred only callbacks when the deletion is done.
 
-# class VerifiedDeleteTests(TestCase):
-#     """
-#     Tests for ``verified_delete``
-#     """
-#     def response(self, code, headers=None):
-#         """
-#         Returns a mock response with a particular status code
-#         """
-#         response = mock.Mock(spec=['code', 'headers'], code=code, headers=headers)
-#         if code in (204, 404):
-#             return succeed(response)
-#         else:
-#             return fail(response)
+        It also logs deletion success.
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=204))
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', interval=5, clock=self.clock)
+        self.assertEqual(self.treq.delete.call_count, 1)
+        self.assertNoResult(d)
 
-#     def setUp(self):
-#         """
-#         Set up some mocks.
-#         """
-#         set_config_data(fake_config)
-#         self.addCleanup(set_config_data, {})
+        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 2)
+        self.successResultOf(d)
 
-#         self.del_return_values = [self.response(204), self.response(404)]
+        # the loop has stopped
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 2)
 
-#         self.log = mock_log()
-#         self.treq = patch(self, 'otter.worker.launch_server_v1.treq')
-#         patch(self, 'otter.util.http.treq', new=self.treq)
+        # success logged
+        self.log.msg.assert_called_with(
+            matches(StartsWith("Server deleted successfully")),
+            server_id='serverId', time_delete=5)
 
-#         self.treq.delete.side_effect = lambda *a, **kw: self.del_return_values.pop()
+    def test_verified_delete_retries_verification_until_timeout(self):
+        """
+        If the deleting fails until the timeout, log a failure and do not
+        keep trying to delete.
+        """
+        self.treq.delete.side_effect = lambda *a, **kw: succeed(mock.Mock(code=500))
+        d = verified_delete(self.log, 'http://url/', 'my-auth-token',
+                            'serverId', interval=5, timeout=20, clock=self.clock)
+        self.assertNoResult(d)
 
-#         self.clock = Clock()
+        self.clock.pump([5] * 4)
+        self.assertEqual(
+            self.treq.delete.mock_calls,
+            [mock.call('http://url/servers/serverId', headers=expected_headers,
+                      log=mock.ANY)] * 4)
+        self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
+                                             server_id='serverId')
 
-
-
-#     def test_verified_delete_returns_after_delete_but_verifies_deletion(self):
-#         """
-#         verified_delete returns as soon as the deletion succeeded, but also
-#         attempts to verify deleting the server.  It also logs the deletion.
-#         """
-#         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-#                             'serverId', clock=self.clock)
-#         self.assertIsNone(self.successResultOf(d))
-
-#         self.assertEqual(
-#             self.treq.delete.mock_calls,
-#             [mock.call('http://url/servers/serverId',
-#                        headers=expected_headers,
-#                        log=mock.ANY)] * 2)
-
-#         self.log.msg.assert_called_with(
-#             mock.ANY, server_id='serverId', time_delete=0.0)
-
-#     def test_verified_delete_propagates_delete_server_api_failures(self):
-#         """
-#         verified_delete propagates deletions from server deletion
-#         """
-#         self.del_return_values = [self.response(500)]
-
-#         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-#                             'serverId', clock=self.clock)
-#         failure = self.failureResultOf(d, RequestError)
-#         self.assertTrue(failure.value.reason.check(APIError))
-#         self.assertEqual(failure.value.reason.value.code, 500)
-
-#     def test_verified_delete_does_not_propagate_verification_failure(self):
-#         """
-#         verified_delete propagates deletions from server deletion
-#         """
-#         clock = Clock()
-#         self.treq.delete.return_value = succeed(
-#             mock.Mock(spec=['code'], code=204))
-#         self.treq.head.return_value = fail(DummyException('failure'))
-#         self.treq.content.side_effect = lambda *args: succeed("")
-
-#         d = verified_delete(self.log, 'http://url/', 'my-auth-token',
-#                             'serverId', clock=clock)
-#         self.assertIsNone(self.successResultOf(d))
-
-#     def test_verified_delete_retries_verification_until_success(self):
-#         """
-#         If the first verification didn't work, wait a bit and see if it's been
-#         deleted, since a server can sit in DELETE state for a bit.
-
-#         It also logs deletion success, and deletion failure
-#         """
-#         clock = Clock()
-#         self.treq.delete.return_value = succeed(
-#             mock.Mock(spec=['code'], code=204))
-#         self.treq.content.side_effect = lambda *args: succeed("")
-#         self.treq.head.return_value = Deferred()
-
-#         verified_delete(self.log, 'http://url/', 'my-auth-token',
-#                         'serverId', interval=5, clock=clock)
-
-#         self.assertEqual(self.log.msg.call_count, 1)
-#         self.treq.head.return_value.callback(mock.Mock(spec=['code'], code=204))
-
-#         self.treq.head.assert_called_once_with('http://url/servers/serverId',
-#                                                headers=expected_headers,
-#                                                log=mock.ANY)
-
-#         self.treq.head.return_value = succeed(
-#             mock.Mock(spec=['code'], code=404))
-
-#         clock.advance(5)
-#         self.treq.head.assert_has_calls([
-#             mock.call('http://url/servers/serverId', headers=expected_headers,
-#                       log=mock.ANY),
-#             mock.call('http://url/servers/serverId', headers=expected_headers,
-#                       log=mock.ANY)
-#         ])
-#         self.assertEqual(self.log.msg.call_count, 2)
-
-#         # the loop has stopped
-#         clock.advance(5)
-#         self.assertEqual(self.treq.head.call_count, 2)
-
-#     def test_verified_delete_retries_verification_until_timeout(self):
-#         """
-#         If the verification fails until the timeout, log a failure and do not
-#         keep trying to verify.
-#         """
-#         clock = Clock()
-#         self.treq.delete.return_value = succeed(
-#             mock.Mock(spec=['code'], code=204))
-#         self.treq.content.side_effect = lambda *args: succeed("")
-#         self.treq.head.side_effect = lambda *args, **kwargs: succeed(
-#             mock.Mock(spec=['code'], code=204))
-
-#         verified_delete(self.log, 'http://url/', 'my-auth-token',
-#                         'serverId', interval=5, timeout=11, clock=clock)
-
-#         clock.advance(11)
-#         self.treq.head.assert_has_calls([
-#             mock.call('http://url/servers/serverId', headers=expected_headers,
-#                       log=mock.ANY),
-#             mock.call('http://url/servers/serverId', headers=expected_headers,
-#                       log=mock.ANY)
-#         ])
-#         self.log.err.assert_called_once_with(CheckFailure(TimedOutError),
-#                                              server_id='serverId')
-
-#         # the loop has stopped
-#         clock.advance(5)
-#         self.assertEqual(self.treq.head.call_count, 2)
+        # the loop has stopped
+        self.clock.pump([5])
+        self.assertEqual(self.treq.delete.call_count, 4)
 
