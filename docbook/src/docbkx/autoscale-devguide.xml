@@ -922,8 +922,6 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
       </section>
       <section xml:id="Absolute_Limits-d1e1397">
         <title>Absolute Limits</title>
-        <para>&PRODNAME; does not use absolute limits. It does use
-          <link linkend="Rate_Limits-d1e1222">rate limits</link>. </para>
         <table rules="all">
           <caption>Absolute Limits</caption>
           <thead>
@@ -943,12 +941,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
             <tr>
               <td colspan="1">Policies</td>
               <td colspan="3">Maximum volume of Policies per Group</td>
-              <td colspan="1">1000</td>
+              <td colspan="1">100</td>
             </tr>
             <tr>
               <td colspan="1">Webhooks</td>
               <td colspan="3">Maximum volume of Webhooks per Policy</td>
-              <td colspan="1">1000</td>
+              <td colspan="1">25</td>
             </tr>
           </tbody>
         </table>
