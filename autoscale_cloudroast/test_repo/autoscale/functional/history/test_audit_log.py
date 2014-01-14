@@ -8,25 +8,17 @@ class AuditLogBasicsTest(AutoscaleFixture):
     """
     Verify the following basic audit log behaviors:
         1.) Using GET on /tenantid/history returns 200 and result OK
-            > what happens if you try PUT
+            > what happens if you try PUT?
         2.) Entry pagination
-        3.) Only events for the given tenant ID are shown (security)
+        3.) Only events for the given tenant ID are shown (information security)
         4.) Transaction ID is unique?
         5.) log entries still present after group is deleted? (might be in different category)
 
     Prerequisites:
-        1.) Tenant ID for an account with
+        1.) Tenant ID for an account with audit logging
 
 
     """
-
-#    @classmethod
-#    def setUpClass(cls):
-#        """
-#        TBD
-#        """
-#        pass
-
 
     def test_history_resource_response(self):
         """
@@ -68,29 +60,27 @@ class AuditLogBasicsTest(AutoscaleFixture):
                          expected_event['gc_name'],
                          msg='The name in the group config history did not match the request')
 
-    Categories:
-    Requests (simple, ok)
-    Requests (simple, fail)
-    Convergence
-        (Various cases that trigger convergence)
-        > Test that when it converges it is logged correctly, not that convergence happens when it should
-    Server
-        (number of server.active entries matches the number of servers)
-        Confirm there is no way to spin up or down a server without it being logged
-    Error Injection
-        > simulate externally triggered errors
+
+#     Categories:
+#     Requests (simple, ok)
+#     Requests (simple, fail)
+#     Convergence
+#         (Various cases that trigger convergence)
+#         > Test that when it converges it is logged correctly,
+#            not that convergence happens when it should (test logging, not function)
+#     Server
+#         (number of server.active entries matches the number of servers)
+#         Confirm there is no way to spin up or down a server without it being logged
+#     Error Injection
+#         > simulate externally triggered errors
 
 
 
-> Complex Use case
+# > Complex Use case
 
 
-When would audit logs be considered broken:
-> unable to get logs
-> not all events logged
-> log entries present after deletion
-> no way to modify logs
-
-
-
-
+# When would audit logs be considered broken:
+# > unable to get logs
+# > not all events logged
+# > log entries present after deletion
+# > no way to modify logs
