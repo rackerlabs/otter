@@ -1,109 +1,106 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE book [
 
-<!ENTITY PROD "Auto Scale"> <!-- in body -->
-<!ENTITY PRODNAME "Rackspace &PROD;"> <!-- in PDF: for line 1 on the cover page -->
+<!ENTITY PROD "Auto Scale">
+<!-- in body -->
+<!ENTITY PRODNAME "Rackspace &PROD;">
+<!-- in PDF: for line 1 on the cover page -->
 
 ]>
-<book 
-    xmlns="http://docbook.org/ns/docbook"
-    xmlns:xlink="http://www.w3.org/1999/xlink"
-    xmlns:xi="http://www.w3.org/2001/XInclude"
-    version="5.0-extension RaxBook-2.0"
-    xml:id="autoscale-releasenotes">
-  <?rax canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-releasenotes/content"?>
-  <title>&PRODNAME; Release Notes</title>
-  <titleabbrev>&PROD; Release Notes</titleabbrev>
-  <info>
-    <author>
-      <personname>
-        <firstname/>
-        <surname/>
-      </personname>
-      <affiliation>
-        <orgname>Rackspace Cloud</orgname>
-      </affiliation>
-    </author>
-    <copyright>
-      <year>2013</year>
-      <holder>Rackspace US, Inc.</holder>
-    </copyright>
-    <releaseinfo>API v1.0</releaseinfo>
-    <productname>Auto Scale</productname>
-    <pubdate></pubdate>
-    <legalnotice role="rs-api">
-      <annotation>
-        <remark>Copyright details are filled in by the
-          template.</remark>
-      </annotation>
-    </legalnotice>
-    <abstract>
-      <para>This document is intended for software developers who want
-        to develop applications by using...</para>
-    </abstract>
-    <revhistory>
-      <revision>
-        <date>2013-06-17</date>
-        <revdescription>
-          <itemizedlist>
-            <listitem xmlns:db="http://docbook.org/ns/docbook">
-              <para>Ipsum lorem.</para>
-            </listitem>
-          </itemizedlist>
-        </revdescription>
-      </revision>
-    </revhistory>
-    <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
-      <raxm:displayname>Release Notes</raxm:displayname>
-      <raxm:product version="v1.0">cas</raxm:product>
-      <raxm:priority>30</raxm:priority>
-    </raxm:metadata>
-  </info>
-<chapter xml:id="doc_change_history">
-    	<title>Document Change History</title>
-    	<para>This version of the Release Notes replaces and obsoletes all
-    		previous versions. The most recent changes are described
-    		in the table below:</para>
-    	<?rax revhistory?>
-    </chapter>
-	<chapter xml:id="v1">
-		<title>v1.0, November 20, 2013</title>
-		<para>This is the initial release of Cloud Auto Scale.</para>
-		<itemizedlist>
-			<title>New Features</title>
-			<listitem>
-				<para>Activate Sydney for Cloud Load Balancers PTR management.</para>
-			</listitem>
-		</itemizedlist>
-		<itemizedlist>
-			<title>Bug Fixes</title>
-			<listitem>
-				<para>Fixed incorrect error response when updating multiple records that include an SRV record.</para>
-			</listitem>
-		</itemizedlist>
-		<itemizedlist>
-			<title>Resources</title>
-			<listitem>
-				<para><link
-					xlink:href="http://docs.rackspace.com/api/"
-					>DNS Developer Guide</link></para>
-			</listitem>
-			<listitem>
-				<para><link
-					xlink:href="http://feedback.rackspacecloud.com/forums/71021-product-feedback"
-					>Product Feedback Forum</link></para>
-			</listitem>
-			<listitem>
-				<para><link
-					xlink:href="http://www.rackspace.com/cloud/blog/2011/07/11/using-rackspace-dnsaas-with-curl-part-1/"
-					>Cloud DNS Tutorial</link></para>
-			</listitem>
-			<listitem>
-				<para><link
-					xlink:href="http://developer.rackspace.com/"
-					>Use Cloud
-					DNS with an SDK</link></para>
-			</listitem>
-		</itemizedlist>
-	</chapter>
+<book xmlns="http://docbook.org/ns/docbook" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xi="http://www.w3.org/2001/XInclude"
+version="5.0-extension RaxBook-2.0" xml:id="autoscale-releasenotes">
+    <?rax canonical.url.base="http://docs.rackspace.com/cas/api/v1.0/autoscale-releasenotes/content" ?>
+        <title>&PRODNAME; Release Notes</title>
+        <titleabbrev>&PROD; Release Notes</titleabbrev>
+        <info>
+            <author>
+                <personname>
+                    <firstname/>
+                    <surname/>
+                </personname>
+                <affiliation>
+                    <orgname>Rackspace Cloud</orgname>
+                </affiliation>
+            </author>
+            <copyright>
+                <year>2013</year>
+                <holder>Rackspace US, Inc.</holder>
+            </copyright>
+            <releaseinfo>API v1.0</releaseinfo>
+            <productname>Auto Scale</productname>
+            <pubdate></pubdate>
+            <legalnotice role="rs-api">
+                <annotation>
+                    <remark>Copyright details are filled in by the template.
+                    </remark>
+                </annotation>
+            </legalnotice>
+            <abstract>
+                <para>This document is intended for software developers who want to develop applications by
+                    using...</para>
+            </abstract>
+            <revhistory>
+                <revision>
+                    <date>2013-06-17</date>
+                    <revdescription>
+                        <itemizedlist>
+                            <listitem xmlns:db="http://docbook.org/ns/docbook">
+                                <para>Ipsum lorem.</para>
+                            </listitem>
+                        </itemizedlist>
+                    </revdescription>
+                </revision>
+            </revhistory>
+            <raxm:metadata xmlns:raxm="http://docs.rackspace.com/api/metadata">
+                <raxm:displayname>Release Notes</raxm:displayname>
+                <raxm:product version="v1.0">cas</raxm:product>
+                <raxm:priority>30</raxm:priority>
+            </raxm:metadata>
+        </info>
+        <chapter xml:id="doc_change_history">
+            <title>Document Change History</title>
+            <para>This version of the Release Notes replaces and obsoletes all previous versions. The most
+                recent changes are described in the table below:</para>
+            <?rax revhistory?>
+        </chapter>
+        <chapter xml:id="v1">
+            <title>v1.0, November 20, 2013</title>
+            <para>This is the initial release of Cloud Auto Scale.</para>
+            <itemizedlist>
+                <title>New Features</title>
+                <listitem>
+                    <para>Activate Sydney for Cloud Load Balancers PTR management.</para>
+                </listitem>
+            </itemizedlist>
+            <itemizedlist>
+                <title>Bug Fixes</title>
+                <listitem>
+                    <para>Fixed incorrect error response when updating multiple records that include an SRV
+                        record.</para>
+                </listitem>
+            </itemizedlist>
+            <itemizedlist>
+                <title>Resources</title>
+                <listitem>
+                    <para>
+                        <link xlink:href="http://docs.rackspace.com/api/">DNS Developer Guide</link>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        <link xlink:href="http://feedback.rackspacecloud.com/forums/71021-product-feedback">Product Feedback Forum</link>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        <link xlink:href="http://www.rackspace.com/cloud/blog/2011/07/11/using-rackspace-dnsaas-with-curl-part-1/">Cloud DNS Tutorial</link>
+                    </para>
+                </listitem>
+                <listitem>
+                    <para>
+                        <link xlink:href="http://developer.rackspace.com/">Use Cloud DNS with an SDK</link>
+                    </para>
+                </listitem>
+            </itemizedlist>
+        </chapter>
 </book>
