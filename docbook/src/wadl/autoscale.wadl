@@ -310,7 +310,7 @@
 		     required="false"
 		     type="string"
 		     path="$.scalingPolicies.[*].args.at">
-		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+		<wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
@@ -411,8 +411,8 @@
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This method deletes the specified scaling group if the group is empty.
                 An empty group contains no entities. If deletion is successful, no response body is returned. If
-                the group contains pending or active entities, deletion fails and a 409 error message is returned. Pass force=true to force
-                delete the group, ignoring pending/active entities.
+                the group contains pending or active entities, deletion fails and a 409 error message is returned. If there are pending or active servers in the scaling group,  pass force=true to force
+                delete the group. Passing force=true will immediately delete all active servers in the group. Pending servers will be deleted once they finish building and become active.
             </p>
         </doc>
         <response status="204"/>
@@ -422,7 +422,31 @@
     <method id="getGroupState" name="GET" rax:roles="observer autoscale:observer">
         <doc title="Get Group State">
             <db:para role="shortdesc">
-               This method returns the state of a scaling group.
+               This method returns the state of a scaling group. The GroupState object consists of the following properties:
+                <ul xmlns="http://www.w3.org/1999/xhtml">
+                    <li>paused - specifies whether execution of
+                        scaling policies for the group is currently
+                        suspended. If this value is set to true, the
+                        group will not scale up or down. All policy
+                        execution calls will be ignored while this
+                        value is set to true.</li>
+                    <li>pendingCapacity - integer, specifies the
+                        number of servers that are in a "building"
+                        state.</li>
+                    <li>name - specifies the name of the group</li>
+                    <li>Active - Specifies an array of active servers
+                        in the group. This array includes the
+                        serverID, as well as other data</li>
+                    <li>activeCapacity - integer, specifies the number
+                        of active servers in the group</li>
+                    <li>desiredCapacity - integer, specifies the sum
+                        of all servers that are in "Active" and
+                        "Pending" state</li>
+                    <!-- <li>a request to create a policy based on change percentage in response to an alarm</li> -->
+                    <li>A request to create multiple policies,
+                        followed by the matching response</li>
+                </ul>
+
             </db:para>
             <p xmlns="http://www.w3.org/1999/xhtml">
                 This method retrieves the current state of the specified scaling group.
@@ -817,7 +841,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
 		     required="false"
 		     type="string"
 		     path="$.[*].args.at">
-	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+	          <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
 	      </param>
 	      <param style="plain"
 		     name="changePercent"
@@ -934,7 +958,7 @@ IMPORTANT: This method has not been implemented in the Auto Scale API yet and wi
                     required="false"
                     type="string"
                     path="$.scalingPolicies.[*].args.at">
-                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both.</wadl:doc>
+                    <wadl:doc xmlns="http://docbook.org/ns/docbook">This parameter specifies the time at which this policy will be executed. This property is mutually exclusive with the "cron" parameter. You can either provide "cron" or "at" for a given policy, but not both. You must specify seconds when using "at". If seconds are not specified, a 400 error is returned.</wadl:doc>
                 </param>
                 <param style="plain"
                     name="changePercent"
