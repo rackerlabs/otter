@@ -80,10 +80,9 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-class FunctionalService(Service):
+class FunctionalService(Service, object):
     """
-    A simple service that has stores functions to call when starting and
-    stopping service
+    A simple service that has functions to call when starting and stopping service
     """
 
     def __init__(self, start=None, stop=None):
@@ -91,10 +90,24 @@ class FunctionalService(Service):
         :param start: A single argument callable to be called when service is started
         :param stop: A single argument callable to be called when service is stopped
         """
-        if start:
-            self.startService = start
-        if stop:
-            self.stopService = stop
+        self._start = start
+        self._stop = stop
+
+    def startService(self):
+        """
+        Start the service by calling stored function
+        """
+        Service.startService(self)
+        if self._start:
+            return self._start()
+
+    def stopService(self):
+        """
+        Stop the service by calling stored function
+        """
+        Service.stopService(self)
+        if self._stop:
+            return self._stop()
 
 
 def makeService(config):
@@ -102,6 +115,8 @@ def makeService(config):
     Set up the otter-api service.
     """
     set_config_data(dict(config))
+
+    s = MultiService()
 
     if not config_value('mock'):
         seed_endpoints = [
@@ -111,6 +126,8 @@ def makeService(config):
         cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
             seed_endpoints,
             config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
+        # Setup cassandra cluster to disconnect when otter shuts down
+        s.addService(FunctionalService(stop=cassandra_cluster.disconnect))
 
         store = CassScalingGroupCollection(cassandra_cluster)
         admin_store = CassAdmin(cassandra_cluster)
@@ -137,11 +154,6 @@ def makeService(config):
             config_value('identity.url'),
             config_value('identity.admin_url')),
         cache_ttl)
-
-    s = MultiService()
-
-    # Setup cassandra cluster to disconnect when otter shuts down
-    s.addService(FunctionalService(stop=cassandra_cluster.disconnect))
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
