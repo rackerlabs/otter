@@ -23,14 +23,38 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
     def setUp(self):
         """Set an elastic search config var."""
         super(OtterHistoryTestCase, self).setUp()
-        set_config_data({'elasticsearch': {'host': "http://dummy/search"}})
+        set_config_data({'elasticsearch': {'host': "http://dummy"}})
 
+    @mock.patch('otter.rest.history.make_auditlog_query')
     @mock.patch('otter.rest.history.treq')
-    def test_history(self, treq):
+    def test_history(self, treq, make_auditlog_query):
         """
         the history api endpoint returns the items from the audit log
         """
-        data = json.dumps({'abc': 'def'})
+        data = json.dumps({'hits': {
+            'hits': [{
+                '_source': {
+                    'message': 'audit log event',
+                    '@fields': {
+                        'event_type': 'event-abc',
+                        '@timestamp': 1234567890,
+                        'policy_id': 'policy-xyz',
+                        'scaling_group_id': 'scaling-group-uvw',
+                        'server_id': 'server-rst',
+                    }
+                }
+            }]}})
+        expected = {
+            'events': [{
+                'event_type': 'event-abc',
+                'timestamp': 1234567890,
+                'policy_id': 'policy-xyz',
+                'scaling_group_id': 'scaling-group-uvw',
+                'server_id': 'server-rst',
+                'message': 'audit log event',
+            }]
+        }
+        make_auditlog_query.return_value = {'tenant_id': 101010}
         response = mock.Mock(code=200)
 
         def get(*args, **kwargs):
@@ -45,7 +69,8 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
             request(self.root, "GET", self.endpoint))
 
         self.assertEqual(200, result.response.code)
-        self.assertEqual(data, result.content)
+        self.assertEqual(expected, json.loads(result.content))
 
-        treq.get.assert_called_once_with('http://dummy/search')
+        treq.get.assert_called_once_with(
+            'http://dummy/_search', '{"tenant_id": 101010}')
         treq.content.assert_called_once_with(response)
