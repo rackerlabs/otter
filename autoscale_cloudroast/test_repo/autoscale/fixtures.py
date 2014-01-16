@@ -436,8 +436,8 @@ class AutoscaleFixture(BaseTestFixture):
         list_policies = self.autoscale_client.list_policies(group_id).entity
         policies_num = len(list_policies.policies)
         while (hasattr(list_policies.policies_links, 'next')):
-            list_policies = self.autoscale_client.list_scaling_policies(
-                url=list_policies.policies_links.next).entity
+            list_policies = self.autoscale_client.list_policies(
+                url=list_policies.policies_links.next, group_id=group_id).entity
             policies_num += len(list_policies.policies)
         return policies_num
 
