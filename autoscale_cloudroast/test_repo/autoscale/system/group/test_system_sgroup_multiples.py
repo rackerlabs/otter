@@ -5,8 +5,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import time
 
-import unittest
-
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
 
@@ -122,8 +120,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.assertEquals(create_group_beyond_max.status_code, 422,
                           msg='{0} groups exist on the tenant'.format(self.get_total_num_groups()))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_webhook_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -133,15 +130,14 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
             self.autoscale_behaviors.create_policy_min(self.first_scaling_group.id)
         self.assertEquals(self.get_total_num_policies(self.first_scaling_group.id),
                           self.max_policies)
-        policy_beyond_max = self.autoscale_behaviors.create_policy_min(
-            self.first_scaling_group.id)
-        self.assertEquals(policy_beyond_max['status_code'], 422,
+        policy_beyond_max = self.autoscale_client.create_policy(
+            self.first_scaling_group.id, 'test', 0, change=1, policy_type='webhook')
+        self.assertEquals(policy_beyond_max.status_code, 422,
                           msg='Created {0} policies on the '
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_scheduler_policies_on_a_scaling_group(self):
         """
         Verify maximum scaling policies are allowed on a scaling group.
@@ -155,16 +151,15 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
                           self.max_policies,
                           msg='Policies on the group {0} is under/over max '
                           'allowed'.format(self.first_scaling_group.id))
-        policy_beyond_max = self.autoscale_behaviors.create_schedule_policy_given(
-            self.first_scaling_group.id,
-            sp_change_percent=100)
-        self.assertEquals(policy_beyond_max['status_code'], 422,
+        policy_beyond_max = self.autoscale_client.create_policy(
+            self.first_scaling_group.id, 'test', 0, change=1, policy_type='schedule',
+            args={'cron': '* * * * *'})
+        self.assertEquals(policy_beyond_max.status_code, 422,
                           msg='Created {0} policies on the '
                           'group'.format(self.get_total_num_policies(
                                          self.first_scaling_group.id)))
 
-    @unittest.skip('Not yet implemented')
-    @tags(type='one-time')
+    @tags(speed='quick')
     def test_system_max_webhooks_on_a_scaling_policy(self):
         """
         Verify the maximum scaling policies are allowed on a scaling policy.
