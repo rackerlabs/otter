@@ -9,6 +9,7 @@ import treq
 from twisted.internet import reactor
 
 from otter.log import log as default_log
+from otter.util.deferredutils import timeout_deferred
 
 
 def _log_request(treq_call, url, **kwargs):
@@ -18,20 +19,22 @@ def _log_request(treq_call, url, **kwargs):
     :param callable f: a ``treq`` request method, such as ``treq.request``, or
         ``treq.get``, ``treq.post``, etc.
     """
-    time_func = kwargs.pop('time_function', reactor.seconds)
+    clock = kwargs.pop('clock', reactor)
     log = kwargs.pop('log', default_log)
     method = kwargs.get('method', treq_call.__name__)
 
     treq_transaction = str(uuid4())
     log = log.bind(system='treq.request', url=url, method=method,
                    treq_request_id=treq_transaction)
-    start_time = time_func()
+    start_time = clock.seconds()
 
     log.msg("Request to {method} {url} starting.")
     d = treq_call(url=url, **kwargs)
 
+    timeout_deferred(d, 60, clock)
+
     def log_request(response):
-        request_time = time_func() - start_time
+        request_time = clock.seconds() - start_time
         log.msg(
             ("Request to {method} {url} resulted in a {status_code} response "
              "after {request_time} seconds."),
@@ -40,7 +43,7 @@ def _log_request(treq_call, url, **kwargs):
         return response
 
     def log_failure(failure):
-        request_time = time_func() - start_time
+        request_time = clock.seconds() - start_time
         log.msg("Request to {method} {url} failed after {request_time} seconds.",
                 reason=failure, request_time=request_time)
         return failure
