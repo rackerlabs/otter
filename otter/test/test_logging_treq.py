@@ -112,7 +112,6 @@ class LoggingTreqTest(TestCase):
         self.failureResultOf(d, TimedOutError)
         self._assert_failure_logging('patch', TimedOutError, 60)
 
-
     def _test_method_success(self, method):
         """
         On successful call to ``method``, response is returned and request logged
