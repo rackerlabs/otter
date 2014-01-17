@@ -37,52 +37,76 @@ class LoggingTreqTest(TestCase):
 
         patch(self, 'otter.util.logging_treq.treq', self.treq)
 
+        self.url = 'myurl'
+
+    def _assert_success_logging(self, method, status, request_time):
+        """
+        msg expected to be made on a successful request are logged
+        """
+        self.assertEqual(self.log.msg.mock_calls, [
+            mock.call(mock.ANY, url=self.url, system="treq.request",
+                      method=method, treq_request_id=mock.ANY),
+            mock.call(
+                mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
+                system="treq.request", request_time=request_time, method=method,
+                treq_request_id=mock.ANY)
+        ])
+
+    def _assert_failure_logging(self, method, exception_type, request_time):
+        """
+        msg expected to be made on a failed request are logged
+        """
+        self.assertEqual(self.log.msg.mock_calls, [
+            mock.call(mock.ANY, url=self.url, system="treq.request",
+                      method=method, treq_request_id=mock.ANY),
+            mock.call(
+                mock.ANY, url=self.url, reason=CheckFailure(exception_type),
+                system="treq.request", request_time=request_time, method=method,
+                treq_request_id=mock.ANY)
+        ])
+
     def test_request(self):
         """
         On successful call to request, response is returned and request logged
         """
-        d = logging_treq.request('patch', 'myurl', headers={}, data='',
+        d = logging_treq.request('patch', self.url, headers={}, data='',
                                  log=self.log, time_function=self.clock.seconds)
         self.treq.request.assert_called_once_with(
-            method='patch', url='myurl', headers={}, data='')
+            method='patch', url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         self.treq.request.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', status_code=204, headers={'1': '2'},
-            system="treq.request", request_time=5, method='patch')
+        self._assert_success_logging('patch', 204, 5)
 
     def test_request_failure(self):
         """
         On failed call to request, failure is returned and request logged
         """
-        d = logging_treq.request('patch', 'myurl', headers={}, data='',
+        d = logging_treq.request('patch', self.url, headers={}, data='',
                                  log=self.log, time_function=self.clock.seconds)
         self.treq.request.assert_called_once_with(
-            method='patch', url='myurl', headers={}, data='')
+            method='patch', url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         self.treq.request.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', reason=CheckFailure(DummyException),
-            system="treq.request", request_time=5, method='patch')
+        self._assert_failure_logging('patch', DummyException, 5)
 
     def _test_method_success(self, method):
         """
         On successful call to ``method``, response is returned and request logged
         """
         request_function = getattr(logging_treq, method)
-        d = request_function(url='myurl', headers={}, data='', log=self.log,
+        d = request_function(url=self.url, headers={}, data='', log=self.log,
                              time_function=self.clock.seconds)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url='myurl', headers={}, data='')
+        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
 
         self.assertNoResult(d)
 
@@ -90,29 +114,25 @@ class LoggingTreqTest(TestCase):
         treq_function.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', status_code=204, headers={'1': '2'},
-            system="treq.request", request_time=5, method=method)
+        self._assert_success_logging(method, 204, 5)
 
     def _test_method_failure(self, method):
         """
         On failed call to ``method``, failure is returned and request logged
         """
         request_function = getattr(logging_treq, method)
-        d = request_function(url='myurl', headers={}, data='', log=self.log,
+        d = request_function(url=self.url, headers={}, data='', log=self.log,
                              time_function=self.clock.seconds)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url='myurl', headers={}, data='')
+        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         treq_function.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', reason=CheckFailure(DummyException),
-            system="treq.request", request_time=5, method=method)
+        self._assert_failure_logging(method, DummyException, 5)
 
     def test_head(self):
         """
