@@ -82,9 +82,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
     def test_stop_service(self):
         """
-        stopService() calls super's stopService() and stops the allocation
+        stopService() calls super's stopService() and stops the allocation if it
+        is already allocated
         """
         self.scheduler_service.startService()
+        self.kz_partition.allocated = True
         d = self.scheduler_service.stopService()
         self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
         self.kz_partition.finish.assert_called_once_with()
@@ -149,6 +151,15 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not allocted'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
+
+    def test_stop_service_allocating(self):
+        """
+        stopService() does not stop the allocation (i.e. call finish) if it is not allocated
+        """
+        self.scheduler_service.startService()
+        d = self.scheduler_service.stopService()
+        self.assertFalse(self.kz_partition.finish.called)
+        self.assertIsNone(d)
 
     def test_check_events_allocating(self):
         """

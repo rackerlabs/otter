@@ -203,7 +203,9 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 # Store consistency levels
 _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                                  'insert': ConsistencyLevel.ONE,
-                                 'delete': ConsistencyLevel.QUORUM}}
+                                 'delete': ConsistencyLevel.QUORUM},
+                       'group': {'create': ConsistencyLevel.QUORUM},
+                       'state': {'update': ConsistencyLevel.QUORUM}}
 
 
 def get_consistency_level(operation, resource):
@@ -511,16 +513,19 @@ class CassScalingGroup(object):
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
-    def view_state(self):
+    def view_state(self, consistency=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
+        if consistency is None:
+            consistency = get_consistency_level('view', 'partial')
+
         view_query = _cql_view_group_state.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'partial'),
+                          consistency,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_unmarshal_state)
@@ -530,6 +535,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         log = self.log.bind(system='CassScalingGroup.modify_state')
+        consistency = get_consistency_level('update', 'state')
 
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -544,10 +550,10 @@ class CassScalingGroup(object):
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
             return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
-                                           params, get_consistency_level('update', 'state'))
+                                           params, consistency)
 
         def _modify_state():
-            d = self.view_state()
+            d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 

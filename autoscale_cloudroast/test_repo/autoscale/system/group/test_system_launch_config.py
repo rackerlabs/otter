@@ -18,7 +18,7 @@ class LaunchConfigTest(AutoscaleFixture):
         Instantiate client and configs
         """
         super(LaunchConfigTest, cls).setUpClass()
-        cls.upd_server_name = "upd_lc_config"
+        cls.upd_server_name = "updlc_config"
         cls.upd_image_ref = cls.lc_image_ref_alt
         cls.upd_flavor_ref = "3"
 
@@ -187,6 +187,39 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             group.launchConfiguration.server.imageRef,
             group.launchConfiguration.server.flavorRef)
+
+    @tags(speed='slow')
+    def test_system_update_launchconfig_while_group_building_and_scale_down(self):
+        """
+        Create a scaling group and scale up. While servers are building, update launch config
+        and scale down. Servers with the latest launch config are deleted. (AUTO-384)
+        """
+        minentities = 1
+        group = self._create_group(minentities=minentities, policy=True)
+        group_before_upd = group
+        self.wait_for_expected_number_of_active_servers(group_before_upd.id, minentities)
+        # update launch config
+        self._update_launch_config(
+            group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
+        # execute scale up policy
+        self._execute_policy(group)
+        # create and then execute scale down policy
+        scale_down_change = - self.sp_change
+        policy_down = self.autoscale_behaviors.create_policy_given(
+            group_id=group.id,
+            sp_change=scale_down_change,
+            sp_cooldown=0)
+        self._execute_policy(group, policy_down['id'])
+        active_server_list_after_scale_down = self.wait_for_expected_number_of_active_servers(
+            group_id=group.id,
+            expected_servers=minentities)
+        # verify that the servers remaining after scale up and scale down are of older
+        # launch config.
+        self._verify_server_list_for_launch_config(
+            active_server_list_after_scale_down,
+            group_before_upd.launchConfiguration.server.name,
+            group_before_upd.launchConfiguration.server.imageRef,
+            group_before_upd.launchConfiguration.server.flavorRef)
 
     @tags(speed='quick')
     def test_system_update_launchconfig_group_minentities(self):

@@ -61,7 +61,8 @@ class SchedulerService(TimerService):
         Stop this service. This will release buckets partitions it holds
         """
         TimerService.stopService(self)
-        return self.kz_partition.finish()
+        if self.kz_partition.allocated:
+            return self.kz_partition.finish()
 
     def health_check(self):
         """

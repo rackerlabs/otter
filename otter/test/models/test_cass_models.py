@@ -132,6 +132,20 @@ class GetConsistencyTests(TestCase):
         level = get_consistency_level('fetch', 'event')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
+    def test_group_create(self):
+        """
+        Gives QUORUM on group create
+        """
+        level = get_consistency_level('create', 'group')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+    def test_update_state(self):
+        """
+        Gives QUORUM on updating state
+        """
+        level = get_consistency_level('update', 'state')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
 
 class VerifiedViewTests(TestCase):
     """
@@ -326,6 +340,22 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        'a', {'A': 'R'},
                                        {'P': 'R'}, '123', {'PT': 'R'}, False))
 
+    def test_view_respsects_consistency_argument(self):
+        """
+        If a consistency argument is passed to ``view_state``, it is honored
+        over the default consistency
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+        self.returns = [cass_response]
+        d = self.group.view_state(consistency=ConsistencyLevel.ALL)
+        self.successResultOf(d)
+        self.connection.execute.assert_called_once_with(mock.ANY,
+                                                        mock.ANY,
+                                                        ConsistencyLevel.ALL)
+
     def test_view_state_no_such_group(self):
         """
         Calling ``view_state`` on a group that doesn't exist raises a
@@ -388,12 +418,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
+        self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
             ':policyTouched, :paused)')
-
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
