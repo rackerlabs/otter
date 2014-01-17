@@ -22,8 +22,8 @@ _ELASTICSEARCH_QUERY_TEMPLATE = {
             "query": {
                 "bool": {
                     "should": [
-                        {"query_string": {"query": "@fields.is_error:false OR is_error:false"}},
-                        {"query_string": {"query": "@fields.is_error:true OR is_error:true"}}
+                        {"query_string": {"query": "is_error:false"}},
+                        {"query_string": {"query": "is_error:true"}}
                     ]
                 }
             },
@@ -40,7 +40,7 @@ _ELASTICSEARCH_QUERY_TEMPLATE = {
                         "fquery": {
                             "query": {
                                 "field": {
-                                    "@fields.audit_log": {
+                                    "audit_log": {
                                         "query": True
                                     }
                                 }
@@ -56,7 +56,7 @@ _TENANT_ID_TEMPLATE = {
     "fquery": {
         "query": {
             "field": {
-                "@fields.tenant_id": {
+                "tenant_id": {
                     "query": None
                 }
             }
@@ -68,7 +68,7 @@ _TENANT_ID_TEMPLATE = {
 def make_auditlog_query(tenant_id):
     query = copy.deepcopy(_ELASTICSEARCH_QUERY_TEMPLATE)
     tenant_query = copy.deepcopy(_TENANT_ID_TEMPLATE)
-    tenant_query['fquery']['query']['field']['@fields.tenant_id']['query'] = tenant_id
+    tenant_query['fquery']['query']['field']['tenant_id']['query'] = tenant_id
     query['query']['filtered']['filter']['bool']['must'].append(tenant_query)
 
     return query
