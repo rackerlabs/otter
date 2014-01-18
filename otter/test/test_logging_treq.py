@@ -100,7 +100,7 @@ class LoggingTreqTest(TestCase):
 
     def test_request_timeout(self):
         """
-        A request times out after 60 seconds, and the failure is logged
+        A request times out after 45 seconds, and the failure is logged
         """
         d = logging_treq.request('patch', self.url, headers={}, data='',
                                  log=self.log, clock=self.clock)
@@ -108,9 +108,9 @@ class LoggingTreqTest(TestCase):
             method='patch', url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
-        self.clock.advance(60)
+        self.clock.advance(45)
         self.failureResultOf(d, TimedOutError)
-        self._assert_failure_logging('patch', TimedOutError, 60)
+        self._assert_failure_logging('patch', TimedOutError, 45)
 
     def _test_method_success(self, method):
         """
@@ -151,7 +151,7 @@ class LoggingTreqTest(TestCase):
 
     def _test_method_timeout(self, method):
         """
-        A request times out after 60 seconds, and the failure is logged
+        A request times out after 45 seconds, and the failure is logged
         """
         request_function = getattr(logging_treq, method)
         d = request_function(url=self.url, headers={}, data='', log=self.log,
@@ -161,9 +161,9 @@ class LoggingTreqTest(TestCase):
         treq_function.assert_called_once_with(url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
-        self.clock.advance(60)
+        self.clock.advance(45)
         self.failureResultOf(d, TimedOutError)
-        self._assert_failure_logging(method, TimedOutError, 60)
+        self._assert_failure_logging(method, TimedOutError, 45)
 
     def test_head(self):
         """

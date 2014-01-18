@@ -31,7 +31,7 @@ def _log_request(treq_call, url, **kwargs):
     log.msg("Request to {method} {url} starting.")
     d = treq_call(url=url, **kwargs)
 
-    timeout_deferred(d, 60, clock)
+    timeout_deferred(d, 45, clock)
 
     def log_request(response):
         request_time = clock.seconds() - start_time
