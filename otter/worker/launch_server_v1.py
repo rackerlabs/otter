@@ -556,6 +556,7 @@ def verified_delete(log,
     def delete():
         del_d = treq.delete(path, headers=headers(auth_token), log=serv_log)
         del_d.addCallback(check_success, [404])
+        del_d.addCallback(treq.content)
         return del_d
 
     start_time = clock.seconds()
