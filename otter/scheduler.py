@@ -83,7 +83,8 @@ class SchedulerService(TimerService):
             for event in events:
                 if event and (now - event['trigger']).total_seconds() > self.threshold:
                     old_events.append(event)
-            return not bool(old_events), {'old_events': old_events}
+            return (not bool(old_events), {'old_events': old_events,
+                                           'buckets': list(self.kz_partition)})
 
         d = defer.gatherResults(
             [self.store.get_oldest_event(bucket) for bucket in self.kz_partition],

@@ -106,7 +106,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (False, {'old_events': [returns[0]]}))
+        self.assertEqual(self.successResultOf(d), (False, {'old_events': [returns[0]],
+                                                           'buckets': [2, 3]}))
         self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
 
     def test_health_check_before_threshold(self):
@@ -122,7 +123,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (True, {'old_events': []}))
+        self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
+                                                          'buckets': [2, 3]}))
         self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
 
     def test_health_check_None(self):
@@ -136,7 +138,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (True, {'old_events': []}))
+        self.assertEqual(self.successResultOf(d), (True, {'old_events': [],
+                                                          'buckets': [2, 3]}))
         self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
 
     def test_health_check_not_acquired(self):
