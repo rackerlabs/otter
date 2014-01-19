@@ -61,7 +61,7 @@ class SchedulerService(TimerService):
         Stop this service. This will release buckets partitions it holds
         """
         TimerService.stopService(self)
-        if self.kz_partition.allocated:
+        if self.kz_partition.acquired:
             return self.kz_partition.finish()
 
     def health_check(self):
@@ -71,7 +71,7 @@ class SchedulerService(TimerService):
 
         :return: Deferred that fires with tuple (Bool, `dict` of extra debug info)
         """
-        if not self.kz_partition.allocated:
+        if not self.kz_partition.acquired:
             # TODO: Until there is check added for not being allocted for long time
             # it is fine to assume service is not healthy when it is allocating since
             # allocating should happen only on deploy or network issues
@@ -107,7 +107,7 @@ class SchedulerService(TimerService):
                 self.zk_partition_path, set=set(self.buckets),
                 time_boundary=self.time_boundary)
             return
-        if not self.kz_partition.allocated:
+        if not self.kz_partition.acquired:
             self.log.err('Unknown state {}. This cannot happen. Starting new'.format(
                 self.kz_partition.state))
             self.kz_partition.finish()

@@ -52,7 +52,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         self.kz_client = mock.Mock(spec=['SetPartitioner'])
         self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False,
-                                           allocated=False)
+                                           acquired=False)
         self.kz_client.SetPartitioner.return_value = self.kz_partition
         self.zk_partition_path = '/part_path'
         self.time_boundary = 15
@@ -83,10 +83,10 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
     def test_stop_service(self):
         """
         stopService() calls super's stopService() and stops the allocation if it
-        is already allocated
+        is already acquired
         """
         self.scheduler_service.startService()
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         d = self.scheduler_service.stopService()
         self.timer_service.stopService.assert_called_once_with(self.scheduler_service)
         self.kz_partition.finish.assert_called_once_with()
@@ -96,7 +96,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns False when trigger time is above threshold
         """
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
@@ -113,7 +113,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when trigger time is below threshold
         """
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
@@ -129,7 +129,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         """
         `service.health_check` returns True when there are no triggers
         """
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.returns = [None, None]
@@ -139,11 +139,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertEqual(self.successResultOf(d), (True, {'old_events': []}))
         self.mock_store.get_oldest_event.assert_has_calls([mock.call(2), mock.call(3)])
 
-    def test_health_check_not_allocated(self):
+    def test_health_check_not_acquired(self):
         """
-        `service.health_check` returns False when partition is not allocated
+        `service.health_check` returns False when partition is not acquired
         """
-        self.kz_partition.allocated = False
+        self.kz_partition.acquired = False
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
 
@@ -154,7 +154,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
     def test_stop_service_allocating(self):
         """
-        stopService() does not stop the allocation (i.e. call finish) if it is not allocated
+        stopService() does not stop the allocation (i.e. call finish) if it is not acquired
         """
         self.scheduler_service.startService()
         d = self.scheduler_service.stopService()
@@ -247,11 +247,11 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.assertFalse(self.check_events_in_bucket.called)
 
     @mock.patch('otter.scheduler.datetime')
-    def test_check_events_allocated(self, mock_datetime):
+    def test_check_events_acquired(self, mock_datetime):
         """
         `check_events` checks events in each bucket when they are partitoned.
         """
-        self.kz_partition.allocated = True
+        self.kz_partition.acquired = True
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         self.scheduler_service.log = mock.Mock()
