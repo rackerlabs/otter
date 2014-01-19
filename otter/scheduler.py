@@ -75,7 +75,7 @@ class SchedulerService(TimerService):
             # TODO: Until there is check added for not being allocted for long time
             # it is fine to assume service is not healthy when it is allocating since
             # allocating should happen only on deploy or network issues
-            return defer.succeed((False, {'reason': 'Not allocted'}))
+            return defer.succeed((False, {'reason': 'Not acquired'}))
 
         def check_older_events(events):
             now = datetime.utcnow()
