@@ -149,7 +149,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
         d = self.scheduler_service.health_check()
 
-        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not allocted'}))
+        self.assertEqual(self.successResultOf(d), (False, {'reason': 'Not acquired'}))
         self.assertFalse(self.mock_store.get_oldest_event.called)
 
     def test_stop_service_allocating(self):
