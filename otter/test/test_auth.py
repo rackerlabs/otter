@@ -573,23 +573,23 @@ class RetryingAuthenticatorTests(TestCase):
         self.mock_auth.authenticate_tenant.return_value = succeed('result')
         d = self.authenticator.authenticate_tenant(23)
         self.assertEqual(self.successResultOf(d), 'result')
-        self.mock_auth.authenticate_tenant.assert_called_once_with(23)
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23, log=None)
 
     def test_retries(self):
         """
         `RetryingAuthenticator` retries internal authenticator if it fails
         """
-        self.mock_auth.authenticate_tenant.side_effect = lambda _: fail(APIError(500, '2'))
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '2'))
         d = self.authenticator.authenticate_tenant(23)
         # mock_auth is called and there is no result
         self.assertNoResult(d)
-        self.mock_auth.authenticate_tenant.assert_called_once_with(23)
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23, log=None)
         # Advance clock and mock_auth is called again
         self.clock.advance(4)
         self.assertEqual(self.mock_auth.authenticate_tenant.call_count, 2)
         self.assertNoResult(d)
         # advance clock and mock_auth's success return is propogated
-        self.mock_auth.authenticate_tenant.side_effect = lambda _: succeed('result')
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: succeed('result')
         self.clock.advance(4)
         self.assertEqual(self.successResultOf(d), 'result')
 
@@ -598,7 +598,7 @@ class RetryingAuthenticatorTests(TestCase):
         `RetryingAuthenticator` retries internal authenticator and times out if it
         keeps failing for certain period of time
         """
-        self.mock_auth.authenticate_tenant.side_effect = lambda _: fail(APIError(500, '2'))
+        self.mock_auth.authenticate_tenant.side_effect = lambda *a, **kw: fail(APIError(500, '2'))
         d = self.authenticator.authenticate_tenant(23)
         self.assertNoResult(d)
         self.clock.pump([4] * 4)

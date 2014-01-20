@@ -56,7 +56,7 @@ class IAuthenticator(Interface):
     """
     Authenticators know how to authenticate tenants.
     """
-    def authenticate_tenant(tenant_id):
+    def authenticate_tenant(tenant_id, log=None):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
@@ -78,14 +78,15 @@ class RetryingAuthenticator(object):
         self._max_retries = max_retries
         self._retry_interval = retry_interval
 
-    def authenticate_tenant(self, tenant_id):
+    def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        return retry(partial(self._authenticator.authenticate_tenant, tenant_id),
-                     can_retry=retry_times(self._max_retries),
-                     next_interval=repeating_interval(self._retry_interval),
-                     clock=self._reactor)
+        return retry(
+            partial(self._authenticator.authenticate_tenant, tenant_id, log=log),
+            can_retry=retry_times(self._max_retries),
+            next_interval=repeating_interval(self._retry_interval),
+            clock=self._reactor)
 
 
 @implementer(IAuthenticator)
