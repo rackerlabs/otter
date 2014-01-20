@@ -38,12 +38,14 @@ a token.)
 
 import json
 from itertools import groupby
+from functools import partial
 
 from twisted.internet.defer import succeed, Deferred
 
 from zope.interface import Interface, implementer
 
 from otter.util import logging_treq as treq
+from otter.util.retry import retry, retry_times, repeating_interval
 
 from otter.log import log as default_log
 from otter.util.http import (
@@ -60,6 +62,30 @@ class IAuthenticator(Interface):
 
         :returns: 2-tuple of auth token and service catalog.
         """
+
+
+@implementer(IAuthenticator)
+class RetryingAuthenticator(object):
+    """
+    An authenticator that retries the provided auth_function if it fails
+
+    :param IReactorTime reactor: An IReactorTime provider used for retrying
+    :param IAuthenticator authenticator: retry authentication using this
+    """
+    def __init__(self, reactor, authenticator, max_retries=10, retry_interval=10):
+        self._reactor = reactor
+        self._authenticator = authenticator
+        self._max_retries = max_retries
+        self._retry_interval = retry_interval
+
+    def authenticate_tenant(self, tenant_id):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        return retry(partial(self._authenticator.authenticate_tenant, tenant_id),
+                     can_retry=retry_times(self._max_retries),
+                     next_interval=repeating_interval(self._retry_interval),
+                     clock=self._reactor)
 
 
 @implementer(IAuthenticator)

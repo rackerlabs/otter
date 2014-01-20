@@ -24,6 +24,7 @@ from otter.auth import endpoints_for_token
 from otter.auth import user_for_tenant
 from otter.auth import ImpersonatingAuthenticator
 from otter.auth import CachingAuthenticator
+from otter.auth import RetryingAuthenticator
 from otter.auth import IAuthenticator
 
 expected_headers = {'accept': ['application/json'],
@@ -549,3 +550,57 @@ class CachingAuthenticatorTests(TestCase):
         d = self.ca.authenticate_tenant(1)
         failure = self.failureResultOf(d)
         self.assertTrue(failure.check(APIError))
+
+
+class RetryingAuthenticatorTests(TestCase):
+    """
+    Tests for `RetryingAuthenticator`
+    """
+
+    def setUp(self):
+        """
+        Create RetryingAuthenticator
+        """
+        self.clock = Clock()
+        self.mock_auth = iMock(IAuthenticator)
+        self.authenticator = RetryingAuthenticator(
+            self.clock, self.mock_auth, max_retries=3, retry_interval=4)
+
+    def test_delegates(self):
+        """
+        `RetryingAuthenticator` calls internal authenticator and returns its result
+        """
+        self.mock_auth.authenticate_tenant.return_value = succeed('result')
+        d = self.authenticator.authenticate_tenant(23)
+        self.assertEqual(self.successResultOf(d), 'result')
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23)
+
+    def test_retries(self):
+        """
+        `RetryingAuthenticator` retries internal authenticator if it fails
+        """
+        self.mock_auth.authenticate_tenant.side_effect = lambda _: fail(APIError(500, '2'))
+        d = self.authenticator.authenticate_tenant(23)
+        # mock_auth is called and there is no result
+        self.assertNoResult(d)
+        self.mock_auth.authenticate_tenant.assert_called_once_with(23)
+        # Advance clock and mock_auth is called again
+        self.clock.advance(4)
+        self.assertEqual(self.mock_auth.authenticate_tenant.call_count, 2)
+        self.assertNoResult(d)
+        # advance clock and mock_auth's success return is propogated
+        self.mock_auth.authenticate_tenant.side_effect = lambda _: succeed('result')
+        self.clock.advance(4)
+        self.assertEqual(self.successResultOf(d), 'result')
+
+    def test_retries_times_out(self):
+        """
+        `RetryingAuthenticator` retries internal authenticator and times out if it
+        keeps failing for certain period of time
+        """
+        self.mock_auth.authenticate_tenant.side_effect = lambda _: fail(APIError(500, '2'))
+        d = self.authenticator.authenticate_tenant(23)
+        self.assertNoResult(d)
+        self.clock.pump([4] * 4)
+        f = self.failureResultOf(d, APIError)
+        self.assertEqual(f.value.code, 500)
