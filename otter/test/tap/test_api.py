@@ -84,14 +84,18 @@ class HealthCheckerTests(TestCase):
         """
         If there are no healthed objects, HealthChecker returns healthy
         """
-        d = HealthChecker().health_check()
+        checker = HealthChecker()
+        self.assertEqual(checker.keys(), [])
+        d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {'healthy': True})
 
     def test_invalid_healthed_objects(self):
         """
         If an invalid healthed object is added, it is unhealthy
         """
-        d = HealthChecker({'invalid': None}).health_check()
+        checker = HealthChecker({'invalid': None})
+        self.assertEqual(checker.keys(), ['invalid'])
+        d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
             'invalid': {
@@ -105,7 +109,9 @@ class HealthCheckerTests(TestCase):
         Healthed object that has a synchronous health-check function works
         """
         healthed = mock.Mock(**{'health_check.return_value': (True, {})})
-        d = HealthChecker({'sync': healthed}).health_check()
+        checker = HealthChecker({'sync': healthed})
+        self.assertEqual(checker.keys(), ['sync'])
+        d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': True,
             'sync': {
@@ -120,7 +126,8 @@ class HealthCheckerTests(TestCase):
         """
         healthed = mock.Mock(
             **{'health_check.return_value': defer.succeed((True, {}))})
-        d = HealthChecker({'sync': healthed}).health_check()
+        checker = HealthChecker({'sync': healthed})
+        d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': True,
             'sync': {
@@ -135,9 +142,12 @@ class HealthCheckerTests(TestCase):
         """
         healthy = mock.Mock(**{'health_check.return_value': (True, {})})
         unhealthy = mock.Mock(**{'health_check.return_value': (False, {})})
-        healthed = {'healthy_thing': healthy, 'unhealthy_thing': unhealthy}
-
-        d = HealthChecker(healthed).health_check()
+        checker = HealthChecker({'healthy_thing': healthy,
+                                 'unhealthy_thing': unhealthy})
+        self.assertEqual(
+            set(checker.keys()),
+            set(['healthy_thing', 'unhealthy_thing']))
+        d = checker.health_check()
         self.assertEqual(self.successResultOf(d), {
             'healthy': False,
             'healthy_thing': {
@@ -173,6 +183,14 @@ class APIMakeServiceTests(TestCase):
 
         self.CassScalingGroupCollection = patch(self, 'otter.tap.api.CassScalingGroupCollection')
         self.store = self.CassScalingGroupCollection.return_value
+
+        self.health_checker = None
+
+        def make_health_checker(*args, **kwargs):
+            self.health_checker = HealthChecker(*args, **kwargs)
+            return self.health_checker
+
+        patch(self, 'otter.tap.api.HealthChecker', side_effect=make_health_checker)
 
     def test_service_site_on_port(self):
         """
@@ -267,7 +285,7 @@ class APIMakeServiceTests(TestCase):
     def test_cassandra_store(self):
         """
         makeService configures the CassScalingGroupCollection as the
-        api store.
+        api store
         """
         makeService(test_config)
         self.Otter.assert_called_once_with(self.store)
@@ -289,6 +307,17 @@ class APIMakeServiceTests(TestCase):
             self.assertEqual(len(mock_calls), 0,
                              "{0} called with {1}".format(mocked, mock_calls))
 
+    def test_health_checker(self):
+        """
+        A health checker is constructed by default with the store and an
+        invalid scheduler service
+        """
+        self.assertIsNone(self.health_checker)
+        makeService(test_config)
+        self.assertIsNotNone(self.health_checker)
+        self.assertEqual(self.health_checker['store'], self.store)
+        self.assertIsNone(self.health_checker['scheduler'])
+
     @mock.patch('otter.tap.api.SupervisorService', wraps=SupervisorService)
     def test_supervisor_service_set_by_default(self, supervisor):
         """
@@ -306,7 +335,8 @@ class APIMakeServiceTests(TestCase):
     def test_kazoo_client_success(self, mock_txkz, mock_setup_scheduler):
         """
         TxKazooClient is started and calls `setup_scheduler`. Its instance
-        is also set in store.kz_client after start has finished
+        is also set in store.kz_client after start has finished, and the
+        scheduler added to the health checker
         """
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
@@ -324,14 +354,18 @@ class APIMakeServiceTests(TestCase):
             hosts='zk_hosts', threads=20, txlog=self.log.bind.return_value)
         kz_client.start.assert_called_once_with()
 
-        # setup_scheduler and store.kz_client is not called yet
+        # setup_scheduler and store.kz_client is not called yet, and nothing
+        # added to the health checker
         self.assertFalse(mock_setup_scheduler.called)
         self.assertIsNone(self.store.kz_client)
+        self.assertIsNone(self.health_checker['scheduler'])
 
         # they are called after start completes
         start_d.callback(None)
         mock_setup_scheduler.assert_called_once_with(parent, self.store, kz_client)
         self.assertEqual(self.store.kz_client, kz_client)
+        self.assertEqual(self.health_checker['scheduler'],
+                         mock_setup_scheduler.return_value)
 
     @mock.patch('otter.tap.api.setup_scheduler')
     @mock.patch('otter.tap.api.TxKazooClient')

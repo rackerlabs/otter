@@ -82,7 +82,7 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-class HealthChecker(object):
+class HealthChecker(dict):
     """
     A object to store other objects with ``.health_check`` attributes, that has
     a single health check function that calls all the others and assembles their
@@ -96,11 +96,6 @@ class HealthChecker(object):
         attributes to be called, mapped to the key the health check data should
         live under.
     """
-    def __init__(self, healthed=None):
-        self.healthed = healthed
-        if not healthed:
-            self.healthed = {}
-
     def health_check(self):
         """
         Synthesizes all health checks and returns a JSON blob containing the
@@ -110,9 +105,9 @@ class HealthChecker(object):
         # splitting off keys and values here because we want the keys
         # correlated with the results of the DeferredList at the end
         # (if self.healthed changes in the interim,  the DeferredList may not
-        # match up with self.healthed.keys() later)
+        # match up with self._healthed.keys() later)
         keys, checks = ([], [])
-        for k, v in self.healthed.iteritems():
+        for k, v in self.iteritems():
             keys.append(k)
             healthcheck = getattr(v, 'health_check', None)
             if healthcheck:
@@ -183,6 +178,7 @@ def makeService(config):
         cache_ttl)
 
     s = MultiService()
+    health_checker = HealthChecker({'store': store, 'scheduler': None})
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
@@ -211,13 +207,18 @@ def makeService(config):
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
                                   threads=threads, txlog=log.bind(system='kazoo'))
         d = kz_client.start()
-        # Setup scheduler service after starting
-        d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
-        # Set the client after starting
-        # NOTE: There is small amount of time when the start is not finished
-        # and the kz_client is not set in which case policy execution and group
-        # delete will fail
-        d.addCallback(lambda _: setattr(store, 'kz_client', kz_client))
+
+        def on_client_ready(_):
+            # Setup scheduler service after starting
+            scheduler = setup_scheduler(s, store, kz_client)
+            health_checker['scheduler'] = scheduler
+            # Set the client after starting
+            # NOTE: There is small amount of time when the start is not finished
+            # and the kz_client is not set in which case policy execution and group
+            # delete will fail
+            store.kz_client = kz_client
+
+        d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return s
@@ -239,3 +240,4 @@ def setup_scheduler(parent, store, kz_client):
                                          store, kz_client, partition_path, time_boundary,
                                          buckets)
     scheduler_service.setServiceParent(parent)
+    return scheduler_service
