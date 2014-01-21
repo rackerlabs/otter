@@ -20,8 +20,9 @@ class Otter(object):
     """
     app = OtterApp()
 
-    def __init__(self, store):
+    def __init__(self, store, health_check_function=None):
         self.store = store
+        self.health_check_function = health_check_function
 
     @app.route('/')
     def base(self, request):
@@ -67,4 +68,7 @@ class Otter(object):
         Return whether health checks succeeded
         """
         request.setHeader('X-Response-Id', 'health_check')
-        return self.store.health_check().addCallback(json.dumps)
+        if self.health_check_function:
+            return self.health_check_function().addCallback(json.dumps)
+
+        return json.dumps({'healthy': True})
