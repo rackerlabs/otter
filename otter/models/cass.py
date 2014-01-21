@@ -1161,7 +1161,7 @@ class CassScalingGroupCollection:
         """
         d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
                                     {'bucket': bucket},
-                                    get_consistency_level('insert', 'event'))
+                                    get_consistency_level('check', 'event'))
         d.addCallback(lambda r: r[0] if len(r) > 0 else None)
         return d
 
