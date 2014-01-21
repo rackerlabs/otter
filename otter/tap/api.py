@@ -6,6 +6,7 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
+from twisted.internet.defer import DeferredList, maybeDeferred, succeed
 from twisted.internet.task import coiterate
 
 from twisted.internet.endpoints import clientFromString
@@ -79,6 +80,61 @@ class Options(usage.Options):
         if self.get('environment') == 'staging':
             self['cloudServersOpenStack'] = 'cloudServersPreprod'
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
+
+
+class HealthChecker(object):
+    """
+    A object to store other objects with ``.health_check`` attributes, that has
+    a single health check function that calls all the others and assembles their
+    results.
+
+    ``.health_check`` should return a tuple of ``(bool, dict)``, the boolean
+    being whether the object is healthy, and the dictionary being extra data
+    to be included.
+
+    :param healthed: a dictionary containing objects that have `.health_check`
+        attributes to be called, mapped to the key the health check data should
+        live under.
+    """
+    def __init__(self, healthed=None):
+        self.healthed = healthed
+        if not healthed:
+            self.healthed = {}
+
+    def health_check(self):
+        """
+        Synthesizes all health checks and returns a JSON blob containing the
+        key ``healthy``, which is whether all the healthed items are healthy,
+        and one key and value per healthed item.
+        """
+        # splitting off keys and values here because we want the keys
+        # correlated with the results of the DeferredList at the end
+        # (if self.healthed changes in the interim,  the DeferredList may not
+        # match up with self.healthed.keys() later)
+        keys, checks = ([], [])
+        for k, v in self.healthed.iteritems():
+            keys.append(k)
+            healthcheck = getattr(v, 'health_check', None)
+            if healthcheck:
+                checks.append(maybeDeferred(healthcheck).addErrback(
+                    lambda _: (False, {'reason': 'error during health check'})))
+            else:
+                checks.append(succeed(
+                    (False, {'reason': 'invalid health check object'})))
+
+        d = DeferredList(checks)
+
+        def assembleResults(results):
+            # because DeferredList returns with (bool, results)
+            results = [r[1] for r in results]
+            results = [{'healthy': r[0], 'details': r[1]} for r in results]
+            healthy = all(r['healthy'] for r in results)
+
+            summary = dict(zip(keys, results))
+            summary['healthy'] = healthy
+            return summary
+
+        return d.addCallback(assembleResults)
 
 
 def makeService(config):

@@ -11,7 +11,7 @@ from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
-from otter.tap.api import Options, makeService, setup_scheduler
+from otter.tap.api import Options, HealthChecker, makeService, setup_scheduler
 from otter.test.utils import patch, CheckFailure
 from otter.util.config import set_config_data
 
@@ -74,6 +74,81 @@ class APIOptionsTests(TestCase):
         self.assertFalse(config['mock'])
         config.parseOptions(['-m'])
         self.assertTrue(config['mock'])
+
+
+class HealthCheckerTests(TestCase):
+    """
+    Tests for the HealthChecker object
+    """
+    def test_no_healthed_objects(self):
+        """
+        If there are no healthed objects, HealthChecker returns healthy
+        """
+        d = HealthChecker().health_check()
+        self.assertEqual(self.successResultOf(d), {'healthy': True})
+
+    def test_invalid_healthed_objects(self):
+        """
+        If an invalid healthed object is added, it is unhealthy
+        """
+        d = HealthChecker({'invalid': None}).health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': False,
+            'invalid': {
+                'healthy': False,
+                'details': {'reason': 'invalid health check object'}
+            }
+        })
+
+    def test_synchronous_health_check(self):
+        """
+        Healthed object that has a synchronous health-check function works
+        """
+        healthed = mock.Mock(**{'health_check.return_value': (True, {})})
+        d = HealthChecker({'sync': healthed}).health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': True,
+            'sync': {
+                'healthy': True,
+                'details': {}
+            }
+        })
+
+    def test_asynchronous_health_check(self):
+        """
+        Healthed object that has an asynchronous health-check function works
+        """
+        healthed = mock.Mock(
+            **{'health_check.return_value': defer.succeed((True, {}))})
+        d = HealthChecker({'sync': healthed}).health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': True,
+            'sync': {
+                'healthy': True,
+                'details': {}
+            }
+        })
+
+    def test_all_health_must_pass(self):
+        """
+        Healthed object that has an asynchronous health-check function works
+        """
+        healthy = mock.Mock(**{'health_check.return_value': (True, {})})
+        unhealthy = mock.Mock(**{'health_check.return_value': (False, {})})
+        healthed = {'healthy_thing': healthy, 'unhealthy_thing': unhealthy}
+
+        d = HealthChecker(healthed).health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': False,
+            'healthy_thing': {
+                'healthy': True,
+                'details': {}
+            },
+            'unhealthy_thing': {
+                'healthy': False,
+                'details': {}
+            }
+        })
 
 
 class APIMakeServiceTests(TestCase):
