@@ -2491,10 +2491,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = None
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('Not connected yet')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
 
     def test_health_check_zookeeper_not_connected(self):
         """
@@ -2502,10 +2503,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.collection.kz_client = mock.MagicMock(connected=False)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('Not connected yet')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
 
     def test_health_check_zookeeper_connected(self):
         """
@@ -2515,10 +2517,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.CONNECTED)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'zookeeper': Equals(True),
-             'zookeeper_state': Equals('CONNECTED')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (True, matches(ContainsDict(
+               {'zookeeper': Equals(True),
+                'zookeeper_state': Equals('CONNECTED')}))))
 
     def test_health_check_zookeeper_suspended(self):
         """
@@ -2527,10 +2530,11 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.collection.kz_client = mock.MagicMock(connected=True,
                                                    state=KazooState.SUSPENDED)
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False), 'zookeeper': Equals(False),
-             'zookeeper_state': Equals('SUSPENDED')}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('SUSPENDED')}))))
 
     def test_health_check_cassandra_fails(self):
         """
@@ -2538,12 +2542,12 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         """
         self.connection.execute.return_value = defer.fail(Exception('boo'))
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False),
-             'cassandra': Equals(False),
-             'cassandra_failure': Equals("Exception('boo',)"),
-             'cassandra_time': Equals(0)}
-        )))
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("Exception('boo',)"),
+                 'cassandra_time': Equals(0)}))))
 
     def test_health_check_cassandra_times_out(self):
         """
@@ -2554,13 +2558,12 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.assertNoResult(d)
 
         self.clock.advance(15)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(False),
-             'cassandra': Equals(False),
-             'cassandra_failure': Equals("TimedOutError('cassandra health check "
-                                         "timed out after 15 seconds.',)"),
-             'cassandra_time': Equals(15)}
-        )))
+        self.assertEqual(self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
+                                             "timed out after 15 seconds.',)"),
+                 'cassandra_time': Equals(15)}))))
         # to make sure the deferred doesn't get GCed without being called
         self.connection.execute.return_value.callback(None)
 
@@ -2569,19 +2572,17 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'cassandra': Equals(True),
-             'cassandra_time': Equals(0)}
-        )))
+        self.assertEqual(self.successResultOf(d),
+            (True, matches(ContainsDict(
+                {'cassandra': Equals(True),
+                 'cassandra_time': Equals(0)}))))
 
     def test_health_check_succeeds_if_both_succeed(self):
         """
         If both zookeeper and cassandra are healthy, the store is healthy
         """
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d), matches(ContainsDict(
-            {'healthy': Equals(True)}
-        )))
+        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 
 class CassAdminTestCase(TestCase):

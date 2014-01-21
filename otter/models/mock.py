@@ -497,7 +497,7 @@ class MockScalingGroupCollection:
 
         see :meth:`otter.models.interface.IScalingGroupCollection.health_check`
         """
-        return defer.succeed({'healthy': True})
+        return defer.succeed((True, {}))
 
 
 @implementer(IAdmin)
