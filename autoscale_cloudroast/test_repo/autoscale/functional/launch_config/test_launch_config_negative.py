@@ -7,7 +7,6 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cloudcafe.common.tools.datagen import rand_name
 
 
-@unittest.skip('currently fails')
 class LaunchConfigNegtaiveTest(AutoscaleFixture):
 
     """
@@ -20,8 +19,9 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         """
         super(LaunchConfigNegtaiveTest, self).setUp()
         self.lc_name = rand_name('negative_launch_config')
-        self.invalid_flavor_ids = ['', 'INVALID-FLAVOR-ID', '8888', '-4', None]
-        self.invalid_image_ids = ['', 'INVALID-IMAGE-ID', '1111', self.lc_image_ref + 'Z', None]
+        self.invalid_flavor_ids = ['INVALID-FLAVOR-ID', '8888', '-4', None]
+        self.invalid_image_ids = ['INVALID-IMAGE-ID', '1111', self.lc_image_ref + 'Z', None]
+        self.failing_id = ['']
 
     def test_update_scaling_group_launch_config_to_invalid_imageid(self):
         """
@@ -55,7 +55,6 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                               msg='Updating group with invalid flavor id was successsful with'
                               ' response {0}'.format(update_launch_config_response.status_code))
 
-    @unittest.skip('AUTO-622')
     def test_update_scaling_group_launch_config_to_invalid_flavorid_1(self):
         """
         Verify update launch config fails with a 400 when the new launch config
@@ -95,6 +94,44 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
         has an invalid flavorid.
         """
         for each_invalid_id in self.invalid_flavor_ids:
+            create_group_response = self.autoscale_client.create_scaling_group(
+                gc_name='test',
+                gc_cooldown=self.gc_cooldown,
+                gc_min_entities=self.gc_min_entities,
+                lc_name=self.lc_name,
+                lc_image_ref=self.lc_image_ref,
+                lc_flavor_ref=each_invalid_id)
+            self.assertEquals(create_group_response.status_code, 400,
+                              msg='Create group with invalid flavor id was successsful with'
+                              ' response {0}'.format(create_group_response.status_code))
+
+    @unittest.skip('AUTO-875')
+    def test_create_scaling_group_invalid_imageid_not_handled(self):
+        """
+        Verify scaling group creation fails with a 400 when launch config
+        has imageId left blank. Note: Include failing_id as part of invalid_flavor_ids and
+        invalid_image_ids, when this is fixed.
+        """
+        for each_invalid_id in self.failing_id:
+            create_group_response = self.autoscale_client.create_scaling_group(
+                gc_name='test',
+                gc_cooldown=self.gc_cooldown,
+                gc_min_entities=self.gc_min_entities,
+                lc_name=self.lc_name,
+                lc_image_ref=each_invalid_id,
+                lc_flavor_ref=self.lc_flavor_ref)
+            self.assertEquals(create_group_response.status_code, 400,
+                              msg='Create group with invalid server image id was successsful with'
+                              ' response {0}'.format(create_group_response.status_code))
+
+    @unittest.skip('AUTO-875')
+    def test_create_scaling_group_invalid_flavorid_not_handled(self):
+        """
+        Verify scaling group creation fails with a 400 when launch config
+        has flavorId left blank. Note: Include failing_id as part of invalid_flavor_ids and
+        invalid_image_ids, when this is fixed.
+        """
+        for each_invalid_id in self.failing_id:
             create_group_response = self.autoscale_client.create_scaling_group(
                 gc_name='test',
                 gc_cooldown=self.gc_cooldown,
