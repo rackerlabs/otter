@@ -2341,6 +2341,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'created_at': None
         }]
         self.returns = [group_dicts, None]
+        self.collection.get_scaling_group = mock.Mock()
 
         expectedData = {'tenantId': '123', 'limit': 100}
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
@@ -2392,19 +2393,24 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }]
         self.returns = [group_dicts, None]
 
-        expectedCql = ('BEGIN BATCH '
-                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId0 '
-                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
-                       '"groupId" = :groupId1 '
-                       'APPLY BATCH;')
-        expectedData = {'groupId0': 'group124',
-                        'groupId1': 'group125',
-                        'tenantId': '123'}
+        groups = []
+
+        def get_scaling_group(*args, **kwargs):
+            group = mock.Mock(spec=['delete_group'])
+            groups.append(group)
+            return group
+
+        self.collection.get_scaling_group = mock.Mock(wraps=get_scaling_group)
+
         r = self.validate_list_states_return_value(self.mock_log, '123')
-        self.assertEqual(self.connection.execute.call_count, 2)
-        self.assertEqual(self.connection.execute.call_args_list[1],
-                         mock.call(expectedCql, expectedData, ConsistencyLevel.TWO))
+        self.assertEqual(
+            self.collection.get_scaling_group.mock_calls,
+            [mock.call(mock.ANY, '123', 'group124'),
+             mock.call(mock.ANY, '123', 'group125')])
+        self.assertEqual(len(groups), 2)
+        for group in groups:
+            group.delete_group.assert_called_once_with()
+
         self.assertEqual(r, [
             GroupState('123', 'group123', 'test123', {}, {}, '0001-01-01T00:00:00Z', {}, False)])
 
