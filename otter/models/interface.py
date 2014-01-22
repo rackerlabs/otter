@@ -580,6 +580,16 @@ class IScalingScheduleCollection(Interface):
         :return: None
         """
 
+    def get_oldest_event(bucket):
+        """
+        Get oldest event from the bucket
+
+        :param bucket: oldest event from this bucket
+        :type param: ``int``
+
+        :return: Deferred that fires with dict of oldest event
+        """
+
 
 class IScalingGroupCollection(Interface):
     """

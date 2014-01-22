@@ -95,6 +95,7 @@ _cql_fetch_batch_of_events = (
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
 _cql_delete_bucket_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
                             'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
+_cql_oldest_event = 'SELECT * from {cf} WHERE bucket=:bucket LIMIT 1;'
 
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -1153,6 +1154,16 @@ class CassScalingGroupCollection:
             data.update({event_name + key: event[key] for key in event})
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
+
+    def get_oldest_event(self, bucket):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.get_oldest_event`
+        """
+        d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
+                                    {'bucket': bucket},
+                                    get_consistency_level('check', 'event'))
+        d.addCallback(lambda r: r[0] if len(r) > 0 else None)
+        return d
 
     def webhook_info_by_hash(self, log, capability_hash):
         """

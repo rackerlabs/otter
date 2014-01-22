@@ -2005,6 +2005,31 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.assert_called_once_with(
             cql, data, ConsistencyLevel.ONE)
 
+    def test_get_oldest_event(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                   'trigger': 100, 'cron': 'c1', 'version': 'v1'}]
+        self.returns = [events]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertEqual(self.successResultOf(d), events[0])
+        self.connection.execute.assert_called_once_with(
+            'SELECT * from scaling_schedule_v2 WHERE bucket=:bucket LIMIT 1;',
+            {'bucket': 2}, ConsistencyLevel.ONE)
+
+    def test_get_oldest_event_empty(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        self.returns = [[]]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertIsNone(self.successResultOf(d))
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
