@@ -61,7 +61,7 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.clock = Clock()
         self.scheduler_service = SchedulerService(
             100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.clock)
+            self.time_boundary, self.buckets, self.clock, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
         self.timer_service = patch(self, 'otter.scheduler.TimerService')
 

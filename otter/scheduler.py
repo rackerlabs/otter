@@ -24,7 +24,7 @@ class SchedulerService(TimerService):
     """
 
     def __init__(self, batchsize, interval, store, kz_client,
-                 zk_partition_path, time_boundary, buckets, clock=None, threshold=600):
+                 zk_partition_path, time_boundary, buckets, clock=None, threshold=60):
         """
         Initialize the scheduler service
 
