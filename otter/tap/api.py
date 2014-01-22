@@ -185,7 +185,7 @@ def makeService(config):
 
     set_supervisor(supervisor)
 
-    otter = Otter(store)
+    otter = Otter(store, health_checker.health_check)
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 
