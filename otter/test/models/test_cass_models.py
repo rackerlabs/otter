@@ -2370,8 +2370,18 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'paused': '\x00',
             'created_at': 23
         }, {
-            'tenantId': '23',
-            'groupId': 'group23',
+            'tenantId': '123',
+            'groupId': 'group124',
+            'group_config': '{"name": "test123"}',
+            'active': '{}',
+            'pending': '{}',
+            'groupTouched': None,
+            'policyTouched': '{}',
+            'paused': '\x00',
+            'created_at': None
+        }, {
+            'tenantId': '123',
+            'groupId': 'group125',
             'group_config': '{"name": "test123"}',
             'active': '{}',
             'pending': '{}',
@@ -2382,8 +2392,15 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         }]
         self.returns = [group_dicts, None]
 
-        expectedCql = 'DELETE FROM scaling_group WHERE "groupId" IN (:column_value0);'
-        expectedData = {'column_value0': 'group23'}
+        expectedCql = ('BEGIN BATCH '
+                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId0 '
+                       'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND '
+                       '"groupId" = :groupId1 '
+                       'APPLY BATCH;')
+        expectedData = {'groupId0': 'group124',
+                        'groupId1': 'group125',
+                        'tenantId': '123'}
         r = self.validate_list_states_return_value(self.mock_log, '123')
         self.assertEqual(self.connection.execute.call_count, 2)
         self.assertEqual(self.connection.execute.call_args_list[1],

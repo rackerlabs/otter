@@ -64,7 +64,6 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      'pending, "policyTouched", paused, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                      ':pending, :policyTouched, :paused, :created_at)')
-_cql_delete_many = 'DELETE FROM {cf} WHERE {column} IN ({column_values});'
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -105,7 +104,7 @@ _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                            '"groupId" = :groupId')
+                            '"groupId" = :groupId{name}')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
                              'AND "groupId" = :groupId AND "policyId" = :policyId')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -475,7 +474,7 @@ class CassScalingGroup(object):
             return d
 
         view_query = _cql_view_manifest.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -489,7 +488,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_config`
         """
         view_query = _cql_view.format(cf=self.group_table, column='group_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -503,7 +502,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.view_launch_config`
         """
         view_query = _cql_view.format(cf=self.group_table, column='launch_config')
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -520,7 +519,7 @@ class CassScalingGroup(object):
             consistency = get_consistency_level('view', 'partial')
 
         view_query = _cql_view_group_state.format(cf=self.group_table)
-        del_query = _cql_delete_all_in_group.format(cf=self.group_table)
+        del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
@@ -906,7 +905,7 @@ class CassScalingGroup(object):
                 'groupId': self.uuid
             }
             queries = [
-                _cql_delete_all_in_group.format(cf=table) for table in
+                _cql_delete_all_in_group.format(cf=table, name='') for table in
                 (self.group_table, self.policies_table, self.webhooks_table)]
 
             b = Batch(queries, params,
@@ -930,23 +929,6 @@ class CassScalingGroup(object):
         lock = self.kz_client.Lock(LOCK_PATH + '/' + self.uuid)
         lock.acquire = functools.partial(lock.acquire, timeout=120)
         return with_lock(reactor, lock, log.bind(category='locking'), _delete_group)
-
-
-def _delete_many_query_and_params(cf, column, column_values):
-    """
-    Creates query and parameters that deletes many rows based on given column and values
-
-    :param cf: column family
-    :param column: column name based on which row will be deleted
-    :return: iterable column_values, column values that will match deleted row
-    """
-    column_values = list(column_values)
-    column_values_args = ','.join(
-        [':column_value{}'.format(i) for i in range(len(column_values))])
-    params = {'column_value{}'.format(i): column_value
-              for i, column_value in enumerate(column_values)}
-    query = _cql_delete_many.format(cf=cf, column=column, column_values=column_values_args)
-    return (query, params)
 
 
 @implementer(IScalingGroupCollection, IScalingScheduleCollection)
@@ -1094,11 +1076,17 @@ class CassScalingGroupCollection:
             if not groups:
                 return None
             log.msg('Resurrected rows', rows=groups)
-            query, params = _delete_many_query_and_params(
-                self.group_table, '"groupId"',
-                (group['groupId'] for group in groups))
-            return self.connection.execute(query, params,
-                                           get_consistency_level('delete', 'group'))
+
+            queries = [
+                _cql_delete_all_in_group.format(cf=self.group_table, name=i)
+                for i in range(len(groups))]
+
+            params = dict([('groupId{0}'.format(i), group['groupId'])
+                           for i, group in enumerate(groups)])
+            params['tenantId'] = tenant_id
+
+            b = Batch(queries, params, get_consistency_level('delete', 'group'))
+            return b.execute(self.connection)
 
         log = log.bind(tenant_id=tenant_id)
         cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
