@@ -82,6 +82,8 @@ class SchedulerService(TimerService):
             old_events = []
             for event in events:
                 if event and (now - event['trigger']).total_seconds() > self.threshold:
+                    event['version'] = str(event['version'])
+                    event['trigger'] = str(event['trigger'])
                     old_events.append(event)
             return (not bool(old_events), {'old_events': old_events,
                                            'buckets': list(self.kz_partition)})

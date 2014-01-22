@@ -100,8 +100,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
-        returns = [{'trigger': now - timedelta(hours=1)},
-                   {'trigger': now - timedelta(seconds=2)}]
+        returns = [{'trigger': now - timedelta(hours=1), 'version': 'v1'},
+                   {'trigger': now - timedelta(seconds=2), 'version': 'v1'}]
         self.returns = returns[:]
 
         d = self.scheduler_service.health_check()
@@ -118,8 +118,8 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.scheduler_service.startService()
         self.kz_partition.__iter__.return_value = [2, 3]
         now = datetime.utcnow()
-        self.returns = [{'trigger': now + timedelta(hours=1)},
-                        {'trigger': now + timedelta(seconds=2)}]
+        self.returns = [{'trigger': now + timedelta(hours=1), 'version': 'v1'},
+                        {'trigger': now + timedelta(seconds=2), 'version': 'v1'}]
 
         d = self.scheduler_service.health_check()
 
