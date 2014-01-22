@@ -104,7 +104,7 @@ _cql_update = ('INSERT INTO {cf}("tenantId", "groupId", {column}) '
 _cql_update_webhook = ('INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data) '
                        'VALUES (:tenantId, :groupId, :policyId, :webhookId, :data);')
 _cql_delete_all_in_group = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
-                            '"groupId" = :groupId')
+                            '"groupId" = :groupId{name}')
 _cql_delete_all_in_policy = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId '
                              'AND "groupId" = :groupId AND "policyId" = :policyId')
 _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
@@ -1077,12 +1077,17 @@ class CassScalingGroupCollection:
                 return None
             log.msg('Resurrected rows', rows=groups)
 
-            return defer.gatherResults([
-                self.get_scaling_group(
-                    log.bind(resurrected=True),
-                    tenant_id, group['groupId']).delete_group()
-                for group in groups
-            ])
+            queries = [
+                _cql_delete_all_in_group.format(cf=table, name=i)
+                for table in (self.group_table, self.policies_table, self.webhooks_table)
+                for i in range(len(groups))]
+
+            params = dict([('groupId{0}'.format(i), group['groupId'])
+                          for i, group in enumerate(groups)])
+            params['tenantId'] = tenant_id
+
+            b = Batch(queries, params, get_consistency_level('delete', 'group'))
+            return b.execute(self.connection)
 
         log = log.bind(tenant_id=tenant_id)
         cql, params = _paginated_list(tenant_id, limit=limit, marker=marker)
