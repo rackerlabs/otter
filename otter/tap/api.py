@@ -6,7 +6,7 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
-from twisted.internet.defer import DeferredList, maybeDeferred, succeed
+from twisted.internet.defer import DeferredList, maybeDeferred
 from twisted.internet.task import coiterate
 
 from twisted.internet.endpoints import clientFromString
@@ -82,20 +82,24 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
-class HealthChecker(dict):
+class HealthChecker(object):
     """
-    A object to store other objects with ``.health_check`` attributes, that has
-    a single health check function that calls all the others and assembles their
+    A dictionary to store callables that are health checks, that has a single
+    health check function that calls all the others and assembles their
     results.
 
-    ``.health_check`` should return a tuple of ``(bool, dict)``, the boolean
-    being whether the object is healthy, and the dictionary being extra data
-    to be included.
+    The health check callabls should return a tuple of ``(bool, dict)``, the
+    boolean being whether the object is healthy, and the dictionary being extra
+    data to be included.
 
-    :param healthed: a dictionary containing objects that have `.health_check`
-        attributes to be called, mapped to the key the health check data should
-        live under.
+    :param checks: a dictionary containing the name of things to health check
+        mapped to their health check callabls
     """
+    def __init__(self, checks=None):
+        self.checks = checks
+        if checks is None:
+            self.checks = {}
+
     def health_check(self):
         """
         Synthesizes all health checks and returns a JSON blob containing the
@@ -107,15 +111,12 @@ class HealthChecker(dict):
         # (if self.healthed changes in the interim,  the DeferredList may not
         # match up with self._healthed.keys() later)
         keys, checks = ([], [])
-        for k, v in self.iteritems():
+        for k, v in self.checks.iteritems():
             keys.append(k)
-            healthcheck = getattr(v, 'health_check', None)
-            if healthcheck:
-                checks.append(maybeDeferred(healthcheck).addErrback(
-                    lambda _: (False, {'reason': 'error during health check'})))
-            else:
-                checks.append(succeed(
-                    (False, {'reason': 'invalid health check object'})))
+            d = maybeDeferred(v)
+            d.addErrback(
+                lambda f: (False, {'reason': f.getTraceback()}))
+            checks.append(d)
 
         d = DeferredList(checks)
 
@@ -178,7 +179,9 @@ def makeService(config):
         cache_ttl)
 
     s = MultiService()
-    health_checker = HealthChecker({'store': store, 'scheduler': None})
+    health_checker = HealthChecker({
+        'store': getattr(store, 'health_check', None)
+    })
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
@@ -203,6 +206,8 @@ def makeService(config):
 
     # Setup Kazoo client
     if config_value('zookeeper'):
+        health_checker.checks['scheduler'] = (
+            lambda: (False, {'reason': 'scheduler not ready yet'}))
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
                                   threads=threads, txlog=log.bind(system='kazoo'))
@@ -211,7 +216,9 @@ def makeService(config):
         def on_client_ready(_):
             # Setup scheduler service after starting
             scheduler = setup_scheduler(s, store, kz_client)
-            health_checker['scheduler'] = scheduler
+            health_checker.checks['scheduler'] = getattr(
+                scheduler, 'health_check',
+                lambda: (False, 'scheduler health check not implemented'))
             # Set the client after starting
             # NOTE: There is small amount of time when the start is not finished
             # and the kz_client is not set in which case policy execution and group
