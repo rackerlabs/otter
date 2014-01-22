@@ -2520,8 +2520,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.assertEqual(
             self.successResultOf(d),
             (True, matches(ContainsDict(
-               {'zookeeper': Equals(True),
-                'zookeeper_state': Equals('CONNECTED')}))))
+                {'zookeeper': Equals(True),
+                 'zookeeper_state': Equals('CONNECTED')}))))
 
     def test_health_check_zookeeper_suspended(self):
         """
@@ -2558,7 +2558,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         self.assertNoResult(d)
 
         self.clock.advance(15)
-        self.assertEqual(self.successResultOf(d),
+        self.assertEqual(
+            self.successResultOf(d),
             (False, matches(ContainsDict(
                 {'cassandra': Equals(False),
                  'cassandra_failure': Equals("TimedOutError('cassandra health check "
@@ -2572,7 +2573,8 @@ class CassScalingGroupsCollectionHealthCheckTestCase(
         Health check fails if cassandra fails
         """
         d = self.collection.health_check(self.clock)
-        self.assertEqual(self.successResultOf(d),
+        self.assertEqual(
+            self.successResultOf(d),
             (True, matches(ContainsDict(
                 {'cassandra': Equals(True),
                  'cassandra_time': Equals(0)}))))
