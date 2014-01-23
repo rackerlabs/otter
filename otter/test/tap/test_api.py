@@ -147,7 +147,7 @@ class HealthCheckerTests(TestCase):
             }
         })
 
-    def test_all_health_must_pass(self):
+    def test_one_failed_health_fails_overall_health(self):
         """
         All health checks must pass in order for the main check to be healthy
         """
@@ -164,6 +164,31 @@ class HealthCheckerTests(TestCase):
             },
             'unhealthy_thing': {
                 'healthy': False,
+                'details': {}
+            }
+        })
+
+    def test_all_health_passes_means_overall_health_passes(self):
+        """
+        When all health checks pass the overall check is healthy
+        """
+        checker = HealthChecker(dict([
+            ("check{0}".format(i), mock.Mock(return_value=(True, {})))
+            for i in range(3)
+        ]))
+        d = checker.health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': True,
+            'check0': {
+                'healthy': True,
+                'details': {}
+            },
+            'check1': {
+                'healthy': True,
+                'details': {}
+            },
+            'check2': {
+                'healthy': True,
                 'details': {}
             }
         })
