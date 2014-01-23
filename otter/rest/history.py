@@ -66,6 +66,7 @@ _TENANT_ID_TEMPLATE = {
 
 
 def make_auditlog_query(tenant_id):
+    """Make an elastic search query to fetch audit logs."""
     query = copy.deepcopy(_ELASTICSEARCH_QUERY_TEMPLATE)
     tenant_query = copy.deepcopy(_TENANT_ID_TEMPLATE)
     tenant_query['fquery']['query']['field']['tenant_id']['query'] = tenant_id
