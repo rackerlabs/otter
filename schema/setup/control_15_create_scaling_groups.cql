@@ -38,6 +38,7 @@ CREATE COLUMNFAMILY scaling_group (
     "groupId" ascii,
     group_config ascii,
     launch_config ascii,
+    desired int,
     active ascii,
     pending ascii,
     "groupTouched" ascii,
