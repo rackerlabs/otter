@@ -1231,20 +1231,18 @@ class CassScalingGroupCollection:
         timeout_deferred(d, 15, clock=clock,
                          deferred_description='cassandra health check')
 
-        d.addCallback(lambda _: dict(
-            healthy=zk_health['zookeeper'],
+        d.addCallback(lambda _: (zk_health['zookeeper'], dict(
             cassandra=True,
             cassandra_time=(clock.seconds() - start_time),
             **zk_health
-        ))
+        )))
 
-        d.addErrback(lambda f: dict(
-            healthy=False,
+        d.addErrback(lambda f: (False, dict(
             cassandra=False,
             cassandra_failure=repr(f.value),
             cassandra_time=clock.seconds() - start_time,
             **zk_health
-        ))
+        )))
 
         return d
 

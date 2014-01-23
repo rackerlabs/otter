@@ -708,7 +708,9 @@ class IScalingGroupCollection(Interface):
         contain other information as well
 
         :param clock: an option clock with which to use for testing.
-        :return: ``dict`` containing health information.
+        :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
+            whether the services is healthy and the dictionar contains
+            extra health information.
         """
 
 
