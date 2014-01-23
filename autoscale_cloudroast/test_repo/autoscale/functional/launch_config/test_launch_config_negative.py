@@ -55,6 +55,7 @@ class LaunchConfigNegtaiveTest(AutoscaleFixture):
                               msg='Updating group with invalid flavor id was successsful with'
                               ' response {0}'.format(update_launch_config_response.status_code))
 
+    @unittest.skip('AUTO-622')
     def test_update_scaling_group_launch_config_to_invalid_flavorid_1(self):
         """
         Verify update launch config fails with a 400 when the new launch config
