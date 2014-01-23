@@ -5,6 +5,8 @@ Tests for the otter-api tap plugin.
 import json
 import mock
 
+from testtools.matchers import Contains
+
 from twisted.internet import reactor, defer
 
 from twisted.application.service import MultiService
@@ -12,7 +14,7 @@ from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
 from otter.tap.api import Options, HealthChecker, makeService, setup_scheduler
-from otter.test.utils import patch, CheckFailure
+from otter.test.utils import matches, patch, CheckFailure
 from otter.util.config import set_config_data
 
 
@@ -99,6 +101,20 @@ class HealthCheckerTests(TestCase):
             'invalid': {
                 'healthy': False,
                 'details': {'reason': mock.ANY}
+            }
+        })
+
+    def test_check_failure(self):
+        """
+        If a check raises an exception, its health is unhealthy
+        """
+        checker = HealthChecker({'fail': mock.Mock(side_effect=Exception)})
+        d = checker.health_check()
+        self.assertEqual(self.successResultOf(d), {
+            'healthy': False,
+            'fail': {
+                'healthy': False,
+                'details': {'reason': matches(Contains('Exception'))}
             }
         })
 

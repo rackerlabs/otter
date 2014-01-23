@@ -6,7 +6,7 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
-from twisted.internet.defer import DeferredList, maybeDeferred
+from twisted.internet.defer import gatherResults, maybeDeferred
 from twisted.internet.task import coiterate
 
 from twisted.internet.endpoints import clientFromString
@@ -103,13 +103,13 @@ class HealthChecker(object):
     def health_check(self):
         """
         Synthesizes all health checks and returns a JSON blob containing the
-        key ``healthy``, which is whether all the healthed items are healthy,
-        and one key and value per healthed item.
+        key ``healthy``, which is whether all the health checks are healthy,
+        and one key and value per health check.
         """
         # splitting off keys and values here because we want the keys
         # correlated with the results of the DeferredList at the end
-        # (if self.healthed changes in the interim,  the DeferredList may not
-        # match up with self._healthed.keys() later)
+        # (if self.checks changes in the interim, the DeferredList may not
+        # match up with self.checks.keys() later)
         keys, checks = ([], [])
         for k, v in self.checks.iteritems():
             keys.append(k)
@@ -118,11 +118,9 @@ class HealthChecker(object):
                 lambda f: (False, {'reason': f.getTraceback()}))
             checks.append(d)
 
-        d = DeferredList(checks)
+        d = gatherResults(checks)
 
         def assembleResults(results):
-            # because DeferredList returns with (bool, results)
-            results = [r[1] for r in results]
             results = [{'healthy': r[0], 'details': r[1]} for r in results]
             healthy = all(r['healthy'] for r in results)
 
