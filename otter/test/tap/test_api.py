@@ -120,7 +120,7 @@ class HealthCheckerTests(TestCase):
 
     def test_synchronous_health_check(self):
         """
-        Healthed object that has a synchronous health-check function works
+        Synchronous health checks are supported
         """
         checker = HealthChecker({'sync': mock.Mock(return_value=(True, {}))})
         d = checker.health_check()
@@ -134,7 +134,7 @@ class HealthCheckerTests(TestCase):
 
     def test_asynchronous_health_check(self):
         """
-        Healthed object that has an asynchronous health-check function works
+        Asynchronous health checks are supported
         """
         checker = HealthChecker(
             {'sync': mock.Mock(return_value=defer.succeed((True, {})))})
@@ -149,7 +149,7 @@ class HealthCheckerTests(TestCase):
 
     def test_all_health_must_pass(self):
         """
-        Healthed object that has an asynchronous health-check function works
+        All health checks must pass in order for the main check to be healthy
         """
         checker = HealthChecker({
             'healthy_thing': mock.Mock(return_value=(True, {})),
