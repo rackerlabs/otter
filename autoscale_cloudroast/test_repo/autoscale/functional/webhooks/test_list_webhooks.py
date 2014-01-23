@@ -34,7 +34,8 @@ class ListWebhooks(ScalingGroupPolicyFixture):
                           msg='List webhooks returns response {0} for group'
                           ' {1}'.format(list_webhooks_resp.status_code, self.group.id))
         self.validate_headers(list_webhooks_resp.headers)
-        webhook_id_list = [webhook.id for webhook in list_webhooks_resp.entity]
+        webhook_id_list = [webhook.id for webhook in (list_webhooks_resp.entity).webhooks]
         self.assertTrue(self.webhook1['id'] in webhook_id_list)
         self.assertTrue(self.webhook2['id'] in webhook_id_list)
+
         self.assertTrue(self.webhook3['id'] in webhook_id_list)

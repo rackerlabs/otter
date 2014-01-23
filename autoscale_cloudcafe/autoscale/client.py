@@ -4,7 +4,7 @@ Client objects for all the autoscale api calls
 from autoscale.models.response.autoscale_response import (Group, Config,
                                                           Policy, Webhook,
                                                           ScalingGroup, Groups,
-                                                          Policies)
+                                                          Policies, Webhooks)
 from autoscale.models.response.limits_response import Limits
 from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
@@ -536,7 +536,8 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
                             request_entity=webhooks,
                             requestslib_kwargs=requestslib_kwargs)
 
-    def list_webhooks(self, group_id, policy_id, requestslib_kwargs=None):
+    def list_webhooks(self, group_id, policy_id, marker=None,
+                      limit=None, requestslib_kwargs=None, url=None):
         """
         :summary: List basic info for all webhooks under scaling policy
         :param group_id: The id of an existing scaling group.
@@ -550,11 +551,12 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
         GET
         '/<tenantId>/groups/<groupId>/policy/<policyId>/webhook'
         """
-        url = '%s/groups/%s/policies/%s/webhooks/' % (
+        params = {'marker': marker, 'limit': limit}
+        url = url or '%s/groups/%s/policies/%s/webhooks/' % (
             self.url, group_id, policy_id)
-        return self.request('GET', url,
+        return self.request('GET', url, params=params,
                             requestslib_kwargs=requestslib_kwargs,
-                            response_entity_type=Webhook)
+                            response_entity_type=Webhooks)
 
     def update_webhook(self, group_id, policy_id, webhook_id, name,
                        metadata=None, requestslib_kwargs=None):

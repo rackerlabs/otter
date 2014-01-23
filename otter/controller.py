@@ -27,6 +27,7 @@ import iso8601
 import json
 
 from twisted.internet import defer
+from twisted.internet.task import deferLater
 
 from otter.log import audit
 from otter.models.interface import NoSuchScalingGroupError
@@ -34,6 +35,10 @@ from otter.supervisor import get_supervisor
 from otter.json_schema.group_schemas import MAX_ENTITIES
 from otter.util.deferredutils import unwrap_first_error
 from otter.util.timestamp import from_timestamp
+
+
+# Amount of time spaced between starting delete jobs when scaling down
+DELETE_WAIT_INTERVAL = 20
 
 
 class CannotExecutePolicyError(Exception):
@@ -318,7 +323,7 @@ def find_servers_to_evict(log, state, delta):
 
 
 def delete_active_servers(log, transaction_id, scaling_group,
-                          delta, state):
+                          delta, state, clock=None):
     """
     Start deleting active servers jobs
     """
@@ -331,9 +336,14 @@ def delete_active_servers(log, transaction_id, scaling_group,
         state.remove_active(server['id'])
 
     # then start deleting those servers
+    if not clock:
+        from twisted.internet import reactor
+        clock = reactor
     supervisor = get_supervisor()
-    return [_DeleteJob(log, transaction_id, scaling_group, server_info, supervisor).start()
-            for server_info in servers_to_evict]
+    for i, server_info in enumerate(servers_to_evict):
+        job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
+        d = deferLater(clock, i * DELETE_WAIT_INTERVAL, job.start)
+        supervisor.deferred_pool.add(d)
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):

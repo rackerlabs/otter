@@ -38,14 +38,16 @@ a token.)
 
 import json
 from itertools import groupby
+from functools import partial
 
 from twisted.internet.defer import succeed, Deferred
 
 from zope.interface import Interface, implementer
 
-import treq
+from otter.util import logging_treq as treq
+from otter.util.retry import retry, retry_times, repeating_interval
 
-from otter.log import log
+from otter.log import log as default_log
 from otter.util.http import (
     headers, check_success, append_segments, wrap_request_error)
 
@@ -54,12 +56,37 @@ class IAuthenticator(Interface):
     """
     Authenticators know how to authenticate tenants.
     """
-    def authenticate_tenant(tenant_id):
+    def authenticate_tenant(tenant_id, log=None):
         """
         :param tenant_id: A keystone tenant ID to authenticate as.
 
         :returns: 2-tuple of auth token and service catalog.
         """
+
+
+@implementer(IAuthenticator)
+class RetryingAuthenticator(object):
+    """
+    An authenticator that retries the provided auth_function if it fails
+
+    :param IReactorTime reactor: An IReactorTime provider used for retrying
+    :param IAuthenticator authenticator: retry authentication using this
+    """
+    def __init__(self, reactor, authenticator, max_retries=10, retry_interval=10):
+        self._reactor = reactor
+        self._authenticator = authenticator
+        self._max_retries = max_retries
+        self._retry_interval = retry_interval
+
+    def authenticate_tenant(self, tenant_id, log=None):
+        """
+        see :meth:`IAuthenticator.authenticate_tenant`
+        """
+        return retry(
+            partial(self._authenticator.authenticate_tenant, tenant_id, log=log),
+            can_retry=retry_times(self._max_retries),
+            next_interval=repeating_interval(self._retry_interval),
+            clock=self._reactor)
 
 
 @implementer(IAuthenticator)
@@ -80,15 +107,25 @@ class CachingAuthenticator(object):
 
         self._waiters = {}
         self._cache = {}
-        self._log = log.bind(system='otter.auth.cache',
-                             authenticator=authenticator,
-                             cache_ttl=ttl)
+        self._log = self._bind_log(default_log)
 
-    def authenticate_tenant(self, tenant_id):
+    def _bind_log(self, log, **kwargs):
+        """
+        Binds relevant authenticator arguments to a `BoundLog`
+        """
+        return log.bind(system='otter.auth.cache',
+                        authenticator=self._authenticator,
+                        cache_ttl=self._ttl,
+                        **kwargs)
+
+    def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
-        log = self._log.bind(tenant_id=tenant_id)
+        if log is None:
+            log = self._log.bind(tenant_id=tenant_id)
+        else:
+            log = self._bind_log(log, tenant_id=tenant_id)
 
         if tenant_id in self._cache:
             (created, data) = self._cache[tenant_id]
@@ -126,7 +163,7 @@ class CachingAuthenticator(object):
 
         log.msg('otter.auth.cache.miss')
         self._waiters[tenant_id] = []
-        d = self._authenticator.authenticate_tenant(tenant_id)
+        d = self._authenticator.authenticate_tenant(tenant_id, log=log)
         d.addCallback(when_authenticated)
         d.addErrback(when_auth_fails)
 
@@ -145,20 +182,21 @@ class ImpersonatingAuthenticator(object):
         self._url = url
         self._admin_url = admin_url
 
-    def authenticate_tenant(self, tenant_id):
+    def authenticate_tenant(self, tenant_id, log=None):
         """
         see :meth:`IAuthenticator.authenticate_tenant`
         """
         d = authenticate_user(self._url,
                               self._identity_admin_user,
-                              self._identity_admin_password)
+                              self._identity_admin_password,
+                              log=log)
         d.addCallback(extract_token)
 
         def find_user(identity_admin_token):
             d = user_for_tenant(self._admin_url,
                                 self._identity_admin_user,
                                 self._identity_admin_password,
-                                tenant_id)
+                                tenant_id, log=log)
             d.addCallback(lambda username: (identity_admin_token, username))
             return d
 
@@ -167,7 +205,7 @@ class ImpersonatingAuthenticator(object):
         def impersonate((identity_admin_token, user)):
             iud = impersonate_user(self._admin_url,
                                    identity_admin_token,
-                                   user)
+                                   user, log=log)
             iud.addCallback(extract_token)
             iud.addCallback(lambda token: (identity_admin_token, token))
             return iud
@@ -175,7 +213,8 @@ class ImpersonatingAuthenticator(object):
         d.addCallback(impersonate)
 
         def endpoints((identity_admin_token, token)):
-            scd = endpoints_for_token(self._admin_url, identity_admin_token, token)
+            scd = endpoints_for_token(self._admin_url, identity_admin_token,
+                                      token, log=log)
             scd.addCallback(lambda endpoints: (token, _endpoints_to_service_catalog(endpoints)))
             return scd
 
@@ -195,7 +234,8 @@ def extract_token(auth_response):
     return auth_response['access']['token']['id'].encode('ascii')
 
 
-def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
+def endpoints_for_token(auth_endpoint, identity_admin_token, user_token,
+                        log=None):
     """
     Get the list of endpoints from the service_catalog for the specified token.
 
@@ -207,14 +247,14 @@ def endpoints_for_token(auth_endpoint, identity_admin_token, user_token):
     :return: decoded JSON response as dict.
     """
     d = treq.get(append_segments(auth_endpoint, 'tokens', user_token, 'endpoints'),
-                 headers=headers(identity_admin_token))
+                 headers=headers(identity_admin_token), log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, auth_endpoint, data='token_endpoints')
     d.addCallback(treq.json_content)
     return d
 
 
-def user_for_tenant(auth_endpoint, username, password, tenant_id):
+def user_for_tenant(auth_endpoint, username, password, tenant_id, log=None):
     """
     Use a super secret API to get the special actual username for a tenant id.
 
@@ -228,7 +268,8 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id):
     d = treq.get(
         append_segments(auth_endpoint.replace('v2.0', 'v1.1'), 'mosso', str(tenant_id)),
         auth=(username, password),
-        allow_redirects=False)
+        allow_redirects=False,
+        log=log)
     d.addCallback(check_success, [301])
     d.addErrback(wrap_request_error, auth_endpoint, data='mosso')
     d.addCallback(treq.json_content)
@@ -236,7 +277,7 @@ def user_for_tenant(auth_endpoint, username, password, tenant_id):
     return d
 
 
-def authenticate_user(auth_endpoint, username, password):
+def authenticate_user(auth_endpoint, username, password, log=None):
     """
     Authenticate to a Identity auth endpoint with a username and password.
 
@@ -257,7 +298,8 @@ def authenticate_user(auth_endpoint, username, password):
                     }
                 }
             }),
-        headers=headers())
+        headers=headers(),
+        log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, auth_endpoint,
                  data=('authenticating', username))
@@ -265,7 +307,8 @@ def authenticate_user(auth_endpoint, username, password):
     return d
 
 
-def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10800):
+def impersonate_user(auth_endpoint, identity_admin_token, username,
+                     expire_in=10800, log=None):
     """
     Acquire an auth-token for a user via impersonation.
 
@@ -285,7 +328,8 @@ def impersonate_user(auth_endpoint, identity_admin_token, username, expire_in=10
                 "expire-in-seconds": expire_in
             }
         }),
-        headers=headers(identity_admin_token))
+        headers=headers(identity_admin_token),
+        log=log)
     d.addCallback(check_success, [200, 203])
     d.addErrback(wrap_request_error, auth_endpoint, data='impersonation')
     d.addCallback(treq.json_content)

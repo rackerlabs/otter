@@ -25,7 +25,7 @@ class ScalingWebhooksNegative(ScalingGroupPolicyFixture):
         policy = self.autoscale_behaviors.create_policy_min(group.id)
         list_webhooks_resp = self.autoscale_client.list_webhooks(
             group.id, policy['id'])
-        list_webhooks = list_webhooks_resp.entity
+        list_webhooks = (list_webhooks_resp.entity).webhooks
         self.assertEquals(list_webhooks_resp.status_code, 200,
                           msg='List webhooks failed with {0} on group '
                           '{1}'.format(list_webhooks_resp.status_code,

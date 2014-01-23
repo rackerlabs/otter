@@ -32,12 +32,14 @@ from otter.test.models.test_interface import (
     IScalingScheduleCollectionProviderMixin)
 
 from otter.test.utils import patch, matches
-from testtools.matchers import IsInstance
+from testtools.matchers import IsInstance, ContainsDict, Equals
 from otter.util.timestamp import from_timestamp
 from otter.util.config import set_config_data
 
 from twisted.internet import defer
+from twisted.internet.task import Clock
 from silverberg.client import ConsistencyLevel
+from kazoo.protocol.states import KazooState
 
 
 def _de_identify(json_obj):
@@ -128,6 +130,20 @@ class GetConsistencyTests(TestCase):
         Gives QUORUM on event fetch
         """
         level = get_consistency_level('fetch', 'event')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+    def test_group_create(self):
+        """
+        Gives QUORUM on group create
+        """
+        level = get_consistency_level('create', 'group')
+        self.assertEqual(level, ConsistencyLevel.QUORUM)
+
+    def test_update_state(self):
+        """
+        Gives QUORUM on updating state
+        """
+        level = get_consistency_level('update', 'state')
         self.assertEqual(level, ConsistencyLevel.QUORUM)
 
 
@@ -324,6 +340,22 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        'a', {'A': 'R'},
                                        {'P': 'R'}, '123', {'PT': 'R'}, False))
 
+    def test_view_respsects_consistency_argument(self):
+        """
+        If a consistency argument is passed to ``view_state``, it is honored
+        over the default consistency
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+        self.returns = [cass_response]
+        d = self.group.view_state(consistency=ConsistencyLevel.ALL)
+        self.successResultOf(d)
+        self.connection.execute.assert_called_once_with(mock.ANY,
+                                                        mock.ANY,
+                                                        ConsistencyLevel.ALL)
+
     def test_view_state_no_such_group(self):
         """
         Calling ``view_state`` on a group that doesn't exist raises a
@@ -386,12 +418,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         d = self.group.modify_state(modifier)
         self.assertEqual(self.successResultOf(d), None)
+        self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
             'pending, "groupTouched", "policyTouched", paused) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
             ':policyTouched, :paused)')
-
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
@@ -1973,6 +2005,31 @@ class CassScalingScheduleCollectionTestCase(IScalingScheduleCollectionProviderMi
         self.connection.execute.assert_called_once_with(
             cql, data, ConsistencyLevel.ONE)
 
+    def test_get_oldest_event(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        events = [{'tenantId': '1d2', 'groupId': 'gr2', 'policyId': 'ef',
+                   'trigger': 100, 'cron': 'c1', 'version': 'v1'}]
+        self.returns = [events]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertEqual(self.successResultOf(d), events[0])
+        self.connection.execute.assert_called_once_with(
+            'SELECT * from scaling_schedule_v2 WHERE bucket=:bucket LIMIT 1;',
+            {'bucket': 2}, ConsistencyLevel.ONE)
+
+    def test_get_oldest_event_empty(self):
+        """
+        Tests for `get_oldest_event`
+        """
+        self.returns = [[]]
+
+        d = self.collection.get_oldest_event(2)
+
+        self.assertIsNone(self.successResultOf(d))
+
 
 class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
                                           TestCase):
@@ -1989,10 +2046,10 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         self.returns = [[{"count": 0}], None]
 
         def _responses(*args):
-            result = _de_identify(self.returns.pop(0))
+            result = self.returns.pop(0)
             if isinstance(result, Exception):
                 return defer.fail(result)
-            return defer.succeed(result)
+            return defer.succeed(_de_identify(result))
 
         self.connection.execute.side_effect = _responses
 
@@ -2436,6 +2493,123 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         result = self.successResultOf(d)
         self.assertEquals(result, expectedResults)
         self.connection.execute.assert_has_calls(calls)
+
+
+class CassScalingGroupsCollectionHealthCheckTestCase(
+        IScalingGroupCollectionProviderMixin, TestCase):
+    """
+    Tests for :class:`CassScalingGroupCollection`
+    """
+
+    def setUp(self):
+        """ Setup the mocks """
+        self.connection = mock.MagicMock(spec=['execute'])
+        self.connection.execute.return_value = defer.succeed([])
+        self.collection = CassScalingGroupCollection(self.connection)
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.CONNECTED)
+        self.clock = Clock()
+
+    def test_health_check_no_zookeeper(self):
+        """
+        Health check fails if there is no zookeeper client
+        """
+        self.collection.kz_client = None
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
+
+    def test_health_check_zookeeper_not_connected(self):
+        """
+        Health check fails if there is no zookeeper client
+        """
+        self.collection.kz_client = mock.MagicMock(connected=False)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('Not connected yet')}))))
+
+    def test_health_check_zookeeper_connected(self):
+        """
+        Health check for zookeeper succeeds if the zookeeper client state is
+        CONNECTED
+        """
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.CONNECTED)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (True, matches(ContainsDict(
+                {'zookeeper': Equals(True),
+                 'zookeeper_state': Equals('CONNECTED')}))))
+
+    def test_health_check_zookeeper_suspended(self):
+        """
+        Health check fails if the zookeeper client state is not CONNECTED
+        """
+        self.collection.kz_client = mock.MagicMock(connected=True,
+                                                   state=KazooState.SUSPENDED)
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'zookeeper': Equals(False),
+                 'zookeeper_state': Equals('SUSPENDED')}))))
+
+    def test_health_check_cassandra_fails(self):
+        """
+        Health check fails if cassandra fails
+        """
+        self.connection.execute.return_value = defer.fail(Exception('boo'))
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("Exception('boo',)"),
+                 'cassandra_time': Equals(0)}))))
+
+    def test_health_check_cassandra_times_out(self):
+        """
+        Health check for cassandra fails if cassandra check times out
+        """
+        self.connection.execute.return_value = defer.Deferred()
+        d = self.collection.health_check(self.clock)
+        self.assertNoResult(d)
+
+        self.clock.advance(15)
+        self.assertEqual(
+            self.successResultOf(d),
+            (False, matches(ContainsDict(
+                {'cassandra': Equals(False),
+                 'cassandra_failure': Equals("TimedOutError('cassandra health check "
+                                             "timed out after 15 seconds.',)"),
+                 'cassandra_time': Equals(15)}))))
+        # to make sure the deferred doesn't get GCed without being called
+        self.connection.execute.return_value.callback(None)
+
+    def test_health_check_cassandra_succeeds(self):
+        """
+        Health check fails if cassandra fails
+        """
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(
+            self.successResultOf(d),
+            (True, matches(ContainsDict(
+                {'cassandra': Equals(True),
+                 'cassandra_time': Equals(0)}))))
+
+    def test_health_check_succeeds_if_both_succeed(self):
+        """
+        If both zookeeper and cassandra are healthy, the store is healthy
+        """
+        d = self.collection.health_check(self.clock)
+        self.assertEqual(self.successResultOf(d), (True, mock.ANY))
 
 
 class CassAdminTestCase(TestCase):
