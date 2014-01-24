@@ -59,6 +59,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_will_hit_max(self):
         """
@@ -76,6 +77,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_but_at_max(self):
         """
@@ -93,6 +95,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_positive_change_but_at_default_max(self):
         """
@@ -110,6 +113,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_negative_change_within_min_max(self):
         """
@@ -127,6 +131,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_negative_change_will_hit_min(self):
         """
@@ -144,6 +149,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_negative_change_but_at_min(self):
         """
@@ -160,6 +166,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_positive_change_within_min_max(self):
         """
@@ -176,6 +183,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 6)
 
     def test_percent_positive_change_will_hit_max(self):
         """
@@ -192,6 +200,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_positive_change_but_at_max(self):
         """
@@ -208,6 +217,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_positive_change_but_at_default_max(self):
         """
@@ -224,6 +234,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_percent_negative_change_within_min_max(self):
         """
@@ -240,6 +251,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_negative_change_will_hit_min(self):
         """
@@ -256,6 +268,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_negative_change_but_at_min(self):
         """
@@ -271,6 +284,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_percent_rounding(self):
         """
@@ -281,16 +295,17 @@ class CalculateDeltaTestCase(TestCase):
         fake_state = self.get_state({}, dict.fromkeys(range(5)))
 
         test_cases = [
-            (50, 3), (5, 1), (75, 4),
-            (-50, -3), (-5, -1), (-75, -4)]
+            (50, 8, 3), (5, 6, 1), (75, 9, 4),
+            (-50, 2, -3), (-5, 4, -1), (-75, 1, -4)]
 
-        for change_percent, expected_delta in test_cases:
+        for change_percent, expected_desired, expected_delta in test_cases:
             fake_policy = {'changePercent': change_percent}
             self.assertEqual(expected_delta,
                              controller.calculate_delta(self.mock_log,
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+            self.assertEqual(fake_state.desired, expected_desired)
 
     def test_desired_positive_change_within_min_max(self):
         """
@@ -307,6 +322,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 25)
 
     def test_desired_positive_change_will_hit_max(self):
         """
@@ -323,6 +339,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_positive_change_but_at_max(self):
         """
@@ -339,6 +356,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_positive_change_but_at_default_max(self):
         """
@@ -355,6 +373,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 10)
 
     def test_desired_will_hit_min(self):
         """
@@ -371,6 +390,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_desired_at_min(self):
         """
@@ -386,6 +406,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_no_change_or_percent_or_desired_fails(self):
         """
@@ -414,6 +435,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_zero_change_below_min(self):
         """
@@ -429,6 +451,7 @@ class CalculateDeltaTestCase(TestCase):
                                                        fake_state,
                                                        fake_config,
                                                        fake_policy))
+        self.assertEqual(fake_state.desired, 5)
 
     def test_zero_change_above_max(self):
         """
@@ -444,6 +467,7 @@ class CalculateDeltaTestCase(TestCase):
                                                         fake_state,
                                                         fake_config,
                                                         fake_policy))
+        self.assertEqual(fake_state.desired, 2)
 
     def test_logs_relevant_information(self):
         """
@@ -456,6 +480,7 @@ class CalculateDeltaTestCase(TestCase):
         controller.calculate_delta(self.mock_log, fake_state, fake_config,
                                    fake_policy)
         args, kwargs = self.mock_log.msg.call_args
+        self.assertEqual(fake_state.desired, 1)
         self.assertEqual(args, ('calculating delta',))
         self.assertEqual(kwargs, matches(ContainsDict({
             'server_delta': Equals(1),
