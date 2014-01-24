@@ -6,6 +6,7 @@ import jsonfig
 from twisted.python import usage
 
 from twisted.internet import reactor
+from twisted.internet.defer import gatherResults, maybeDeferred
 from twisted.internet.task import coiterate
 
 from twisted.internet.endpoints import clientFromString
@@ -27,6 +28,7 @@ from otter.scheduler import SchedulerService
 
 from otter.supervisor import SupervisorService, set_supervisor
 from otter.auth import ImpersonatingAuthenticator
+from otter.auth import RetryingAuthenticator
 from otter.auth import CachingAuthenticator
 
 from otter.log import log
@@ -110,6 +112,55 @@ class FunctionalService(Service, object):
             return self._stop()
 
 
+class HealthChecker(object):
+    """
+    A dictionary to store callables that are health checks, that has a single
+    health check function that calls all the others and assembles their
+    results.
+
+    The health check callabls should return a tuple of ``(bool, dict)``, the
+    boolean being whether the object is healthy, and the dictionary being extra
+    data to be included.
+
+    :param checks: a dictionary containing the name of things to health check
+        mapped to their health check callabls
+    """
+    def __init__(self, checks=None):
+        self.checks = checks
+        if checks is None:
+            self.checks = {}
+
+    def health_check(self):
+        """
+        Synthesizes all health checks and returns a JSON blob containing the
+        key ``healthy``, which is whether all the health checks are healthy,
+        and one key and value per health check.
+        """
+        # splitting off keys and values here because we want the keys
+        # correlated with the results of the DeferredList at the end
+        # (if self.checks changes in the interim, the DeferredList may not
+        # match up with self.checks.keys() later)
+        keys, checks = ([], [])
+        for k, v in self.checks.iteritems():
+            keys.append(k)
+            d = maybeDeferred(v)
+            d.addErrback(
+                lambda f: (False, {'reason': f.getTraceback()}))
+            checks.append(d)
+
+        d = gatherResults(checks)
+
+        def assembleResults(results):
+            results = [{'healthy': r[0], 'details': r[1]} for r in results]
+            healthy = all(r['healthy'] for r in results)
+
+            summary = dict(zip(keys, results))
+            summary['healthy'] = healthy
+            return summary
+
+        return d.addCallback(assembleResults)
+
+
 def makeService(config):
     """
     Set up the otter-api service.
@@ -148,19 +199,28 @@ def makeService(config):
 
     authenticator = CachingAuthenticator(
         reactor,
-        ImpersonatingAuthenticator(
-            config_value('identity.username'),
-            config_value('identity.password'),
-            config_value('identity.url'),
-            config_value('identity.admin_url')),
+        RetryingAuthenticator(
+            reactor,
+            ImpersonatingAuthenticator(
+                config_value('identity.username'),
+                config_value('identity.password'),
+                config_value('identity.url'),
+                config_value('identity.admin_url')),
+            max_retries=config_value('identity.max_retries'),
+            retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
+
+    s = MultiService()
+    health_checker = HealthChecker({
+        'store': getattr(store, 'health_check', None)
+    })
 
     supervisor = SupervisorService(authenticator.authenticate_tenant, coiterate)
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
 
-    otter = Otter(store)
+    otter = Otter(store, health_checker.health_check)
     site = Site(otter.app.resource())
     site.displayTracebacks = False
 
@@ -178,17 +238,26 @@ def makeService(config):
 
     # Setup Kazoo client
     if config_value('zookeeper'):
+        health_checker.checks['scheduler'] = (
+            lambda: (False, {'reason': 'scheduler not ready yet'}))
         threads = config_value('zookeeper.threads') or 10
         kz_client = TxKazooClient(hosts=config_value('zookeeper.hosts'),
-                                  threads=threads)
+                                  threads=threads, txlog=log.bind(system='kazoo'))
         d = kz_client.start()
-        # Setup scheduler service after starting
-        d.addCallback(lambda _: setup_scheduler(s, store, kz_client))
-        # Set the client after starting
-        # NOTE: There is small amount of time when the start is not finished
-        # and the kz_client is not set in which case policy execution and group
-        # delete will fail
-        d.addCallback(lambda _: setattr(store, 'kz_client', kz_client))
+
+        def on_client_ready(_):
+            # Setup scheduler service after starting
+            scheduler = setup_scheduler(s, store, kz_client)
+            health_checker.checks['scheduler'] = getattr(
+                scheduler, 'health_check',
+                lambda: (False, 'scheduler health check not implemented'))
+            # Set the client after starting
+            # NOTE: There is small amount of time when the start is not finished
+            # and the kz_client is not set in which case policy execution and group
+            # delete will fail
+            store.kz_client = kz_client
+
+        d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
 
     return s
@@ -210,3 +279,4 @@ def setup_scheduler(parent, store, kz_client):
                                          store, kz_client, partition_path, time_boundary,
                                          buckets)
     scheduler_service.setServiceParent(parent)
+    return scheduler_service

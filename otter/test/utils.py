@@ -173,6 +173,25 @@ class LockMixin(object):
         return lock
 
 
+class DeferredFunctionMixin(object):
+    """
+    A mixin for adding functions that return specific values
+    """
+
+    def setup_func(self, func):
+        """
+        Setup `func` to return value from self.returns
+        """
+
+        def mock_func(*args, **kwargs):
+            ret = self.returns.pop(0)
+            if isinstance(ret, Exception):
+                return defer.fail(ret)
+            return defer.succeed(ret)
+
+        func.side_effect = mock_func
+
+
 def mock_log(*args, **kwargs):
     """
     Returns a BoundLog whose msg and err methods are mocks.  Makes it easier

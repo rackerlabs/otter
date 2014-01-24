@@ -95,6 +95,7 @@ _cql_fetch_batch_of_events = (
     'WHERE bucket = :bucket AND trigger <= :now LIMIT :size;')
 _cql_delete_bucket_event = ('DELETE FROM {cf} WHERE bucket = :bucket '
                             'AND trigger = :{name}trigger AND "policyId" = :{name}policyId;')
+_cql_oldest_event = 'SELECT * from {cf} WHERE bucket=:bucket LIMIT 1;'
 
 _cql_insert_webhook = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", "webhookId", data, capability, '
@@ -202,7 +203,9 @@ def _paginated_list(tenant_id, group_id=None, policy_id=None, limit=100,
 # Store consistency levels
 _consistency_levels = {'event': {'fetch': ConsistencyLevel.QUORUM,
                                  'insert': ConsistencyLevel.ONE,
-                                 'delete': ConsistencyLevel.QUORUM}}
+                                 'delete': ConsistencyLevel.QUORUM},
+                       'group': {'create': ConsistencyLevel.QUORUM},
+                       'state': {'update': ConsistencyLevel.QUORUM}}
 
 
 def get_consistency_level(operation, resource):
@@ -510,16 +513,19 @@ class CassScalingGroup(object):
 
         return d.addCallback(lambda group: _jsonloads_data(group['launch_config']))
 
-    def view_state(self):
+    def view_state(self, consistency=None):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_state`
         """
+        if consistency is None:
+            consistency = get_consistency_level('view', 'partial')
+
         view_query = _cql_view_group_state.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table)
         d = verified_view(self.connection, view_query, del_query,
                           {"tenantId": self.tenant_id,
                            "groupId": self.uuid},
-                          get_consistency_level('view', 'partial'),
+                          consistency,
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
 
         return d.addCallback(_unmarshal_state)
@@ -529,6 +535,7 @@ class CassScalingGroup(object):
         see :meth:`otter.models.interface.IScalingGroup.modify_state`
         """
         log = self.log.bind(system='CassScalingGroup.modify_state')
+        consistency = get_consistency_level('update', 'state')
 
         def _write_state(new_state):
             assert (new_state.tenant_id == self.tenant_id and
@@ -543,10 +550,10 @@ class CassScalingGroup(object):
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
             return self.connection.execute(_cql_insert_group_state.format(cf=self.group_table),
-                                           params, get_consistency_level('update', 'state'))
+                                           params, consistency)
 
         def _modify_state():
-            d = self.view_state()
+            d = self.view_state(consistency)
             d.addCallback(lambda state: modifier_callable(self, state, *args, **kwargs))
             return d.addCallback(_write_state)
 
@@ -1148,6 +1155,16 @@ class CassScalingGroupCollection:
         b = Batch(queries, data, get_consistency_level('insert', 'event'))
         return b.execute(self.connection)
 
+    def get_oldest_event(self, bucket):
+        """
+        see :meth:`otter.models.interface.IScalingScheduleCollection.get_oldest_event`
+        """
+        d = self.connection.execute(_cql_oldest_event.format(cf=self.event_table),
+                                    {'bucket': bucket},
+                                    get_consistency_level('check', 'event'))
+        d.addCallback(lambda r: r[0] if len(r) > 0 else None)
+        return d
+
     def webhook_info_by_hash(self, log, capability_hash):
         """
         see :meth:`otter.models.interface.IScalingGroupCollection.webhook_info_by_hash`
@@ -1214,20 +1231,18 @@ class CassScalingGroupCollection:
         timeout_deferred(d, 15, clock=clock,
                          deferred_description='cassandra health check')
 
-        d.addCallback(lambda _: dict(
-            healthy=zk_health['zookeeper'],
+        d.addCallback(lambda _: (zk_health['zookeeper'], dict(
             cassandra=True,
             cassandra_time=(clock.seconds() - start_time),
             **zk_health
-        ))
+        )))
 
-        d.addErrback(lambda f: dict(
-            healthy=False,
+        d.addErrback(lambda f: (False, dict(
             cassandra=False,
             cassandra_failure=repr(f.value),
             cassandra_time=clock.seconds() - start_time,
             **zk_health
-        ))
+        )))
 
         return d
 
