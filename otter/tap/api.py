@@ -210,7 +210,6 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    s = MultiService()
     health_checker = HealthChecker({
         'store': getattr(store, 'health_check', None)
     })
