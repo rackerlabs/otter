@@ -110,6 +110,12 @@ class FunctionalService(Service, object):
             return self._stop()
 
 
+def cassandra_disconnect(cass, supervisor):
+    d = supervisor.notify_on_jobs_completion()
+    d.addCallback(lambda _: cass.disconnect())
+    return d
+
+
 def makeService(config):
     """
     Set up the otter-api service.
@@ -126,8 +132,6 @@ def makeService(config):
         cassandra_cluster = LoggingCQLClient(RoundRobinCassandraCluster(
             seed_endpoints,
             config_value('cassandra.keyspace')), log.bind(system='otter.silverberg'))
-        # Setup cassandra cluster to disconnect when otter shuts down
-        s.addService(FunctionalService(stop=cassandra_cluster.disconnect))
 
         store = CassScalingGroupCollection(cassandra_cluster)
         admin_store = CassAdmin(cassandra_cluster)
@@ -159,6 +163,11 @@ def makeService(config):
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
+
+    # Setup cassandra cluster to disconnect when otter shuts down
+    if 'cassandra_cluster' in locals():
+        s.addService(FunctionalService(stop=partial(cassandra_disconnect,
+                                                    cassandra_cluster, supervisor)))
 
     otter = Otter(store)
     site = Site(otter.app.resource())
