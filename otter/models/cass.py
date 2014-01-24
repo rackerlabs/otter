@@ -1082,8 +1082,8 @@ class CassScalingGroupCollection:
                 for table in (self.group_table, self.policies_table, self.webhooks_table)
                 for i in range(len(groups))]
 
-            params = dict([('groupId{0}'.format(i), group['groupId'])
-                          for i, group in enumerate(groups)])
+            params = {'groupId{0}'.format(i): group['groupId']
+                      for i, group in enumerate(groups)}
             params['tenantId'] = tenant_id
 
             b = Batch(queries, params, get_consistency_level('delete', 'group'))
