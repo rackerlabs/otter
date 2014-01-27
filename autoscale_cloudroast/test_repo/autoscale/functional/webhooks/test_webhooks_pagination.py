@@ -11,6 +11,15 @@ class PaginateWebhooks(AutoscaleFixture):
     Verify pagination for list webhooks
     """
 
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize autoscale configs, behaviors and client
+        """
+        super(PaginateWebhooks, cls).setUpClass()
+        cls.limits_response = cls.autoscale_client.view_limits().entity
+        cls.max_webhooks = cls.limits_response.absolute.maxWebhooksPerPolicy
+
     def setUp(self):
         """
         Create a group, a scaling policy, and four webhooks for testing since no webhook is supplied
@@ -30,15 +39,13 @@ class PaginateWebhooks(AutoscaleFixture):
         than the maximum of 100. Verify that the webhooks are listed in batches of the
         maximum limit (100) with a next link.
         """
-        self._create_multiple_webhooks(self.pagination_limit)
+        to_build = self.max_policies - self.get_total_num_webhooks(self.group.id, self.policy['id'])
+        self._create_multiple_webhooks(to_build)
         params = [None, 10000]
         for each_param in params:
             list_webhooks = self._list_webhooks_with_given_limit(each_param)
-            self._assert_list_webhooks_with_limits_next_link(self.pagination_limit,
-                                                             list_webhooks)
-            rem_list_webhooks = self.autoscale_client.list_webhooks(
-                self.group.id, self.policy['id'], url=list_webhooks.webhooks_links.next).entity
-            self._assert_list_webhooks_with_limits_next_link(1, rem_list_webhooks, False)
+            self._assert_list_webhooks_with_limits_next_link(self.max_webhooks,
+                                                             list_webhooks, False)
 
     def test_list_webhooks_with_specified_limit_less_than_number_of_policies(self):
         """

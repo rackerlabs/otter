@@ -580,6 +580,16 @@ class IScalingScheduleCollection(Interface):
         :return: None
         """
 
+    def get_oldest_event(bucket):
+        """
+        Get oldest event from the bucket
+
+        :param bucket: oldest event from this bucket
+        :type param: ``int``
+
+        :return: Deferred that fires with dict of oldest event
+        """
+
 
 class IScalingGroupCollection(Interface):
     """
@@ -698,7 +708,9 @@ class IScalingGroupCollection(Interface):
         contain other information as well
 
         :param clock: an option clock with which to use for testing.
-        :return: ``dict`` containing health information.
+        :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
+            whether the services is healthy and the dictionar contains
+            extra health information.
         """
 
 

@@ -101,7 +101,7 @@ class SupervisorService(object, Service):
 
         log.msg("Authenticating for tenant")
 
-        d = self.auth_function(scaling_group.tenant_id)
+        d = self.auth_function(scaling_group.tenant_id, log=log)
 
         def when_authenticated((auth_token, service_catalog)):
             log.msg("Executing launch config.")
@@ -151,7 +151,7 @@ class SupervisorService(object, Service):
                 auth_token,
                 (server['id'], server['lb_info']))
 
-        d = self.auth_function(scaling_group.tenant_id)
+        d = self.auth_function(scaling_group.tenant_id, log=log)
         log.msg("Authenticating for tenant")
         d.addCallback(when_authenticated)
         self.deferred_pool.add(d)
@@ -176,7 +176,7 @@ class SupervisorService(object, Service):
 
         log = log.bind(system='otter.supervisor.validate_launch_config',
                        tenant_id=tenant_id)
-        d = self.auth_function(tenant_id)
+        d = self.auth_function(tenant_id, log=log)
         log.msg('Authenticating for tenant')
         return d.addCallback(when_authenticated)
 
