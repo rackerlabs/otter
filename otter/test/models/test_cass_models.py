@@ -414,7 +414,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         ``modify_state`` writes the state the modifier returns to the database
         """
         def modifier(group, state):
-            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None, {}, True)
+            return GroupState(self.tenant_id, self.group_id, 'a', {}, {}, None,
+                              {}, True, desired=5)
 
         self.group.view_state = mock.Mock(return_value=defer.succeed('state'))
 
@@ -423,14 +424,14 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group.view_state.assert_called_once_with(ConsistencyLevel.TWO)
         expectedCql = (
             'INSERT INTO scaling_group("tenantId", "groupId", active, '
-            'pending, "groupTouched", "policyTouched", paused) VALUES('
+            'pending, "groupTouched", "policyTouched", paused, desired) VALUES('
             ':tenantId, :groupId, :active, :pending, :groupTouched, '
-            ':policyTouched, :paused)')
+            ':policyTouched, :paused, :desired)')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id,
                         "active": _S({}), "pending": _S({}),
                         "groupTouched": '0001-01-01T00:00:00Z',
                         "policyTouched": _S({}),
-                        "paused": True}
+                        "paused": True, "desired": 5}
         self.connection.execute.assert_called_once_with(expectedCql,
                                                         expectedData,
                                                         ConsistencyLevel.TWO)

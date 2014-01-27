@@ -71,8 +71,8 @@ _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused)')
+                           '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
+                           ':pending, :groupTouched, :policyTouched, :paused, :desired)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
                          '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -550,6 +550,7 @@ class CassScalingGroup(object):
                 'active': serialize_json_data(new_state.active, 1),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
+                'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
