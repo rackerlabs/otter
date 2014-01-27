@@ -188,9 +188,6 @@ class SupervisorService(object, Service):
         super(SupervisorService, self).stopService()
         return self.deferred_pool.notify_when_empty()
 
-    def notify_on_jobs_completion(self):
-        return self.deferred_pool.notify_when_empty()
-
 
 _supervisor = None
 
