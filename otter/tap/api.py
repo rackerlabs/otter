@@ -118,7 +118,9 @@ def cassandra_disconnect(cass, supervisor):
 
     Returns Deferred that fires after disconnecting
     """
-    d = supervisor.notify_on_jobs_completion()
+    # This might have got called earlier but there is no harm in calling again
+    # to ensure cassandra disconnects after all the jobs are completed
+    d = supervisor.stopService()
     d.addCallback(lambda _: cass.disconnect())
     return d
 

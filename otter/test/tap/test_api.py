@@ -13,7 +13,8 @@ from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
-from otter.tap.api import Options, HealthChecker, makeService, setup_scheduler
+from otter.tap.api import (
+    Options, HealthChecker, makeService, setup_scheduler, cassandra_disconnect)
 from otter.test.utils import matches, patch, CheckFailure
 from otter.util.config import set_config_data
 
@@ -192,6 +193,33 @@ class HealthCheckerTests(TestCase):
                 'details': {}
             }
         })
+
+
+class CassDisconnectTests(TestCase):
+    """
+    Tests for `cassandra_disconnect`
+    """
+
+    def test_disconnects_after_stop_completes(self):
+        """
+        Cassandra is disconnected after supervisor is completed stopped
+        """
+        supervisor = mock.Mock(spec=['stopService'])
+        supervisor.stopService.return_value = defer.Deferred()
+        cass = mock.Mock(spec=['disconnect'])
+        cass.disconnect.return_value = defer.succeed(None)
+
+        d = cassandra_disconnect(cass, supervisor)
+
+        # No result
+        self.assertNoResult(d)
+        supervisor.stopService.assert_called_once_with()
+        self.assertFalse(cass.disconnect.called)
+
+        # supervisor stops and cass.disconnect is called
+        supervisor.stopService.return_value.callback(None)
+        cass.disconnect.assert_called_once_with()
+        self.assertIsNone(self.successResultOf(d))
 
 
 class APIMakeServiceTests(TestCase):
