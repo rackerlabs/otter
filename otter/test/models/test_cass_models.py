@@ -325,12 +325,13 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23, 'desired': 10}]
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         expectedCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                       '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
+                       '"groupTouched", "policyTouched", paused, desired, created_at '
+                       'FROM scaling_group '
                        'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         expectedData = {"tenantId": self.tenant_id, "groupId": self.group_id}
         self.connection.execute.assert_called_once_with(expectedCql,
@@ -338,7 +339,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                                         ConsistencyLevel.TWO)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a', {'A': 'R'},
-                                       {'P': 'R'}, '123', {'PT': 'R'}, False))
+                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
+                                       desired=10))
 
     def test_view_respsects_consistency_argument(self):
         """
@@ -348,7 +350,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23}]
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0, 'created_at': 23}]
         self.returns = [cass_response]
         d = self.group.view_state(consistency=ConsistencyLevel.ALL)
         self.successResultOf(d)
@@ -374,12 +376,12 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = [
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': None}]
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': None, 'created_at': None}]
         self.returns = [cass_response, None]
         d = self.group.view_state()
         self.failureResultOf(d, NoSuchScalingGroupError)
         viewCql = ('SELECT "tenantId", "groupId", group_config, active, pending, '
-                   '"groupTouched", "policyTouched", paused, created_at FROM scaling_group '
+                   '"groupTouched", "policyTouched", paused, desired, created_at FROM scaling_group '
                    'WHERE "tenantId" = :tenantId AND "groupId" = :groupId;')
         delCql = ('DELETE FROM scaling_group '
                   'WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -396,14 +398,14 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         cass_response = _cassandrify_data([
             {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
              'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'created_at': 3}])
+             'policyTouched': '{"PT":"R"}', 'paused': '\x01', 'desired': 0, 'created_at': 3}])
 
         self.returns = [cass_response]
         d = self.group.view_state()
         r = self.successResultOf(d)
         self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
                                        'a', {'A': 'R'}, {'P': 'R'},
-                                       '123', {'PT': 'R'}, True))
+                                       '123', {'PT': 'R'}, True, desired=0))
 
     @mock.patch('otter.models.cass.serialize_json_data',
                 side_effect=lambda *args: _S(args[0]))

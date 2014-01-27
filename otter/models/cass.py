@@ -74,7 +74,7 @@ _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pend
                            '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
                            ':pending, :groupTouched, :policyTouched, :paused)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                         '"policyTouched", paused, created_at FROM {cf} WHERE '
+                         '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
@@ -378,6 +378,10 @@ def _jsonloads_data(raw_data):
 
 
 def _unmarshal_state(state_dict):
+    desired_capacity = state_dict.get('desired', None)
+    if desired_capacity is None:
+        desired_capacity = 0
+
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
         _jsonloads_data(state_dict["group_config"])["name"],
@@ -385,7 +389,8 @@ def _unmarshal_state(state_dict):
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
-        bool(ord(state_dict["paused"]))
+        bool(ord(state_dict["paused"])),
+        desired=desired_capacity
     )
 
 
