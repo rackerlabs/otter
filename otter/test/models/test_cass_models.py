@@ -2093,13 +2093,14 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "active": '{}',
             "pending": '{}',
             "policyTouched": '{}',
-            "paused": False}
+            "paused": False,
+            "desired": 0}
         expectedCql = ('BEGIN BATCH '
                        'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
                        'launch_config, active, pending, "policyTouched", '
-                       'paused, created_at) '
+                       'paused, desired, created_at) '
                        'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                       ':pending, :policyTouched, :paused, :created_at) '
+                       ':pending, :policyTouched, :paused, :desired, :created_at) '
                        'APPLY BATCH;')
         self.mock_key.return_value = '12345678'
 
@@ -2136,6 +2137,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'tenantId': '123',
             "active": '{}',
             "pending": '{}',
+            "desired": 0,
             "policyTouched": '{}',
             "paused": False,
             'policy0policyId': '12345678',
@@ -2144,9 +2146,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'BEGIN BATCH '
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'APPLY BATCH;')
@@ -2187,6 +2189,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             "pending": '{}',
             "policyTouched": '{}',
             "paused": False,
+            "desired": 0,
             'policy0policyId': '2',
             'policy0data': _S(policies[0]),
             'policy0version': 'timeuuid',
@@ -2196,9 +2199,9 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
         expectedCql = (
             'BEGIN BATCH '
             'INSERT INTO scaling_group("tenantId", "groupId", group_config, '
-            'launch_config, active, pending, "policyTouched", paused, created_at) '
+            'launch_config, active, pending, "policyTouched", paused, desired, created_at) '
             'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-            ':pending, :policyTouched, :paused, :created_at) '
+            ':pending, :policyTouched, :paused, :desired, :created_at) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '
             'VALUES (:tenantId, :groupId, :policy0policyId, :policy0data, :policy0version) '
             'INSERT INTO scaling_policies("tenantId", "groupId", "policyId", data, version) '

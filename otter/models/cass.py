@@ -61,9 +61,9 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
-                     'pending, "policyTouched", paused, created_at) '
+                     'pending, "policyTouched", paused, desired, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                     ':pending, :policyTouched, :paused, :created_at)')
+                     ':pending, :policyTouched, :paused, :desired, :created_at)')
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
                       'pending, "groupTouched", "policyTouched", paused, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
@@ -1028,7 +1028,8 @@ class CassScalingGroupCollection:
                 "pending": '{}',
                 "created_at": datetime.utcnow(),
                 "policyTouched": '{}',
-                "paused": False
+                "paused": False,
+                "desired": config.get('minEntities', 0)
             }
 
             scaling_group_state = GroupState(
@@ -1039,7 +1040,8 @@ class CassScalingGroupCollection:
                 {},
                 data['created_at'],
                 {},
-                data['paused']
+                data['paused'],
+                desired=data['desired']
             )
             outpolicies = _build_policies(policies, self.policies_table,
                                           self.event_table, queries, data, self.buckets)
