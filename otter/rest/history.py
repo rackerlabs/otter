@@ -18,14 +18,6 @@ from otter.util.http import append_segments, check_success
 _ELASTICSEARCH_QUERY_TEMPLATE = {
     "query": {
         "filtered": {
-            "query": {
-                "bool": {
-                    "should": [
-                        {"query_string": {"query": "is_error:false"}},
-                        {"query_string": {"query": "is_error:true"}}
-                    ]
-                }
-            },
             "filter": {
                 "bool": {
                     "must": [{
