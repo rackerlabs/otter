@@ -6,14 +6,13 @@ rest endpoints that return the audit log
 import copy
 import json
 
-import treq
-
 from otter.log import log
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import fails_with, succeeds_with, with_transaction_id
 from otter.rest.errors import exception_codes
+from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.http import check_success
+from otter.util.http import append_segments, check_success
 
 
 _ELASTICSEARCH_QUERY_TEMPLATE = {
@@ -105,24 +104,19 @@ class OtterHistory(object):
             return json.dumps(data)
 
         data = make_auditlog_query(self.tenant_id)
-        d = treq.get('{0}/_search'.format(host), json.dumps(data))
+        d = treq.get(append_segments(host, '_search'), json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
-
-        def get_body(response):
-
-            return treq.content(response)
-        d.addCallback(get_body)
+        d.addCallback(treq.json_content)
 
         def build_response(body):
             events = []
 
-            response = json.loads(body)
-            for hit in response['hits']['hits']:
-                fields = hit['_source']['@fields']
+            for hit in body['hits']['hits']:
+                fields = hit['_source']
                 event = {
                     'event_type': fields['event_type'],
                     'timestamp': fields['@timestamp'],
-                    'message': hit['_source']['message'],
+                    'message': fields['message'],
                     'policy_id': fields['policy_id'],
                     'scaling_group_id': fields['scaling_group_id'],
                     'server_id': fields['server_id']

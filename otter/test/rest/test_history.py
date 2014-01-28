@@ -25,25 +25,30 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         super(OtterHistoryTestCase, self).setUp()
         set_config_data({'elasticsearch': {'host': "http://dummy"}})
 
+    @mock.patch('otter.rest.history.log')
     @mock.patch('otter.rest.history.make_auditlog_query')
     @mock.patch('otter.rest.history.treq')
-    def test_history(self, treq, make_auditlog_query):
+    def test_history(self, treq, make_auditlog_query, log):
         """
         the history api endpoint returns the items from the audit log
         """
-        data = json.dumps({'hits': {
+        log_object = mock.Mock()
+
+        def return_log_object(*args, **kwargs):
+            return log_object
+        log.bind.side_effect = return_log_object
+
+        data = {'hits': {
             'hits': [{
                 '_source': {
                     'message': 'audit log event',
-                    '@fields': {
-                        'event_type': 'event-abc',
-                        '@timestamp': 1234567890,
-                        'policy_id': 'policy-xyz',
-                        'scaling_group_id': 'scaling-group-uvw',
-                        'server_id': 'server-rst',
-                    }
+                    'event_type': 'event-abc',
+                    '@timestamp': 1234567890,
+                    'policy_id': 'policy-xyz',
+                    'scaling_group_id': 'scaling-group-uvw',
+                    'server_id': 'server-rst',
                 }
-            }]}})
+                }]}}
         expected = {
             'events': [{
                 'event_type': 'event-abc',
@@ -61,9 +66,9 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
             return defer.succeed(response)
         treq.get.side_effect = get
 
-        def content(*args, **kwargs):
+        def json_content(*args, **kwargs):
             return defer.succeed(data)
-        treq.content.side_effect = content
+        treq.json_content.side_effect = json_content
 
         result = self.successResultOf(
             request(self.root, "GET", self.endpoint))
@@ -72,5 +77,5 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(expected, json.loads(result.content))
 
         treq.get.assert_called_once_with(
-            'http://dummy/_search', '{"tenant_id": 101010}')
-        treq.content.assert_called_once_with(response)
+            'http://dummy/_search', '{"tenant_id": 101010}', log=log_object.bind())
+        treq.json_content.assert_called_once_with(response)
