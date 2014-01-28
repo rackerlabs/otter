@@ -204,8 +204,8 @@ class CassDisconnectTests(TestCase):
         """
         Cassandra is disconnected after supervisor is completed stopped
         """
-        supervisor = mock.Mock(spec=['stopService'])
-        supervisor.stopService.return_value = defer.Deferred()
+        supervisor = mock.Mock(spec=['deferred_pool'])
+        supervisor.deferred_pool.notify_when_empty.return_value = defer.Deferred()
         cass = mock.Mock(spec=['disconnect'])
         cass.disconnect.return_value = defer.succeed(None)
 
@@ -213,11 +213,11 @@ class CassDisconnectTests(TestCase):
 
         # No result
         self.assertNoResult(d)
-        supervisor.stopService.assert_called_once_with()
+        supervisor.deferred_pool.notify_when_empty.assert_called_once_with()
         self.assertFalse(cass.disconnect.called)
 
-        # supervisor stops and cass.disconnect is called
-        supervisor.stopService.return_value.callback(None)
+        # Supervisor jobs are completed and cass.disconnect is called
+        supervisor.deferred_pool.notify_when_empty.return_value.callback(None)
         cass.disconnect.assert_called_once_with()
         self.assertIsNone(self.successResultOf(d))
 
