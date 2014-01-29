@@ -77,5 +77,5 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         self.assertEqual(expected, json.loads(result.content))
 
         treq.get.assert_called_once_with(
-            'http://dummy/_search', '{"tenant_id": 101010}', log=log_object.bind())
+            'http://dummy/_search', data='{"tenant_id": 101010}', log=log_object.bind())
         treq.json_content.assert_called_once_with(response)

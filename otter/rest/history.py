@@ -54,14 +54,32 @@ _TENANT_ID_TEMPLATE = {
         }
     }
 }
+_REGION_TEMPLATE = {
+    "fquery": {
+        "query": {
+            "field": {
+                "tags": {
+                    "query": None
+                }
+            }
+        }
+    }
+}
 
 
-def make_auditlog_query(tenant_id):
+def make_auditlog_query(tenant_id, region):
     """Make an elastic search query to fetch audit logs."""
     query = copy.deepcopy(_ELASTICSEARCH_QUERY_TEMPLATE)
+
+    # Add the tenant id query
     tenant_query = copy.deepcopy(_TENANT_ID_TEMPLATE)
     tenant_query['fquery']['query']['field']['tenant_id']['query'] = tenant_id
     query['query']['filtered']['filter']['bool']['must'].append(tenant_query)
+
+    # Add the region query
+    region_query = copy.deepcopy(_REGION_TEMPLATE)
+    region_query['fquery']['query']['field']['tenant_id']['query'] = region.lower()
+    query['query']['filtered']['filter']['bool']['must'].append(region_query)
 
     return query
 
@@ -95,8 +113,8 @@ class OtterHistory(object):
             data = {}
             return json.dumps(data)
 
-        data = make_auditlog_query(self.tenant_id)
-        d = treq.get(append_segments(host, '_search'), json.dumps(data), log=self.log)
+        data = make_auditlog_query(self.tenant_id, config_value('region'))
+        d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
         d.addCallback(treq.json_content)
 
