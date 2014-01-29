@@ -17,6 +17,7 @@ class GroupState(object):
         object represents
     :ivar str group_name: the name of the scaling group whose state this
         object represents
+    :ivar str desired: the desired capacity of the scaling group
     :ivar dict active: the mapping of active server ids and their info
     :ivar dict pending: the list of pending job ids and their info
     :ivar bool paused: whether the scaling group is paused in scaling activities
@@ -30,10 +31,11 @@ class GroupState(object):
     TODO: ``remove_active``, ``pause`` and ``resume`` ?
     """
     def __init__(self, tenant_id, group_id, group_name, active, pending, group_touched,
-                 policy_touched, paused, now=timestamp.now):
+                 policy_touched, paused, desired=0, now=timestamp.now):
         self.tenant_id = tenant_id
         self.group_id = group_id
         self.group_name = group_name
+        self.desired = desired
         self.active = active
         self.pending = pending
         self.paused = paused
@@ -45,15 +47,17 @@ class GroupState(object):
 
         self.now = now
 
+        self._attributes = (
+            'tenant_id', 'group_id', 'group_name', 'desired', 'active',
+            'pending', 'group_touched', 'policy_touched', 'paused')
+
     def __eq__(self, other):
         """
         Two states are equal if all of the parameters are equal (except for
         the now callable)
         """
-        params = ('tenant_id', 'group_id', 'group_name', 'active', 'pending', 'paused',
-                  'policy_touched', 'group_touched')
         return all((getattr(self, param) == getattr(other, param)
-                    for param in params))
+                    for param in self._attributes))
 
     def __ne__(self, other):
         """
@@ -65,11 +69,9 @@ class GroupState(object):
         """
         Prints out a representation of self
         """
-        return "GroupState({}, {}, {}, {}, {}, {}, {}, {})".format(
-            self.tenant_id, self.group_id, self.group_name, repr(self.active),
-            repr(self.pending), self.group_touched, repr(self.policy_touched),
-            self.paused
-        )
+        return "GroupState({0})".format(", ".join([
+            str(getattr(self, attr)) for attr in self._attributes
+        ]))
 
     def remove_job(self, job_id):
         """
@@ -580,6 +582,16 @@ class IScalingScheduleCollection(Interface):
         :return: None
         """
 
+    def get_oldest_event(bucket):
+        """
+        Get oldest event from the bucket
+
+        :param bucket: oldest event from this bucket
+        :type param: ``int``
+
+        :return: Deferred that fires with dict of oldest event
+        """
+
 
 class IScalingGroupCollection(Interface):
     """
@@ -698,7 +710,9 @@ class IScalingGroupCollection(Interface):
         contain other information as well
 
         :param clock: an option clock with which to use for testing.
-        :return: ``dict`` containing health information.
+        :return: ``tuple`` of (``bool``, ``dict``), where the boolean is
+            whether the services is healthy and the dictionar contains
+            extra health information.
         """
 
 

@@ -3,11 +3,13 @@
 """
 Tests for :mod:`otter.rest.application`
 """
+import json
 import mock
 
 from twisted.internet.defer import succeed
 from twisted.trial.unittest import TestCase
 
+from otter.rest.application import Otter
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import with_transaction_id, log_arguments
 from otter.test.rest.request import RequestTestMixin, RestAPITestMixin
@@ -455,16 +457,21 @@ class HealthCheckTestCase(RestAPITestMixin, TestCase):
     endpoint = "/health"
     invalid_methods = ("DELETE", "PUT", "POST")
 
-    def setUp(self):
+    def test_health_check_endpoint_health_check_function(self):
         """
-        Set health check to succeed
+        Returns a healthy = True result
         """
-        super(HealthCheckTestCase, self).setUp()
-        self.mock_store.health_check.return_value = succeed({'health': 'check'})
+        resp = self.assert_status_code(200)
+        self.assertEqual(resp, json.dumps({"healthy": True}))
 
     def test_health_check_endpoint_calls_store_health_check(self):
         """
         And returns the stringified json blob
         """
+        def health_check():
+            return succeed({'blargh': 'boo'})
+
+        self.root = Otter(self.mock_store, health_check).app.resource()
+
         resp = self.assert_status_code(200)
-        self.assertEqual(resp, '{"health": "check"}')
+        self.assertEqual(resp, json.dumps({'blargh': 'boo'}))

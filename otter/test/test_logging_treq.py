@@ -10,6 +10,7 @@ from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
 from otter.util import logging_treq
+from otter.util.deferredutils import TimedOutError
 from otter.test.utils import CheckFailure, DummyException, mock_log, patch
 
 
@@ -37,52 +38,90 @@ class LoggingTreqTest(TestCase):
 
         patch(self, 'otter.util.logging_treq.treq', self.treq)
 
+        self.url = 'myurl'
+
+    def _assert_success_logging(self, method, status, request_time):
+        """
+        msg expected to be made on a successful request are logged
+        """
+        self.assertEqual(self.log.msg.mock_calls, [
+            mock.call(mock.ANY, url=self.url, system="treq.request",
+                      method=method, treq_request_id=mock.ANY),
+            mock.call(
+                mock.ANY, url=self.url, status_code=status, headers={'1': '2'},
+                system="treq.request", request_time=request_time, method=method,
+                treq_request_id=mock.ANY)
+        ])
+
+    def _assert_failure_logging(self, method, exception_type, request_time):
+        """
+        msg expected to be made on a failed request are logged
+        """
+        self.assertEqual(self.log.msg.mock_calls, [
+            mock.call(mock.ANY, url=self.url, system="treq.request",
+                      method=method, treq_request_id=mock.ANY),
+            mock.call(
+                mock.ANY, url=self.url, reason=CheckFailure(exception_type),
+                system="treq.request", request_time=request_time, method=method,
+                treq_request_id=mock.ANY)
+        ])
+
     def test_request(self):
         """
         On successful call to request, response is returned and request logged
         """
-        d = logging_treq.request('patch', 'myurl', headers={}, data='',
-                                 log=self.log, time_function=self.clock.seconds)
+        d = logging_treq.request('patch', self.url, headers={}, data='',
+                                 log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
-            method='patch', url='myurl', headers={}, data='')
+            method='patch', url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         self.treq.request.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', status_code=204, headers={'1': '2'},
-            system="treq.request", request_time=5, method='patch')
+        self._assert_success_logging('patch', 204, 5)
 
     def test_request_failure(self):
         """
         On failed call to request, failure is returned and request logged
         """
-        d = logging_treq.request('patch', 'myurl', headers={}, data='',
-                                 log=self.log, time_function=self.clock.seconds)
+        d = logging_treq.request('patch', self.url, headers={}, data='',
+                                 log=self.log, clock=self.clock)
         self.treq.request.assert_called_once_with(
-            method='patch', url='myurl', headers={}, data='')
+            method='patch', url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         self.treq.request.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', reason=CheckFailure(DummyException),
-            system="treq.request", request_time=5, method='patch')
+        self._assert_failure_logging('patch', DummyException, 5)
+
+    def test_request_timeout(self):
+        """
+        A request times out after 45 seconds, and the failure is logged
+        """
+        d = logging_treq.request('patch', self.url, headers={}, data='',
+                                 log=self.log, clock=self.clock)
+        self.treq.request.assert_called_once_with(
+            method='patch', url=self.url, headers={}, data='')
+        self.assertNoResult(d)
+
+        self.clock.advance(45)
+        self.failureResultOf(d, TimedOutError)
+        self._assert_failure_logging('patch', TimedOutError, 45)
 
     def _test_method_success(self, method):
         """
         On successful call to ``method``, response is returned and request logged
         """
         request_function = getattr(logging_treq, method)
-        d = request_function(url='myurl', headers={}, data='', log=self.log,
-                             time_function=self.clock.seconds)
+        d = request_function(url=self.url, headers={}, data='', log=self.log,
+                             clock=self.clock)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url='myurl', headers={}, data='')
+        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
 
         self.assertNoResult(d)
 
@@ -90,29 +129,41 @@ class LoggingTreqTest(TestCase):
         treq_function.return_value.callback(self.response)
 
         self.assertIs(self.successResultOf(d), self.response)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', status_code=204, headers={'1': '2'},
-            system="treq.request", request_time=5, method=method)
+        self._assert_success_logging(method, 204, 5)
 
     def _test_method_failure(self, method):
         """
         On failed call to ``method``, failure is returned and request logged
         """
         request_function = getattr(logging_treq, method)
-        d = request_function(url='myurl', headers={}, data='', log=self.log,
-                             time_function=self.clock.seconds)
+        d = request_function(url=self.url, headers={}, data='', log=self.log,
+                             clock=self.clock)
 
         treq_function = getattr(self.treq, method)
-        treq_function.assert_called_once_with(url='myurl', headers={}, data='')
+        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
         self.assertNoResult(d)
 
         self.clock.advance(5)
         treq_function.return_value.errback(Failure(DummyException('e')))
 
         self.failureResultOf(d, DummyException)
-        self.log.msg.assert_called_once_with(
-            mock.ANY, url='myurl', reason=CheckFailure(DummyException),
-            system="treq.request", request_time=5, method=method)
+        self._assert_failure_logging(method, DummyException, 5)
+
+    def _test_method_timeout(self, method):
+        """
+        A request times out after 45 seconds, and the failure is logged
+        """
+        request_function = getattr(logging_treq, method)
+        d = request_function(url=self.url, headers={}, data='', log=self.log,
+                             clock=self.clock)
+
+        treq_function = getattr(self.treq, method)
+        treq_function.assert_called_once_with(url=self.url, headers={}, data='')
+        self.assertNoResult(d)
+
+        self.clock.advance(45)
+        self.failureResultOf(d, TimedOutError)
+        self._assert_failure_logging(method, TimedOutError, 45)
 
     def test_head(self):
         """
@@ -126,6 +177,12 @@ class LoggingTreqTest(TestCase):
         """
         self._test_method_failure('head')
 
+    def test_head_timeout(self):
+        """
+        On timed out call to head, failure is returned and request logged
+        """
+        self._test_method_timeout('head')
+
     def test_get(self):
         """
         On successful call to get, response is returned and request logged
@@ -137,6 +194,12 @@ class LoggingTreqTest(TestCase):
         On failed call to get, failure is returned and request logged
         """
         self._test_method_failure('get')
+
+    def test_get_timeout(self):
+        """
+        On timed out call to get, failure is returned and request logged
+        """
+        self._test_method_timeout('get')
 
     def test_post(self):
         """
@@ -150,6 +213,12 @@ class LoggingTreqTest(TestCase):
         """
         self._test_method_failure('post')
 
+    def test_post_timeout(self):
+        """
+        On timed out call to post, failure is returned and request logged
+        """
+        self._test_method_timeout('post')
+
     def test_put(self):
         """
         On successful call to put, response is returned and request logged
@@ -161,6 +230,12 @@ class LoggingTreqTest(TestCase):
         On failed call to put, failure is returned and request logged
         """
         self._test_method_failure('put')
+
+    def test_put_timeout(self):
+        """
+        On timed out call to put, failure is returned and request logged
+        """
+        self._test_method_timeout('put')
 
     def test_patch(self):
         """
@@ -174,6 +249,12 @@ class LoggingTreqTest(TestCase):
         """
         self._test_method_failure('patch')
 
+    def test_patch_timeout(self):
+        """
+        On timed out call to patch, failure is returned and request logged
+        """
+        self._test_method_timeout('patch')
+
     def test_delete(self):
         """
         On successful call to delete, response is returned and request logged
@@ -185,3 +266,9 @@ class LoggingTreqTest(TestCase):
         On failed call to delete, failure is returned and request logged
         """
         self._test_method_failure('delete')
+
+    def test_delete_timeout(self):
+        """
+        On timed out call to delete, failure is returned and request logged
+        """
+        self._test_method_timeout('delete')

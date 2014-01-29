@@ -284,12 +284,12 @@ def calculate_delta(log, state, config, policy):
     max_entities = config['maxEntities']
     if max_entities is None:
         max_entities = MAX_ENTITIES
-    constrained = max(min(desired, max_entities), config['minEntities'])
-    delta = constrained - current
+    state.desired = max(min(desired, max_entities), config['minEntities'])
+    delta = state.desired - current
 
     log.msg("calculating delta",
             unconstrained_desired_capacity=desired,
-            constrained_desired_capacity=constrained,
+            constrained_desired_capacity=state.desired,
             max_entities=max_entities, min_entities=config['minEntities'],
             server_delta=delta, current_active=len(state.active),
             current_pending=len(state.pending))

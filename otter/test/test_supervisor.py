@@ -94,7 +94,8 @@ class LaunchConfigTests(SupervisorTests):
         self.supervisor.execute_config(self.log, 'transaction-id',
                                        self.group, self.launch_config)
 
-        self.auth_function.assert_called_once_with(11111)
+        self.auth_function.assert_called_once_with(
+            11111, log=self.log.bind.return_value)
 
     def test_execute_config_propagates_auth_error(self):
         """
@@ -254,7 +255,8 @@ class DeleteServerTests(SupervisorTests):
         self.supervisor.execute_delete_server(self.log, 'transaction-id',
                                               self.group, self.fake_server)
 
-        self.auth_function.assert_called_once_with(11111)
+        self.auth_function.assert_called_once_with(
+            11111, log=self.log.bind.return_value)
 
     def test_execute_delete_propagates_auth_error(self):
         """
@@ -294,7 +296,8 @@ class ValidateLaunchConfigTests(SupervisorTests):
         d = self.supervisor.validate_launch_config(self.log, self.group.tenant_id,
                                                    self.launch_config)
         self.successResultOf(d)
-        self.auth_function.assert_called_once_with(self.group.tenant_id)
+        self.auth_function.assert_called_once_with(
+            self.group.tenant_id, log=self.log.bind.return_value)
         self.validate_launch_server_config.assert_called_once_with(
             self.log.bind.return_value, 'ORD', self.service_catalog,
             self.auth_token, 'launch_args')

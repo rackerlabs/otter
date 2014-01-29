@@ -329,11 +329,11 @@ class ObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with({
             'host': 'localhost',
-            'version': '1.0',
+            '@version': 1,
             'short_message': 'Hello',
-            'full_message': 'Hello',
-            'facility': '',
-            'timestamp': 0,
+            'message': 'Hello',
+            'otter_facility': '',
+            '@timestamp': datetime.fromtimestamp(0).isoformat(),
             'level': 6,
         })
 
@@ -344,7 +344,7 @@ class ObserverWrapperTests(TestCase):
         self.wrapper({'failure': Failure(ValueError()), 'isError': True})
 
         self.observer.assert_called_once_with(
-            matches(ContainsDict({'full_message': Contains('Traceback')})))
+            matches(ContainsDict({'message': Contains('Traceback')})))
 
     def test_failure_repr_in_short_message(self):
         """
@@ -363,7 +363,7 @@ class ObserverWrapperTests(TestCase):
 
         self.observer.assert_called_once_with(
             matches(ContainsDict({'short_message': Equals('uh oh'),
-                                  'full_message': Equals('uh oh')})))
+                                  'message': Equals('uh oh')})))
 
     def test_isError_sets_level_3(self):
         """
@@ -421,11 +421,11 @@ class ObserverWrapperTests(TestCase):
         the audit log dictionary and a regular log (passes timestamp and
         hostname too)
         """
-        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 't'})
+        self.wrapper({'message': 'meh', 'audit_log': True, 'time': 1234.0})
         self.observer.has_calls([
             mock.call(matches(ContainsDict({'_message': Equals('meh'),
                                             'audit_log': Equals(True),
-                                            '@timestamp': Equals('t'),
+                                            '@timestamp': Equals(1234),
                                             'host': Equals('hostname')}))),
             mock.call(matches(ContainsDict({
                 'short_message': Equals('meh'),
