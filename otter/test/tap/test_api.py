@@ -13,7 +13,8 @@ from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
-from otter.tap.api import Options, HealthChecker, makeService, setup_scheduler
+from otter.tap.api import (
+    Options, HealthChecker, makeService, setup_scheduler, cassandra_disconnect)
 from otter.test.utils import matches, patch, CheckFailure
 from otter.util.config import set_config_data
 
@@ -194,6 +195,33 @@ class HealthCheckerTests(TestCase):
         })
 
 
+class CassDisconnectTests(TestCase):
+    """
+    Tests for `cassandra_disconnect`
+    """
+
+    def test_disconnects_after_stop_completes(self):
+        """
+        Cassandra is disconnected after supervisor is completed stopped
+        """
+        supervisor = mock.Mock(spec=['deferred_pool'])
+        supervisor.deferred_pool.notify_when_empty.return_value = defer.Deferred()
+        cass = mock.Mock(spec=['disconnect'])
+        cass.disconnect.return_value = defer.succeed(None)
+
+        d = cassandra_disconnect(cass, supervisor)
+
+        # No result
+        self.assertNoResult(d)
+        supervisor.deferred_pool.notify_when_empty.assert_called_once_with()
+        self.assertFalse(cass.disconnect.called)
+
+        # Supervisor jobs are completed and cass.disconnect is called
+        supervisor.deferred_pool.notify_when_empty.return_value.callback(None)
+        cass.disconnect.assert_called_once_with()
+        self.assertIsNone(self.successResultOf(d))
+
+
 class APIMakeServiceTests(TestCase):
     """
     Test creation of the API service heirarchy.
@@ -314,6 +342,16 @@ class APIMakeServiceTests(TestCase):
         self.LoggingCQLClient.assert_called_once_with(self.RoundRobinCassandraCluster.return_value,
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
+
+    @mock.patch('otter.tap.api.cassandra_disconnect', return_value=defer.succeed(None))
+    def test_cassandra_cluster_disconnects_on_stop(self, cass_disconn):
+        """
+        Cassandra cluster connection is disconnected when main service is stopped
+        """
+        service = makeService(test_config)
+        service.stopService()
+        cass_disconn.assert_called_once_with(self.LoggingCQLClient.return_value,
+                                             get_supervisor())
 
     def test_cassandra_store(self):
         """
