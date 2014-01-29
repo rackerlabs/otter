@@ -274,6 +274,8 @@ def makeService(config):
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
+        # Setup kazoo to stop when shutting down
+        s.addService(FunctionalService(stop=kz_client.stop))
 
     return s
 

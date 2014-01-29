@@ -427,7 +427,7 @@ class APIMakeServiceTests(TestCase):
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
 
-        kz_client = mock.Mock(spec=['start'])
+        kz_client = mock.Mock(spec=['start', 'stop'])
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
@@ -461,7 +461,7 @@ class APIMakeServiceTests(TestCase):
         """
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        kz_client = mock.Mock(spec=['start'])
+        kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
@@ -473,6 +473,29 @@ class APIMakeServiceTests(TestCase):
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+        """
+        TxKazooClient is stopped when parent service stops
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+        self.store.kz_client = None
+
+        parent = makeService(config)
+
+        kz_client.stop.return_value = defer.Deferred()
+        d = parent.stopService()
+
+        self.assertTrue(kz_client.stop.called)
+        self.assertNoResult(d)
+        kz_client.stop.return_value.callback(None)
+        self.successResultOf(d)
 
 
 class SchedulerSetupTests(TestCase):
