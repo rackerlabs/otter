@@ -1406,30 +1406,52 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>name</parameter>
                             </td>
-                            <td>Specifies the name of the scaling group
-                            </td>
+                            <td>Specifies the name of the scaling
+                            group.</td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>maxEntities</parameter>
                             </td>
-                            <td>Specifies the maximum amount of identities that are allowed in this group</td>
+                            <td>Specifies the maximum amount of
+                            identities that are allowed in this group.
+                            You cannot scale up above this value.
+                            Decreasing this value can cause an
+                            immediate reduction of the scaling group. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>minEntities</parameter>
                             </td>
-                            <td>Specifies the minimum amount of identities that are allowed in this group</td>
+                            <td>Specifies the minimum amount of
+                            identities that are allowed in this group.
+                            You cannot scale down below this value.
+                            Increasing this value can cause an
+                            immediate addition to the scaling group. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>cooldown</parameter>
                             </td>
                             <td>
-                                <para>Describes, in seconds, how long the group must wait after a scaling policy
-                                    is triggered before another request for scaling is accepted</para>
+                                <para>Describes, in seconds, how long
+                                the group must wait after a scaling
+                                policy is triggered before another
+                                request for scaling is accepted.
+                                Applies mainly to event-based
+                                policies.</para>
                             </td>
                         </tr>
+                    <tr>
+                        <td>
+                            <parameter>metadata</parameter>
+                        </td>
+                        <td>Optional. The maximum size of the metadata
+                            key and value is 255 bytes each. For more
+                            information, see the <link
+                                xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                >Server</link></td>
+                    </tr>
                     </tbody>
                 </table>
                 <para>The number of resources entities that are specified in
@@ -1487,9 +1509,12 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <td>
                                     <parameter>args</parameter>
                                 </td>
-                                <td>Specifies the item to be configured. Must be "server" and, in most cases,
-                                    "loadbalancer." Most launch configurations have both a server and
-                                    a loadbalancer configured.</td>
+                                <td>Specifies the item to be
+                                configured. Must be "server" and also,
+                                in most cases, "loadbalancer." Most
+                                launch configurations have both a
+                                server and a loadbalancer
+                                configured.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1548,46 +1573,64 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                 <td>
                                     <parameter>name</parameter>
                                 </td>
-                                <td>Specifies the name of the server. The name of the server will be automatically
-                                    generated using the following formula: [serverName]-AS[uniqueHash],
-                                    and will look like the following: autoscale_server-AS12fabe. The
-                                    name of the server may be truncated to fit within the limit of 255
-                                    characters.
-                                </td>
+                                <td>Specifies a prefix to the name for
+                                created servers. The name of new
+                                servers will be automatically
+                                generated using the following formula:
+                                [serverName]-AS[uniqueHash], and will
+                                look similar to the following:
+                                [serverName]-AS12fabe. The name of new
+                                servers may be truncated to fit within
+                                the limit of 255 characters. </td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>flavorRef</parameter>
                                 </td>
-                                <td>Specifies the flavor Id for the server. A flavor is a resource configuration
-                                    for a server. For more information on available flavors, see
-                                    <olink targetdoc="autoscale-devguide" targetptr="server-flavors">“Server Flavors”
-                                    </olink>.</td>
+                                <td>Specifies the flavor Id for the
+                                server. A flavor is a resource
+                                configuration for a server. For more
+                                information on available flavors, see
+                                   <olink
+                                   targetdoc="autoscale-devguide"
+                                   targetptr="server-flavors">“Server
+                                   Flavors” </olink>.  Example:
+                                performance1-4.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>imageRef</parameter>
                                 </td>
-                                <td>Specifies the Id of the Cloud Server image to start.</td>
+                                <td>Specifies the Id of the Cloud
+                                Server image to start.  Example:
+                                0d589460-f177-4b0f-81c1-8ab8903ac7d8.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>OS-DCF:diskConfig</parameter>
                                 </td>
-                                <td>Specifies the disk configuration value. Valid values are "AUTO" or "manual."
-                                    For more information, see the
-                                    <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute">Disk Configuration Extension
-                                    </link>documentation for Rackspace Cloud Servers.</td>
+                                <td>Specifies the disk configuration
+                                value, specifically, how the disk on
+                                new servers is partitioned. . Valid
+                                values are "AUTO" or "MANUAL." For
+                                more information, see the <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/ch_extensions.html#diskconfig_attribute"
+                                   >Disk Configuration Extension
+                                </link>documentation for Rackspace
+                                Cloud Servers.</td>
                             </tr>
                             <tr>
                                 <td>
                                     <parameter>metadata</parameter>
                                 </td>
-                                <td>This parameter is optional. The maximum size of the metadata key and
-                                    value is 255 bytes each. For more information, see the
-                                    <link xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html">Server Metadata</link>
-                                    documentation for Rackspace Cloud Servers.
-                                </td>
+                                <td>Optional. The maximum size of the
+                                metadata key and value is 255 bytes
+                                each. For more information, see the
+                                   <link
+                                   xlink:href="http://docs.rackspace.com/servers/api/v2/cs-devguide/content/Server_Metadata-d1e2529.html"
+                                   >Server Metadata</link>
+                                documentation for Rackspace Cloud
+                                Servers. </td>
                             </tr>
                             <tr>
                                 <td>
@@ -1632,15 +1675,17 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>loadBalancerId</parameter>
                             </td>
-                            <td>Specifies the id of the load balancer that is automatically generated when
-                                the load balancer is created</td>
+                            <td>Specifies the ID of the load balancer
+                            that is automatically generated when the
+                            load balancer is created.</td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>port</parameter>
                             </td>
-                            <td>Specifies the port for the load balancer
-                            </td>
+                            <td> The port on which new servers will
+                            receive traffic from the load balancer,
+                            often port 80. </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1720,14 +1765,31 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                             <td>
                                 <parameter>changePercent</parameter>
                             </td>
-                            <td>Specifies the change value, in incremental stages or per cent</td>
+                            <td>Specifies the change value, in
+                            incremental stages or per cent.  Use to
+                            change the percentage of servers relative
+                            to the current number of servers. If a
+                            positive number is used, servers are
+                            added; if a negative number is used,
+                            servers are removed. The absolute change
+                            in the number of servers is always rounded
+                            up. For example, if -X% of the current
+                            number of servers translates to -0.5 or
+                            -0.25 or -0.75 servers, the actual number
+                            of servers that will be shut down is 1. </td>
                         </tr>
                         <tr>
                             <td>
                                 <parameter>cooldown</parameter>
                             </td>
-                            <td>Specifies the policy cooldown time, in seconds
-                            </td>
+                            <td>Specifies the policy cooldown time, in
+                            seconds.  Prohibits the execution of this
+                            specific policy until the configured
+                            cooldown time period has passed. Helps
+                            prevent an event triggering a policy and
+                            can help to ensure that servers can be
+                            added quickly (long cooldown) and removed
+                            gradually (short cooldown). </td>
                         </tr>
                         <tr>
                             <td>
@@ -1801,23 +1863,46 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                     <td>
                                         <parameter>change</parameter>
                                     </td>
-                                    <td>Specifies the number of entities to add or remove, for example "1"
-                                        implies that 1 server needs to be added.
-                                    </td>
+                                    <td>Specifies the number of
+                                   entities to add or remove, for
+                                   example "1" implies that 1 server
+                                   needs to be added. Use to change
+                                   the number of servers to a specific
+                                   number. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>changePercent</parameter>
                                     </td>
-                                    <td>Specifies the change value in per cent
-                                    </td>
+                                    <td>Specifies the change value in
+                                   per cent. Use to change the
+                                   percentage of servers relative to
+                                   the current number of servers. If a
+                                   positive number is used, servers
+                                   are added; if a negative number is
+                                   used, servers are removed. The
+                                   absolute change in the number of
+                                   servers is always rounded up. For
+                                   example, if -X% of the current
+                                   number of servers translates to
+                                   -0.5 or -0.25 or -0.75 servers, the
+                                   actual number of servers that
+                                   will be shut down is 1. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>desiredCapacity</parameter>
                                     </td>
-                                    <td>Specifies the final capacity that is desired by the scale up event.
-                                        Note that this value is always rounded up.</td>
+                                    <td>Specifies the final capacity
+                                   that is desired by the scale up
+                                   event. Note that this value is
+                                   always rounded up. Use to specify a
+                                   number of servers for the policy to
+                                   implement—by either adding or
+                                   removing servers as needed. </td>
                                 </tr>
                             </tbody>
                         </table>The webhook object takes no
@@ -1864,21 +1949,46 @@ config at https://github.com/rackerlabs/autoscaling-chef/blob/master/site-cookbo
                                     <td>
                                         <parameter>change</parameter>
                                     </td>
-                                    <td>Specifies the number of entities to add or remove, for example "1"
-                                        implies that 1 server needs to be added.
-                                    </td>
+                                    <td>Specifies the number of
+                                   entities to add or remove, for
+                                   example "1" implies that 1 server
+                                   needs to be added. Use to change
+                                   the number of servers to a specific
+                                   number. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed.</td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>changePercent</parameter>
                                     </td>
-                                    <td>Specifies the change value, in incremental stages or per cent</td>
+                                    <td>Specifies the change value, in
+                                   incremental stages or per cent. Use
+                                   to change the percentage of servers
+                                   relative to the current number of
+                                   servers. If a positive number is
+                                   used, servers are added; if a
+                                   negative number is used, servers
+                                   are removed. The absolute change in
+                                   the number of servers is always
+                                   rounded up. For example, if -X% of
+                                   the current number of servers
+                                   translates to -0.5 or -0.25 or
+                                   -0.75 servers, the actual number of
+                                   servers that will be shut down is
+                                   1. </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <parameter>desiredCapacity</parameter>
                                     </td>
-                                    <td>Specifies final capacity that is desired by the scale up event</td>
+                                    <td>Specifies final capacity that
+                                   is desired by the scale up event.
+                                   Use to specify a number of servers
+                                   for the policy to implement—by
+                                   either adding or removing servers
+                                   as needed. </td>
                                 </tr>
                                 <tr>
                                     <td>
