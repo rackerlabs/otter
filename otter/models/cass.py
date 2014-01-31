@@ -378,7 +378,7 @@ def _jsonloads_data(raw_data):
 
 
 def _unmarshal_state(state_dict):
-    desired_capacity = state_dict.get('desired', None)
+    desired_capacity = state_dict['desired']
     if desired_capacity is None:
         desired_capacity = 0
 

@@ -342,6 +342,21 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                        {'P': 'R'}, '123', {'PT': 'R'}, False,
                                        desired=10))
 
+    def test_view_state_no_desired_capacity(self):
+        """
+        If there is no desired capacity, it defaults to 0
+        """
+        cass_response = [
+            {'tenantId': self.tenant_id, 'groupId': self.group_id, 'group_config': '{"name": "a"}',
+             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23, 'desired': None}]
+        self.returns = [cass_response]
+        r = self.successResultOf(self.group.view_state())
+        self.assertEqual(r, GroupState(self.tenant_id, self.group_id,
+                                       'a', {'A': 'R'},
+                                       {'P': 'R'}, '123', {'PT': 'R'}, False,
+                                       desired=0))
+
     def test_view_respsects_consistency_argument(self):
         """
         If a consistency argument is passed to ``view_state``, it is honored
@@ -1429,7 +1444,8 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
             'launch_config': serialize_json_data(self.launch_config, 1.0),
             'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
-            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'created_at': 23
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
         })
         self.group._naive_list_policies = mock.MagicMock(
             return_value=defer.succeed([]))
@@ -2282,6 +2298,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         } for i in range(2)]]
 
@@ -2359,6 +2376,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         }, {
             'tenantId': '23',
@@ -2369,6 +2387,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': None
         }]
         self.returns = [group_dicts, None]
@@ -2399,6 +2418,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': 23
         }, {
             'tenantId': '123',
@@ -2409,6 +2429,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': None
         }, {
             'tenantId': '123',
@@ -2419,6 +2440,7 @@ class CassScalingGroupsCollectionTestCase(IScalingGroupCollectionProviderMixin,
             'groupTouched': None,
             'policyTouched': '{}',
             'paused': '\x00',
+            'desired': 0,
             'created_at': None
         }]
         self.returns = [group_dicts, None]
