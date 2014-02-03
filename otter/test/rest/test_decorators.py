@@ -182,10 +182,9 @@ class FaultTestCase(TestCase):
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
-        self.mockLog.bind.assert_called_once_with(code=404, uri='/',
-                                                  details='', message='fail',
-                                                  type='BlahError')
-        self.mockLog.bind().msg.assert_called_once_with('fail')
+        self.mockLog.msg.assert_called_once_with(
+            "Request failed: {message}", code=404, uri='/', details='',
+            message='fail', type='BlahError')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -215,11 +214,9 @@ class FaultTestCase(TestCase):
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(404)
 
-        self.mockLog.bind.assert_called_once_with(code=404, uri='/',
-                                                  details='this is a detail',
-                                                  message='fail',
-                                                  type='DetailsError')
-        self.mockLog.bind().msg.assert_called_once_with('fail')
+        self.mockLog.msg.assert_called_once_with(
+            "Request failed: {message}", code=404, uri='/',
+            details='this is a detail', message='fail', type='DetailsError')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -292,10 +289,9 @@ class FaultTestCase(TestCase):
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(400)
 
-        self.mockLog.bind.assert_called_once_with(code=400, uri='/',
-                                                  details='', message='fail',
-                                                  type='BlahError')
-        self.mockLog.bind().msg.assert_called_once_with('fail')
+        self.mockLog.msg.assert_called_once_with(
+            "Request failed: {message}", code=400, uri='/', details='',
+            message='fail', type='BlahError')
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -335,10 +331,10 @@ class FaultTestCase(TestCase):
             def __eq__(self, other):
                 return isinstance(other, Failure) and other.value == self._exception
 
-        self.mockLog.bind.assert_called_once_with(code=500, uri='/')
-        self.mockLog.bind().err.assert_called_once_with(
+        self.mockLog.err.assert_called_once_with(
             _CmpFailure(blah),
-            'Unhandled Error handling request'
+            'Request failed: Unhandled Error',
+            code=500, uri='/'
         )
 
         faultDoc = json.loads(r)

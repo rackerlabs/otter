@@ -39,10 +39,8 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
-                    self.log.bind(
-                        uri=request.uri,
-                        **errorObj
-                    ).msg(failure.value.message)
+                    self.log.msg("Request failed: {message}", uri=request.uri,
+                                 **errorObj)
                 else:
                     errorObj = {
                         'type': 'InternalError',
@@ -50,10 +48,8 @@ def fails_with(mapping):
                         'message': 'An Internal Error was encountered',
                         'details': ''
                     }
-                    self.log.bind(
-                        uri=request.uri,
-                        code=code
-                    ).err(failure, 'Unhandled Error handling request')
+                    self.log.err(failure, 'Request failed: Unhandled Error',
+                                 uri=request.uri, code=code)
                 request.setResponseCode(code)
                 return json.dumps({'error': errorObj})
 
