@@ -78,7 +78,7 @@ def wait_for_active(log,
                     server_endpoint,
                     auth_token,
                     server_id,
-                    interval=5,
+                    interval=20,
                     timeout=3600,
                     clock=None):
     """
