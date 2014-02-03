@@ -40,7 +40,7 @@ def fails_with(mapping):
                         'details': getattr(failure.value, 'details', '')
                     }
                     self.log.msg("Request failed: {message}", uri=request.uri,
-                                 **errorObj)
+                                 request_status="failed", **errorObj)
                 else:
                     errorObj = {
                         'type': 'InternalError',
@@ -49,7 +49,8 @@ def fails_with(mapping):
                         'details': ''
                     }
                     self.log.err(failure, 'Request failed: Unhandled Error',
-                                 uri=request.uri, code=code)
+                                 uri=request.uri, code=code,
+                                 request_status="failed")
                 request.setResponseCode(code)
                 return json.dumps({'error': errorObj})
 
@@ -86,10 +87,8 @@ def succeeds_with(success_code):
                 # is 200, then it is the default and can be overriden
                 if request.code == 200:
                     request.setResponseCode(success_code)
-                self.log.bind(
-                    uri=request.uri,
-                    code=request.code
-                ).msg('Request succeeded')
+                self.log.msg('Request succeeded', uri=request.uri,
+                             code=request.code, request_status="succeeded")
                 return result
 
             d = defer.maybeDeferred(f, self, request, *args, **kwargs)
@@ -150,13 +149,14 @@ def with_transaction_id():
             self.log = self.log.bind(
                 system=reflect.fullyQualifiedName(f),
                 transaction_id=transaction_id)
-            self.log.bind(
+            self.log.msg(
+                "Received request",
                 method=request.method,
                 uri=request.uri,
                 clientproto=request.clientproto,
                 referer=request.getHeader("referer"),
-                useragent=request.getHeader("user-agent")
-            ).msg("Received request")
+                useragent=request.getHeader("user-agent"),
+                request_status="received")
             return f(self, request, *args, **kwargs)
         return _
     return decorator

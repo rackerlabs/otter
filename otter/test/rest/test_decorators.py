@@ -79,12 +79,10 @@ class TransactionIdTestCase(TestCase):
         self.mock_log.bind.assert_called_once_with(
             system='otter.test.rest.test_decorators.doWork',
             transaction_id='12345678')
-        self.assertEqual(self.mock_log.bind().bind.call_args_list[0],
-                         mock.call(useragent='Mosaic/1.0',
-                                   clientproto='HTTP/1.1',
-                                   referer='referrer(sic)',
-                                   uri='/',
-                                   method='PROPFIND'))
+        self.mock_log.bind().msg.assert_called_once_with(
+            "Received request", useragent='Mosaic/1.0',
+            clientproto='HTTP/1.1', referer='referrer(sic)', uri='/',
+            method='PROPFIND', request_status='received')
         self.mockRequest.setHeader.called_once_with('X-Response-Id', '12345678')
         self.assertEqual('hello', r)
 
@@ -138,8 +136,8 @@ class FaultTestCase(TestCase):
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
 
-        self.mockLog.bind.assert_called_once_with(code=204, uri='/')
-        self.mockLog.bind().msg.assert_called_once_with('Request succeeded')
+        self.mockLog.msg.assert_called_once_with(
+            "Request succeeded", code=204, uri='/', request_status="succeeded")
 
         self.assertEqual('hello', r)
 
@@ -160,8 +158,8 @@ class FaultTestCase(TestCase):
         d = FakeApp().doWork(self.mockRequest)
         r = self.successResultOf(d)
         self.mockRequest.setResponseCode.assert_called_once_with(204)
-        self.mockLog.bind.assert_called_once_with(code=204, uri='/')
-        self.mockLog.bind().msg.assert_called_once_with('Request succeeded')
+        self.mockLog.msg.assert_called_once_with(
+            "Request succeeded", code=204, uri='/', request_status="succeeded")
 
         self.assertEqual('hello', r)
 
@@ -184,7 +182,7 @@ class FaultTestCase(TestCase):
 
         self.mockLog.msg.assert_called_once_with(
             "Request failed: {message}", code=404, uri='/', details='',
-            message='fail', type='BlahError')
+            message='fail', type='BlahError', request_status="failed")
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -216,7 +214,8 @@ class FaultTestCase(TestCase):
 
         self.mockLog.msg.assert_called_once_with(
             "Request failed: {message}", code=404, uri='/',
-            details='this is a detail', message='fail', type='DetailsError')
+            details='this is a detail', message='fail', type='DetailsError',
+            request_status="failed")
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -291,7 +290,7 @@ class FaultTestCase(TestCase):
 
         self.mockLog.msg.assert_called_once_with(
             "Request failed: {message}", code=400, uri='/', details='',
-            message='fail', type='BlahError')
+            message='fail', type='BlahError', request_status="failed")
 
         faultDoc = json.loads(r)
         self.assertEqual(faultDoc, {
@@ -334,7 +333,7 @@ class FaultTestCase(TestCase):
         self.mockLog.err.assert_called_once_with(
             _CmpFailure(blah),
             'Request failed: Unhandled Error',
-            code=500, uri='/'
+            code=500, uri='/', request_status='failed'
         )
 
         faultDoc = json.loads(r)
