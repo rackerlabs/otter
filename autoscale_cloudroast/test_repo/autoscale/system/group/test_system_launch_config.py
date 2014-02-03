@@ -193,14 +193,18 @@ class LaunchConfigTest(AutoscaleFixture):
         """
         Create a scaling group and scale up. While servers are building, update launch config
         and scale down. Servers with the latest launch config are deleted. (AUTO-384)
+        Note : Mimic sets the created server to be in building state for the time in seconds,
+        given in the server metadata 'server_building'.
         """
         minentities = 1
-        group = self._create_group(minentities=minentities, policy=True)
+        metadata = {'server_building': 30}
+        group = self._create_group(minentities=minentities, policy=True,
+                                   metadata=metadata)
         group_before_upd = group
         self.wait_for_expected_number_of_active_servers(group_before_upd.id, minentities)
         # update launch config
         self._update_launch_config(
-            group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref)
+            group, self.upd_server_name, self.upd_image_ref, self.upd_flavor_ref, metadata)
         # execute scale up policy
         self._execute_policy(group)
         # create and then execute scale down policy
@@ -336,7 +340,7 @@ class LaunchConfigTest(AutoscaleFixture):
             group.launchConfiguration.server.name,
             self.sp_change)
 
-    def _create_group(self, minentities=None, maxentities=None, policy=False):
+    def _create_group(self, minentities=None, maxentities=None, policy=False, metadata=None):
         """
         Create a scaling group with the given minentities, maxentities,
         and cooldown as 0. Create group with scaling policy if policy is set to True.
@@ -350,11 +354,11 @@ class LaunchConfigTest(AutoscaleFixture):
                         }]
             create_group_response = self.autoscale_behaviors.create_scaling_group_given(
                 gc_min_entities=minentities, gc_max_entities=maxentities,
-                gc_cooldown=0, sp_list=sp_list)
+                gc_cooldown=0, sp_list=sp_list, lc_metadata=metadata)
         else:
             create_group_response = self.autoscale_behaviors.create_scaling_group_given(
                 gc_min_entities=minentities, gc_max_entities=maxentities,
-                gc_cooldown=0)
+                gc_cooldown=0, lc_metadata=metadata)
         group = create_group_response.entity
         self.assertEqual(create_group_response.status_code, 201,
                          msg='Create group failed with {0}'.format(group.id))
@@ -362,7 +366,7 @@ class LaunchConfigTest(AutoscaleFixture):
         return group
 
     def _update_launch_config(self, group, server_name=None, image_ref=None,
-                              flavor_ref=None):
+                              flavor_ref=None, metadata=None):
         """
         Update the scaling group's launch configuration and
         assert the update was successful.
@@ -371,7 +375,8 @@ class LaunchConfigTest(AutoscaleFixture):
             group_id=group.id,
             name=rand_name(server_name),
             image_ref=image_ref,
-            flavor_ref=flavor_ref)
+            flavor_ref=flavor_ref,
+            metadata=metadata)
         self.assertEquals(update_launch_config_response.status_code, 204,
                           msg='Updating launch config failed with {0} for group {1}'
                           .format(update_launch_config_response, group.id))
