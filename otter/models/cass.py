@@ -112,7 +112,7 @@ _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                    '"policyTouched", paused, created_at FROM {cf} WHERE '
+                    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
