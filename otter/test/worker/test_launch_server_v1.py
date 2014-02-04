@@ -441,6 +441,46 @@ class LoadBalancersTests(TestCase):
         self.log.msg.assert_any_call(
             'Node to delete does not exist', loadbalancer_id=12345, node_id=1)
 
+    def test_remove_from_load_balancer_on_422_LB_deleted(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        has been deleted and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=422))
+        self.treq.json_content.return_value = succeed({
+            "message": "The load balancer is deleted and considered immutable.",
+            "code": 422
+        })
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(
+            'The load balancer is deleted and considered immutable.',
+            loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_fails_on_422_LB_other(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and will fail if the 422 response
+        is not a result of the LB being deleted.
+        """
+        self.treq.delete.return_value = succeed(mock.Mock(code=422))
+        self.treq.json_content.return_value = succeed({
+            "message": ("Load Balancer '1' has a status of 'ERROR' and is "
+                        "considered immutable."),
+            "code": 422
+        })
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.failureResultOf(d, RequestError)
+        self.log.msg.assert_any_call(
+            'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
+            loadbalancer_id=12345, node_id=1)
+
     def test_removelb_retries(self):
         """
         remove_from_load_balancer will retry again until it succeeds
