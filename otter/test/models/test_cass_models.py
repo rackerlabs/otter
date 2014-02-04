@@ -1466,7 +1466,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group._naive_list_policies.assert_called_once_with(limit=10)
 
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}
@@ -1504,7 +1504,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         r = self.group.view_manifest()
         self.failureResultOf(r, NoSuchScalingGroupError)
         view_cql = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                    'pending, "groupTouched", "policyTouched", paused, created_at '
+                    'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                     'FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
         del_cql = 'DELETE FROM scaling_group WHERE "tenantId" = :tenantId AND "groupId" = :groupId'
         exp_data = {'tenantId': self.tenant_id, 'groupId': self.group_id}

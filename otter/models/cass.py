@@ -65,7 +65,7 @@ _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, laun
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
                      ':pending, :policyTouched, :paused, :desired, :created_at)')
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused, created_at '
+                      'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
