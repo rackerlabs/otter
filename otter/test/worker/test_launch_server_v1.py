@@ -732,7 +732,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
@@ -767,7 +767,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         clock.advance(5)
 
@@ -793,7 +793,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
@@ -825,7 +825,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
