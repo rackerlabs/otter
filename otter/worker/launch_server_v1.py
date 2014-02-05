@@ -136,9 +136,10 @@ def wait_for_active(log,
 
         def check_404(f):
             f.trap(RequestError)
-            err = f.value.reason
+            wrapped_f = f.value.reason
+            wrapped_f.trap(APIError)
 
-            if isinstance(err, APIError) and err.code == 404:
+            if wrapped_f.value.code == 404:
                 raise ServerDeleted(server_id)
             return f
 

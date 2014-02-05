@@ -7,6 +7,7 @@ import json
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
@@ -787,7 +788,7 @@ class ServerTests(TestCase):
         clock = Clock()
 
         server_details.return_value = fail(
-            RequestError(APIError(500, '', {}), 'url'))
+            RequestError(Failure(APIError(500, '', {})), 'url'))
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
@@ -809,7 +810,7 @@ class ServerTests(TestCase):
         clock = Clock()
 
         server_details.return_value = fail(
-            RequestError(APIError(404, '', {}), 'url'))
+            RequestError(Failure(APIError(404, '', {})), 'url'))
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
