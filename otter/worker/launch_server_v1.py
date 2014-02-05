@@ -26,7 +26,8 @@ from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, APIError, RequestError)
+                             wrap_request_error, raise_error_on_code,
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -81,7 +82,8 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, path, 'server_details')
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -134,17 +136,8 @@ def wait_for_active(log,
             else:
                 raise TransientRetryError()  # just poll again
 
-        def check_404(f):
-            f.trap(RequestError)
-            wrapped_f = f.value.reason
-            wrapped_f.trap(APIError)
-
-            if wrapped_f.value.code == 404:
-                raise ServerDeleted(server_id)
-            return f
-
         sd = server_details(server_endpoint, auth_token, server_id, log=log)
-        sd.addCallbacks(check_status, check_404)
+        sd.addCallback(check_status)
         return sd
 
     timeout_description = ("Waiting for server <{0}> to change from BUILD "

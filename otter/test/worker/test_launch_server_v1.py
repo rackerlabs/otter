@@ -656,6 +656,20 @@ class ServerTests(TestCase):
 
         self.assertEqual(results, self.treq.json_content.return_value)
 
+    def test_server_details_on_404(self):
+        """
+        server_details will perform a properly formed GET request against
+        the server endpoint and return the decoded json content.
+        """
+        response = mock.Mock()
+        response.code = 404
+
+        self.treq.get.return_value = succeed(response)
+        self.treq.content.return_value = succeed("Not found")
+
+        d = server_details('http://url/', 'my-auth-token', 'serverId')
+        self.failureResultOf(d, ServerDeleted)
+
     def test_server_details_propagates_api_failure(self):
         """
         server_details will propagate API failures.
@@ -803,15 +817,13 @@ class ServerTests(TestCase):
         self.assertEqual(result['server']['status'], 'ACTIVE')
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
-    def test_wait_for_active_stops_looping_on_404(self, server_details):
+    def test_wait_for_active_stops_looping_on_server_deletion(self, server_details):
         """
         wait_for_active will errback it's Deferred if it encounters a 404
         """
         clock = Clock()
 
-        server_details.return_value = fail(
-            RequestError(Failure(APIError(404, '', {})), 'url'))
-
+        server_details.return_value = fail(ServerDeleted('1234'))
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
                             interval=5, clock=clock)
