@@ -45,6 +45,17 @@ class RequestError(Exception):
             self.url, self.reason, self.data)
 
 
+def raise_error_on_code(failure, code, error, url, data=None):
+    """
+    Raise `error` if given `code` in APIError.code inside failure matches.
+    Otherwise `RequestError` is raised with `url` and `data`
+    """
+    failure.trap(APIError)
+    if failure.value.code == code:
+        raise error
+    raise RequestError(failure, url, data)
+
+
 def wrap_request_error(failure, target, data=None):
     """
     Some errors, such as connection timeouts, aren't useful becuase they don't
