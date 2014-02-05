@@ -55,6 +55,17 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
+class ServerDeleted(Exception):
+    """
+    An exception to be raised when a server was deleted unexpectedly.
+    """
+    def __init__(self, server_id):
+        super(ServerDeleted, self).__init__(
+            'Server {server_id} has been deleted unexpectedly.'.format(
+                server_id=server_id))
+        self.server_id = server_id
+
+
 def server_details(server_endpoint, auth_token, server_id, log=None):
     """
     Fetch the details of a server as specified by id.
@@ -123,8 +134,16 @@ def wait_for_active(log,
             else:
                 raise TransientRetryError()  # just poll again
 
+        def check_404(f):
+            f.trap(RequestError)
+            err = f.value.reason
+
+            if isinstance(err, APIError) and err.code == 404:
+                raise ServerDeleted(server_id)
+            return f
+
         sd = server_details(server_endpoint, auth_token, server_id, log=log)
-        sd.addCallback(check_status)
+        sd.addCallbacks(check_status, check_404)
         return sd
 
     timeout_description = ("Waiting for server <{0}> to change from BUILD "
@@ -132,7 +151,7 @@ def wait_for_active(log,
 
     return retry_and_timeout(
         poll, timeout,
-        can_retry=transient_errors_except(UnexpectedServerStatus),
+        can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)

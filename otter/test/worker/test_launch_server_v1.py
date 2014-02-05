@@ -22,6 +22,7 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
+    ServerDeleted,
     verified_delete,
     LB_MAX_RETRIES, LB_RETRY_INTERVAL
 )
@@ -777,6 +778,45 @@ class ServerTests(TestCase):
         self.assertEqual(failure.value.server_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
         self.assertEqual(failure.value.expected_status, 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_continues_looping_on_500(self, server_details):
+        """
+        wait_for_active will errback it's Deferred if it encounters a 404
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(
+            RequestError(APIError(500, '', {}), 'url'))
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        self.assertNoResult(d)
+        server_details.return_value = succeed({'server': {'status': 'ACTIVE'}})
+
+        clock.advance(5)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result['server']['status'], 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_404(self, server_details):
+        """
+        wait_for_active will errback it's Deferred if it encounters a 404
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(
+            RequestError(APIError(404, '', {}), 'url'))
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(ServerDeleted))
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active_stops_looping_on_error(self, server_details):
