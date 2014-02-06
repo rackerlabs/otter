@@ -61,20 +61,20 @@ _cql_view_webhook = ('SELECT data, capability FROM {cf} WHERE "tenantId" = :tena
                      '"groupId" = :groupId AND "policyId" = :policyId AND '
                      '"webhookId" = :webhookId;')
 _cql_create_group = ('INSERT INTO {cf}("tenantId", "groupId", group_config, launch_config, active, '
-                     'pending, "policyTouched", paused, created_at) '
+                     'pending, "policyTouched", paused, desired, created_at) '
                      'VALUES (:tenantId, :groupId, :group_config, :launch_config, :active, '
-                     ':pending, :policyTouched, :paused, :created_at)')
+                     ':pending, :policyTouched, :paused, :desired, :created_at)')
 _cql_view_manifest = ('SELECT "tenantId", "groupId", group_config, launch_config, active, '
-                      'pending, "groupTouched", "policyTouched", paused, created_at '
+                      'pending, "groupTouched", "policyTouched", paused, desired, created_at '
                       'FROM {cf} WHERE "tenantId" = :tenantId AND "groupId" = :groupId')
 _cql_insert_policy = (
     'INSERT INTO {cf}("tenantId", "groupId", "policyId", data, version) '
     'VALUES (:tenantId, :groupId, :{name}policyId, :{name}data, :{name}version)')
 _cql_insert_group_state = ('INSERT INTO {cf}("tenantId", "groupId", active, pending, "groupTouched", '
-                           '"policyTouched", paused) VALUES(:tenantId, :groupId, :active, '
-                           ':pending, :groupTouched, :policyTouched, :paused)')
+                           '"policyTouched", paused, desired) VALUES(:tenantId, :groupId, :active, '
+                           ':pending, :groupTouched, :policyTouched, :paused, :desired)')
 _cql_view_group_state = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                         '"policyTouched", paused, created_at FROM {cf} WHERE '
+                         '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                          '"tenantId" = :tenantId AND "groupId" = :groupId;')
 
 # --- Event related queries
@@ -112,7 +112,7 @@ _cql_delete_one_webhook = ('DELETE FROM {cf} WHERE "tenantId" = :tenantId AND '
                            '"groupId" = :groupId AND "policyId" = :policyId AND '
                            '"webhookId" = :webhookId')
 _cql_list_states = ('SELECT "tenantId", "groupId", group_config, active, pending, "groupTouched", '
-                    '"policyTouched", paused, created_at FROM {cf} WHERE '
+                    '"policyTouched", paused, desired, created_at FROM {cf} WHERE '
                     '"tenantId" = :tenantId;')
 _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
                     '"tenantId" = :tenantId AND "groupId" = :groupId;')
@@ -378,6 +378,10 @@ def _jsonloads_data(raw_data):
 
 
 def _unmarshal_state(state_dict):
+    desired_capacity = state_dict['desired']
+    if desired_capacity is None:
+        desired_capacity = 0
+
     return GroupState(
         state_dict["tenantId"], state_dict["groupId"],
         _jsonloads_data(state_dict["group_config"])["name"],
@@ -385,7 +389,8 @@ def _unmarshal_state(state_dict):
         _jsonloads_data(state_dict["pending"]),
         state_dict["groupTouched"],
         _jsonloads_data(state_dict["policyTouched"]),
-        bool(ord(state_dict["paused"]))
+        bool(ord(state_dict["paused"])),
+        desired=desired_capacity
     )
 
 
@@ -545,6 +550,7 @@ class CassScalingGroup(object):
                 'active': serialize_json_data(new_state.active, 1),
                 'pending': serialize_json_data(new_state.pending, 1),
                 'paused': new_state.paused,
+                'desired': new_state.desired,
                 'groupTouched': new_state.group_touched,
                 'policyTouched': serialize_json_data(new_state.policy_touched, 1)
             }
@@ -1022,7 +1028,8 @@ class CassScalingGroupCollection:
                 "pending": '{}',
                 "created_at": datetime.utcnow(),
                 "policyTouched": '{}',
-                "paused": False
+                "paused": False,
+                "desired": config.get('minEntities', 0)
             }
 
             scaling_group_state = GroupState(
@@ -1033,7 +1040,8 @@ class CassScalingGroupCollection:
                 {},
                 data['created_at'],
                 {},
-                data['paused']
+                data['paused'],
+                desired=data['desired']
             )
             outpolicies = _build_policies(policies, self.policies_table,
                                           self.event_table, queries, data, self.buckets)

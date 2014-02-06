@@ -12,7 +12,7 @@ from otter.util import logging_treq as treq
 from otter.worker.launch_server_v1 import public_endpoint_url
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             RequestError, APIError, wrap_request_error)
+                             raise_error_on_code, wrap_request_error)
 
 
 b64_chars_re = re.compile("^[+/=a-zA-Z0-9]+$")
@@ -172,17 +172,6 @@ def validate_launch_server_config(log, region, service_catalog, auth_token, laun
     return defer.DeferredList(deferreds, consumeErrors=True).addCallback(collect_errors)
 
 
-def raise_error(failure, code, error, url, data=None):
-    """
-    Raise `error` if given `code` in APIError.code inside failure matches.
-    Otherwise `RequestError` is raised with `url` and `data`
-    """
-    failure.trap(APIError)
-    if failure.value.code == code:
-        raise error
-    raise RequestError(failure, url, data)
-
-
 def validate_image(log, auth_token, server_endpoint, image_ref):
     """
     Validate Image by getting the image information. It ensures that image is active
@@ -190,7 +179,8 @@ def validate_image(log, auth_token, server_endpoint, image_ref):
     url = append_segments(server_endpoint, 'images', image_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error, 404, UnknownImage(image_ref), url, 'get_image')
+    d.addErrback(raise_error_on_code, 404, UnknownImage(image_ref), url,
+                 'get_image')
 
     def is_image_active(image_detail):
         if image_detail['image']['status'] != 'ACTIVE':
@@ -207,7 +197,8 @@ def validate_flavor(log, auth_token, server_endpoint, flavor_ref):
     url = append_segments(server_endpoint, 'flavors', flavor_ref)
     d = treq.get(url, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(raise_error, 404, UnknownFlavor(flavor_ref), url, 'get_flavor')
+    d.addErrback(raise_error_on_code, 404, UnknownFlavor(flavor_ref), url,
+                 'get_flavor')
 
     # Extracting the content to avoid a strange bug in twisted/treq where next
     # subsequent call to nova hangs indefintely

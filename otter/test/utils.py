@@ -209,7 +209,7 @@ def mock_log(*args, **kwargs):
     return BoundLog(mock.Mock(spec=[]), mock.Mock(spec=[]))
 
 
-def mock_treq(code=200, json_content={}, method='get', content=''):
+def mock_treq(code=200, json_content={}, method='get', content='', treq_mock=None):
     """
     Return mocked treq instance configured based on arguments given
 
@@ -218,7 +218,8 @@ def mock_treq(code=200, json_content={}, method='get', content=''):
     :param method: HTTP method
     :param content: Str to be returned from treq.content
     """
-    treq_mock = mock.MagicMock(spec=treq)
+    if treq_mock is None:
+        treq_mock = mock.MagicMock(spec=treq)
     response = mock.MagicMock(code=code)
     treq_mock.configure_mock(**{method + '.return_value': defer.succeed(response)})
     treq_mock.json_content.return_value = defer.succeed(json_content)

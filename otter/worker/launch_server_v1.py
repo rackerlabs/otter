@@ -26,7 +26,8 @@ from otter.util import logging_treq as treq
 
 from otter.util.config import config_value
 from otter.util.http import (append_segments, headers, check_success,
-                             wrap_request_error, APIError, RequestError)
+                             wrap_request_error, raise_error_on_code,
+                             APIError, RequestError)
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
@@ -55,6 +56,17 @@ class UnexpectedServerStatus(Exception):
         self.expected_status = expected_status
 
 
+class ServerDeleted(Exception):
+    """
+    An exception to be raised when a server was deleted unexpectedly.
+    """
+    def __init__(self, server_id):
+        super(ServerDeleted, self).__init__(
+            'Server {server_id} has been deleted unexpectedly.'.format(
+                server_id=server_id))
+        self.server_id = server_id
+
+
 def server_details(server_endpoint, auth_token, server_id, log=None):
     """
     Fetch the details of a server as specified by id.
@@ -70,7 +82,8 @@ def server_details(server_endpoint, auth_token, server_id, log=None):
     path = append_segments(server_endpoint, 'servers', server_id)
     d = treq.get(path, headers=headers(auth_token), log=log)
     d.addCallback(check_success, [200, 203])
-    d.addErrback(wrap_request_error, path, 'server_details')
+    d.addErrback(raise_error_on_code, 404, ServerDeleted(server_id),
+                 path, 'server_details')
     return d.addCallback(treq.json_content)
 
 
@@ -132,7 +145,7 @@ def wait_for_active(log,
 
     return retry_and_timeout(
         poll, timeout,
-        can_retry=transient_errors_except(UnexpectedServerStatus),
+        can_retry=transient_errors_except(UnexpectedServerStatus, ServerDeleted),
         next_interval=repeating_interval(interval),
         clock=clock,
         deferred_description=timeout_description)
