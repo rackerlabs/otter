@@ -270,11 +270,12 @@ def makeService(config):
             # and the kz_client is not set in which case policy execution and group
             # delete will fail
             store.kz_client = kz_client
+            # Setup kazoo to stop when shutting down
+            s.addService(FunctionalService(stop=partial(call_after_supervisor,
+                                                        kz_client.stop, supervisor)))
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')
-        # Setup kazoo to stop when shutting down
-        s.addService(FunctionalService(stop=kz_client.stop))
 
     return s
 
