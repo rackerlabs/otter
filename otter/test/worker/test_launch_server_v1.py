@@ -658,8 +658,8 @@ class ServerTests(TestCase):
 
     def test_server_details_on_404(self):
         """
-        server_details will perform a properly formed GET request against
-        the server endpoint and return the decoded json content.
+        server_details will raise a :class:`ServerDeleted` error when it
+        it gets a 404 back in the response
         """
         mock_treq(code=404, content='not found', method='get',
                   treq_mock=self.treq)
@@ -794,7 +794,8 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active_continues_looping_on_500(self, server_details):
         """
-        wait_for_active will errback it's Deferred if it encounters a 404
+        wait_for_active will keep looping if ``server_details`` raises other
+        exceptions, for instance RequestErrors.
         """
         clock = Clock()
 
@@ -816,7 +817,8 @@ class ServerTests(TestCase):
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active_stops_looping_on_server_deletion(self, server_details):
         """
-        wait_for_active will errback it's Deferred if it encounters a 404
+        wait_for_active will errback it's Deferred if ``server_details`` raises
+        a ``ServerDeletion`` error
         """
         clock = Clock()
 
