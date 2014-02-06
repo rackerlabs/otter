@@ -661,11 +661,8 @@ class ServerTests(TestCase):
         server_details will perform a properly formed GET request against
         the server endpoint and return the decoded json content.
         """
-        response = mock.Mock()
-        response.code = 404
-
-        self.treq.get.return_value = succeed(response)
-        self.treq.content.return_value = succeed("Not found")
+        mock_treq(code=404, content='not found', method='get',
+                  treq_mock=self.treq)
 
         d = server_details('http://url/', 'my-auth-token', 'serverId')
         self.failureResultOf(d, ServerDeleted)
