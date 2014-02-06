@@ -248,8 +248,8 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         ip_list_on_scale_down = self._get_ipv4_address_list_on_servers(activeservers_after_scaledown)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_after_scaledown,
                                                         self.load_balancer_3)
-        servers_removed = set(ip_list_on_scale_up) - set(ip_list_on_scale_down)
-        self._verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, servers_removed)
+        ips_removed = set(ip_list_on_scale_up) - set(ip_list_on_scale_down)
+        self._verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, ips_removed)
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name,
             self.gc_min_entities_alt)

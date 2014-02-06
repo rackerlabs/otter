@@ -197,7 +197,7 @@ class LaunchConfigTest(AutoscaleFixture):
         given in the server metadata 'server_building'.
         """
         minentities = 1
-        metadata = {'server_building': 30}
+        metadata = {'server_building': '30'}
         group = self._create_group(minentities=minentities, policy=True,
                                    metadata=metadata)
         group_before_upd = group
