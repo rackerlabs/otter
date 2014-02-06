@@ -113,15 +113,14 @@ class FunctionalService(Service, object):
             return self._stop()
 
 
-def cassandra_disconnect(cass, supervisor):
+def call_after_supervisor(func, supervisor):
     """
-    Disconnect from cassandra after supervisor jobs have completed
+    Call function after supervisor jobs have completed
 
-    Returns Deferred that fires after disconnecting
+    Returns Deferred that fires with return value of `func`
     """
-    # Ensure supervisor's jobs are completed before disconnecting
     d = supervisor.deferred_pool.notify_when_empty()
-    d.addCallback(lambda _: cass.disconnect())
+    d.addCallback(lambda _: func())
     return d
 
 
@@ -232,8 +231,8 @@ def makeService(config):
 
     # Setup cassandra cluster to disconnect when otter shuts down
     if 'cassandra_cluster' in locals():
-        s.addService(FunctionalService(stop=partial(cassandra_disconnect,
-                                                    cassandra_cluster, supervisor)))
+        s.addService(FunctionalService(stop=partial(call_after_supervisor,
+                                                    cassandra_cluster.disconnect, supervisor)))
 
     otter = Otter(store, health_checker.health_check)
     site = Site(otter.app.resource())
