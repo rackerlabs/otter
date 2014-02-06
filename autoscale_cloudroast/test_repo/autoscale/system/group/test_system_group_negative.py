@@ -91,19 +91,19 @@ class NegativeGroupFixture(AutoscaleFixture):
         """
         server_count = 4
         group_response = self.autoscale_behaviors.create_scaling_group_given(
-            gc_min_entities=server_count, lc_metadata={'server_building': 30})
+            gc_min_entities=server_count, lc_metadata={'server_building': '30'})
         group = group_response.entity
-        self.assertEqual(group.state.pending, server_count,
-                         msg='{0} servers are building. Expected {1}'.format(group.state.pending,
-                                                                             server_count))
-        server_list = self.get_servers_containing_given_name_on_tenant(group_id=group.id)
-        self.assertEqual(len(server_list), server_count, msg='The number of servers building'
+        self.resources.add(group, self.empty_scaling_group)
+        server_list = self.check_for_expected_number_of_building_servers(group.id, server_count)
+        self.assertEqual(len(server_list), server_count, msg='The number of servers building '
                          'is {0}, but should be {1} for group {2}'.format(len(server_list), server_count,
                                                                           group.id))
         self.server_client.delete_server(server_list[0])
-        self.assertEqual(group.state.pending, server_count - 1,
-                         msg='{0} servers are building. Expected {1}'.format(group.state.pending,
-                                                                             server_count - 1))
+        self.wait_for_expected_group_state(group.id, server_count - 1)
+        updated_state = self.autoscale_client.list_status_entities_sgroups(group.id).entity
+        self.assertEqual(updated_state.pendingCapacity, server_count - 1,
+                         msg='{0} servers are building. Expected '
+                         '{1}'.format(updated_state.pendingCapacity, server_count - 1))
 
     def test_system_create_delete_scaling_group_server_building_indefinitely(self):
         """
