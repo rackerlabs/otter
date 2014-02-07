@@ -449,8 +449,7 @@ class OtterGroup(object):
             deferreds = []
             for policy in policies:
                 ow = OtterWebhooks(self.store, self.tenant_id, gid, policy['id'])
-                d = ow.list_webhooks(request)
-                d.addCallback(json.loads)
+                d = ow.list_webhooks_dict({})
                 d.addCallback(policy.update)
                 deferreds.append(d)
             return defer.gatherResults(deferreds)

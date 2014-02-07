@@ -115,6 +115,12 @@ class OtterWebhooks(object):
                 "webhooks_links": []
             }
         """
+        return self.list_webhooks_dict(paginate).addCallback(json.dumps)
+
+    def list_webhooks_dict(self, paginate):
+        """
+        Return all webhooks `dict`
+        """
         def format_webhooks(webhook_list):
             webhook_list = [_format_webhook(webhook_model, self.tenant_id,
                                             self.group_id, self.policy_id)
@@ -130,8 +136,8 @@ class OtterWebhooks(object):
         rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
         deferred = rec.list_webhooks(self.policy_id, **paginate)
         deferred.addCallback(format_webhooks)
-        deferred.addCallback(json.dumps)
         return deferred
+
 
     @app.route('/', methods=['POST'])
     @with_transaction_id()
