@@ -19,6 +19,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    InvalidQueryArgument)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
+from otter.rest.webhooks import OtterWebhooks
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
 from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
@@ -440,12 +441,29 @@ class OtterGroup(object):
                 }
             }
         """
+        def with_webhooks(request):
+            return ('webhooks' in request.args and
+                    request.args['webhooks'][0].lower() == 'true')
+
+        def add_webhooks(policies, gid):
+            deferreds = []
+            for policy in policies:
+                ow = OtterWebhooks(self.store, self.tenant_id, gid, policy['id'])
+                d = ow.list_webhooks(request)
+                d.addCallback(json.loads)
+                d.addCallback(policy.update)
+                deferreds.append(d)
+            return defer.gatherResults(deferreds)
+
         def openstack_formatting(data, uuid):
             data["links"] = get_autoscale_links(self.tenant_id, uuid)
             data["state"] = format_state_dict(data["state"])
             linkify_policy_list(data["scalingPolicies"], self.tenant_id, uuid)
             data['scalingPolicies_links'] = get_policies_links(
                 data['scalingPolicies'], self.tenant_id, uuid, rel='policies')
+            if with_webhooks(request):
+                d = add_webhooks(data["scalingPolicies"], uuid)
+                return d.addCallback(lambda _: {"group": data})
             return {"group": data}
 
         group = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
