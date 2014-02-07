@@ -138,7 +138,6 @@ class OtterWebhooks(object):
         deferred.addCallback(format_webhooks)
         return deferred
 
-
     @app.route('/', methods=['POST'])
     @with_transaction_id()
     @fails_with(exception_codes)
