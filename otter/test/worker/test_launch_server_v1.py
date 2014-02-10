@@ -421,6 +421,7 @@ class LoadBalancersTests(TestCase):
         URL represting the load balancer node.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed('')
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -436,6 +437,7 @@ class LoadBalancersTests(TestCase):
         i.e. it returns 404. It also logs it
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.treq.content.return_value = succeed(json.dumps({'message': 'LB does not exist'}))
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -454,7 +456,7 @@ class LoadBalancersTests(TestCase):
             "message": "The load balancer is deleted and considered immutable.",
             "code": 422
         }
-        mock_treq(code=422, json_content=body, method='delete', treq_mock=self.treq)
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -474,7 +476,7 @@ class LoadBalancersTests(TestCase):
                         "considered immutable."),
             "code": 422
         }
-        mock_treq(code=422, json_content=body, method='delete', treq_mock=self.treq)
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
