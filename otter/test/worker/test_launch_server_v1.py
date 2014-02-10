@@ -415,12 +415,28 @@ class LoadBalancersTests(TestCase):
 
         self.assertEqual(self.successResultOf(d), [])
 
-    def test_remove_from_load_balancer(self):
+    def test_remove_from_load_balancer_200_succeeds(self):
         """
         remove_from_load_balancer makes a DELETE request against the
-        URL represting the load balancer node.
+        URL represting the load balancer node, and succeeds on 200
         """
-        self.treq.delete.return_value = succeed(mock.Mock(code=200))
+        mock_treq(code=200, content=json.dumps({'code': 200, 'message': 'ok'}),
+                  method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.treq.delete.assert_called_once_with(
+            'http://url/loadbalancers/12345/nodes/1',
+            headers=expected_headers, log=matches(IsInstance(self.log.__class__)))
+
+    def test_remove_from_load_balancer_202_succeeds(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node, and succeeds on 202 (no body)
+        """
+        mock_treq(code=200, content='', method='delete', treq_mock=self.treq)
+        self.treq.json_content.side_effect = lambda _: fail(ValueError('Invalid JSON'))
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -435,7 +451,8 @@ class LoadBalancersTests(TestCase):
         URL represting the load balancer node and ignores if it is already deleted
         i.e. it returns 404. It also logs it
         """
-        self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        mock_treq(code=404, content=json.dumps({'code': 404, 'message': 'not found'}),
+                  method='delete', treq_mock=self.treq)
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -454,7 +471,7 @@ class LoadBalancersTests(TestCase):
             "message": "The load balancer is deleted and considered immutable.",
             "code": 422
         }
-        mock_treq(code=422, json_content=body, method='delete', treq_mock=self.treq)
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -474,7 +491,23 @@ class LoadBalancersTests(TestCase):
                         "considered immutable."),
             "code": 422
         }
-        mock_treq(code=422, json_content=body, method='delete', treq_mock=self.treq)
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.failureResultOf(d, RequestError)
+        self.log.msg.assert_any_call(
+            'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
+            loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_fails_on_422_malformed(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and will fail if the 422 response
+        is malformed (improper json)
+        """
+        mock_treq(code=422, content='oh no', method='delete', treq_mock=self.treq)
+        self.treq.json_content.side_effect = lambda _: fail(ValueError('Invalid JSON'))
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
