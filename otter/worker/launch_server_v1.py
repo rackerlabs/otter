@@ -481,7 +481,8 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
 
         def content_and_response(response):
-            d = treq.json_content(response)
+            d = treq.content(response)
+            d.addCallback(lambda content: content and json.loads(content))
             return d.addCallback(lambda body: (body, response))
 
         # Success is 200/202.  An LB not being found is 404.  A node not being
