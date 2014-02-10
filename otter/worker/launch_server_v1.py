@@ -473,15 +473,23 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         # it except resetting it - may as well remove the server.)
         body, response = content_response_tuple
         if response.code == 422:
-            if 'load balancer is deleted' not in body['message']:
-                raise APIError(response.code, json.dumps(body), response.headers)
-            lb_log.msg(body["message"])
+            try:
+                json_body = json.loads(body)
+            except:
+                # malformed 422
+                pass
+            else:
+                if 'load balancer is deleted' in json_body['message']:
+                    lb_log.msg(json_body["message"])
+                    return
+
+            raise APIError(response.code, body, response.headers)
 
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
 
         def content_and_response(response):
-            d = treq.json_content(response)
+            d = treq.content(response)
             return d.addCallback(lambda body: (body, response))
 
         # Success is 200/202.  An LB not being found is 404.  A node not being
