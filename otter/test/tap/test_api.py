@@ -497,6 +497,32 @@ class APIMakeServiceTests(TestCase):
         kz_client.stop.return_value.callback(None)
         self.successResultOf(d)
 
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_stops_after_supervisor(self, mock_txkz, mock_setup_scheduler):
+        """
+        Kazoo is stopped after supervisor stops
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        kz_client.stop.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+        self.store.kz_client = None
+
+        parent = makeService(config)
+
+        sd = defer.Deferred()
+        get_supervisor().deferred_pool.add(sd)
+        d = parent.stopService()
+
+        self.assertNoResult(d)
+        self.assertFalse(kz_client.stop.called)
+        sd.callback(None)
+        self.successResultOf(d)
+        self.assertTrue(kz_client.stop.called)
+
 
 class SchedulerSetupTests(TestCase):
     """
