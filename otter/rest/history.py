@@ -7,6 +7,7 @@ import copy
 import json
 
 from otter.log import log
+from otter.log.formatters import AUDIT_LOG_FIELDS
 from otter.rest.otterapp import OtterApp
 from otter.rest.decorators import fails_with, succeeds_with, with_transaction_id
 from otter.rest.errors import exception_codes
@@ -127,10 +128,13 @@ class OtterHistory(object):
                     'event_type': fields['event_type'],
                     'timestamp': fields['@timestamp'],
                     'message': fields['message'],
-                    'policy_id': fields['policy_id'],
                     'scaling_group_id': fields['scaling_group_id'],
                     'server_id': fields['server_id']
                 }
+                for name in AUDIT_LOG_FIELDS.keys():
+                    field = fields.get(name)
+                    if field is not None:
+                        event[name] = field
                 events.append(event)
             return json.dumps({'events': events})
         d.addCallback(build_response)
