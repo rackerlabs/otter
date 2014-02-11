@@ -107,13 +107,6 @@ class OtterHistory(object):
         returns a list of logged autoscale events
         """
         host = config_value('elasticsearch.host')
-        # XXX: rockstar (12 Dec 2013) - This is only here until we actually have an
-        # endpoint in config. It'd be much better to have this blow up when it's missing
-        # a config.
-        if not host:
-            data = {}
-            return json.dumps(data)
-
         data = make_auditlog_query(self.tenant_id, config_value('region'))
         d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
