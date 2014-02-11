@@ -46,6 +46,30 @@ def _format_webhook(webhook_model, tenant_id, group_id, policy_id,
     return webhook_model
 
 
+def list_webhooks(log, tenant_id, group_id, policy_id, store, paginate):
+    """
+    Return all webhooks along with links of given policy
+
+    :returns: Deferred that fires with `dict`
+    """
+    def format_webhooks(webhook_list):
+        webhook_list = [_format_webhook(webhook_model, tenant_id,
+                                        group_id, policy_id)
+                        for webhook_model in webhook_list]
+
+        return {
+            'webhooks': webhook_list,
+            "webhooks_links": get_webhooks_links(
+                webhook_list, tenant_id, group_id,
+                policy_id, None, **paginate)
+        }
+
+    rec = store.get_scaling_group(log, tenant_id, group_id)
+    deferred = rec.list_webhooks(policy_id, **paginate)
+    deferred.addCallback(format_webhooks)
+    return deferred
+
+
 class OtterWebhooks(object):
     """
     REST endpoints for managing scaling group webhooks.
@@ -115,28 +139,8 @@ class OtterWebhooks(object):
                 "webhooks_links": []
             }
         """
-        return self.list_webhooks_dict(paginate).addCallback(json.dumps)
-
-    def list_webhooks_dict(self, paginate):
-        """
-        Return all webhooks `dict`
-        """
-        def format_webhooks(webhook_list):
-            webhook_list = [_format_webhook(webhook_model, self.tenant_id,
-                                            self.group_id, self.policy_id)
-                            for webhook_model in webhook_list]
-
-            return {
-                'webhooks': webhook_list,
-                "webhooks_links": get_webhooks_links(
-                    webhook_list, self.tenant_id, self.group_id,
-                    self.policy_id, None, **paginate)
-            }
-
-        rec = self.store.get_scaling_group(self.log, self.tenant_id, self.group_id)
-        deferred = rec.list_webhooks(self.policy_id, **paginate)
-        deferred.addCallback(format_webhooks)
-        return deferred
+        return list_webhooks(self.log, self.tenant_id, self.group_id,
+                             self.policy_id, self.store, paginate).addCallback(json.dumps)
 
     @app.route('/', methods=['POST'])
     @with_transaction_id()
