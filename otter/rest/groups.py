@@ -19,7 +19,7 @@ from otter.rest.decorators import (validate_body, fails_with, succeeds_with,
                                    InvalidQueryArgument)
 from otter.rest.errors import exception_codes
 from otter.rest.policies import OtterPolicies, linkify_policy_list
-from otter.rest.webhooks import OtterWebhooks
+from otter.rest.webhooks import list_webhooks
 from otter.rest.errors import InvalidMinEntities
 from otter.rest.otterapp import OtterApp
 from otter.util.http import (get_autoscale_links, transaction_id, get_groups_links,
@@ -448,8 +448,8 @@ class OtterGroup(object):
         def add_webhooks(policies, gid):
             deferreds = []
             for policy in policies:
-                ow = OtterWebhooks(self.store, self.tenant_id, gid, policy['id'])
-                d = ow.list_webhooks_dict({})
+                d = list_webhooks(self.log, self.tenant_id, gid,
+                                  policy['id'], self.store, {})
                 d.addCallback(policy.update)
                 deferreds.append(d)
             return defer.gatherResults(deferreds)

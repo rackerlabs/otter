@@ -661,6 +661,92 @@ class OneGroupTestCase(RestAPITestMixin, TestCase):
             mock.ANY, '11111', 'one')
         self.mock_group.view_manifest.assert_called_once_with()
 
+    @mock.patch('otter.rest.groups.list_webhooks')
+    def test_view_manifest_with_webhooks(self, mock_list_webhooks):
+        """
+        `view_manifest` gives webhooks information in policies if query args contains
+        ?webhooks=true
+        """
+        manifest = {
+            'groupConfiguration': config_examples()[0],
+            'launchConfiguration': launch_examples()[0],
+            'id': 'one',
+            'state': GroupState('11111', '1', '', {}, {}, None, {}, False),
+            'scalingPolicies': [dict(id="5", **policy_examples()[0]),
+                                dict(id="6", **policy_examples()[1])]
+        }
+        self.mock_group.view_manifest.return_value = defer.succeed(manifest)
+
+        webhooks = [
+            {
+                "webhooks": [
+                    {
+                        'id': '3',
+                        'name': 'three',
+                        'metadata': {},
+                        'links': [
+                            {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
+                             "rel": "self"},
+                            {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}
+                        ]
+                    },
+                    {
+                        'id': '4',
+                        'name': 'four',
+                        'metadata': {},
+                        'links': [
+                            {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
+                             "rel": "self"},
+                            {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}
+                        ]
+                    }
+                ],
+                "webhooks_links": []
+            },
+            {
+                "webhooks": [
+                    {
+                        'id': '5',
+                        'name': 'five',
+                        'metadata': {},
+                        'links': [
+                            {"href": '/v1.0/11111/groups/1/policies/2/webhooks/3/',
+                             "rel": "self"},
+                            {"href": '/v1.0/execute/1/xxx/', "rel": "capability"}
+                        ]
+                    },
+                    {
+                        'id': '6',
+                        'name': 'six',
+                        'metadata': {},
+                        'links': [
+                            {"href": '/v1.0/11111/groups/1/policies/2/webhooks/4/',
+                             "rel": "self"},
+                            {"href": '/v1.0/execute/1/yyy/', "rel": "capability"}
+                        ]
+                    }
+                ],
+                "webhooks_links": []
+            }
+        ]
+        wh_returns = webhooks[:]
+        mock_list_webhooks.side_effect = lambda *args: defer.succeed(wh_returns.pop(0))
+
+        response_body = self.assert_status_code(
+            200, endpoint="{0}?webhooks=true".format(self.endpoint), method="GET")
+        resp = json.loads(response_body)
+        validate(resp, rest_schemas.create_and_manifest_response)
+
+        # ensure webhooks is added in policies
+        for i in [0, 1]:
+            self.assertEqual(resp['group']['scalingPolicies'][i]['webhooks'],
+                             webhooks[i]['webhooks'])
+            self.assertEqual(resp['group']['scalingPolicies'][i]['webhooks_links'],
+                             webhooks[i]['webhooks_links'])
+        mock_list_webhooks.assert_has_calls(
+            [mock.call(mock.ANY, '11111', 'one', '5', self.mock_store, {}),
+             mock.call(mock.ANY, '11111', 'one', '6', self.mock_store, {})])
+
     def test_group_delete(self):
         """
         Deleting an existing group succeeds with a 204.
