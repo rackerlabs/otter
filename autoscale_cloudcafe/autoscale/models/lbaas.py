@@ -46,6 +46,9 @@ class NodeList(AutoMarshallingModel):
 
 
 class LoadBalancer(AutoMarshallingModel):
+    """
+    Marshalling and unmarshalling for create load balancer request and response
+    """
 
     ROOT_TAG = 'loadBalancer'
 
@@ -57,7 +60,6 @@ class LoadBalancer(AutoMarshallingModel):
                  contentCaching=None, halfClosed=None, timeout=None,
                  cluster=None, sourceAddresses=None, sslTermination=None,
                  httpsRedirect=None):
-        '''An object that represents the data of a Load Balancer.'''
         self.name = name
         self.nodes = nodes
         self.protocol = protocol
@@ -84,30 +86,43 @@ class LoadBalancer(AutoMarshallingModel):
         self.httpsRedirect = httpsRedirect
 
     def get_public_ipv4_vip(self):
+        """
+        gets public ipv4 addresses
+        """
         for vip in self.virtualIps:
             if vip.ipVersion == 'IPV4' and vip.type == 'PUBLIC':
                 return vip
 
     def get_public_ipv6_vip(self):
+        """
+        gets public ipv6 addresses
+        """
         for vip in self.virtualIps:
             if vip.ipVersion == 'IPV6' and vip.type == 'PUBLIC':
                 return vip
 
     def get_servicenet_ipv4_vip(self):
+        """
+        gets service net ipv4 addresses
+        """
         for vip in self.virtualIps:
             if vip.ipVersion == 'IPV4' and vip.type == 'SERVICENET':
                 return vip
 
     def _obj_to_json(self):
+        """
+        Marshalling from object to json
+        """
         ret = self._auto_to_dict()
         return json.dumps(ret)
 
     def _obj_to_dict(self):
+        """
+        Marshalling from object to dict
+        """
         ret = {}
         for attr in vars(self).keys():
             value = vars(self).get(attr)
-            #quick and dirty fix for _log getting added in
-            #ideally _log should be __log, talk to Jose about this.
             if value is not None and attr != '_log':
                 ret[attr] = self._auto_value_to_dict(value)
 
@@ -117,6 +132,9 @@ class LoadBalancer(AutoMarshallingModel):
             return ret
 
     def _auto_value_to_dict(self, value):
+        """
+        converts value to dict
+        """
         ret = None
         if isinstance(value, (int, str, unicode, bool)):
             ret = value
@@ -134,6 +152,9 @@ class LoadBalancer(AutoMarshallingModel):
 
     @classmethod
     def _json_to_obj(cls, serialized_str):
+        """
+        Used to marshal create load balancer request to Load balancer object type
+        """
         json_dict = json.loads(serialized_str)
         if cls.ROOT_TAG not in json_dict:
             return None
@@ -142,51 +163,10 @@ class LoadBalancer(AutoMarshallingModel):
 
     @classmethod
     def _dict_to_obj(cls, dic):
+        """
+        Used to marshal create load balancer response to Load balancer object type
+        """
         if 'nodes' in dic:
             node_list = dic.get('nodes')
             dic[NodeList.ROOT_TAG] = NodeList._dict_to_obj(node_list)
-        # if VirtualIpList.ROOT_TAG in dic:
-        #     vip_list = dic.get(VirtualIpList.ROOT_TAG)
-        #     dic[VirtualIpList.ROOT_TAG] = \
-        #         VirtualIpList._dict_to_obj(vip_list)
-        # if Created.ROOT_TAG in dic:
-        #     created = dic.get(Created.ROOT_TAG)
-        #     dic[Created.ROOT_TAG] = Created._dict_to_obj(created)
-        # if Updated.ROOT_TAG in dic:
-        #     updated = dic.get(Updated.ROOT_TAG)
-        #     dic[Updated.ROOT_TAG] = Updated._dict_to_obj(updated)
-        # if SourceAddresses.ROOT_TAG in dic:
-        #     s_addrs = dic.get(SourceAddresses.ROOT_TAG)
-        #     dic[SourceAddresses.ROOT_TAG] = \
-        #         SourceAddresses._dict_to_obj(s_addrs)
-        # if Cluster.ROOT_TAG in dic:
-        #     cluster = dic.get(Cluster.ROOT_TAG)
-        #     dic[Cluster.ROOT_TAG] = Cluster._dict_to_obj(cluster)
-        # if ContentCaching.ROOT_TAG in dic:
-        #     cc = dic.get(ContentCaching.ROOT_TAG)
-        #     dic[ContentCaching.ROOT_TAG] = ContentCaching._dict_to_obj(cc)
-        # if ConnectionLogging.ROOT_TAG in dic:
-        #     cl = dic.get(ConnectionLogging.ROOT_TAG)
-        #     dic[ConnectionLogging.ROOT_TAG] = \
-        #         ConnectionLogging._dict_to_obj(cl)
-        # if SessionPersistence.ROOT_TAG in dic:
-        #     sp = dic.get(SessionPersistence.ROOT_TAG)
-        #     dic[SessionPersistence.ROOT_TAG] = \
-        #         SessionPersistence._dict_to_obj(sp)
-        # if AccessList.ROOT_TAG in dic:
-        #     al = dic.get(AccessList.ROOT_TAG)
-        #     dic[AccessList.ROOT_TAG] = AccessList._dict_to_obj(al)
-        # if ConnectionThrottle.ROOT_TAG in dic:
-        #     ct = dic.get(ConnectionThrottle.ROOT_TAG)
-        #     dic[ConnectionThrottle.ROOT_TAG] = \
-        #         ConnectionThrottle._dict_to_obj(ct)
-        # if HealthMonitor.ROOT_TAG in dic:
-        #     hm = dic.get(HealthMonitor.ROOT_TAG)
-        #     dic[HealthMonitor.ROOT_TAG] = HealthMonitor._dict_to_obj(hm)
-        # if Metadata.ROOT_TAG in dic:
-        #     md = dic.get(Metadata.ROOT_TAG)
-        #     dic[Metadata.ROOT_TAG] = Metadata._dict_to_obj(md)
-        # if SSLTermination.ROOT_TAG in dic:
-        #     ssl = dic.get(SSLTermination.ROOT_TAG)
-        #     dic[SSLTermination.ROOT_TAG] = SSLTermination._dict_to_obj(ssl)
         return LoadBalancer(**dic)
