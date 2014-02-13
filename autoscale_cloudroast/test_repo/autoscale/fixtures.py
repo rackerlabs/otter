@@ -454,6 +454,20 @@ class AutoscaleFixture(BaseTestFixture):
             webhooks_num += len(list_webhooks.webhooks)
         return webhooks_num
 
+    def successfully_delete_given_loadbalancer(self, lb_id):
+        """
+        Given the load balancer Id, deletes the load balancer until a 204 is received
+        """
+        endtime = time.time() + 900
+        while time.time() < endtime:
+            del_lb = self.lbaas_client.delete_load_balancer(lb_id)
+            if del_lb.status_code == 202:
+                break
+            time.sleep(self.interval_time)
+        else:
+            self.fail('Deleting load balancer failed, as load balncer remained in building'
+                      ' after waiting 15 mins'.format(lb_id))
+
     @classmethod
     def tearDownClass(cls):
         """

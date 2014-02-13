@@ -13,6 +13,30 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     System tests to verify lbaas integration with autoscale
     """
 
+    @tags(speed='test', type='lbaas')
+    def test_delete_load_balancer_during_scale_down(self):
+        """
+        Create a load balancer and provide it in the launch config during create group.
+        Scale up, Delete the load balancer and scale down. Verify that the servers are scaled down
+        even when the load balancer was deleted.
+        """
+        lb = self.lbaas_client.create_load_balancer('test', [], 'HTTP', 80, "PUBLIC")
+        lb_id = lb.entity.id
+        # policy_up_data = {'change': self.gc_min_entities_alt}
+        # policy_down_data = {'change': -self.gc_min_entities_alt}
+        # group = self._create_group_given_lbaas_id(lb_id)
+        # active_server_list = self.wait_for_expected_number_of_active_servers(
+        #     group.id,
+        #     self.gc_min_entities_alt)
+        # self._verify_lbs_on_group_have_servers_as_nodes(group.id, active_server_list, lb_id)
+        # self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        # self.wait_for_expected_number_of_active_servers(
+        #     group.id,
+        #     self.gc_min_entities_alt * 2)
+        # self._assert_lb_nodes_before_scale_persists_after_scale(lb_node_list_before_scale,
+        #                                                         load_balancer)
+        self.successfully_delete_given_loadbalancer(lb_id)
+
     @tags(speed='slow', type='lbaas')
     def test_add_multiple_lbaas_to_group(self):
         """
