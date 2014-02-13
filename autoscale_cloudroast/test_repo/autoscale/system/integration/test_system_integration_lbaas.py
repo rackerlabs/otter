@@ -13,7 +13,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     System tests to verify lbaas integration with autoscale
     """
 
-    @tags(speed='test', type='lbaas')
+    @tags(speed='slow', type='lbaas')
     def test_delete_server_if_deleted_load_balancer_during_scale_down(self):
         """
         Create a load balancer and provide it in the launch config during create group.
@@ -36,8 +36,30 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, servers_after_scale_up, lb_id)
         self.successfully_delete_given_loadbalancer(lb_id)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
-        remaining_servers = self.wait_for_expected_number_of_active_servers(group.id, 2)
+        remaining_servers = self.wait_for_expected_number_of_active_servers(group.id,
+                                                                            self.gc_min_entities_alt)
         self.assertTrue(server_to_be_deleted not in remaining_servers)
+
+    @tags(speed='slow', type='lbaas')
+    def test_delete_server_if_deleted_load_balancer_during_scale_up(self):
+        """
+        Create a load balancer and provide it in the launch config during create group.
+        Delete the load balancer and scale up. Verify that a new server for the scale up
+        policy begin building, but is deleted after it is active, as the lb no longer exists.
+        """
+        lb = self.lbaas_client.create_load_balancer('test', [], 'HTTP', 80, "PUBLIC")
+        lb_id = lb.entity.id
+        policy_up_data = {'change': self.gc_min_entities_alt}
+        group = self._create_group_given_lbaas_id(lb_id)
+        servers_on_create_group = self.wait_for_expected_number_of_active_servers(
+            group.id,
+            self.gc_min_entities_alt)
+        self._verify_lbs_on_group_have_servers_as_nodes(group.id, servers_on_create_group, lb_id)
+        self.successfully_delete_given_loadbalancer(lb_id)
+        self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
+        self.check_for_expected_number_of_building_servers(group.id, self.gc_min_entities_alt * 2)
+        self.assert_servers_deleted_successfully(group.launchConfiguration.server.name,
+                                                 self.gc_min_entities_alt)
 
     @tags(speed='slow', type='lbaas')
     def test_add_multiple_lbaas_to_group(self):
