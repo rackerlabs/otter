@@ -238,17 +238,18 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
         activeservers_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group.id, policy_up_data['desired_capacity'])
+        ip_list_on_scale_up = self._get_ipv4_address_list_on_servers(activeservers_after_scale_up)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_after_scale_up,
                                                         self.load_balancer_3)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
         activeservers_after_scaledown = self.wait_for_expected_number_of_active_servers(
             group.id,
             policy_down_data['desired_capacity'])
+        ip_list_on_scale_down = self._get_ipv4_address_list_on_servers(activeservers_after_scaledown)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, activeservers_after_scaledown,
                                                         self.load_balancer_3)
-        servers_removed = set(activeservers_after_scale_up) - set(activeservers_after_scaledown)
-        ip_list = self._get_ipv4_address_list_on_servers(servers_removed)
-        self._verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, ip_list)
+        ips_removed = set(ip_list_on_scale_up) - set(ip_list_on_scale_down)
+        self._verify_given_ips_do_not_exist_as_nodes_on_lb(self.load_balancer_3, ips_removed)
         self.assert_servers_deleted_successfully(
             group.launchConfiguration.server.name,
             self.gc_min_entities_alt)
