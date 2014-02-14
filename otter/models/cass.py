@@ -119,6 +119,8 @@ _cql_list_policy = ('SELECT "policyId", data FROM {cf} WHERE '
 _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                      '"policyId" = :policyId;')
+_cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
+                          'AND "groupId" = :groupId;')
 
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -460,24 +462,50 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-    def view_manifest(self):
+    def view_manifest(self, webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
+        limit = config_value('limits.pagination') or 100
+
         def _get_policies(group):
-            """
-            Now that we know the group exists, get its policies
-            """
-            limit = config_value('limits.pagination') or 100
             d = self._naive_list_policies(limit=limit)
-            d.addCallback(lambda policies: {
+            return d.addCallback(lambda policies: (group, policies))
+
+        def _get_policies_and_webhooks(group):
+            d = defer.gatherResults(
+                [self._naive_list_policies(limit=limit),
+                 self._naive_list_all_webhooks()], consumeErrors=True)
+            return d.addCallback(lambda results: (group, results))
+
+        def _assemble_webhooks_in_policies((group, results)):
+            policies, webhooks = results
+            if not webhooks:
+                return group, policies
+
+            # Assuming policies and webhooks are sorted based on policyId and
+            # (policyId, webhookID) respectively
+            iwebhooks = iter(webhooks)
+            webhook = iwebhooks.next()
+            try:
+                for policy in policies:
+                    policy['webhooks'] = []
+                    while policy['id'] == webhook['policyId']:
+                        policy['webhooks'].append(
+                            _assemble_webhook_from_row(webhook, include_id=True))
+                        webhook = iwebhooks.next()
+            except StopIteration:
+                pass
+            return group, policies
+
+        def _generate_manifest((group, policies)):
+            return {
                 'groupConfiguration': _jsonloads_data(group['group_config']),
                 'launchConfiguration': _jsonloads_data(group['launch_config']),
                 'scalingPolicies': policies,
                 'id': self.uuid,
                 'state': _unmarshal_state(group)
-            })
-            return d
+            }
 
         view_query = _cql_view_manifest.format(cf=self.group_table)
         del_query = _cql_delete_all_in_group.format(cf=self.group_table, name='')
@@ -486,7 +514,12 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-        d.addCallback(_get_policies)
+        if webhooks:
+            d.addCallback(_get_policies_and_webhooks)
+            d.addCallback(_assemble_webhooks_in_policies)
+        else:
+            d.addCallback(_get_policies)
+        d.addCallback(_generate_manifest)
         return d
 
     def view_config(self):
@@ -756,6 +789,17 @@ class CassScalingGroup(object):
 
         d = self.get_policy(policy_id)
         d.addCallback(_do_delete)
+        return d
+
+    def _naive_list_all_webhooks(self):
+        """
+        List all webhooks of a group. Does not check if group exists and
+        does not paginate
+        """
+        d = self.connection.execute(
+            _cql_list_all_in_group.format(cf=self.webhooks_table),
+            {'tenantId': self.tenant_id, 'groupId': self.uuid},
+            get_consistency_level('list', 'webhook'))
         return d
 
     def _naive_list_webhooks(self, policy_id, limit, marker):
