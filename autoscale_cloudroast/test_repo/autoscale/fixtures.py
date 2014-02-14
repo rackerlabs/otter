@@ -387,14 +387,15 @@ class AutoscaleFixture(BaseTestFixture):
     def assert_servers_deleted_successfully(self, server_name, count=0):
         """
         Given a partial server name, polls for 15 mins to assert that the tenant id
-        has only specified count of servers containing that name.
+        has only specified count of servers containing that name, and returns the list
+        of servers.
         """
         endtime = time.time() + 900
         while time.time() < endtime:
             server_list = self.get_servers_containing_given_name_on_tenant(
                 server_name=server_name)
             if len(server_list) == count:
-                break
+                return server_list
             time.sleep(self.interval_time)
         else:
             self.fail('Servers on the tenant with name {0} were not deleted even'

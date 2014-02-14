@@ -25,20 +25,21 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         policy_up_data = {'change': self.gc_min_entities_alt}
         policy_down_data = {'change': -self.gc_min_entities_alt}
         group = self._create_group_given_lbaas_id(lb_id)
-        servers_on_create_group = self.wait_for_expected_number_of_active_servers(
+        self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_up_data, execute_policy=True)
         servers_after_scale_up = self.wait_for_expected_number_of_active_servers(
             group.id,
             self.gc_min_entities_alt * 2)
-        server_to_be_deleted = set(servers_on_create_group) - set(servers_after_scale_up)
         self._verify_lbs_on_group_have_servers_as_nodes(group.id, servers_after_scale_up, lb_id)
         self.successfully_delete_given_loadbalancer(lb_id)
         self.autoscale_behaviors.create_policy_webhook(group.id, policy_down_data, execute_policy=True)
         remaining_servers = self.wait_for_expected_number_of_active_servers(group.id,
                                                                             self.gc_min_entities_alt)
-        self.assertTrue(server_to_be_deleted not in remaining_servers)
+        actual_remaining_servers = self.assert_servers_deleted_successfully(
+            group.launchConfiguration.server.name, 1)
+        self.assertEquals(actual_remaining_servers, remaining_servers)
 
     @tags(speed='slow', type='lbaas')
     def test_delete_server_if_deleted_load_balancer_during_scale_up(self):
