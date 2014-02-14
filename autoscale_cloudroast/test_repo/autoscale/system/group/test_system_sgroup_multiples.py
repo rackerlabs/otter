@@ -4,6 +4,7 @@ System tests for account with multiple scaling groups
 from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import time
+import unittest
 
 
 class ScalingGroupMultiplesTest(AutoscaleFixture):
@@ -101,6 +102,7 @@ class ScalingGroupMultiplesTest(AutoscaleFixture):
         self.verify_group_state(
             self.first_scaling_group.id, (self.sp_change * 3))
 
+    @unittest.skip("Hits rate limit causing other tests in this class to fail")
     @tags(type='one-time')
     def test_system_max_scaling_groups_on_one_account(self):
         """

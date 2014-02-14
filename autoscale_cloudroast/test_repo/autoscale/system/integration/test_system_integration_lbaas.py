@@ -262,7 +262,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         are removed.
         """
         group = self._create_group_given_lbaas_id(self.load_balancer_3, self.lb_other_region)
-        self.wait_for_expected_group_state(group.id, 0)
+        self.wait_for_expected_group_state(group.id, 0, 900)
         nodes_on_lb = self._get_node_list_from_lb(self.load_balancer_3)
         self.assertEquals(len(nodes_on_lb), 0)
 
