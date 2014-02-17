@@ -491,11 +491,14 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         d.addCallback(check_success, [200, 202, 422, 404])
         d.addCallback(content_and_response)
         d.addCallback(check_422)
-
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
         return d
 
-    d = remove()
+    d = retry_and_timeout(
+        remove, 20 * 60,
+        next_interval=repeating_interval(
+            config_value('worker.lb_retry_interval') or LB_RETRY_INTERVAL),
+        clock=clock, deferred_description='LB node removal timed out')
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
