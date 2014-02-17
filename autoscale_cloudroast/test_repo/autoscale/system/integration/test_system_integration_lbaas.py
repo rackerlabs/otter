@@ -5,6 +5,7 @@ from test_repo.autoscale.fixtures import AutoscaleFixture
 from cafe.drivers.unittest.decorators import tags
 import random
 import time
+import unittest
 
 
 class AutoscaleLbaasFixture(AutoscaleFixture):
@@ -32,6 +33,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         cls.resources.add(cls.load_balancer_3, cls.lbaas_client.delete_load_balancer)
         cls.lb_other_region = 0000
 
+    @unittest.skip("Issue-AS-68")
     @tags(speed='slow', type='lbaas')
     def test_delete_server_if_deleted_load_balancer_during_scale_down(self):
         """
