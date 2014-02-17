@@ -24,7 +24,7 @@
     <!-- ======================================================================================= -->
     <!-- Resources -->
     <!-- ======================================================================================= -->
-    <resources base="https://{region}.autoscale.api.rackspacecloud.com/">
+    <resources base="https://{region}.autoscale.api.rackspacecloud.com/" xml:id="autoscale-v1">
         <resource id="version" path="v1.0/" rax:roles="admin autoscale:admin autoscale:service-admin">
 
             <!-- GROUPS resource -->
