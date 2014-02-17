@@ -12,6 +12,25 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
     """
     System tests to verify lbaas integration with autoscale
     """
+    @classmethod
+    def setUpClass(cls):
+        """
+        Create 3 load balancers
+        """
+        super(AutoscaleLbaasFixture, cls).setUpClass()
+        cls.load_balancer_1_response = cls.lbaas_client.create_load_balancer('test', [],
+                                                                             'HTTP', 80, "PUBLIC")
+        cls.load_balancer_1 = cls.load_balancer_1_response.entity.id
+        cls.resources.add(cls.load_balancer_1, cls.lbaas_client.delete_load_balancer)
+        cls.load_balancer_2_response = cls.lbaas_client.create_load_balancer('test', [],
+                                                                             'HTTP', 80, "PUBLIC")
+        cls.load_balancer_2 = cls.load_balancer_2_response.entity.id
+        cls.resources.add(cls.load_balancer_2, cls.lbaas_client.delete_load_balancer)
+        cls.load_balancer_3_response = cls.lbaas_client.create_load_balancer('test', [],
+                                                                             'HTTP', 80, "PUBLIC")
+        cls.load_balancer_3 = cls.load_balancer_3_response.entity.id
+        cls.resources.add(cls.load_balancer_3, cls.lbaas_client.delete_load_balancer)
+        cls.lb_other_region = 0000
 
     @tags(speed='slow', type='lbaas')
     def test_delete_server_if_deleted_load_balancer_during_scale_down(self):
@@ -311,7 +330,7 @@ class AutoscaleLbaasFixture(AutoscaleFixture):
         are removed.
         """
         group = self._create_group_given_lbaas_id(self.load_balancer_3, self.lb_other_region)
-        self.wait_for_expected_group_state(group.id, 0)
+        self.wait_for_expected_group_state(group.id, 0, 900)
         nodes_on_lb = self._get_node_list_from_lb(self.load_balancer_3)
         self.assertEquals(len(nodes_on_lb), 0)
 

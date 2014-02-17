@@ -93,10 +93,6 @@ class AutoscaleFixture(BaseTestFixture):
         cls.lc_load_balancers = cls.autoscale_config.lc_load_balancers
         cls.sp_list = cls.autoscale_config.sp_list
         cls.wb_name = rand_name(cls.autoscale_config.wb_name)
-        cls.load_balancer_1 = int(cls.autoscale_config.load_balancer_1)
-        cls.load_balancer_2 = int(cls.autoscale_config.load_balancer_2)
-        cls.load_balancer_3 = int(cls.autoscale_config.load_balancer_3)
-        cls.lb_other_region = int(cls.autoscale_config.lb_other_region)
         cls.interval_time = int(cls.autoscale_config.interval_time)
         cls.timeout = int(cls.autoscale_config.timeout)
         cls.scheduler_interval = OtterConstants.SCHEDULER_INTERVAL
@@ -328,13 +324,13 @@ class AutoscaleFixture(BaseTestFixture):
                 "observe the active server list achieving the expected servers count: {2}.".format(
                     timeout, group_id, expected_servers))
 
-    def wait_for_expected_group_state(self, group_id, expected_servers):
+    def wait_for_expected_group_state(self, group_id, expected_servers, wait_time=120):
         """
         :summary: verify the group state reached the expected servers count.
         :param group_id: Group id
         :param expected_servers: Number of servers expected
         """
-        end_time = time.time() + 120
+        end_time = time.time() + wait_time
         while time.time() < end_time:
             group_state = self.autoscale_client.list_status_entities_sgroups(group_id).entity
             if group_state.desiredCapacity == expected_servers:
