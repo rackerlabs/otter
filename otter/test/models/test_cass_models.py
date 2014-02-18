@@ -1521,7 +1521,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
 
         # Getting the result and comparing
-        resp = self.validate_view_manifest_return_value(webhooks=True)
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
         exp_policies = deepcopy(policies)
         exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
                                        _assemble_webhook_from_row(webhooks[1], True)]
@@ -1554,7 +1554,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed([]))
 
         # Getting the result and comparing
-        resp = self.validate_view_manifest_return_value(webhooks=True)
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
         exp_policies = deepcopy(policies)
         [policy.update({'webhooks': []}) for policy in exp_policies]
         self.assertEqual(resp['scalingPolicies'], exp_policies)

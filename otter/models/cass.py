@@ -462,7 +462,7 @@ class CassScalingGroup(object):
         self.webhooks_table = "policy_webhooks"
         self.event_table = "scaling_schedule_v2"
 
-    def view_manifest(self, webhooks=False):
+    def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
@@ -515,7 +515,7 @@ class CassScalingGroup(object):
                            "groupId": self.uuid},
                           get_consistency_level('view', 'group'),
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
-        if webhooks:
+        if with_webhooks:
             d.addCallback(_get_policies_and_webhooks)
             d.addCallback(_assemble_webhooks_in_policies)
         else:
