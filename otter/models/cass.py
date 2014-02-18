@@ -120,7 +120,7 @@ _cql_list_webhook = ('SELECT "webhookId", data, capability FROM {cf} '
                      'WHERE "tenantId" = :tenantId AND "groupId" = :groupId AND '
                      '"policyId" = :policyId;')
 _cql_list_all_in_group = ('SELECT * FROM {cf} WHERE "tenantId" = :tenantId '
-                          'AND "groupId" = :groupId;')
+                          'AND "groupId" = :groupId {order_by};')
 
 _cql_find_webhook_token = ('SELECT "tenantId", "groupId", "policyId" FROM {cf} WHERE '
                            '"webhookKey" = :webhookKey;')
@@ -798,7 +798,8 @@ class CassScalingGroup(object):
         does not paginate
         """
         d = self.connection.execute(
-            _cql_list_all_in_group.format(cf=self.webhooks_table),
+            _cql_list_all_in_group.format(cf=self.webhooks_table,
+                                          order_by='ORDER BY "policyId", "webhookId"'),
             {'tenantId': self.tenant_id, 'groupId': self.uuid},
             get_consistency_level('list', 'webhook'))
         return d

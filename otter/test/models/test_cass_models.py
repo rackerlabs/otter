@@ -1126,6 +1126,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+    def test_naive_list_all_webhooks(self):
+        """
+        Listing all webhooks from `_naive_list_all_webhooks` makes the right query
+        """
+        self.returns = [[{'webhookId': 'w1'}]]
+        d = self.group._naive_list_all_webhooks()
+
+        self.assertEqual(self.successResultOf(d), [{'webhookId': 'w1'}])
+        exp_cql = ('SELECT * FROM policy_webhooks WHERE "tenantId" = :tenantId '
+                   'AND "groupId" = :groupId ORDER BY "policyId", "webhookId";')
+        self.connection.execute.assert_called_once_with(
+            exp_cql, {'tenantId': self.tenant_id, 'groupId': self.group_id},
+            ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
