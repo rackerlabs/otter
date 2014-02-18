@@ -10,7 +10,7 @@ from autoscale.models.request.autoscale_requests import (
     Group_Request, Policy_Request, Webhook_Request, Config_Request,
     ScalingGroup_Request, Update_Policy_Request, Update_Webhook_Request,
     Maas_Policy_Request, Update_Maas_Policy_Request)
-from autoscale.models.lbaas import NodeList
+from autoscale.models.lbaas import NodeList, LoadBalancer
 from cafe.engine.clients.rest import AutoMarshallingRestClient
 from urlparse import urlparse
 
@@ -408,7 +408,7 @@ class AutoscalingAPIClient(AutoMarshallingRestClient):
 
     def update_policy(self, group_id, policy_id, name, cooldown, change=None,
                       change_percent=None, desired_capacity=None,
-                      policy_type=None, args=None,  check_label=None,
+                      policy_type=None, args=None, check_label=None,
                       check_type=None, check_url=None, check_method=None,
                       monitoring_zones=None, check_timeout=None, check_period=None,
                       target_alias=None, alarm_criteria=None,
@@ -670,6 +670,52 @@ class LbaasAPIClient(AutoMarshallingRestClient):
                                                self.serialize_format
         self.default_headers['Accept'] = 'application/%s' % \
                                          self.deserialize_format
+
+    def create_load_balancer(self, name, nodes, protocol, port, virtualIps,
+                             halfClosed=None, accessList=None, algorithm=None,
+                             connectionLogging=None, connectionThrottle=None,
+                             healthMonitor=None, metadata=None,
+                             timeout=None, sessionPersistence=None,
+                             contentCaching=None, httpsRedirect=None,
+                             requestslib_kwargs=None):
+        """
+        :summary: Create load balancer with only the required fields and no nodes
+        :param name: The name of the load balancer
+        :type name: string
+        :param protocol: The protocol of the load balancer
+        :type protocol: string
+        :param algorithm: The algorithm of the load balancer
+        :type algorithm: string
+        :param port: The port of the load balancer
+        :type port: integer
+        :param virtualIps: The virtualIps of the load balancer
+        :type virtualIps: string
+        :return: Response Object containing response code 202
+        on success and returns created load balancer json
+        :rtype: Response Object
+        """
+        lb = LoadBalancer(name=name, nodes=nodes, protocol=protocol,
+                          virtualIps=[{"type": virtualIps}], algorithm=algorithm,
+                          port=port)
+        return self.request('POST', self.url,
+                            response_entity_type=LoadBalancer,
+                            request_entity=lb,
+                            requestslib_kwargs=requestslib_kwargs)
+
+    def delete_load_balancer(self, load_balancer_id, requestslib_kwargs=None):
+        """
+        :summary: Delete a load balancer
+        :param load_balancer_id: The id of an existing load balancer.
+        :type load_balancer_id: String
+        :param load balancer_id: The id of an existing load balancer.
+        :type node_id: String
+        :return: Response Object containing response code 204
+         on success and empty body
+        :rtype: Response Object
+        """
+        full_url = '/'.join([self.url, str(load_balancer_id)])
+        return self.request('DELETE', full_url,
+                            requestslib_kwargs=requestslib_kwargs)
 
     def list_nodes(self, load_balancer_id, limit=None, marker=None,
                    offset=None, requestslib_kwargs=None):

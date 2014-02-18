@@ -3,6 +3,7 @@ Deletes.
 """
 from cafe.drivers.unittest.decorators import tags
 from test_repo.autoscale.fixtures import AutoscaleFixture
+import unittest
 
 
 class DeleteAll(AutoscaleFixture):
@@ -40,6 +41,7 @@ class DeleteAll(AutoscaleFixture):
         print 'Deleting {0} servers, {1} still exist'.format(len(all_servers), len(list_servers))\
             if len(list_servers) is not 0 else "Deleted {0} servers".format(len(all_servers))
 
+    @unittest.skip("Preexisting LB no longer exist as part of Otter tests")
     @tags(type='nodes')
     def test_delete_all_but_one_node_on_all_loadbalancers_on_the_account(self):
         """
