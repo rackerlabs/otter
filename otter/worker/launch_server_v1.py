@@ -464,13 +464,35 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
     lb_log.msg('Removing from load balancer')
     path = append_segments(endpoint, 'loadbalancers', str(loadbalancer_id), 'nodes', str(node_id))
 
+    def check_422(content_response_tuple):
+        # A LB being deleted sometimes results in a 422.  This function
+        # unfortunately has to parse the body of the message to see if this is an
+        # acceptable 422 (if the LB has been deleted or the node has already been
+        # removed, then 'removing from load balancer' as a task should be
+        # successful - if the LB is in ERROR, then nothing more can be done to
+        # it except resetting it - may as well remove the server.)
+        body, response = content_response_tuple
+        if response.code == 422:
+            if 'load balancer is deleted' not in body['message']:
+                raise APIError(response.code, json.dumps(body), response.headers)
+            lb_log.msg(body["message"])
+
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
+
+        def content_and_response(response):
+            d = treq.content(response)
+            d.addCallback(lambda content: content and json.loads(content))
+            return d.addCallback(lambda body: (body, response))
+
+        # Success is 200/202.  An LB not being found is 404.  A node not being
+        # found is a 404.  But a deleted LB sometimes results in a 422.
         d.addCallback(log_on_response_code, lb_log, 'Node to delete does not exist', 404)
-        d.addCallback(check_success, [200, 202, 404])
+        d.addCallback(check_success, [200, 202, 422, 404])
+        d.addCallback(content_and_response)
+        d.addCallback(check_422)
+
         d.addErrback(log_lb_unexpected_errors, path, lb_log, 'remove_node')
-        # To avoid the twisted hang bug - TESTING
-        d.addCallback(treq.content)
         return d
 
     d = remove()

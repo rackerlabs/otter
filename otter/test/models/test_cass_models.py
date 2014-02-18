@@ -6,6 +6,7 @@ import json
 import mock
 from datetime import datetime
 import itertools
+from copy import deepcopy
 
 from twisted.trial.unittest import TestCase
 from jsonschema import ValidationError
@@ -18,7 +19,8 @@ from otter.models.cass import (
     CassAdmin,
     serialize_json_data,
     get_consistency_level,
-    verified_view)
+    verified_view,
+    _assemble_webhook_from_row)
 
 from otter.models.interface import (
     GroupState, GroupNotEmptyError, NoSuchScalingGroupError, NoSuchPolicyError,
@@ -1124,6 +1126,20 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
         self.connection.execute.assert_called_once_with(
             expected_cql, expected_data, ConsistencyLevel.TWO)
 
+    def test_naive_list_all_webhooks(self):
+        """
+        Listing all webhooks from `_naive_list_all_webhooks` makes the right query
+        """
+        self.returns = [[{'webhookId': 'w1'}]]
+        d = self.group._naive_list_all_webhooks()
+
+        self.assertEqual(self.successResultOf(d), [{'webhookId': 'w1'}])
+        exp_cql = ('SELECT * FROM policy_webhooks WHERE "tenantId" = :tenantId '
+                   'AND "groupId" = :groupId ORDER BY "groupId", "policyId", "webhookId";')
+        self.connection.execute.assert_called_once_with(
+            exp_cql, {'tenantId': self.tenant_id, 'groupId': self.group_id},
+            ConsistencyLevel.TWO)
+
     @mock.patch('otter.models.cass.CassScalingGroup.get_policy',
                 return_value=defer.fail(NoSuchPolicyError('t', 'g', 'p')))
     def test_naive_list_webhooks_valid_policy(self, mock_get_policy):
@@ -1447,8 +1463,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
             'created_at': 23
         })
-        self.group._naive_list_policies = mock.MagicMock(
-            return_value=defer.succeed([]))
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed([]))
 
         self.assertEqual(self.validate_view_manifest_return_value(), {
             'groupConfiguration': self.config,
@@ -1474,6 +1489,155 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
                                               exp_data, ConsistencyLevel.TWO,
                                               matches(IsInstance(NoSuchScalingGroupError)),
                                               self.mock_log)
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks(self, verified_view):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '2', 'webhookId': '21'},
+                    {'policyId': '2', 'webhookId': '22'},
+                    {'policyId': '2', 'webhookId': '23'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
+                                       _assemble_webhook_from_row(webhooks[1], True)]
+        exp_policies[1]['webhooks'] = []
+        exp_policies[2]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_all(self, verified_view):
+        """
+        Viewing manifest with_webhooks=True returns webhooks inside policies when
+        all the policies have webhooks
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(2)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '1', 'webhookId': '21'},
+                    {'policyId': '1', 'webhookId': '22'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
+                                       _assemble_webhook_from_row(webhooks[1], True)]
+        exp_policies[1]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_no_webhooks(self, verified_view):
+        """
+        Viewing manifest with_webhooks=True with no actual webhooks still adds
+        empty 'webhooks' in policy
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # No webhooks
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed([]))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        [policy.update({'webhooks': []}) for policy in exp_policies]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
+
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_empty_webhooks(self, verified_view):
+        """
+        Viewing manifest with with_webhooks=True returns webhooks inside policies and
+        gives empty webhooks array for policies that do not have webhooks that occur
+        after all webhooks have been processed
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # Getting webhooks
+        wh_part = {'data': '{"name": "a", "metadata": {"a": "b"}}',
+                   'capability': '{"version": "v1"}'}
+        webhooks = [{'policyId': '0', 'webhookId': '11'},
+                    {'policyId': '0', 'webhookId': '12'},
+                    {'policyId': '1', 'webhookId': '21'},
+                    {'policyId': '1', 'webhookId': '22'}]
+        [webhook.update(wh_part) for webhook in webhooks]
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed(webhooks))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(with_webhooks=True)
+        exp_policies = deepcopy(policies)
+        exp_policies[0]['webhooks'] = [_assemble_webhook_from_row(webhooks[0], True),
+                                       _assemble_webhook_from_row(webhooks[1], True)]
+        exp_policies[1]['webhooks'] = [
+            _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
+        exp_policies[2]['webhooks'] = []
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
 
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
