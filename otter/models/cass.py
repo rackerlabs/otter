@@ -488,15 +488,17 @@ class CassScalingGroup(object):
             # (policyId, webhookID) respectively
             iwebhooks = iter(webhooks)
             webhook = iwebhooks.next()
+            ipolicies = iter(policies)
             try:
-                for policy in policies:
+                for policy in ipolicies:
                     policy['webhooks'] = []
                     while policy['id'] == webhook['policyId']:
                         policy['webhooks'].append(
                             _assemble_webhook_from_row(webhook, include_id=True))
                         webhook = iwebhooks.next()
             except StopIteration:
-                pass
+                # Add empty webhooks for remaining policies
+                [policy.update({'webhooks': []}) for policy in ipolicies]
             return group, policies
 
         def _generate_manifest((group, policies)):
