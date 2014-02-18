@@ -1516,6 +1516,35 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
             _assemble_webhook_from_row(webhook, True) for webhook in webhooks[2:]]
         self.assertEqual(resp['scalingPolicies'], exp_policies)
 
+    @mock.patch('otter.models.cass.verified_view')
+    def test_view_manifest_with_webhooks_no_webhooks(self, verified_view):
+        """
+        Viewing manifest with webhooks=True with no actual webhooks still adds
+        empty 'webhooks' in policy
+        """
+        verified_view.return_value = defer.succeed({
+            'tenantId': self.tenant_id, "groupId": self.group_id,
+            'id': "12345678g", 'group_config': serialize_json_data(self.config, 1.0),
+            'launch_config': serialize_json_data(self.launch_config, 1.0),
+            'active': '{"A":"R"}', 'pending': '{"P":"R"}', 'groupTouched': '123',
+            'policyTouched': '{"PT":"R"}', 'paused': '\x00', 'desired': 0,
+            'created_at': 23
+        })
+
+        # Getting policies
+        policies = [group_examples.policy()[i] for i in range(3)]
+        [policy.update({'id': str(i)}) for i, policy in enumerate(policies)]
+        self.group._naive_list_policies = mock.Mock(return_value=defer.succeed(policies))
+
+        # No webhooks
+        self.group._naive_list_all_webhooks = mock.Mock(return_value=defer.succeed([]))
+
+        # Getting the result and comparing
+        resp = self.validate_view_manifest_return_value(webhooks=True)
+        exp_policies = deepcopy(policies)
+        [policy.update({'webhooks': []}) for policy in exp_policies]
+        self.assertEqual(resp['scalingPolicies'], exp_policies)
+
     @mock.patch('otter.models.cass.verified_view',
                 return_value=defer.fail(NoSuchScalingGroupError(2, 3)))
     def test_view_manifest_no_such_group(self, verified_view):

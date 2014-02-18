@@ -481,6 +481,7 @@ class CassScalingGroup(object):
         def _assemble_webhooks_in_policies((group, results)):
             policies, webhooks = results
             if not webhooks:
+                [policy.update({'webhooks': []}) for policy in policies]
                 return group, policies
 
             # Assuming policies and webhooks are sorted based on policyId and
