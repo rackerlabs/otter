@@ -1135,7 +1135,7 @@ class CassScalingGroupTests(CassScalingGroupTestCase):
 
         self.assertEqual(self.successResultOf(d), [{'webhookId': 'w1'}])
         exp_cql = ('SELECT * FROM policy_webhooks WHERE "tenantId" = :tenantId '
-                   'AND "groupId" = :groupId ORDER BY "policyId", "webhookId";')
+                   'AND "groupId" = :groupId ORDER BY "groupId", "policyId", "webhookId";')
         self.connection.execute.assert_called_once_with(
             exp_cql, {'tenantId': self.tenant_id, 'groupId': self.group_id},
             ConsistencyLevel.TWO)

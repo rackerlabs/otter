@@ -799,7 +799,7 @@ class CassScalingGroup(object):
         """
         d = self.connection.execute(
             _cql_list_all_in_group.format(cf=self.webhooks_table,
-                                          order_by='ORDER BY "policyId", "webhookId"'),
+                                          order_by='ORDER BY "groupId", "policyId", "webhookId"'),
             {'tenantId': self.tenant_id, 'groupId': self.uuid},
             get_consistency_level('list', 'webhook'))
         return d
