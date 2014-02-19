@@ -117,13 +117,7 @@ class OtterHistory(object):
 
             for hit in body['hits']['hits']:
                 fields = hit['_source']
-                event = {
-                    'event_type': fields['event_type'],
-                    'timestamp': fields['@timestamp'],
-                    'message': fields['message'],
-                    'scaling_group_id': fields['scaling_group_id'],
-                    'server_id': fields['server_id']
-                }
+                event = {'timestamp': fields['@timestamp']}
                 for name in AUDIT_LOG_FIELDS.keys():
                     field = fields.get(name)
                     if field is not None:
