@@ -452,18 +452,31 @@ class LoadBalancersTests(TestCase):
         has been deleted and is considered immutable (a 422 response with a
         particular message). It also logs it
         """
-        body = {
-            "message": "The load balancer is deleted and considered immutable.",
-            "code": 422
-        }
+        message = "The load balancer is deleted and considered immutable."
+        body = {"message": message, "code": 422}
         mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
         self.assertEqual(self.successResultOf(d), None)
-        self.log.msg.assert_any_call(
-            'The load balancer is deleted and considered immutable.',
-            loadbalancer_id=12345, node_id=1)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_on_422_Pending_delete(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        is in PENDING_DELETE and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        message = ("Load Balancer '12345' has a status of 'PENDING_DELETE' and "
+                   "is considered immutable.")
+        body = {"message": message, "code": 422}
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
 
     def test_remove_from_load_balancer_fails_on_422_LB_other(self):
         """
