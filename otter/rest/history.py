@@ -17,6 +17,8 @@ from otter.util.http import append_segments, check_success
 
 
 _ELASTICSEARCH_QUERY_TEMPLATE = {
+    "from": None,
+    "size": None,
     "query": {
         "filtered": {
             "filter": {
@@ -68,7 +70,7 @@ _REGION_TEMPLATE = {
 }
 
 
-def make_auditlog_query(tenant_id, region):
+def make_auditlog_query(tenant_id, region, start, size):
     """Make an elastic search query to fetch audit logs."""
     query = copy.deepcopy(_ELASTICSEARCH_QUERY_TEMPLATE)
 
@@ -81,6 +83,9 @@ def make_auditlog_query(tenant_id, region):
     region_query = copy.deepcopy(_REGION_TEMPLATE)
     region_query['fquery']['query']['field']['tags']['query'] = region.lower()
     query['query']['filtered']['filter']['bool']['must'].append(region_query)
+
+    query['start'] = start
+    query['size'] = size
 
     return query
 
@@ -107,7 +112,9 @@ class OtterHistory(object):
         returns a list of logged autoscale events
         """
         host = config_value('elasticsearch.host')
-        data = make_auditlog_query(self.tenant_id, config_value('region'))
+        start = request.args.get('start', 0)
+        size = request.args.get('size', 20)
+        data = make_auditlog_query(self.tenant_id, config_value('region'), start, size)
         d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
         d.addCallback(treq.json_content)

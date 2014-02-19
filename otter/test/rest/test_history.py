@@ -79,3 +79,5 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
         treq.get.assert_called_once_with(
             'http://dummy/_search', data='{"tenant_id": 101010}', log=log_object.bind())
         treq.json_content.assert_called_once_with(response)
+
+        make_auditlog_query.assert_called_once_with('101010', None, 0, 20)
