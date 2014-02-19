@@ -79,7 +79,7 @@ def make_auditlog_query(tenant_id, region):
 
     # Add the region query
     region_query = copy.deepcopy(_REGION_TEMPLATE)
-    region_query['fquery']['query']['field']['tenant_id']['query'] = region.lower()
+    region_query['fquery']['query']['field']['tags']['query'] = region.lower()
     query['query']['filtered']['filter']['bool']['must'].append(region_query)
 
     return query
