@@ -446,7 +446,6 @@ class OtterGroup(object):
                     _request.args['webhooks'][0].lower() == 'true')
 
         def add_webhooks_links(policies, gid):
-            deferreds = []
             for policy in policies:
                 webhook_list = [_format_webhook(webhook_model, self.tenant_id,
                                                 gid, policy['id'])
