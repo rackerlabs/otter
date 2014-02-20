@@ -47,7 +47,7 @@
         "index": "not_analyzed",
         "type": "string"
       },
-      "_message": {
+      "message": {
         "index": "not_analyzed",
         "type": "string"
       },

@@ -8,7 +8,7 @@ examples = [
     ("Creating a group successfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Created a group.",
+            "message": "Created a group.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -72,7 +72,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting two new servers to satisfy desired capacity",
+            "message": "Starting two new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -87,7 +87,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -98,7 +98,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -112,7 +112,7 @@ examples = [
     ("Creating a group unsuccessfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Failed to created a group - invalid launch config due to imageRef \"image\".",
+            "message": "Failed to created a group - invalid launch config due to imageRef \"image\".",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -181,7 +181,7 @@ examples = [
     ("Executing a scaling policy successfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Execute scaling policy.",
+            "message": "Execute scaling policy.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -197,7 +197,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -212,7 +212,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -223,7 +223,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:02.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -237,7 +237,7 @@ examples = [
     ("Executing a webhook successfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Execute webhook policy.",
+            "message": "Execute webhook policy.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -253,7 +253,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -268,7 +268,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Active server",
+            "message": "Active server",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -279,7 +279,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:02.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -293,7 +293,7 @@ examples = [
     ("Force deleting a group successfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Delete group (force).",
+            "message": "Delete group (force).",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -308,7 +308,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Deleting 10 new servers to satisfy desired capacity",
+            "message": "Deleting 10 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -323,7 +323,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:03.000001Z",
-            "_message": "Deleted server",
+            "message": "Deleted server",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -334,7 +334,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Deleted server",
+            "message": "Deleted server",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -348,7 +348,7 @@ examples = [
     ("Random bit of convergence (triggered by external deletion)", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Starting 1 new server to satisfy desired capacity",
+            "message": "Starting 1 new server to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "transaction_id": "00000000-0000-0000-0000-00000000001",
@@ -362,7 +362,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -376,7 +376,7 @@ examples = [
     ("Updating group configuration partially successfully", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Attempt to update the group configuration.",
+            "message": "Attempt to update the group configuration.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -396,7 +396,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -411,7 +411,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:03.000001Z",
-            "_message": "Error creating server: Nova server limit has been reached",
+            "message": "Error creating server: Nova server limit has been reached",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -432,7 +432,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:05:01.000001Z",
-            "_message": "Server is Active",
+            "message": "Server is Active",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000002",
@@ -446,7 +446,7 @@ examples = [
     ("Error while scaling up because the user deleted the image", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Execute scaling policy.",
+            "message": "Execute scaling policy.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -462,7 +462,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -477,7 +477,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find image "
+            "message": ("Could not find image "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "user_id": "11111",
             "tenant_id": "000001",
@@ -498,7 +498,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find image "
+            "message": ("Could not find image "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "user_id": "11111",
             "tenant_id": "000001",
@@ -522,7 +522,7 @@ examples = [
     ("Error while scaling up because the user deleted the load balancer", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Execute scaling policy.",
+            "message": "Execute scaling policy.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -537,7 +537,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -552,7 +552,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find load balancer "
+            "message": ("Could not find load balancer "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",
@@ -572,7 +572,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find load balancer "
+            "message": ("Could not find load balancer "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",
@@ -595,7 +595,7 @@ examples = [
     ("Error while scaling up because of upstream API error", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": "Execute scaling policy.",
+            "message": "Execute scaling policy.",
             "request_ip": "85.125.12.1",
             "user_id": "11111",
             "tenant_id": "000001",
@@ -610,7 +610,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": "Starting 2 new servers to satisfy desired capacity",
+            "message": "Starting 2 new servers to satisfy desired capacity",
             "tenant_id": "000001",
             "scaling_group_id": "10000000-0000-0000-0000-00000000001",
             "parent_id": "00000000-0000-0000-0000-00000000001",
@@ -625,7 +625,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find load balancer "
+            "message": ("Could not find load balancer "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",
@@ -646,7 +646,7 @@ examples = [
         },
         {
             "timestamp": "2013-01-01T00:00:02.000001Z",
-            "_message": ("Could not find load balancer "
+            "message": ("Could not find load balancer "
                          "52415800-8b69-11e0-9b19-734f6f007777"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",
@@ -670,7 +670,7 @@ examples = [
     ("Error while executing policy because the cooldown limit has been hit", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": ("Failed to execute policy - maximum group size "
+            "message": ("Failed to execute policy - maximum group size "
                          "limit of 2 hit, cannot scale up by 2 servers"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",
@@ -696,7 +696,7 @@ examples = [
     ("Error while executing policy because the cooldown limit has been hit", [
         {
             "timestamp": "2013-01-01T00:00:01.000001Z",
-            "_message": ("Failed to execute policy - maximum group size "
+            "message": ("Failed to execute policy - maximum group size "
                          "limit of 2 hit, cannot scale up by 2 servers"),
             "request_ip": "85.125.12.1",
             "user_id": "11111",

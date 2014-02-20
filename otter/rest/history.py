@@ -124,8 +124,6 @@ class OtterHistory(object):
             for hit in body['hits']['hits']:
                 fields = hit['_source']
                 event = {'timestamp': fields['@timestamp']}
-                if fields.get('message'):
-                    event['message'] = fields.get('message')
                 for name in AUDIT_LOG_FIELDS.keys():
                     field = fields.get(name)
                     if field is not None:

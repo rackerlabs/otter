@@ -126,7 +126,7 @@ IGNORE_FIELDS = set(["message", "time", "isError", "system", "id", "failure",
 
 AUDIT_LOG_FIELDS = {
     "audit_log": bool,
-    "_message": basestring,
+    "message": basestring,
     "request_ip": basestring,
     "user_id": basestring,
     "tenant_id": basestring,
@@ -170,8 +170,8 @@ def audit_log_formatter(eventDict, timestamp, hostname):
         if key in AUDIT_LOG_FIELDS and isinstance(value, AUDIT_LOG_FIELDS[key]):
                 audit_log_params[key] = value
 
-    if "_message" not in audit_log_params:
-        audit_log_params["_message"] = " ".join([
+    if "message" not in audit_log_params:
+        audit_log_params["message"] = " ".join([
             str(m) for m in eventDict["message"]])
 
     if eventDict.get("isError", False):
@@ -191,12 +191,12 @@ def audit_log_formatter(eventDict, timestamp, hostname):
             if 'message' not in fault:
                 fault['message'] = eventDict['failure'].value.message
 
-        audit_log_params["_message"] = 'Failed: {0}.'.format(
-            audit_log_params["_message"])
+        audit_log_params["message"] = 'Failed: {0}.'.format(
+            audit_log_params["message"])
 
         if 'why' in eventDict and eventDict['why']:
-            audit_log_params["_message"] = '{0} {1}'.format(
-                audit_log_params["_message"], eventDict['why'])
+            audit_log_params["message"] = '{0} {1}'.format(
+                audit_log_params["message"], eventDict['why'])
 
         # strip out any repeated info in the details dict
         delete = []
