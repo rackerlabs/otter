@@ -84,7 +84,7 @@ def make_auditlog_query(tenant_id, region, marker=0, limit=0):
     region_query['fquery']['query']['field']['tags']['query'] = region.lower()
     query['query']['filtered']['filter']['bool']['must'].append(region_query)
 
-    query['start'] = marker
+    query['from'] = marker
     query['size'] = limit
 
     return query
