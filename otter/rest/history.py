@@ -9,7 +9,7 @@ import json
 from otter.log import log
 from otter.log.formatters import AUDIT_LOG_FIELDS
 from otter.rest.otterapp import OtterApp
-from otter.rest.decorators import fails_with, succeeds_with, with_transaction_id
+from otter.rest.decorators import fails_with, paginatable, succeeds_with, with_transaction_id
 from otter.rest.errors import exception_codes
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
@@ -70,7 +70,7 @@ _REGION_TEMPLATE = {
 }
 
 
-def make_auditlog_query(tenant_id, region, start, size):
+def make_auditlog_query(tenant_id, region, marker=0, limit=0):
     """Make an elastic search query to fetch audit logs."""
     query = copy.deepcopy(_ELASTICSEARCH_QUERY_TEMPLATE)
 
@@ -84,8 +84,8 @@ def make_auditlog_query(tenant_id, region, start, size):
     region_query['fquery']['query']['field']['tags']['query'] = region.lower()
     query['query']['filtered']['filter']['bool']['must'].append(region_query)
 
-    query['start'] = start
-    query['size'] = size
+    query['start'] = marker
+    query['size'] = limit
 
     return query
 
@@ -107,14 +107,13 @@ class OtterHistory(object):
     @with_transaction_id()
     @fails_with(exception_codes)
     @succeeds_with(200)
-    def history(self, request):
+    @paginatable
+    def history(self, request, paginate):
         """
         returns a list of logged autoscale events
         """
         host = config_value('elasticsearch.host')
-        start = request.args.get('start', 0)
-        size = request.args.get('size', 20)
-        data = make_auditlog_query(self.tenant_id, config_value('region'), start, size)
+        data = make_auditlog_query(self.tenant_id, config_value('region'), **paginate)
         d = treq.get(append_segments(host, '_search'), data=json.dumps(data), log=self.log)
         d.addCallback(check_success, [200])
         d.addCallback(treq.json_content)

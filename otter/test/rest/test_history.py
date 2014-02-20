@@ -23,7 +23,9 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
     def setUp(self):
         """Set an elastic search config var."""
         super(OtterHistoryTestCase, self).setUp()
-        set_config_data({'elasticsearch': {'host': "http://dummy"}})
+        set_config_data({
+            'elasticsearch': {'host': 'http://dummy'},
+            'limits': {'pagination': 20}})
 
     @mock.patch('otter.rest.history.log')
     @mock.patch('otter.rest.history.make_auditlog_query')
@@ -80,4 +82,4 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
             'http://dummy/_search', data='{"tenant_id": 101010}', log=log_object.bind())
         treq.json_content.assert_called_once_with(response)
 
-        make_auditlog_query.assert_called_once_with('101010', None, 0, 20)
+        make_auditlog_query.assert_called_once_with('101010', None, limit=20)
