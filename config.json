@@ -29,7 +29,8 @@
     },
     "worker": {
         "lb_max_retries": 10,
-        "lb_retry_interval": 10
+        "lb_retry_interval": 10,
+        "lb_delete_timeout": 10 * 60
     },
     "limits": {
         "pagination": 100,
