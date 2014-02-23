@@ -114,7 +114,7 @@ class OtterLaunch(object):
     def __init__(self, store, tenant_id, group_id):
         self.log = log.bind(system='otter.rest.launch',
                             tenant_id=tenant_id,
-                            group_id=group_id)
+                            scaling_group_id=group_id)
         self.store = store
         self.tenant_id = tenant_id
         self.group_id = group_id
