@@ -1,0 +1,6 @@
+$ curl -i https://{region}.autoscale.api.rackspacecloud.com/v1.0/{tenantID}/groups \
+       -X POST\ 
+       -H  'Content-Type: application/json' \
+       -H  'Accept: application/json' \
+       -H  'X-Auth-Token: AUTH_TOKEN' 
+       --data-binary -T reqCreateGroup.json  
