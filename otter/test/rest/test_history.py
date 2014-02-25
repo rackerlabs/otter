@@ -59,7 +59,8 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 'scaling_group_id': 'scaling-group-uvw',
                 'server_id': 'server-rst',
                 'message': 'audit log event',
-            }]
+            }],
+            'links': [{'href': '/v1.0/101010/history', 'rel': 'self'}]
         }
         make_auditlog_query.return_value = {'tenant_id': 101010}
         response = mock.Mock(code=200)
