@@ -19,6 +19,7 @@ initiating a launch_server job.
 import json
 import itertools
 from copy import deepcopy
+import random
 
 from twisted.internet.defer import gatherResults, maybeDeferred
 
@@ -39,6 +40,8 @@ LB_MAX_RETRIES = 10
 # Interval between subsequent retries
 LB_RETRY_INTERVAL = 10
 
+# Delete node from LB timeout (seconds)
+LB_DELETE_TIMEOUT = 600
 
 class UnexpectedServerStatus(Exception):
     """
@@ -492,10 +495,10 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         return d
 
     d = retry_and_timeout(
-        remove, config_value('worker.lb_delete_timeout') or LB_TIMEOUT,
+        remove, config_value('worker.lb_delete_timeout') or LB_DELETE_TIMEOUT,
         next_interval=repeating_interval(
-            config_value('worker.lb_retry_interval') or LB_RETRY_INTERVAL),
-        clock=clock, deferred_description='LB node removal timed out')
+            random.uniform(*(config_value('worker.lb_retry_interval_range') or [10, 15]))),
+        clock=clock, deferred_description='LB node removal')
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
 
