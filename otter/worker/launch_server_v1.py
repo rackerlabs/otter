@@ -235,7 +235,7 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
         add,
         can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
         next_interval=repeating_interval(
-            config_value('worker.lb_retry_interval') or LB_RETRY_INTERVAL),
+            random.uniform(*(config_value('worker.lb_retry_interval_range') or [10, 15]))),
         clock=clock)
 
     def when_done(result):
