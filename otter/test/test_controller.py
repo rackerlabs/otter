@@ -873,7 +873,7 @@ class DeleteActiveServersTests(TestCase):
         for i, job in enumerate(self.jobs):
             # deferred pool is not empty until every single job is done.
             self.assertNoResult(done)
-            clock.advance(i * 20)
+            clock.advance(i * 60)
             self.assertTrue(job.start.called)
             self.assertTrue(all([not job.start.called for job in self.jobs[i + 1:]]))
 
