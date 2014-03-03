@@ -481,6 +481,8 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
             if 'load balancer is deleted' not in message:
                 return failure
             lb_log.msg(message)
+        else:
+            return failure
 
     def remove():
         d = treq.delete(path, headers=headers(auth_token), log=lb_log)
