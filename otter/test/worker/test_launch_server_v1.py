@@ -137,10 +137,15 @@ class LoadBalancersTests(TestCase):
         self.undo = iMock(IUndoStack)
 
         self.max_retries = 12
-        self.retry_interval = 5
+        self.delete_timeout = 600
         set_config_data({'worker': {'lb_max_retries': self.max_retries,
-                                    'lb_retry_interval': self.retry_interval}})
+                                    'lb_retry_interval_range': [5, 7],
+                                    'lb_delete_timeout': self.delete_timeout}})
         self.addCleanup(set_config_data, {})
+        # patch random.uniform()
+        rand = patch(self, 'otter.worker.launch_server_v1.random')
+        self.retry_interval = rand.uniform.return_value = 6
+        self.uniform = rand.uniform
 
     def test_add_to_load_balancer(self):
         """
@@ -180,6 +185,7 @@ class LoadBalancersTests(TestCase):
         """
         self.codes = [422] * 10 + [200]
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.content.return_value = succeed(json.dumps({'message': 'PENDING_UPDATE'}))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
@@ -194,6 +200,7 @@ class LoadBalancersTests(TestCase):
                          [mock.call('http://url/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
+        self.uniform.assert_called_once_with(5, 7)
 
     def test_add_lb_defaults_retries_configs(self):
         """
@@ -288,7 +295,7 @@ class LoadBalancersTests(TestCase):
                        error=matches(IsInstance(RequestError)), loadbalancer_id=12345)
              for code in bad_codes])
 
-    test_add_lb_retries_logs_unexpected_errors.skip = 'Until LB error is fixed'
+    test_add_lb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
     def test_add_to_load_balancer_pushes_remove_onto_undo_stack(self):
         """
@@ -485,9 +492,13 @@ class LoadBalancersTests(TestCase):
             'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
             loadbalancer_id=12345, node_id=1)
 
+    test_remove_from_load_balancer_fails_on_422_LB_other.skip = 'Until we bail out early on ERROR'
+
+
     def test_removelb_retries(self):
         """
-        remove_from_load_balancer will retry again until it succeeds
+        remove_from_load_balancer will retry again until it succeeds and retry interval
+        will be random number based on lb_retry_interval_range config value
         """
         self.codes = [422] * 10 + [200]
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
@@ -496,13 +507,13 @@ class LoadBalancersTests(TestCase):
         d = remove_from_load_balancer(
             self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
 
-        clock.pump([LB_RETRY_INTERVAL] * 11)
+        clock.pump([self.retry_interval] * 11)
         self.assertIsNone(self.successResultOf(d))
         self.assertEqual(self.treq.delete.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes/1',
-                                    headers=expected_headers)] * 11)
-
-    test_removelb_retries.skip = 'Until LB error is fixed'
+                                    headers=expected_headers,
+                                    log=matches(IsInstance(self.log.__class__)))] * 11)
+        self.uniform.assert_called_once_with(5, 7)
 
     def test_removelb_retries_times_out(self):
         """
@@ -515,16 +526,14 @@ class LoadBalancersTests(TestCase):
         d = remove_from_load_balancer(
             self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
 
-        clock.pump([LB_RETRY_INTERVAL] * LB_MAX_RETRIES)
-        failure = self.failureResultOf(d, RequestError)
-        real_failure = failure.value.reason
-        self.assertTrue(real_failure.check(APIError))
-        self.assertEqual(real_failure.value.code, 422)
+        call_count = self.delete_timeout / self.retry_interval
+        clock.pump([self.retry_interval] * call_count)
+        failure = self.failureResultOf(d, TimedOutError)
+        self.assertEqual(failure.value.message, 'LB node removal timed out after 600 seconds.')
         self.assertEqual(self.treq.delete.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes/1',
-                                    headers=expected_headers)] * (LB_MAX_RETRIES + 1))
-
-    test_removelb_retries_times_out.skip = 'Until LB error is fixed'
+                                    headers=expected_headers,
+                                    log=matches(IsInstance(self.log.__class__)))] * call_count)
 
     def test_removelb_retries_logs_errors(self):
         """
@@ -533,20 +542,20 @@ class LoadBalancersTests(TestCase):
         self.codes = [500, 503, 422, 422, 401, 200]
         bad_codes_len = len(self.codes) - 1
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(json.dumps({'message': 'PENDING_UPDATE'}))
         clock = Clock()
 
         d = remove_from_load_balancer(
             self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
 
-        clock.pump([LB_RETRY_INTERVAL] * 6)
+        clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
+        #print self.log.msg.mock_calls
         self.assertEqual(
             self.log.msg.mock_calls[1:-1],
             [mock.call('Got LB error while {m}: {e}', m='remove_node',
                        e=matches(IsInstance(RequestError)),
                        loadbalancer_id=12345, node_id=1)] * bad_codes_len)
-
-    test_removelb_retries_logs_errors.skip = 'Until LB error is fixed'
 
     def test_removelb_retries_logs_unexpected_errors(self):
         """
@@ -569,7 +578,7 @@ class LoadBalancersTests(TestCase):
                        node_id=1)
              for code in bad_codes])
 
-    test_removelb_retries_logs_unexpected_errors.skip = 'Until LB error is fixed'
+    test_removelb_retries_logs_unexpected_errors.skip = 'Lets log all errors for now'
 
 
 class BobbyServerTests(TestCase):
