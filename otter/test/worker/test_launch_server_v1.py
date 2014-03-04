@@ -185,7 +185,6 @@ class LoadBalancersTests(TestCase):
         """
         self.codes = [422] * 10 + [200]
         self.treq.post.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
-        self.treq.content.return_value = succeed(json.dumps({'message': 'PENDING_UPDATE'}))
         clock = Clock()
 
         d = add_to_load_balancer(self.log, 'http://url/', 'my-auth-token',
