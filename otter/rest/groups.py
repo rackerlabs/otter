@@ -569,7 +569,6 @@ class OtterGroup(object):
         return OtterConfig(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/launch/')
-    @with_transaction_id()
     def launch(self, request):
         """
         launch route handled by OtterLaunch
@@ -577,7 +576,6 @@ class OtterGroup(object):
         return OtterLaunch(self.store, self.tenant_id, self.group_id).app.resource()
 
     @app.route('/policies/', branch=True)
-    @with_transaction_id()
     def policies(self, request):
         """
         policies routes handled by OtterPolicies
