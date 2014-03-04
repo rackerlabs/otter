@@ -481,7 +481,9 @@ class CalculateDeltaTestCase(TestCase):
                                    fake_policy)
         args, kwargs = self.mock_log.msg.call_args
         self.assertEqual(fake_state.desired, 1)
-        self.assertEqual(args, ('calculating delta',))
+        self.assertEqual(
+            args, (('calculating delta {current_active} + {current_pending}'
+                    ' -> {constrained_desired_capacity}'),))
         self.assertEqual(kwargs, matches(ContainsDict({
             'server_delta': Equals(1),
             'constrained_desired_capacity': Equals(1)})))
