@@ -343,8 +343,6 @@ def delete_active_servers(log, transaction_id, scaling_group,
     for i, server_info in enumerate(servers_to_evict):
         job = _DeleteJob(log, transaction_id, scaling_group, server_info, supervisor)
         job.start()
-        #d = deferLater(clock, i * DELETE_WAIT_INTERVAL, job.start)
-        #supervisor.deferred_pool.add(d)
 
 
 def exec_scale_down(log, transaction_id, state, scaling_group, delta):

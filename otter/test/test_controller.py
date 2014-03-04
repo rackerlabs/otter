@@ -866,19 +866,8 @@ class DeleteActiveServersTests(TestCase):
             [mock.call(self.log, 'trans-id', 'group', data, self.supervisor)
                 for i, data in enumerate(self.evict_servers.values())])
 
-        done = self.supervisor.deferred_pool.notify_when_empty()
-
-        # They were started at intervals
-        self.assertTrue(all([not job.start.called for job in self.jobs]))
-        for i, job in enumerate(self.jobs):
-            # deferred pool is not empty until every single job is done.
-            self.assertNoResult(done)
-            clock.advance(i * 60)
-            self.assertTrue(job.start.called)
-            self.assertTrue(all([not job.start.called for job in self.jobs[i + 1:]]))
-
-        # now pool should be empty
-        self.successResultOf(done)
+        # They were started
+        self.assertTrue(all([job.start.called for job in self.jobs]))
 
 
 class DeleteJobTests(TestCase):
