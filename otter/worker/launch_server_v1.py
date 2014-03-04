@@ -475,7 +475,8 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
         error = failure.value
         if error.code == 422:
             message = json.loads(error.body)['message']
-            if 'load balancer is deleted' not in message:
+            if ('load balancer is deleted' not in message and
+                    'PENDING_DELETE' not in message):
                 return failure
             lb_log.msg(message)
         else:
