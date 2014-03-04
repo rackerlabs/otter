@@ -43,6 +43,7 @@ LB_RETRY_INTERVAL = 10
 # Delete node from LB timeout (seconds)
 LB_DELETE_TIMEOUT = 600
 
+
 class UnexpectedServerStatus(Exception):
     """
     An exception to be raised when a server is found in an unexpected state.

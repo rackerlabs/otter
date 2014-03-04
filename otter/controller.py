@@ -27,7 +27,6 @@ import iso8601
 import json
 
 from twisted.internet import defer
-from twisted.internet.task import deferLater
 
 from otter.log import audit
 from otter.models.interface import NoSuchScalingGroupError

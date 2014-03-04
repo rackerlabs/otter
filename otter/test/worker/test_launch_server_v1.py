@@ -494,7 +494,6 @@ class LoadBalancersTests(TestCase):
 
     test_remove_from_load_balancer_fails_on_422_LB_other.skip = 'Until we bail out early on ERROR'
 
-
     def test_removelb_retries(self):
         """
         remove_from_load_balancer will retry again until it succeeds and retry interval
@@ -542,7 +541,8 @@ class LoadBalancersTests(TestCase):
         self.codes = [500, 503, 422, 422, 401, 200]
         bad_codes_len = len(self.codes) - 1
         self.treq.delete.side_effect = lambda *_, **ka: succeed(mock.Mock(code=self.codes.pop(0)))
-        self.treq.content.side_effect = lambda *a, **ka: succeed(json.dumps({'message': 'PENDING_UPDATE'}))
+        self.treq.content.side_effect = lambda *a, **ka: succeed(
+            json.dumps({'message': 'PENDING_UPDATE'}))
         clock = Clock()
 
         d = remove_from_load_balancer(
