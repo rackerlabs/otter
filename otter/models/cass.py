@@ -396,6 +396,40 @@ def _unmarshal_state(state_dict):
     )
 
 
+def assemble_webhooks_in_policies(policies, webhooks):
+    """
+    Assemble webhooks inside policies. 'webhooks' property will be added to
+    each policy `dict` in `policies`. It will be list of webhooks taken from `webhooks`
+
+    :param policies: list of policy `dict` sorted based on 'id' based on `group_schemas.policy`
+    :param webhooks: list of webhook `dict` sorted based on 'policyId' and 'webhookId'
+                     based on `model_schemas.webhook`
+
+    :return: policies with webhooks in them
+    """
+    # Assuming policies and webhooks are sorted based on policyId and
+    # (policyId, webhookId) respectively
+    iwebhooks = iter(webhooks)
+    ipolicies = iter(policies)
+    try:
+        webhook = iwebhooks.next()
+        policy = ipolicies.next()
+        while True:
+            policy.setdefault('webhooks', [])
+            if policy['id'] == webhook['policyId']:
+                policy['webhooks'].append(
+                    _assemble_webhook_from_row(webhook, include_id=True))
+                webhook = iwebhooks.next()
+            elif policy['id'] < webhook['policyId']:
+                policy = ipolicies.next()
+            else:
+                webhook = iwebhooks.next()
+    except StopIteration:
+        # Add empty webhooks for remaining policies
+        [p.update({'webhooks': []}) for p in ipolicies]
+    return policies
+
+
 def verified_view(connection, view_query, del_query, data, consistency, exception_if_empty, log):
     """
     Ensures the view query does not get resurrected row, i.e. one that does not have "created_at" in it.
@@ -466,40 +500,19 @@ class CassScalingGroup(object):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
-        limit = config_value('limits.pagination') or 100
-
         def _get_policies(group):
-            d = self._naive_list_policies(limit=limit)
+            d = self._naive_list_policies()
             return d.addCallback(lambda policies: (group, policies))
 
         def _get_policies_and_webhooks(group):
             d = defer.gatherResults(
-                [self._naive_list_policies(limit=limit),
+                [self._naive_list_policies(),
                  self._naive_list_all_webhooks()], consumeErrors=True)
             return d.addCallback(lambda results: (group, results))
 
-        def _assemble_webhooks_in_policies((group, results)):
+        def _assemble_webhooks((group, results)):
             policies, webhooks = results
-            if not webhooks:
-                [policy.update({'webhooks': []}) for policy in policies]
-                return group, policies
-
-            # Assuming policies and webhooks are sorted based on policyId and
-            # (policyId, webhookID) respectively
-            iwebhooks = iter(webhooks)
-            webhook = iwebhooks.next()
-            ipolicies = iter(policies)
-            try:
-                for policy in ipolicies:
-                    policy['webhooks'] = []
-                    while policy['id'] == webhook['policyId']:
-                        policy['webhooks'].append(
-                            _assemble_webhook_from_row(webhook, include_id=True))
-                        webhook = iwebhooks.next()
-            except StopIteration:
-                # Add empty webhooks for remaining policies
-                [policy.update({'webhooks': []}) for policy in ipolicies]
-            return group, policies
+            return group, assemble_webhooks_in_policies(policies, webhooks)
 
         def _generate_manifest((group, policies)):
             return {
@@ -519,7 +532,7 @@ class CassScalingGroup(object):
                           NoSuchScalingGroupError(self.tenant_id, self.uuid), self.log)
         if with_webhooks:
             d.addCallback(_get_policies_and_webhooks)
-            d.addCallback(_assemble_webhooks_in_policies)
+            d.addCallback(_assemble_webhooks)
         else:
             d.addCallback(_get_policies)
         d.addCallback(_generate_manifest)
