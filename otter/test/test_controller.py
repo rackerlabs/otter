@@ -8,7 +8,6 @@ import mock
 from testtools.matchers import ContainsDict, Equals
 
 from twisted.internet import defer
-from twisted.internet.task import Clock
 from twisted.python.failure import Failure
 from twisted.trial.unittest import TestCase
 
@@ -845,12 +844,8 @@ class DeleteActiveServersTests(TestCase):
         Removes servers to evict from state and create `_DeleteJob` to start
         deleting them
         """
-        clock = Clock()
-        # nothing in the deferred pool
-        self.successResultOf(self.supervisor.deferred_pool.notify_when_empty())
-
         controller.delete_active_servers(self.log, 'trans-id', 'group',
-                                         3, self.fake_state, clock)
+                                         3, self.fake_state)
 
         # find_servers_to_evict was called
         self.find_servers_to_evict.assert_called_once_with(
