@@ -37,9 +37,6 @@ from otter.util.retry import (retry, retry_times, repeating_interval, transient_
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
 
-# Interval between subsequent retries
-LB_RETRY_INTERVAL = 10
-
 # Delete node from LB timeout (seconds)
 LB_DELETE_TIMEOUT = 600
 
