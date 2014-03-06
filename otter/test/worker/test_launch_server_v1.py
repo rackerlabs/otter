@@ -25,7 +25,7 @@ from otter.worker.launch_server_v1 import (
     UnexpectedServerStatus,
     ServerDeleted,
     verified_delete,
-    LB_MAX_RETRIES, LB_RETRY_INTERVAL
+    LB_MAX_RETRIES
 )
 
 
@@ -142,10 +142,11 @@ class LoadBalancersTests(TestCase):
                                     'lb_retry_interval_range': [5, 7],
                                     'lb_delete_timeout': self.delete_timeout}})
         self.addCleanup(set_config_data, {})
-        # patch random.uniform()
-        rand = patch(self, 'otter.worker.launch_server_v1.random')
-        self.retry_interval = rand.uniform.return_value = 6
-        self.uniform = rand.uniform
+
+        # patch random_interval
+        self.retry_interval = 6
+        self.rand_interval = patch(self, 'otter.worker.launch_server_v1.random_interval')
+        self.rand_interval.return_value = mock.Mock(return_value=self.retry_interval)
 
     def test_add_to_load_balancer(self):
         """
@@ -199,11 +200,11 @@ class LoadBalancersTests(TestCase):
                          [mock.call('http://url/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
-        self.uniform.assert_called_once_with(5, 7)
+        self.rand_interval.assert_called_once_with(5, 7)
 
     def test_add_lb_defaults_retries_configs(self):
         """
-        add_to_load_balancer will use global defaults LB_RETRY_INTERVAL, LB_MAX_RETRIES
+        add_to_load_balancer will use defaults [10, 15], LB_MAX_RETRIES
         when not configured
         """
         set_config_data({})
@@ -214,13 +215,14 @@ class LoadBalancersTests(TestCase):
                                   'port': 80},
                                  '192.168.1.1',
                                  self.undo, clock=clock)
-        clock.pump([LB_RETRY_INTERVAL] * LB_MAX_RETRIES)
+        clock.pump([self.retry_interval] * LB_MAX_RETRIES)
         self.failureResultOf(d, RequestError)
         self.assertEqual(self.treq.post.mock_calls,
                          [mock.call('http://url/loadbalancers/12345/nodes',
                                     headers=expected_headers, data=mock.ANY,
                                     log=matches(IsInstance(self.log.__class__)))]
                          * (LB_MAX_RETRIES + 1))
+        self.rand_interval.assert_called_once_with(10, 15)
 
     def failed_add_to_lb(self, code=500):
         """
@@ -511,7 +513,7 @@ class LoadBalancersTests(TestCase):
                          [mock.call('http://url/loadbalancers/12345/nodes/1',
                                     headers=expected_headers,
                                     log=matches(IsInstance(self.log.__class__)))] * 11)
-        self.uniform.assert_called_once_with(5, 7)
+        self.rand_interval.assert_called_once_with(5, 7)
 
     def test_removelb_retries_times_out(self):
         """
@@ -568,7 +570,7 @@ class LoadBalancersTests(TestCase):
         d = remove_from_load_balancer(
             self.log, 'http://url/', 'my-auth-token', 12345, 1, clock=clock)
 
-        clock.pump([LB_RETRY_INTERVAL] * 6)
+        clock.pump([self.retry_interval] * 6)
         self.successResultOf(d)
         self.log.msg.assert_has_calls(
             [mock.call('Unexpected status {status} while {msg}: {error}',

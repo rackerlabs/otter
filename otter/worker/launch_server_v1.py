@@ -19,7 +19,6 @@ initiating a launch_server job.
 import json
 import itertools
 from copy import deepcopy
-import random
 
 from twisted.internet.defer import gatherResults, maybeDeferred
 
@@ -32,7 +31,7 @@ from otter.util.http import (append_segments, headers, check_success,
 from otter.util.hashkey import generate_server_name
 from otter.util.deferredutils import retry_and_timeout
 from otter.util.retry import (retry, retry_times, repeating_interval, transient_errors_except,
-                              TransientRetryError)
+                              TransientRetryError, random_interval)
 
 # Number of times to retry when adding/removing nodes from LB
 LB_MAX_RETRIES = 10
@@ -232,8 +231,8 @@ def add_to_load_balancer(log, endpoint, auth_token, lb_config, ip_address, undo,
     d = retry(
         add,
         can_retry=retry_times(config_value('worker.lb_max_retries') or LB_MAX_RETRIES),
-        next_interval=repeating_interval(
-            random.uniform(*(config_value('worker.lb_retry_interval_range') or [10, 15]))),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or [10, 15])),
         clock=clock)
 
     def when_done(result):
@@ -496,8 +495,8 @@ def remove_from_load_balancer(log, endpoint, auth_token, loadbalancer_id,
 
     d = retry_and_timeout(
         remove, config_value('worker.lb_delete_timeout') or LB_DELETE_TIMEOUT,
-        next_interval=repeating_interval(
-            random.uniform(*(config_value('worker.lb_retry_interval_range') or [10, 15]))),
+        next_interval=random_interval(
+            *(config_value('worker.lb_retry_interval_range') or [10, 15])),
         clock=clock, deferred_description='LB node removal')
     d.addCallback(lambda _: lb_log.msg('Removed from load balancer'))
     return d
