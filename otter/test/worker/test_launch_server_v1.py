@@ -111,7 +111,8 @@ class UtilityTests(TestCase):
 expected_headers = {
     'content-type': ['application/json'],
     'accept': ['application/json'],
-    'x-auth-token': ['my-auth-token']
+    'x-auth-token': ['my-auth-token'],
+    'User-Agent': ['OtterScale/0.0']
 }
 
 
