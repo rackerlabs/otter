@@ -529,10 +529,7 @@ class LoadBalancersTests(TestCase):
                                    loadbalancer_id=12345, node_id=1))
         # Random interval from config
         self.rand_interval.assert_called_once_with(5, 7)
-        self.assertEqual(self.interval_func.call_count, 10)
-        for args, k in self.interval_func.call_args_list:
-            self.assertIsInstance(args[0], Failure)
-            self.assertIsInstance(args[0].value, RequestError)
+        self.interval_func.assert_has_calls([mock.call(CheckFailure(RequestError))] * 10)
 
     def test_removelb_limits_retries(self):
         """
@@ -568,10 +565,8 @@ class LoadBalancersTests(TestCase):
                        loadbalancer_id=12345, node_id=1)] * (self.max_retries + 1))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(5, 7)
-        self.assertEqual(self.interval_func.call_count, self.max_retries)
-        for args, k in self.interval_func.call_args_list:
-            self.assertIsInstance(args[0], Failure)
-            self.assertIsInstance(args[0].value, RequestError)
+        self.interval_func.assert_has_calls(
+            [mock.call(CheckFailure(RequestError))] * self.max_retries)
 
     def test_removelb_retries_uses_defaults(self):
         """
@@ -608,10 +603,8 @@ class LoadBalancersTests(TestCase):
                        loadbalancer_id=12345, node_id=1)] * (LB_MAX_RETRIES + 1))
         # Interval func call max times?
         self.rand_interval.assert_called_once_with(*LB_RETRY_INTERVAL_RANGE)
-        self.assertEqual(self.interval_func.call_count, LB_MAX_RETRIES)
-        for args, k in self.interval_func.call_args_list:
-            self.assertIsInstance(args[0], Failure)
-            self.assertIsInstance(args[0].value, RequestError)
+        self.interval_func.assert_has_calls(
+            [mock.call(CheckFailure(RequestError))] * LB_MAX_RETRIES)
 
     def test_removelb_retries_logs_unexpected_errors(self):
         """
