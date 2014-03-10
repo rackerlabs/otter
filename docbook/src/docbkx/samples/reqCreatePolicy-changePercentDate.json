@@ -1,11 +1,11 @@
 [
-  {
-    "name": "scale down by 5.5 percent on the 5th",
-    "changePercent": -5.5,
-    "cooldown": 1800,
-    "type": "schedule",
-    "args": {
-      "at": "2013-06-05T03:12Z"
-    }
-  }
+   {
+      "name":"scale down by 5.5 percent on the 5th",
+      "changePercent":-5.5,
+      "cooldown":1800,
+      "type":"schedule",
+      "args":{
+         "at":"2013-06-05T03:12Z"
+      }
+   }
 ]
