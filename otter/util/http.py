@@ -143,7 +143,8 @@ def headers(auth_token=None):
     :return: A dict of common headers.
     """
     h = {'content-type': ['application/json'],
-         'accept': ['application/json']}
+         'accept': ['application/json'],
+         'User-Agent': ['OtterScale/0.0']}
 
     if auth_token is not None:
         h['x-auth-token'] = [auth_token]

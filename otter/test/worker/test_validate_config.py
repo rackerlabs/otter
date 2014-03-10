@@ -185,7 +185,8 @@ class ValidateImageTests(TestCase):
                                         method='get'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
@@ -236,7 +237,8 @@ class ValidateFlavorTests(TestCase):
                           new=mock_treq(code=200, method='get'))
         patch(self, 'otter.util.http.treq', new=self.treq)
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
@@ -284,7 +286,8 @@ class ValidatePersonalityTests(TestCase):
              'contents': base64.b64encode('This is a test of base64 encoding')}
         ]
         self.headers = {'content-type': ['application/json'],
-                        'accept': ['application/json']}
+                        'accept': ['application/json'],
+                        'User-Agent': ['OtterScale/0.0']}
 
     def test_valid(self):
         """
