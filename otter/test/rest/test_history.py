@@ -60,7 +60,7 @@ class OtterHistoryTestCase(RestAPITestMixin, TestCase):
                 'server_id': 'server-rst',
                 'message': 'audit log event',
             }],
-            'links': [{'href': '/v1.0/101010/history', 'rel': 'self'}]
+            'events_links': [{'href': '/v1.0/101010/history', 'rel': 'self'}]
         }
         make_auditlog_query.return_value = {'tenant_id': 101010}
         response = mock.Mock(code=200)

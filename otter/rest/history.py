@@ -132,7 +132,7 @@ class OtterHistory(object):
             links = get_collection_links(
                 events, request.uri, 'self', limit=paginate.get('limit'),
                 marker=paginate.get('marker'))
-            return json.dumps({'events': events, 'links': links})
+            return json.dumps({'events': events, 'events_links': links})
         d.addCallback(build_response)
 
         return d
