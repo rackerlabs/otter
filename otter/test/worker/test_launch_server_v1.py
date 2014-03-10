@@ -137,7 +137,6 @@ class LoadBalancersTests(TestCase):
         self.undo = iMock(IUndoStack)
 
         self.max_retries = 12
-        self.delete_timeout = 600
         set_config_data({'worker': {'lb_max_retries': self.max_retries,
                                     'lb_retry_interval_range': [5, 7],
                                     'lb_delete_timeout': self.delete_timeout}})
