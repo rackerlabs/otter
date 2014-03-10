@@ -39,8 +39,10 @@ class AutoscaleFixture(BaseTestFixture):
         load_balancer_service = access_data.get_service(
             cls.autoscale_config.load_balancer_endpoint_name)
         server_url = server_service.get_endpoint(
+            cls.autoscale_config.server_region_override or
             cls.autoscale_config.region).public_url
         lbaas_url = load_balancer_service.get_endpoint(
+            cls.autoscale_config.lbaas_region_override or
             cls.autoscale_config.region).public_url
 
         cls.tenant_id = cls.autoscale_config.tenant_id
