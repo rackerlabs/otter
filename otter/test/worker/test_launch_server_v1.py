@@ -535,7 +535,7 @@ class LoadBalancersTests(TestCase):
             self.assertIsInstance(args[0], Failure)
             self.assertIsInstance(args[0].value, RequestError)
 
-    def test_removelb_retries_times_out(self):
+    def test_removelb_limits_retries(self):
         """
         remove_from_load_balancer will retry again and again for LB_MAX_RETRIES times.
         It will fail after that
