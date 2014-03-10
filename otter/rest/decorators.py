@@ -39,8 +39,11 @@ def fails_with(mapping):
                         'message': failure.value.message,
                         'details': getattr(failure.value, 'details', '')
                     }
-                    self.log.msg("Request failed: {message}", uri=request.uri,
-                                 request_status="failed", **errorObj)
+                    # format here, because the logger does something special
+                    # with the 'message' key
+                    self.log.msg(
+                        "Request failed: {message}".format(message=errorObj['message']),
+                        uri=request.uri, request_status="failed", **errorObj)
                 else:
                     errorObj = {
                         'type': 'InternalError',
