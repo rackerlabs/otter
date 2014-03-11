@@ -125,7 +125,7 @@ class MockScalingGroup:
             self.policies = None
             self.webhooks = None
 
-    def view_manifest(self):
+    def view_manifest(self, with_webhooks=False):
         """
         see :meth:`otter.models.interface.IScalingGroup.view_manifest`
         """
