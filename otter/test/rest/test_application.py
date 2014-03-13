@@ -498,8 +498,8 @@ class RootRouteTestCase(RestAPITestMixin, TestCase):
         """
         # want to make a copy of the headers
         return {k.lower(): list(v) for k, v in
-            response_wrapper.response.headers.getAllRawHeaders()
-            if k not in ('X-Response-Id', 'Content-Type')}
+                response_wrapper.response.headers.getAllRawHeaders()
+                if k not in ('X-Response-Id', 'Content-Type')}
 
     def test_default_empty_200(self):
         """
