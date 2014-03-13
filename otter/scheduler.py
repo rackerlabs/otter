@@ -56,7 +56,7 @@ class SchedulerService(Service):
     """
 
     def __init__(self, batchsize, interval, store, zk_hosts,
-                 zk_partition_path, time_boundary, buckets, reactor=None, clock=None,
+                 zk_partition_path, time_boundary, buckets, reactor, clock=None,
                  threshold=60):
         """
         Initialize the scheduler service
@@ -71,8 +71,6 @@ class SchedulerService(Service):
         :param clock: An instance of IReactorTime provider that defaults to reactor param
         """
         self.store = store
-        if not reactor:
-            from twisted.internet import reactor
         self.reactor = reactor
         self.batchsize = batchsize
         self.interval = interval
