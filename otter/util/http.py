@@ -161,7 +161,20 @@ def get_url_root():
 
 
 def _pagination_link(url, rel, limit, marker):
-    # tuples to ensure consistent ordering of the url for testing
+    """
+    Generates a link dictionary where the href link has (possibly) limit
+    and marker query parameters, so long as they are not None.
+
+    :param url: URL of the collection
+    :param rel: What to put under 'rel'
+    :param limit: pagination limit
+    :param marker: the current pagination marker
+
+    :return: ``dict`` containing an href and the rel, the href being a link
+        to the collection represented by the url, limit, and marker
+    """
+    # these are tuples, not a dictionary, to ensure consistent ordering of the
+    # url for testing
     query_params = []
 
     if marker is not None:
@@ -179,6 +192,13 @@ def next_marker_by_offset(collection, limit, marker):
     """
     Returns the next marker that is just the current marker offset by the
     length of the collection or the limit, whichever is smaller
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the offset from the current marker
     """
     return (marker or 0) + limit
 
@@ -186,6 +206,13 @@ def next_marker_by_offset(collection, limit, marker):
 def next_marker_by_id(collection, limit, marker):
     """
     Returns the next marker based on the limit-1 item in the collection
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the collection item ids
     """
     return collection[limit - 1]['id']
 
