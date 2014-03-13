@@ -5,6 +5,7 @@ Tests for :mod:`otter.scheduler`
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
 from twisted.internet.task import Clock
+from twisted.internet.test.test_endpoints import MemoryProcessReactor
 
 import mock
 from datetime import datetime, timedelta
@@ -50,20 +51,17 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
         self.log = mock_log()
         otter_log.bind.return_value = self.log
 
-        self.kz_client = mock.Mock(spec=['SetPartitioner'])
-        self.kz_partition = mock.MagicMock(allocating=False, release=False, failed=False,
-                                           acquired=False)
-        self.kz_client.SetPartitioner.return_value = self.kz_partition
+        self.zk_hosts = '127.0.0.1:2181'
         self.zk_partition_path = '/part_path'
         self.time_boundary = 15
-        self.buckets = range(1, 10)
+        self.buckets = range(1, 3)
 
         self.clock = Clock()
+        self.reactor = MemoryProcessReactor()
         self.scheduler_service = SchedulerService(
-            100, 1, self.mock_store, self.kz_client, self.zk_partition_path,
-            self.time_boundary, self.buckets, self.clock, threshold=600)
+            100, 1, self.mock_store, self.zk_hosts, self.zk_partition_path,
+            self.time_boundary, self.buckets, self.reactor, clock=self.clock, threshold=600)
         otter_log.bind.assert_called_once_with(system='otter.scheduler')
-        self.timer_service = patch(self, 'otter.scheduler.TimerService')
 
         self.check_events_in_bucket = patch(self, 'otter.scheduler.check_events_in_bucket')
 
@@ -72,13 +70,27 @@ class SchedulerServiceTests(SchedulerTests, DeferredFunctionMixin):
 
     def test_start_service(self):
         """
-        startService() calls super's startService() and creates SetPartitioner object
+        startService() calls super's startService() and calls start_process()
         """
-        self.scheduler_service.startService()
-        self.kz_client.SetPartitioner.assert_called_once_with(
-            self.zk_partition_path, set=set(self.buckets), time_boundary=self.time_boundary)
-        self.assertEqual(self.scheduler_service.kz_partition, self.kz_partition)
-        self.timer_service.startService.assert_called_once_with(self.scheduler_service)
+        self.scheduler_service.start_process = mock.Mock(return_value=2)
+        d = self.scheduler_service.startService()
+        self.service.startService.assert_called_once_with(self.scheduler_service)
+        self.scheduler_service.start_process.assert_called_once_with()
+        self.assertEqual(d, 2)
+
+    def test_start_process(self):
+        """
+        start_process() spawns a new process with configured values. It sets the
+        `PartitionProtocol` object in self.proc_protocol
+        """
+        d = self.scheduler_service.start_process()
+        self.reactor.spawnProcess
+        self.assertEqual(self.reactor.executable, self.scheduler_service.python_exe)
+        self.assertEqual(
+            self.reactor.args,
+            [self.scheduler_service.python_exe, self.scheduler_service.partition_py_path,
+             '127.0.0.1:2181', '/part_path', '1,2,3', '15', '1'])
+        self.assertEqual(self.reactor.env, None)
 
     def test_stop_service(self):
         """
