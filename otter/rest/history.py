@@ -13,7 +13,8 @@ from otter.rest.decorators import fails_with, paginatable, succeeds_with, with_t
 from otter.rest.errors import exception_codes
 from otter.util import logging_treq as treq
 from otter.util.config import config_value
-from otter.util.http import append_segments, check_success, get_collection_links
+from otter.util.http import (
+    append_segments, check_success, get_collection_links, next_marker_by_offset)
 
 
 _ELASTICSEARCH_QUERY_TEMPLATE = {
@@ -131,7 +132,7 @@ class OtterHistory(object):
                 events.append(event)
             links = get_collection_links(
                 events, request.uri, 'self', limit=paginate.get('limit'),
-                marker=paginate.get('marker'))
+                marker=paginate.get('marker'), next_marker=next_marker_by_offset)
             return json.dumps({'events': events, 'events_links': links})
         d.addCallback(build_response)
 
