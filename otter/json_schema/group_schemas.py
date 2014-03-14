@@ -68,11 +68,15 @@ server = {
     "properties": {
         "imageRef": {
             "type": "string",
-            "required": True
+            "required": True,
+            "minLength": 1,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "flavorRef": {
             "type": "string",
-            "required": True
+            "required": True,
+            "minLength": 1,
+            "pattern": "\S+"  # must contain non-whitespace
         },
         "personality": {
             "type": "array",

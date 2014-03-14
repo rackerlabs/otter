@@ -467,15 +467,14 @@ class OneWebhookTestCase(RestAPITestMixin, TestCase):
             202, '/v1.0/execute/1/11111/', 'POST')
 
         self.mock_store.get_scaling_group.assert_called_once_with(
-            log.bind(), self.tenant_id, self.group_id)
+            log.bind.return_value, self.tenant_id, self.group_id)
 
-        self.assertEqual(log.bind.call_args_list[1],
-                         mock.call(tenant_id=self.tenant_id,
-                                   scaling_group_id=self.group_id,
-                                   policy_id=self.policy_id))
+        log.bind.assert_called_once_with(tenant_id=self.tenant_id,
+                                         scaling_group_id=self.group_id,
+                                         policy_id=self.policy_id)
 
         self.mock_controller.maybe_execute_scaling_policy.assert_called_once_with(
-            log.bind(),
+            log.bind.return_value,
             'transaction-id',
             self.mock_group,
             self.mock_state,

@@ -1,11 +1,12 @@
 """
 System tests for negative groups scenarios
 """
-from test_repo.autoscale.fixtures import ScalingGroupWebhookFixture
+from test_repo.autoscale.fixtures import AutoscaleFixture
 import unittest
+from cafe.drivers.unittest.decorators import tags
 
 
-class NegativeGroupFixture(ScalingGroupWebhookFixture):
+class NegativeGroupFixture(AutoscaleFixture):
 
     """
     System tests to verify negative scaling group scenarios
@@ -32,7 +33,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEquals(create_group_response.status_code, 201,
                           msg='Create group with invalid lbaas id failed with {0}'
                           .format(create_group_response.status_code))
-        #check active servers and wait for lbaas add node to fail
+        # check active servers and wait for lbaas add node to fail
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             group.id)
         self.assertEquals(group_state_response.status_code, 200)
@@ -70,7 +71,7 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEquals(execute_policy_response.status_code, 202,
                           msg='Policy executed with an invalid lbaas id with status {0}'
                           .format(execute_policy_response.status_code))
-        #check active servers and wait for lbaas add node to fail
+        # check active servers and wait for lbaas add node to fail
         group_state_response = self.autoscale_client.list_status_entities_sgroups(
             self.group.id)
         self.assertEquals(group_state_response.status_code, 200)
@@ -82,38 +83,38 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         self.assertEqual(group_state.desiredCapacity, 0,
                          msg='Desired capacity is not equal to expected number of servers')
 
-    def test_system_delete_group_delete_all_servers(self):
+    @tags(speed='quick')
+    def test_system_user_delete_some_servers_out_of_band(self):
         """
-        Verify delete scaling group when user deletes all the servers on the group
-        Autoscaling will re create all the deleted servers
-        (try changing launch config jus before delete)
+        Create a group with 4 minentities and verify the group state when user deletes one
+        of the servers on the group
         """
-        pass
-
-    def test_system_delete_group_delete_some_servers(self):
-        """
-        Verify delete scaling group when user deletes some of the servers on the group
-
-        """
-        pass
-
-    def test_system_delete_group_other_server_actions(self):
-        """
-        Verify delete scaling group when user performs actions on the servers in the group
-        Autoscaling will continue, like no action occured
-        """
-        pass
+        server_count = 4
+        group_response = self.autoscale_behaviors.create_scaling_group_given(
+            gc_min_entities=server_count, lc_metadata={'server_building': '30'})
+        group = group_response.entity
+        self.resources.add(group, self.empty_scaling_group)
+        server_list = self.check_for_expected_number_of_building_servers(group.id, server_count)
+        self.assertEqual(len(server_list), server_count, msg='The number of servers building '
+                         'is {0}, but should be {1} for group {2}'.format(len(server_list), server_count,
+                                                                          group.id))
+        self.server_client.delete_server(server_list[0])
+        self.wait_for_expected_group_state(group.id, server_count - 1)
+        updated_state = self.autoscale_client.list_status_entities_sgroups(group.id).entity
+        self.assertEqual(updated_state.pendingCapacity, server_count - 1,
+                         msg='{0} servers are building. Expected '
+                         '{1}'.format(updated_state.pendingCapacity, server_count - 1))
 
     def test_system_create_delete_scaling_group_server_building_indefinitely(self):
         """
-        Verify create delete scaling group when servers build indefinitely
-
+        Verify create delete scaling group when servers remain in 'build' state
+        indefinitely
         """
         pass
 
     def test_system_execute_policy_server_building_indefinitely(self):
         """
-        Verify execute policy when servers build indefinitely
+        Verify execute policy when servers remain in build indefinitely
         """
         pass
 
@@ -125,21 +126,21 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
 
     def test_system_create_delete_scaling_group_some_servers_error(self):
         """
-        Verify create delete scaling group when servers build indefinitely
+        Verify create delete scaling group when servers some servers go
+        into error state
         """
         pass
 
     def test_system_create_delete_scaling_group_all_servers_error(self):
         """
-        Verify create delete scaling group when servers build indefinitely
-        Autoscale will know through atomhopper feed
+        Verify create delete scaling group when all the servers go into
+        error state
         """
         pass
 
     def test_system_create_delete_scaling_group_server_rate_limit_met(self):
         """
         Verify create delete group when maximum servers allowed already exist.
-
         """
         pass
 
@@ -192,12 +193,6 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         """
         pass
 
-    def test_system_scaling_group_lbaas_draining_disabled(self):
-        """
-        Verify execute policy with lbaas draining or disabled
-        """
-        pass
-
     def test_system_create_delete_scaling_group_with_deleted_lbaasid(self):
         """
         Verify creation of scaling group with deleted lbaas id
@@ -209,5 +204,20 @@ class NegativeGroupFixture(ScalingGroupWebhookFixture):
         """
         Verify polic execution with deleted lbaas id
         note : is this same as invalid id??
+        """
+        pass
+
+    def test_system_delete_group_delete_all_servers(self):
+        """
+        Verify delete scaling group when user deletes all the servers on the group
+        Autoscaling will re create all the deleted servers
+        (try changing launch config jus before delete)
+        """
+        pass
+
+    def test_system_delete_group_other_server_actions(self):
+        """
+        Verify delete scaling group when user performs actions on the servers in the group
+        Autoscaling will continue, like no action occured
         """
         pass

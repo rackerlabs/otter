@@ -292,12 +292,44 @@ class LaunchConfigServerPayloadValidationTests(TestCase):
         self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
                                 validate, self.server, group_schemas.server)
 
+    def test_empty_image(self):
+        """
+        invalidates if imageRef is an empty string
+        """
+        self.server['imageRef'] = ''
+        self.assertRaisesRegexp(ValidationError, "'' is too short",
+                                validate, self.server, group_schemas.server)
+
+    def test_blank_image(self):
+        """
+        invalidates if imageRef is just whitespace
+        """
+        self.server['imageRef'] = ' '
+        self.assertRaisesRegexp(ValidationError, "does not match",
+                                validate, self.server, group_schemas.server)
+
     def test_invalid_flavor(self):
         """
         invalidates if flavorRef is not a string
         """
         self.server['flavorRef'] = 3
         self.assertRaisesRegexp(ValidationError, "3 is not of type 'string'",
+                                validate, self.server, group_schemas.server)
+
+    def test_empty_flavor(self):
+        """
+        invalidates if flavorRef is an empty string
+        """
+        self.server['flavorRef'] = ''
+        self.assertRaisesRegexp(ValidationError, "'' is too short",
+                                validate, self.server, group_schemas.server)
+
+    def test_blank_flavor(self):
+        """
+        invalidates if flavorRef is just whitespace
+        """
+        self.server['flavorRef'] = ' '
+        self.assertRaisesRegexp(ValidationError, "does not match",
                                 validate, self.server, group_schemas.server)
 
     def test_invalid_personality_object(self):

@@ -13,9 +13,11 @@ from twisted.application.service import MultiService
 from twisted.trial.unittest import TestCase
 
 from otter.supervisor import get_supervisor, set_supervisor, SupervisorService
-from otter.tap.api import Options, HealthChecker, makeService, setup_scheduler
+from otter.tap.api import (
+    Options, HealthChecker, makeService, setup_scheduler, call_after_supervisor)
 from otter.test.utils import matches, patch, CheckFailure
 from otter.util.config import set_config_data
+from otter.util.deferredutils import DeferredPool
 
 
 test_config = {
@@ -194,6 +196,33 @@ class HealthCheckerTests(TestCase):
         })
 
 
+class CallAfterSupervisorTests(TestCase):
+    """
+    Tests for `call_after_supervisor`
+    """
+
+    def test_calls_after_supervisor_finishes(self):
+        """
+        Func is called after supervisor is completed stopped
+        """
+        supervisor = mock.Mock(spec=['deferred_pool'])
+        supervisor.deferred_pool = mock.Mock(spec=DeferredPool)
+        supervisor.deferred_pool.notify_when_empty.return_value = defer.Deferred()
+        func = mock.Mock(return_value=defer.succeed(2))
+
+        d = call_after_supervisor(func, supervisor)
+
+        # No result
+        self.assertNoResult(d)
+        supervisor.deferred_pool.notify_when_empty.assert_called_once_with()
+        self.assertFalse(func.called)
+
+        # Supervisor jobs are completed and func is called
+        supervisor.deferred_pool.notify_when_empty.return_value.callback(None)
+        func.assert_called_once_with()
+        self.assertEqual(self.successResultOf(d), 2)
+
+
 class APIMakeServiceTests(TestCase):
     """
     Test creation of the API service heirarchy.
@@ -315,6 +344,15 @@ class APIMakeServiceTests(TestCase):
                                                       self.log.bind.return_value)
         self.CassScalingGroupCollection.assert_called_once_with(self.LoggingCQLClient.return_value)
 
+    def test_cassandra_cluster_disconnects_on_stop(self):
+        """
+        Cassandra cluster connection is disconnected when main service is stopped
+        """
+        service = makeService(test_config)
+        service.stopService()
+
+        self.LoggingCQLClient.return_value.disconnect.assert_called_once_with()
+
     def test_cassandra_store(self):
         """
         makeService configures the CassScalingGroupCollection as the
@@ -389,7 +427,7 @@ class APIMakeServiceTests(TestCase):
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
 
-        kz_client = mock.Mock(spec=['start'])
+        kz_client = mock.Mock(spec=['start', 'stop'])
         start_d = defer.Deferred()
         kz_client.start.return_value = start_d
         mock_txkz.return_value = kz_client
@@ -423,7 +461,7 @@ class APIMakeServiceTests(TestCase):
         """
         config = test_config.copy()
         config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
-        kz_client = mock.Mock(spec=['start'])
+        kz_client = mock.Mock(spec=['start', 'stop'])
         kz_client.start.return_value = defer.fail(ValueError('e'))
         mock_txkz.return_value = kz_client
 
@@ -435,6 +473,55 @@ class APIMakeServiceTests(TestCase):
         self.assertFalse(mock_setup_scheduler.called)
         self.log.err.assert_called_once_with(CheckFailure(ValueError),
                                              'Could not start TxKazooClient')
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_stops(self, mock_txkz, mock_setup_scheduler):
+        """
+        TxKazooClient is stopped when parent service stops
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+        self.store.kz_client = None
+
+        parent = makeService(config)
+
+        kz_client.stop.return_value = defer.Deferred()
+        d = parent.stopService()
+
+        self.assertTrue(kz_client.stop.called)
+        self.assertNoResult(d)
+        kz_client.stop.return_value.callback(None)
+        self.successResultOf(d)
+
+    @mock.patch('otter.tap.api.setup_scheduler')
+    @mock.patch('otter.tap.api.TxKazooClient')
+    def test_kazoo_client_stops_after_supervisor(self, mock_txkz, mock_setup_scheduler):
+        """
+        Kazoo is stopped after supervisor stops
+        """
+        config = test_config.copy()
+        config['zookeeper'] = {'hosts': 'zk_hosts', 'threads': 20}
+        kz_client = mock.Mock(spec=['start', 'stop'])
+        kz_client.start.return_value = defer.succeed(None)
+        kz_client.stop.return_value = defer.succeed(None)
+        mock_txkz.return_value = kz_client
+        self.store.kz_client = None
+
+        parent = makeService(config)
+
+        sd = defer.Deferred()
+        get_supervisor().deferred_pool.add(sd)
+        d = parent.stopService()
+
+        self.assertNoResult(d)
+        self.assertFalse(kz_client.stop.called)
+        sd.callback(None)
+        self.successResultOf(d)
+        self.assertTrue(kz_client.stop.called)
 
 
 class SchedulerSetupTests(TestCase):

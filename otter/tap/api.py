@@ -2,6 +2,7 @@
 Twisted Application plugin for otter API nodes.
 """
 import jsonfig
+from functools import partial
 
 from twisted.python import usage
 
@@ -12,7 +13,7 @@ from twisted.internet.task import coiterate
 from twisted.internet.endpoints import clientFromString
 
 from twisted.application.strports import service
-from twisted.application.service import MultiService
+from twisted.application.service import Service, MultiService
 
 from twisted.web.server import Site
 
@@ -82,6 +83,47 @@ class Options(usage.Options):
             self['regionOverrides']['cloudLoadBalancers'] = 'STAGING'
 
 
+class FunctionalService(Service, object):
+    """
+    A simple service that has functions to call when starting and stopping service
+    """
+
+    def __init__(self, start=None, stop=None):
+        """
+        :param start: A single argument callable to be called when service is started
+        :param stop: A single argument callable to be called when service is stopped
+        """
+        self._start = start
+        self._stop = stop
+
+    def startService(self):
+        """
+        Start the service by calling stored function
+        """
+        Service.startService(self)
+        if self._start:
+            return self._start()
+
+    def stopService(self):
+        """
+        Stop the service by calling stored function
+        """
+        Service.stopService(self)
+        if self._stop:
+            return self._stop()
+
+
+def call_after_supervisor(func, supervisor):
+    """
+    Call function after supervisor jobs have completed
+
+    Returns Deferred that fires with return value of `func`
+    """
+    d = supervisor.deferred_pool.notify_when_empty()
+    d.addCallback(lambda _: func())
+    return d
+
+
 class HealthChecker(object):
     """
     A dictionary to store callables that are health checks, that has a single
@@ -137,6 +179,8 @@ def makeService(config):
     """
     set_config_data(dict(config))
 
+    s = MultiService()
+
     if not config_value('mock'):
         seed_endpoints = [
             clientFromString(reactor, str(host))
@@ -176,7 +220,6 @@ def makeService(config):
             retry_interval=config_value('identity.retry_interval')),
         cache_ttl)
 
-    s = MultiService()
     health_checker = HealthChecker({
         'store': getattr(store, 'health_check', None)
     })
@@ -185,6 +228,11 @@ def makeService(config):
     supervisor.setServiceParent(s)
 
     set_supervisor(supervisor)
+
+    # Setup cassandra cluster to disconnect when otter shuts down
+    if 'cassandra_cluster' in locals():
+        s.addService(FunctionalService(stop=partial(call_after_supervisor,
+                                                    cassandra_cluster.disconnect, supervisor)))
 
     otter = Otter(store, health_checker.health_check)
     site = Site(otter.app.resource())
@@ -222,6 +270,9 @@ def makeService(config):
             # and the kz_client is not set in which case policy execution and group
             # delete will fail
             store.kz_client = kz_client
+            # Setup kazoo to stop when shutting down
+            s.addService(FunctionalService(stop=partial(call_after_supervisor,
+                                                        kz_client.stop, supervisor)))
 
         d.addCallback(on_client_ready)
         d.addErrback(log.err, 'Could not start TxKazooClient')

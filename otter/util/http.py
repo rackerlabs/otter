@@ -45,6 +45,17 @@ class RequestError(Exception):
             self.url, self.reason, self.data)
 
 
+def raise_error_on_code(failure, code, error, url, data=None):
+    """
+    Raise `error` if given `code` in APIError.code inside failure matches.
+    Otherwise `RequestError` is raised with `url` and `data`
+    """
+    failure.trap(APIError)
+    if failure.value.code == code:
+        raise error
+    raise RequestError(failure, url, data)
+
+
 def wrap_request_error(failure, target, data=None):
     """
     Some errors, such as connection timeouts, aren't useful becuase they don't
@@ -148,7 +159,65 @@ def get_url_root():
     return config_value('url_root')
 
 
-def get_collection_links(collection, url, rel, limit=None, marker=None):
+def _pagination_link(url, rel, limit, marker):
+    """
+    Generates a link dictionary where the href link has (possibly) limit
+    and marker query parameters, so long as they are not None.
+
+    :param url: URL of the collection
+    :param rel: What to put under 'rel'
+    :param limit: pagination limit
+    :param marker: the current pagination marker
+
+    :return: ``dict`` containing an href and the rel, the href being a link
+        to the collection represented by the url, limit, and marker
+    """
+    # these are tuples, not a dictionary, to ensure consistent ordering of the
+    # url for testing
+    query_params = []
+
+    if marker is not None:
+        query_params = [('marker', marker), ('limit', limit)]
+    elif limit != (config_value('limits.pagination') or 100):
+        query_params.append(('limit', limit))
+
+    if query_params:
+        url = "{0}?{1}".format(url, urlencode(query_params))
+
+    return {'href': url, 'rel': rel}
+
+
+def next_marker_by_offset(collection, limit, marker):
+    """
+    Returns the next marker that is just the current marker offset by the
+    length of the collection or the limit, whichever is smaller
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the offset from the current marker
+    """
+    return (marker or 0) + limit
+
+
+def next_marker_by_id(collection, limit, marker):
+    """
+    Returns the next marker based on the limit-1 item in the collection
+
+    :param collection: an iterable containing the collection to be paginated
+    :param limit: the limit on the collection
+    :marker: the current marker used to obtain this collection
+
+    :return: the next marker that would be used to fetch the next collection,
+        based on the collection item ids
+    """
+    return collection[limit - 1]['id']
+
+
+def get_collection_links(collection, url, rel, limit=None, marker=None,
+                         next_marker=None):
     """
     Return links `dict` for given collection like below. The 'next' link is
     added only if number of items in `collection` has reached `limit`
@@ -173,16 +242,21 @@ def get_collection_links(collection, url, rel, limit=None, marker=None):
 
     :param limit: pagination limit
 
-    :param marker: pagination marker
+    :param marker: the current pagination marker
+
+    :param next_marker: a callable that takes the collection, the limit, and
+        the current marker, and returns the next marker
     """
-    limit = limit or config_value('limits.pagination') or 100
+    if next_marker is None:
+        next_marker = next_marker_by_id
+
     links = []
-    if not marker and rel is not None:
-        links.append({'href': url, 'rel': rel})
+    limit = limit or config_value('limits.pagination') or 100
+    if rel is not None:
+        links.append(_pagination_link(url, rel, limit, marker))
     if len(collection) >= limit:
-        query_params = {'limit': limit, 'marker': collection[limit - 1]['id']}
-        next_url = "{0}?{1}".format(url, urlencode(query_params))
-        links.append({'href': next_url, 'rel': 'next'})
+        links.append(_pagination_link(url, 'next', limit,
+                                      next_marker(collection, limit, marker)))
     return links
 
 

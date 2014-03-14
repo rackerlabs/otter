@@ -7,6 +7,7 @@ import json
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.task import Clock
+from twisted.python.failure import Failure
 
 from otter.worker.launch_server_v1 import (
     private_ip_addresses,
@@ -22,6 +23,7 @@ from otter.worker.launch_server_v1 import (
     remove_from_load_balancer,
     public_endpoint_url,
     UnexpectedServerStatus,
+    ServerDeleted,
     verified_delete,
     LB_MAX_RETRIES, LB_RETRY_INTERVAL
 )
@@ -419,6 +421,7 @@ class LoadBalancersTests(TestCase):
         URL represting the load balancer node.
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=200))
+        self.treq.content.return_value = succeed('')
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
@@ -434,12 +437,66 @@ class LoadBalancersTests(TestCase):
         i.e. it returns 404. It also logs it
         """
         self.treq.delete.return_value = succeed(mock.Mock(code=404))
+        self.treq.content.return_value = succeed(json.dumps({'message': 'LB does not exist'}))
 
         d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
 
         self.assertEqual(self.successResultOf(d), None)
         self.log.msg.assert_any_call(
             'Node to delete does not exist', loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_on_422_LB_deleted(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        has been deleted and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        message = "The load balancer is deleted and considered immutable."
+        body = {"message": message, "code": 422}
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_on_422_Pending_delete(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and ignores if the load balancer
+        is in PENDING_DELETE and is considered immutable (a 422 response with a
+        particular message). It also logs it
+        """
+        message = ("Load Balancer '12345' has a status of 'PENDING_DELETE' and "
+                   "is considered immutable.")
+        body = {"message": message, "code": 422}
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.assertEqual(self.successResultOf(d), None)
+        self.log.msg.assert_any_call(message, loadbalancer_id=12345, node_id=1)
+
+    def test_remove_from_load_balancer_fails_on_422_LB_other(self):
+        """
+        remove_from_load_balancer makes a DELETE request against the
+        URL represting the load balancer node and will fail if the 422 response
+        is not a result of the LB being deleted.
+        """
+        body = {
+            "message": ("Load Balancer '1' has a status of 'ERROR' and is "
+                        "considered immutable."),
+            "code": 422
+        }
+        mock_treq(code=422, content=json.dumps(body), method='delete', treq_mock=self.treq)
+
+        d = remove_from_load_balancer(self.log, 'http://url/', 'my-auth-token', 12345, 1)
+
+        self.failureResultOf(d, RequestError)
+        self.log.msg.assert_any_call(
+            'Got LB error while {m}: {e}', m='remove_node', e=mock.ANY,
+            loadbalancer_id=12345, node_id=1)
 
     def test_removelb_retries(self):
         """
@@ -654,6 +711,17 @@ class ServerTests(TestCase):
 
         self.assertEqual(results, self.treq.json_content.return_value)
 
+    def test_server_details_on_404(self):
+        """
+        server_details will raise a :class:`ServerDeleted` error when it
+        it gets a 404 back in the response
+        """
+        mock_treq(code=404, content='not found', method='get',
+                  treq_mock=self.treq)
+
+        d = server_details('http://url/', 'my-auth-token', 'serverId')
+        self.failureResultOf(d, ServerDeleted)
+
     def test_server_details_propagates_api_failure(self):
         """
         server_details will propagate API failures.
@@ -732,7 +800,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         server_details.assert_called_with('http://url/', 'my-auth-token',
                                           'serverId', log=mock.ANY)
@@ -767,7 +835,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         clock.advance(5)
 
@@ -777,6 +845,45 @@ class ServerTests(TestCase):
         self.assertEqual(failure.value.server_id, 'serverId')
         self.assertEqual(failure.value.status, 'ERROR')
         self.assertEqual(failure.value.expected_status, 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_continues_looping_on_500(self, server_details):
+        """
+        wait_for_active will keep looping if ``server_details`` raises other
+        exceptions, for instance RequestErrors.
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(
+            RequestError(Failure(APIError(500, '', {})), 'url'))
+
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        self.assertNoResult(d)
+        server_details.return_value = succeed({'server': {'status': 'ACTIVE'}})
+
+        clock.advance(5)
+
+        result = self.successResultOf(d)
+        self.assertEqual(result['server']['status'], 'ACTIVE')
+
+    @mock.patch('otter.worker.launch_server_v1.server_details')
+    def test_wait_for_active_stops_looping_on_server_deletion(self, server_details):
+        """
+        wait_for_active will errback it's Deferred if ``server_details`` raises
+        a ``ServerDeletion`` error
+        """
+        clock = Clock()
+
+        server_details.return_value = fail(ServerDeleted('1234'))
+        d = wait_for_active(self.log,
+                            'http://url/', 'my-auth-token', 'serverId',
+                            interval=5, clock=clock)
+
+        failure = self.failureResultOf(d)
+        self.assertTrue(failure.check(ServerDeleted))
 
     @mock.patch('otter.worker.launch_server_v1.server_details')
     def test_wait_for_active_stops_looping_on_error(self, server_details):
@@ -793,7 +900,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
@@ -825,7 +932,7 @@ class ServerTests(TestCase):
 
         d = wait_for_active(self.log,
                             'http://url/', 'my-auth-token', 'serverId',
-                            clock=clock)
+                            interval=5, clock=clock)
 
         # This gets called once immediately then every 5 seconds.
         self.assertEqual(server_details.call_count, 1)
