@@ -122,6 +122,13 @@ class OtterHistory(object):
         def build_response(body):
             events = []
 
+            if 'marker' in paginate:
+                try:
+                    paginate['marker'] = int(paginate['marker'])
+                except:
+                    pass
+
+
             for hit in body['hits']['hits']:
                 fields = hit['_source']
                 event = {'timestamp': fields['@timestamp']}
